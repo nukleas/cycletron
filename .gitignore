@@ -1,0 +1,56 @@
+# Rust / Cargo
+**/target/
+**/*.rs.bk
+Cargo.lock
+
+# Node / Frontend
+**/node_modules/
+**/dist/
+ui/pkg/
+**/.vite/
+
+# Tauri generated
+src-tauri/gen/
+src-tauri/target/
+src-tauri/icons/*.png
+src-tauri/icons/*.icns
+src-tauri/icons/*.ico
+src-tauri/icons/android/
+src-tauri/icons/ios/
+src-tauri/icons/*.png
+
+# Logo / design exploration (temporary)
+tinker/
+
+# Build tools output
+tools/*/node_modules/
+tools/*/dist/
+tools/parity/reports/
+
+# Environment & secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.sublime-*
+
+# Logs
+*.log
+logs/
+
+# WASM / Strudel artifacts that are large or regenerated
+**/*.wasm
+**/*.wat
+
+# Temporary / scratch
+*.tmp
+*.bak
+scratch/

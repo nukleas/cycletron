@@ -1,0 +1,41 @@
+[workspace]
+members = [
+    "crates/robostrudel-core",
+    "crates/robostrudel-agent",
+    "crates/robostrudel-corpus",
+    "src-tauri",
+    "tools/parity/dsl-eval",
+    "tools/parity/corpus-scan",
+    "tools/corpus-check",
+    "tools/midi-inspect",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/naderheidari/robostrudel"
+
+[workspace.dependencies]
+# Internal crates
+robostrudel-core = { path = "crates/robostrudel-core" }
+robostrudel-agent = { path = "crates/robostrudel-agent" }
+robostrudel-corpus = { path = "crates/robostrudel-corpus" }
+# strudel-rs crates (for pattern validation in the backend)
+strudel-core = { path = "../strudel-rs/crates/strudel-core" }
+strudel-mini = { path = "../strudel-rs/crates/strudel-mini", default-features = false }
+strudel-dsl = { path = "../strudel-rs/crates/strudel-dsl" }
+midi-to-strudel = { path = "../strudel-rs/crates/midi-to-strudel" }
+
+# Shared external deps
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+toml = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }

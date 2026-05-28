@@ -1,0 +1,17 @@
+[anthropic]
+# api_key = "sk-..." # Or set ANTHROPIC_API_KEY env var
+model = "claude-sonnet-4-6"
+max_tokens = 8192
+
+[corpus]
+path = "../strudel-corpus"
+# Hand-curated corpus rooted in this repo (gated by `cargo run -p corpus-check`).
+# Loaded first so its entries surface ahead of the bulk corpus.
+curated_path = "corpus"
+
+[audio]
+default_tempo = 120.0
+samples_path = "../strudel-rs/samples/strudel.json"
+
+[ui]
+theme = "dark"

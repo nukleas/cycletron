@@ -1,0 +1,17 @@
+setcpm(25)
+
+// Track 1 (C:major)
+$: note(`<
+    - - - -
+    [- - - - - D5 D5 D5 D5 D5 D5 D5 D5 - C5 -] [C5 A4 - - E5 - D5 - D5 D5 D5 D5 D5 - C5 -] [C5 A4 - - D5 D5 D5 - D5 - D5 D5 E5 - C5 -] [C5 A4 - - E5 - D5 - D5 - D5 D5 E5 - C5 -]>`).sound("gm_soprano_sax").release(0.09).gain(0.79)
+
+// Track 2 (C:major)
+$: note(`<
+    [G4,G5] - [G4,G5] -
+    [A3,C4] [[G3,B3] D4] [F3,A3,C4] [[G3,B3] D4]>`).sound("gm_piano").release(1.37).gain(0.79)
+
+// Track 3 (C:major)
+$: note(`<
+    [A1 - - A1 A1 - A1 - - - A1 - A1 A1 - A1] [A1 - - A1 A1 - A1 - - - A1 - A1 A1 - A1] [A1 - - A1 A1 - A1 - - - A1 - A1 A1 - A1] [A1 - - A1 A1 - A1 - - - A1 - A1 A1 - A1]
+    [A1 - - A1 A1 - A1 - - - A1 - A1 A1 - A1] [A1 - - A1 A1 - A1 - - - A1 - A1 A1 - A1] [A1 - - A1 A1 - A1 - - - A1 - A1 A1 - A1] [A1 - - A1 A1 - A1 - - - A1 - A1 A1 - A1]>`).sound("gm_piano").release(0.17).gain(0.79)
+

@@ -1,0 +1,90 @@
+{
+  "productName": "Robostrudel",
+  "version": "0.1.0",
+  "identifier": "com.nukleas.robostrudel",
+  "build": {
+    "frontendDist": "../ui/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "cd ../ui && npm run dev",
+    "beforeBuildCommand": "cd ../ui && npm run build"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Robostrudel",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "devtools": true,
+        "create": false
+      }
+    ],
+    "security": {
+      "csp": null,
+      "headers": {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Resource-Policy": "same-origin"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "category": "Music",
+    "shortDescription": "AI-first Strudel music engine",
+    "longDescription": "Robostrudel pairs a Strudel WASM REPL with an AI operator that generates and edits live-coded patterns.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["strudel"],
+        "name": "Strudel Pattern",
+        "description": "Robostrudel pattern file",
+        "role": "Editor",
+        "mimeType": "text/plain"
+      },
+      {
+        "ext": ["mid", "midi"],
+        "name": "MIDI File",
+        "description": "Standard MIDI file",
+        "role": "Editor"
+      }
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "entitlements": "Entitlements.plist"
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1"
+        ]
+      }
+    },
+    "iOS": {},
+    "android": {}
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/nukleas/robostrudel/releases/latest/download/latest.json"
+      ],
+      "pubkey": "",
+      "dialog": false
+    }
+  }
+}

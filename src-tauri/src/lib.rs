@@ -1,0 +1,300 @@
+mod agent_loop;
+mod commands;
+mod files;
+mod library;
+mod logs;
+mod menu;
+mod midi;
+mod persistence;
+mod settings;
+mod shortcuts;
+mod snapshots;
+mod state;
+mod strudel;
+mod tray;
+
+
+
+use http_body_util::Full;
+use hyper::body::Bytes;
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper::{Request, Response, StatusCode};
+use hyper_util::rt::TokioIo;
+use rust_embed::RustEmbed;
+use state::AppState;
+use tauri::Manager;
+use tauri::async_runtime;
+use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tokio::net::TcpListener;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt as _;
+use tracing_subscriber::util::SubscriberInitExt as _;
+
+/// Embeds the production frontend (`ui/dist`) at compile time.
+/// This lets us serve it from a real `http://127.0.0.1` origin in production,
+/// which is required for WebKit to expose SharedArrayBuffer + Atomics.
+#[derive(RustEmbed)]
+#[folder = "$CARGO_MANIFEST_DIR/../ui/dist"]
+struct FrontendAssets;
+
+/// Starts a minimal HTTP server on a random localhost port that serves the
+/// embedded `FrontendAssets` and **always** sets the three critical headers
+/// required for SharedArrayBuffer:
+///   - Cross-Origin-Opener-Policy: same-origin
+///   - Cross-Origin-Embedder-Policy: require-corp
+///   - Cross-Origin-Resource-Policy: same-origin
+///
+/// Returns the port it bound to.
+async fn start_local_frontend_server() -> u16 {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("failed to bind local frontend server");
+    let port = listener.local_addr().unwrap().port();
+
+    async_runtime::spawn(async move {
+        loop {
+            let (stream, _) = match listener.accept().await {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!("frontend server accept error: {e}");
+                    continue;
+                }
+            };
+
+            let io = TokioIo::new(stream);
+
+            async_runtime::spawn(async move {
+                let service = service_fn(|req: Request<hyper::body::Incoming>| async move {
+                    serve_embedded_asset(req).await
+                });
+
+                if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+                    tracing::debug!("frontend server connection error: {err}");
+                }
+            });
+        }
+    });
+
+    port
+}
+
+async fn serve_embedded_asset(
+    req: Request<hyper::body::Incoming>,
+) -> Result<Response<Full<Bytes>>, hyper::Error> {
+    let path = req.uri().path().trim_start_matches('/');
+
+    // Default to index.html for SPA-style routing
+    let file_path = if path.is_empty() || path == "index.html" {
+        "index.html"
+    } else {
+        path
+    };
+
+    let file = FrontendAssets::get(file_path);
+
+    let response = if let Some(content) = file {
+        let mime = mime_guess::from_path(file_path).first_or_octet_stream();
+
+        Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", mime.as_ref())
+            // === The magic headers for SharedArrayBuffer ===
+            .header("Cross-Origin-Opener-Policy", "same-origin")
+            .header("Cross-Origin-Embedder-Policy", "require-corp")
+            .header("Cross-Origin-Resource-Policy", "same-origin")
+            .body(Full::from(Bytes::from(content.data.into_owned())))
+            .unwrap()
+    } else {
+        Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header("Cross-Origin-Opener-Policy", "same-origin")
+            .header("Cross-Origin-Embedder-Policy", "require-corp")
+            .header("Cross-Origin-Resource-Policy", "same-origin")
+            .body(Full::from(Bytes::from_static(b"Not Found")))
+            .unwrap()
+    };
+
+    Ok(response)
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    // Compose two layers: stderr fmt for dev, and a bounded ring buffer
+    // so the in-app Logs modal can show recent activity without reaching
+    // out to the OS log facility.
+    let filter = EnvFilter::from_default_env()
+        .add_directive("robostrudel=debug".parse().unwrap());
+    let fmt_layer = tracing_subscriber::fmt::layer().with_writer(std::io::stderr);
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt_layer)
+        .with(logs::InMemoryLayer)
+        .init();
+
+    let app_state = AppState::new();
+
+    tauri::Builder::default()
+        // Single-instance must be registered before any other plugin so a
+        // second launch (e.g. opening a file from Finder) is short-circuited
+        // and its argv forwarded to the existing window.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            crate::commands::handle_second_instance(app, args);
+        }))
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .manage(app_state)
+        .manage(tray::TrayStateHolder::new())
+        .setup(|app| {
+            // Resolve the app data dir (e.g. ~/Library/Application Support/com.nukleas.robostrudel)
+            // and hand it to AppState so recents + session snapshots can persist.
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .unwrap_or_else(|_| std::env::temp_dir().join("robostrudel"));
+            if let Err(e) = std::fs::create_dir_all(&data_dir) {
+                tracing::warn!("could not create app data dir {}: {e}", data_dir.display());
+            }
+
+            let state = app.state::<AppState>();
+            if let Err(e) = state.initialize(data_dir) {
+                tracing::error!("initialization failed: {e}");
+            }
+
+            // Native menu — emits `menu:<action>` events consumed by the frontend.
+            let recents = app
+                .state::<AppState>()
+                .recents
+                .lock()
+                .unwrap()
+                .entries
+                .clone();
+            let menu = menu::build_app_menu(app.handle(), &recents)?;
+            app.set_menu(menu)?;
+            let handle = app.handle().clone();
+            app.on_menu_event(move |_window, event| {
+                menu::handle_menu_event(&handle, event);
+            });
+
+            // System tray — playback transport + show/quit.
+            match tray::build_tray(app.handle()) {
+                Ok(tray_state) => {
+                    let holder = app.state::<tray::TrayStateHolder>();
+                    *holder.play_pause.lock().unwrap() = Some(tray_state.play_pause_item);
+                }
+                Err(e) => tracing::warn!("tray setup failed: {e}"),
+            }
+
+            // System-wide shortcuts (Cmd+Shift+Space, etc.).
+            if let Err(e) = shortcuts::register_defaults(app.handle()) {
+                tracing::warn!("global shortcuts setup failed: {e}");
+            }
+
+            // External-change watcher: emits `file-externally-changed`
+            // whenever the current session file's mtime changes on disk.
+            commands::spawn_external_change_watcher(app.handle().clone());
+
+            // === Proper fix for SharedArrayBuffer in production ===
+            // On macOS WKWebView, the `tauri://localhost` scheme does not expose
+            // SharedArrayBuffer/Atomics even with COOP/COEP headers.
+            //
+            // Solution: In release builds we serve the embedded frontend over a
+            // real `http://127.0.0.1` origin (with the three required headers
+            // injected on every response). This makes WebKit grant full SAB support.
+            //
+            // In debug builds we keep pointing at the Vite dev server (fast HMR).
+            let main_window = if cfg!(debug_assertions) {
+                // Dev: use Vite dev server (headers already set in vite.config.ts)
+                WebviewWindowBuilder::new(
+                    app,
+                    "main",
+                    WebviewUrl::External(
+                        app.config()
+                            .build
+                            .dev_url
+                            .clone()
+                            .expect("devUrl must be set for debug builds")
+                            .to_string()
+                            .parse()
+                            .unwrap(),
+                    ),
+                )
+                .title("Robostrudel")
+                .inner_size(1400.0, 900.0)
+                .min_inner_size(900.0, 600.0)
+                .resizable(true)
+                .build()?
+            } else {
+                // Production: start our own localhost HTTP server that
+                // guarantees the COOP/COEP + CORP headers.
+                // We use block_on here because setup() is synchronous.
+                let port = async_runtime::block_on(start_local_frontend_server());
+                let url = format!("http://127.0.0.1:{}/index.html", port);
+
+                tracing::info!("Production frontend served at {}", url);
+
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse().unwrap()))
+                    .title("Robostrudel")
+                    .inner_size(1400.0, 900.0)
+                    .min_inner_size(900.0, 600.0)
+                    .resizable(true)
+                    .build()?
+            };
+
+            // Keep a reference so the window doesn't get dropped immediately.
+            // (Tauri keeps windows alive as long as the handle exists.)
+            std::mem::forget(main_window);
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::send_message,
+            commands::validate_pattern,
+            commands::search_corpus,
+            commands::get_corpus_source,
+            commands::get_pattern_history,
+            commands::get_config,
+            commands::clear_session,
+            commands::open_file,
+            commands::save_current,
+            commands::save_as,
+            commands::new_file,
+            commands::is_dirty,
+            commands::get_current_file,
+            commands::get_recents,
+            commands::clear_recents,
+            commands::session_undo,
+            commands::session_redo,
+            commands::get_library_root,
+            commands::set_library_root,
+            commands::list_library,
+            commands::create_library_folder,
+            commands::create_library_file,
+            commands::delete_library_path,
+            commands::rename_library_path,
+            commands::reveal_in_os,
+            persistence::autosave_session,
+            persistence::restore_session,
+            tray::tray_set_playback,
+            commands::import_midi,
+            commands::inspect_midi,
+            commands::save_midi_to_library,
+            commands::get_user_settings,
+            commands::set_user_settings,
+            commands::get_app_info,
+            commands::write_binary_file,
+            commands::list_snapshots,
+            commands::read_snapshot,
+            commands::get_logs,
+            commands::clear_logs,
+            commands::diagnostic_dump,
+            commands::set_dock_badge,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

@@ -1,0 +1,46 @@
+[package]
+name = "robostrudel-app"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+robostrudel-core = { workspace = true }
+robostrudel-agent = { workspace = true }
+robostrudel-corpus = { workspace = true }
+strudel-dsl = { workspace = true }
+strudel-mini = { workspace = true, default-features = false }
+midi-to-strudel = { workspace = true }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-opener = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-store = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# For proper production SAB support:
+# We embed the frontend and serve it over real http://127.0.0.1 so WebKit
+# properly exposes SharedArrayBuffer + Atomics (tauri:// scheme does not).
+rust-embed = { version = "8", features = ["interpolate-folder-path"] }
+mime_guess = "2"
+hyper = { version = "1", features = ["full"] }
+http-body-util = "0.1"
+hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
+tower = { version = "0.4", features = ["util"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[lib]
+name = "robostrudel_app"
+crate-type = ["lib", "staticlib", "cdylib"]

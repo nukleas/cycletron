@@ -1,0 +1,16 @@
+[package]
+name = "corpus-scan"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "corpus-scan"
+path = "main.rs"
+
+[dependencies]
+strudel-dsl = { workspace = true }
+strudel-mini = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+walkdir = "2"
+regex = "1"

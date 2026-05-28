@@ -1,0 +1,20 @@
+setcpm(30)
+
+$: note(`<
+    - - - -
+    - - - ->`).sound("gm_tremolo_strings")
+
+$: note(`<
+    - - - -
+    - - - ->`).sound("gm_tremolo_strings")
+
+// Track 3 (C:chromatic)
+$: note(`<
+    - - - [- - - - - C#3 C#3 E3]
+    [C#3 C#3 - - - C#3 C#3 E3] [C#3 C#3 - - - C#3 C#3 E3] [C#3 C#3 - - - C#3 C#3 E3] [F#3 G#3 F#3 - - G#3 G#3 F#3]>`).sound("gm_tremolo_strings").release(0.22).gain(0.79)
+
+// Track 4 (C:chromatic)
+$: note(`<
+    [C#3 C#3 E3 - G#2 - - -] [C#3 C#3 E3 - G#2 - - -] [C#3 C#3 E3 - G#2 - - -] [C#3 C#3 E3 - G#2 - - -]
+    [C#3 C#3 E3 - G#2 - - -] [C#3 C#3 E3 - G#2 - - -] [C#3 C#3 E3 - G#2 - - -] [C#3 C#3 E3 - G#2 - - -]>`).sound("gm_tremolo_strings").release(0.07).gain(0.79)
+

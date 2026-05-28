@@ -1,0 +1,93 @@
+/**
+ * About modal — shows app metadata fetched from the Rust `get_app_info`
+ * command. Triggered by Help → About and the `ui:about` custom event.
+ */
+
+import type {AppInfo} from './types/tauri-commands.js';
+import {dismissibleModal} from './modal-utils.js';
+
+const isTauri = !!(window as any).__TAURI__;
+
+export class AboutModal {
+    private root: HTMLElement | null = null;
+    private versionEl: HTMLElement | null = null;
+    private identifierEl: HTMLElement | null = null;
+    private tauriEl: HTMLElement | null = null;
+    private inited = false;
+    private cleanup: (() => void) | null = null;
+
+    init(): void {
+        if (this.inited) return;
+        this.root = document.getElementById('aboutModal');
+        if (!this.root) return;
+        this.versionEl = document.getElementById('aboutVersion');
+        this.identifierEl = document.getElementById('aboutIdentifier');
+        this.tauriEl = document.getElementById('aboutTauri');
+
+        document.getElementById('aboutDocsBtn')?.addEventListener('click', () => {
+            void openExternal('https://strudel.cc/learn/');
+        });
+        document.getElementById('aboutCheckUpdates')?.addEventListener('click', () => {
+            this.close();
+            document.dispatchEvent(new CustomEvent('updater:check'));
+        });
+        this.inited = true;
+    }
+
+    async open(): Promise<void> {
+        this.init();
+        if (!this.root) return;
+        await this.populate();
+        this.root.hidden = false;
+        this.cleanup = dismissibleModal(this.root, () => this.close());
+    }
+
+    close(): void {
+        if (!this.root) return;
+        this.root.hidden = true;
+        this.cleanup?.();
+        this.cleanup = null;
+    }
+
+    private async populate(): Promise<void> {
+        if (!isTauri) {
+            this.set(this.versionEl, 'dev');
+            this.set(this.identifierEl, 'browser');
+            this.set(this.tauriEl, '—');
+            return;
+        }
+        try {
+            const info = await invoke<AppInfo>('get_app_info');
+            this.set(this.versionEl, info.version);
+            this.set(this.identifierEl, info.identifier);
+            this.set(this.tauriEl, info.tauri_version);
+        } catch (e) {
+            console.warn('[about] get_app_info failed:', e);
+        }
+    }
+
+    private set(el: HTMLElement | null, text: string): void {
+        if (el) el.textContent = text;
+    }
+}
+
+async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+    const api = (window as any).__TAURI__?.core;
+    if (!api) throw new Error('Tauri not available');
+    return api.invoke(cmd, args);
+}
+
+async function openExternal(url: string): Promise<void> {
+    if (!isTauri) {
+        window.open(url, '_blank', 'noopener');
+        return;
+    }
+    try {
+        await (window as any).__TAURI__.core.invoke('plugin:opener|open_url', {url});
+    } catch (e) {
+        console.warn('[about] open external failed:', e);
+    }
+}
+
+export const aboutModal = new AboutModal();
+(window as any).aboutModal = aboutModal;

@@ -1,0 +1,14 @@
+[package]
+name = "corpus-check"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "corpus-check"
+path = "main.rs"
+
+[dependencies]
+strudel-dsl = { workspace = true }
+strudel-mini = { workspace = true }
+strudel-core = { workspace = true }
+walkdir = "2"

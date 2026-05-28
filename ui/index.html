@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robostrudel</title>
+    <link rel="icon" href="data:,">
+    <!-- COOP/COEP are set by the server: Vite (dev) via server.headers,
+         Tauri (prod) via app.security.headers. No service-worker shim
+         needed — in a Tauri WKWebView, the coi-serviceworker triggers a
+         reload loop that can leave SharedArrayBuffer permanently unreachable. -->
+    <link rel="stylesheet" href="style.css">
+    <script src="restore-saved.min.js" vite-ignore></script>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <h1>Robostrudel</h1>
+            <span class="badge rust">RUST</span>
+            <span class="badge">WASM</span>
+            <span class="badge badge-live">SAB</span>
+        </div>
+
+        <div class="controls">
+            <div class="transport-group">
+                <button id="transportBtn" class="primary" disabled>▶ Play</button>
+                <button id="stopBtn" class="danger" disabled>■ Stop</button>
+                <button id="metronomeBtn" class="metronome-btn" title="Metronome off" aria-label="Metronome">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 22h14"/>
+                        <path d="M6 22 9 4h6l3 18"/>
+                        <line x1="12" y1="6" x2="12" y2="16"/>
+                    </svg>
+                </button>
+                <span id="midiInStatus" class="midi-in-status" hidden title="MIDI input"></span>
+            </div>
+             <div class="slider-group">
+                <div class="bpm-control">
+                    <label for="bpmSlider">BPM:</label>
+                    <input type="range" id="bpmSlider" min="30" max="300" value="120" aria-label="Beats per minute">
+                    <input
+                        type="number"
+                        class="bpm-value"
+                        id="bpmValue"
+                        min="30"
+                        max="300"
+                        value="120"
+                        title="Click to type a BPM (30–300)"
+                        aria-label="BPM value"
+                    >
+                </div>
+
+                <div class="gain-control">
+                    <label for="gainSlider">Vol:</label>
+                    <input type="range" id="gainSlider" min="0" max="200" value="100" aria-label="Master volume">
+                    <span id="gainValue">100%</span>
+                </div>
+
+
+            </div>
+        </div>
+    </header>
+
+    <div class="app-body">
+        <!-- AI Chat Panel (outside main grid) -->
+        <div class="ai-panel" id="aiPanel">
+            <div class="ai-panel-header">
+                <span>AI Operator</span>
+                <div class="ai-panel-actions">
+                    <button id="aiClear" class="ai-action-btn" title="New song / clear chat">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                        New
+                    </button>
+                    <button id="aiToggle" class="ai-toggle" title="Toggle AI panel">&#9664;</button>
+                </div>
+            </div>
+            <div id="aiMessages" class="ai-messages"></div>
+            <div id="aiQuickPrompts" class="ai-quick-prompts">
+                <button class="ai-quick" data-prompt="add a melody">+ melody</button>
+                <button class="ai-quick" data-prompt="add drums">+ drums</button>
+                <button class="ai-quick" data-prompt="add a bassline">+ bass</button>
+                <button class="ai-quick" data-prompt="make it darker">darker</button>
+                <button class="ai-quick" data-prompt="add reverb and delay effects">+ fx</button>
+                <button class="ai-quick" data-prompt="speed it up">faster</button>
+            </div>
+            <form id="aiForm" class="ai-form">
+                <input
+                    id="aiInput"
+                    type="text"
+                    placeholder="Describe the music you want..."
+                    autocomplete="off"
+                />
+                <button type="submit">Send</button>
+            </form>
+        </div>
+
+        <!-- File Explorer Panel -->
+        <div class="files-panel" id="filesPanel">
+            <div class="files-panel-header">
+                <span class="files-panel-title">File System</span>
+                <div class="files-panel-actions">
+                    <button id="filesNewFile" class="files-action-btn" title="New file" aria-label="New file">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="13" x2="12" y2="19"/>
+                            <line x1="9" y1="16" x2="15" y2="16"/>
+                        </svg>
+                    </button>
+                    <button id="filesNewFolder" class="files-action-btn" title="New folder" aria-label="New folder">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                            <line x1="12" y1="11" x2="12" y2="17"/>
+                            <line x1="9" y1="14" x2="15" y2="14"/>
+                        </svg>
+                    </button>
+                    <button id="filesMidiImport" class="files-action-btn" title="Import MIDI…" aria-label="Import MIDI">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="6" width="20" height="12" rx="1"/>
+                            <line x1="7" y1="6" x2="7" y2="14"/>
+                            <line x1="11" y1="6" x2="11" y2="14"/>
+                            <line x1="15" y1="6" x2="15" y2="14"/>
+                            <line x1="19" y1="6" x2="19" y2="14"/>
+                        </svg>
+                    </button>
+                    <button id="filesRefresh" class="files-action-btn" title="Refresh" aria-label="Refresh">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                        </svg>
+                    </button>
+                    <button id="filesChangeRoot" class="files-action-btn" title="Change library location" aria-label="Change library location">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                    </button>
+                    <button id="filesToggle" class="files-toggle" title="Toggle files panel" aria-label="Toggle files panel">&#9664;</button>
+                </div>
+            </div>
+            <div id="fileTree" class="file-tree" role="tree"></div>
+            <div class="files-panel-footer">
+                <span class="files-root-label" id="filesRootLabel" title=""></span>
+            </div>
+        </div>
+        <div class="file-context-menu" id="fileContextMenu" hidden></div>
+
+        <main>
+        <div class="editor-panel">
+            <div class="panel-header">
+                <span>Pattern Console</span>
+                <div class="shortcuts">
+                    <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> Play</span>
+                    <span><kbd>Esc</kbd> Stop</span>
+                    <span><kbd>⌘</kbd>+<kbd>O</kbd> Open</span>
+                    <span><kbd>⌘</kbd>+<kbd>S</kbd> Save</span>
+                </div>
+                <div class="panel-header-right">
+                    <button id="historyBtn" class="copy-btn" title="Snapshots of this file (saved on every save)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 3v6h6"/>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                            <path d="M12 7v5l3 2"/>
+                        </svg>
+                        <span class="btn-text">History</span>
+                    </button>
+                    <div class="record-group" title="Record live audio to WAV. Leave bars empty for manual stop.">
+                        <button id="recordBtn" class="copy-btn record-btn">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <circle cx="12" cy="12" r="6"/>
+                            </svg>
+                            <span class="btn-text">Rec</span>
+                        </button>
+                        <input id="recordBars" type="number" min="0" step="1" placeholder="bars" class="record-bars" aria-label="Auto-stop after N bars">
+                        <span id="recordStatus" class="record-status" aria-live="polite"></span>
+                    </div>
+                    <button id="editorMidiBtn" class="copy-btn" title="Open MIDI Lab — convert .mid files to Strudel">
+                        <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <rect x="2" y="6" width="20" height="12" rx="1"/>
+                            <line x1="7" y1="6" x2="7" y2="14"/>
+                            <line x1="11" y1="6" x2="11" y2="14"/>
+                            <line x1="15" y1="6" x2="15" y2="14"/>
+                            <line x1="19" y1="6" x2="19" y2="14"/>
+                        </svg>
+                        <span class="btn-text">MIDI</span>
+                    </button>
+                    <button id="copyBtn" class="copy-btn" title="Copy to clipboard">
+                        <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                        </svg>
+                        <span class="btn-text">Copy</span>
+                    </button>
+                    <div class="editor-zoom">
+                        <button id="editorZoomOut" title="Decrease font size (Ctrl+-)">−</button>
+                        <span id="editorZoomValue"></span>
+                        <button id="editorZoomIn"  title="Increase font size (Ctrl+=)">+</button>
+                    </div>
+                </div>
+            </div>
+            <div id="editor"></div>
+            <div id="error"></div>
+        </div>
+
+        <div id="resizeHandle"></div>
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <h3>Sequence Grid</h3>
+                <div id="visualizer"></div>
+                <div class="viz-controls">
+                    <label for="vizMode" class="sr-only">Visualization mode</label>
+                    <select id="vizMode" aria-label="Visualization mode">
+                        <option value="cycle">Cycle View</option>
+                        <option value="piano">Piano Roll</option>
+                        <option value="waveform">Waveform</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Signal Scope</h3>
+                <div id="scope"></div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Runtime</h3>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-label">Cycle</div>
+                        <div class="stat-value" id="cycleCount">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Voices</div>
+                        <div class="stat-value" id="voiceCount">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Samples</div>
+                        <div class="stat-value" id="sampleCount">-</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">BPM</div>
+                        <div class="stat-value" id="bpmDisplay">120</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section" id="corpusPanel">
+                <h3>Corpus <span id="corpusCount" class="section-count"></span></h3>
+                <div class="corpus-controls">
+                    <input id="corpusSearch" type="search" placeholder="search tags, sounds, title…" autocomplete="off">
+                </div>
+                <div id="corpusResults" class="corpus-results"></div>
+            </div>
+
+            <div class="sidebar-section sidebar-browse">
+                <button id="browseExamples" class="browse-btn">
+                    <span class="browse-icon">&#9654;</span>
+                    Browse Examples
+                    <span class="browse-hint" id="examplesCount"></span>
+                </button>
+                <div class="synths-compact">
+                    <span class="synths-label">Synths:</span>
+                    <code>sine</code> <code>triangle</code> <code>sawtooth</code>
+                    <code>square</code> <code>fm</code> <code>supersaw</code>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span id="status">Press Play to begin</span>
+            <span class="status-file" id="currentFileName">untitled</span>
+            <span class="live" id="liveIndicator"></span>
+        </div>
+    </main>
+    </div><!-- .app-body -->
+
+    <!-- Command Palette -->
+    <div id="commandPalette" class="cmd-palette" hidden role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="cmd-palette-backdrop" data-dismiss></div>
+        <div class="cmd-palette-window" role="document">
+            <input id="cmdPaletteInput" type="text" class="cmd-palette-input" placeholder="Type a command, file, or recent…" autocomplete="off" spellcheck="false">
+            <div id="cmdPaletteList" class="cmd-palette-list" role="listbox"></div>
+            <div class="cmd-palette-footer">
+                <span><kbd>↑↓</kbd> navigate</span>
+                <span><kbd>Enter</kbd> run</span>
+                <span><kbd>Esc</kbd> close</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Welcome (first-run) modal -->
+    <div id="welcomeModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window" role="document">
+            <div class="app-modal-header">
+                <span id="welcomeTitle">Welcome</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="welcome-body">
+                <div class="welcome-step" data-step="0">
+                    <h3>Robostrudel</h3>
+                    <p>AI-first strudel music engine. A quick tour, then you're free.</p>
+                    <ul class="welcome-list">
+                        <li><span class="welcome-key">⌘⇧P</span> command palette — every action, every file</li>
+                        <li><span class="welcome-key">⌘O</span> / <span class="welcome-key">⌘S</span> open / save</li>
+                        <li><span class="welcome-key">⌘↩</span> play · <span class="welcome-key">Esc</span> stop</li>
+                        <li><span class="welcome-key">⌘F</span> find · <span class="welcome-key">⌘⇧F</span> replace</li>
+                    </ul>
+                </div>
+                <div class="welcome-step" data-step="1" hidden>
+                    <h3>Anthropic API key</h3>
+                    <p>Paste your key to enable the AI composer. You can change this any time in Preferences.</p>
+                    <label class="welcome-field">
+                        <span>API key</span>
+                        <input type="password" id="welcomeApiKey" placeholder="sk-…" autocomplete="off" spellcheck="false">
+                    </label>
+                    <p class="prefs-note">Leave blank to read <code>ANTHROPIC_API_KEY</code> from the environment instead.</p>
+                </div>
+                <div class="welcome-step" data-step="2" hidden>
+                    <h3>Library location</h3>
+                    <p>Where Robostrudel keeps the patterns you save and the MIDI conversions you import. You can move it later from Preferences.</p>
+                    <div class="prefs-row">
+                        <code id="welcomeLibraryRoot" class="prefs-path">—</code>
+                        <button id="welcomeChangeLibrary" class="prefs-inline-btn" type="button">Change…</button>
+                    </div>
+                </div>
+                <div class="welcome-step" data-step="3" hidden>
+                    <h3>You're all set</h3>
+                    <p>The cyan panel on the left is the AI Operator; the next one is your file system. The toolbar above the editor has Record, MIDI Lab, and History.</p>
+                    <p>If anything breaks, Help → Show Logs gives you a copy-and-paste diagnostic dump for bug reports.</p>
+                </div>
+            </div>
+            <div class="app-modal-actions welcome-actions">
+                <span id="welcomeStepLabel" class="welcome-step-label">1 / 4</span>
+                <span class="app-modal-spacer"></span>
+                <button id="welcomeBack">Back</button>
+                <button id="welcomeNext" class="app-modal-primary">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs modal -->
+    <div id="logsModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="logsTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window logs-window" role="document">
+            <div class="app-modal-header">
+                <span id="logsTitle">Logs</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="logs-body">
+                <div class="logs-toolbar">
+                    <span id="logsCount">0 entries</span>
+                    <span class="app-modal-spacer"></span>
+                    <button id="logsRefresh" class="prefs-inline-btn" type="button">Refresh</button>
+                    <button id="logsClear" class="prefs-inline-btn" type="button">Clear</button>
+                </div>
+                <pre id="logsContent"></pre>
+            </div>
+            <div class="app-modal-actions">
+                <button data-dismiss>Close</button>
+                <span class="app-modal-spacer"></span>
+                <button id="logsCopyDump" class="app-modal-primary">Copy Diagnostic Dump</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History modal -->
+    <div id="historyModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window history-modal-window" role="document">
+            <div class="app-modal-header">
+                <span id="historyTitle">Version History</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="history-body">
+                <div class="history-list" id="historyList"></div>
+                <div class="history-preview">
+                    <pre id="historyPreview"></pre>
+                </div>
+            </div>
+            <div class="app-modal-actions">
+                <button data-dismiss>Cancel</button>
+                <span class="app-modal-spacer"></span>
+                <button id="historyRestore" class="app-modal-primary" disabled>Restore</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- About modal -->
+    <div id="aboutModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window app-modal-window--small" role="document">
+            <div class="app-modal-header">
+                <span id="aboutTitle">About</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="about-modal-body">
+                <div class="about-logo">ROBO<span class="about-logo-accent">STRUDEL</span></div>
+                <div class="about-tagline">AI-first strudel music engine</div>
+                <dl class="about-grid">
+                    <dt>Version</dt><dd id="aboutVersion">—</dd>
+                    <dt>Identifier</dt><dd id="aboutIdentifier">—</dd>
+                    <dt>Tauri</dt><dd id="aboutTauri">—</dd>
+                </dl>
+                <div class="about-links">
+                    <button id="aboutDocsBtn" class="app-modal-link">Strudel Docs</button>
+                    <button id="aboutCheckUpdates" class="app-modal-link">Check for Updates</button>
+                </div>
+            </div>
+            <div class="app-modal-actions">
+                <span class="app-modal-spacer"></span>
+                <button data-dismiss class="app-modal-primary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preferences modal -->
+    <div id="prefsModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="prefsTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window" role="document">
+            <div class="app-modal-header">
+                <span id="prefsTitle">Preferences</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="prefs-body">
+                <section class="prefs-section">
+                    <h4>AI</h4>
+                    <label class="prefs-field">
+                        <span>Anthropic API key</span>
+                        <input type="password" id="prefsApiKey" placeholder="sk-…" autocomplete="off" spellcheck="false">
+                    </label>
+                    <label class="prefs-field">
+                        <span>Model</span>
+                        <input type="text" id="prefsModel" placeholder="claude-sonnet-4-20250514" autocomplete="off" spellcheck="false">
+                    </label>
+                    <label class="prefs-field">
+                        <span>Max tokens</span>
+                        <input type="number" id="prefsMaxTokens" min="256" max="32000" step="256" placeholder="4096">
+                    </label>
+                </section>
+                <section class="prefs-section">
+                    <h4>Audio</h4>
+                    <label class="prefs-field">
+                        <span>Default tempo (BPM)</span>
+                        <input type="number" id="prefsDefaultTempo" min="30" max="300" step="1" placeholder="120">
+                    </label>
+                    <div class="prefs-field prefs-field-wide">
+                        <div class="prefs-row">
+                            <span>Output device</span>
+                            <button id="prefsAudioRefresh" class="prefs-inline-btn" type="button">Refresh</button>
+                        </div>
+                        <select id="prefsAudioOutput">
+                            <option value="">System default</option>
+                        </select>
+                    </div>
+                    <label class="prefs-field">
+                        <span>Metronome volume</span>
+                        <input type="range" id="prefsMetronomeVolume" min="0" max="100" step="1" value="40">
+                    </label>
+                </section>
+                <section class="prefs-section">
+                    <h4>MIDI Input</h4>
+                    <div class="prefs-field prefs-field-wide">
+                        <div class="prefs-row">
+                            <span>Device</span>
+                            <button id="prefsMidiRefresh" class="prefs-inline-btn" type="button">Refresh</button>
+                        </div>
+                        <select id="prefsMidiInput">
+                            <option value="">All inputs</option>
+                        </select>
+                    </div>
+                    <label class="prefs-field">
+                        <span>CC → master gain</span>
+                        <input type="number" id="prefsMidiCcGain" min="0" max="127" step="1" placeholder="7">
+                    </label>
+                    <label class="prefs-field">
+                        <span>CC → BPM</span>
+                        <input type="number" id="prefsMidiCcBpm" min="0" max="127" step="1" placeholder="74">
+                    </label>
+                </section>
+                <section class="prefs-section">
+                    <h4>Library</h4>
+                    <div class="prefs-field prefs-field-wide">
+                        <span>Library root</span>
+                        <div class="prefs-row">
+                            <code id="prefsLibraryRoot" class="prefs-path">—</code>
+                            <button id="prefsChangeLibrary" class="prefs-inline-btn">Change…</button>
+                        </div>
+                    </div>
+                </section>
+                <section class="prefs-section">
+                    <h4>Notifications</h4>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsNotifications">
+                        <span>Show system notifications</span>
+                    </label>
+                </section>
+                <section class="prefs-section">
+                    <h4>Updates</h4>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsAutoCheck">
+                        <span>Check for updates on startup</span>
+                    </label>
+                    <p class="prefs-note">Update endpoints are configured at build time in <code>tauri.conf.json</code> under <code>plugins.updater.endpoints</code>. <a href="https://v2.tauri.app/plugin/updater/" target="_blank" rel="noopener">Configure a release pipeline →</a></p>
+                </section>
+            </div>
+            <div class="app-modal-actions">
+                <button data-dismiss>Cancel</button>
+                <span class="app-modal-spacer"></span>
+                <button id="prefsSave" class="app-modal-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MIDI Lab modal -->
+    <div id="midiLab" class="midi-lab" hidden role="dialog" aria-modal="true" aria-labelledby="midiLabTitle">
+        <div class="midi-lab-backdrop" id="midiLabBackdrop"></div>
+        <div class="midi-lab-window" role="document">
+            <div class="midi-lab-header">
+                <span id="midiLabTitle">MIDI LAB</span>
+                <button class="midi-lab-close" id="midiLabClose" aria-label="Close">×</button>
+            </div>
+            <div class="midi-lab-fileline">
+                <button id="midiLabBrowse" class="midi-lab-browse">Browse…</button>
+                <span id="midiLabFileName" class="midi-lab-filename">no file</span>
+                <span id="midiLabMeta" class="midi-lab-meta"></span>
+            </div>
+            <div class="midi-lab-body">
+                <div class="midi-lab-tracks">
+                    <h4>Tracks</h4>
+                    <div id="midiLabTrackList" class="midi-lab-track-list">
+                        <div class="midi-lab-track-empty">Select a .mid file to inspect tracks.</div>
+                    </div>
+                </div>
+                <div class="midi-lab-options">
+                    <h4>Options</h4>
+                    <label class="midi-lab-field">
+                        <span>Drum bank</span>
+                        <select id="midiLabDrumBank">
+                            <option value="simple" selected>Simple</option>
+                            <option value="808">TR-808</option>
+                            <option value="909">TR-909</option>
+                            <option value="707">TR-707</option>
+                            <option value="linn">LinnDrum</option>
+                            <option value="dmx">Oberheim DMX</option>
+                            <option value="auto">Auto</option>
+                        </select>
+                    </label>
+                    <label class="midi-lab-field">
+                        <span>Instruments</span>
+                        <select id="midiLabInstrument">
+                            <option value="hybrid" selected>Hybrid</option>
+                            <option value="waveforms">Waveforms</option>
+                            <option value="gm">GM Soundfonts</option>
+                            <option value="auto">Auto</option>
+                        </select>
+                    </label>
+                    <label class="midi-lab-field midi-lab-check">
+                        <input type="checkbox" id="midiLabAutoRes" checked>
+                        <span>Auto resolution</span>
+                    </label>
+                    <label class="midi-lab-field">
+                        <span>Notes/bar</span>
+                        <input type="number" id="midiLabNotesPerBar" min="4" max="128" step="4" value="64" disabled>
+                    </label>
+                    <label class="midi-lab-field">
+                        <span>Bar limit</span>
+                        <input type="number" id="midiLabBarLimit" min="0" max="999" value="0">
+                    </label>
+                    <label class="midi-lab-field midi-lab-check">
+                        <input type="checkbox" id="midiLabCompact">
+                        <span>Compact repeats (!)</span>
+                    </label>
+                    <label class="midi-lab-field midi-lab-check">
+                        <input type="checkbox" id="midiLabDetectDrums" checked>
+                        <span>Detect drum names</span>
+                    </label>
+                </div>
+            </div>
+            <div class="midi-lab-preview">
+                <div class="midi-lab-preview-header">
+                    <h4>Preview</h4>
+                    <span id="midiLabPreviewHint" class="midi-lab-preview-hint">Click <em>Preview</em> to generate.</span>
+                </div>
+                <pre id="midiLabPreview"></pre>
+            </div>
+            <div class="midi-lab-actions">
+                <button id="midiLabCancel">Cancel</button>
+                <span class="midi-lab-spacer"></span>
+                <button id="midiLabPreviewBtn">Preview</button>
+                <button id="midiLabOpen">Open in Editor</button>
+                <button id="midiLabSave" class="midi-lab-primary">Save to Library</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="src/app.ts"></script>
+    <script type="module" src="src/ai-bridge.ts"></script>
+    <script type="module" src="src/boot.ts"></script>
+</body>
+</html>

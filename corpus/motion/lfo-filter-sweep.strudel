@@ -1,0 +1,11 @@
+// Slow LFO sweeping the lowpass: classic synth wash.
+// `slow(2)` stretches the sine over two cycles for a 2-bar phrase.
+setbpm(110);
+
+note("c3 g3 c4 g4")
+  .s("sawtooth")
+  .cutoff(sine.range(300, 3000).slow(2))
+  .resonance(0.5)
+  .attack(0.02)
+  .release(0.5)
+  .gain(0.55)

@@ -1,0 +1,10 @@
+// Jazz ii–V–I in F major: Gm7 → C7 → Fmaj7.
+// `chord(...)` quality suffixes resolve to seventh-chord stacks.
+setbpm(110);
+
+chord("<Gm7 C7 FM7 FM7>")
+  .s("triangle")
+  .attack(0.05)
+  .release(0.7)
+  .cutoff(1500)
+  .gain(0.5)

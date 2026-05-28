@@ -1,0 +1,12 @@
+setcpm(25)
+
+// Track 1: Melody (C:major)
+$: note(`<
+    [[A3,A2] - - [A3,A2] - - [A3,A2] - [A3,A2] - - [A3,A2] - - [A3,A2] -] [[A3,A2] - - [A3,A2] - - [A3,A2] - [A3,A2] - - [A3,A2] - - [A3,A2] -] [[A3,A2] - - [A3,A2] - - [A3,A2] - [A3,A2] - - [A3,A2] - - [A3,A2] -] [[C4,C3] - - [C4,C3] - - [C4,C3] - [C4,C3] - - [C4,C3] - - [C4,C3] -]
+    [[C4,C3] - - [C4,C3] - - [C4,C3] - [C4,C3] - - [C4,C3] - - [C4,C3] -] [[D4,D3] - - [D4,D3] - - [D4,D3] - [D4,D3] - - [D4,D3] - - [D4,D3] -] [[D4,D3] - - [D4,D3] - - [D4,D3] - [D4,D3] - - [D4,D3] - - [D4,D3] -] [[E4,E3] - - [E4,E3] - - [E4,E3] - [E4,E3] - - [E4,E3] - - [E4,E3] -]>`).sound("gm_acoustic_guitar_nylon").release(0.05).gain(0.78).room(0.50)
+
+// Track 2: Bass (C:major)
+$: note(`<
+    - F2 - A2
+    - F2 [- - - C3] A2>`).sound("sine").release(1.43).gain(0.91)
+

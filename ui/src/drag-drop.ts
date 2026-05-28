@@ -1,0 +1,89 @@
+/**
+ * Tauri drag-drop: dropping a .strudel or .js file onto the window loads it.
+ *
+ * Tauri v2 emits three related events on the webview:
+ *   - tauri://drag-enter   (preview of paths)
+ *   - tauri://drag-leave
+ *   - tauri://drag-drop    (final — contains paths)
+ */
+
+import {fileManager} from './file-manager.js';
+import {midiLab} from './midi-lab.js';
+
+const isTauri = !!(window as any).__TAURI__;
+const STRUDEL_EXT = /\.(strudel|js)$/i;
+const MIDI_EXT = /\.(mid|midi)$/i;
+
+// Tracks the last seen Shift state — Tauri drag-drop events don't carry
+// modifier flags, so we sample whatever keydown last told us.
+let shiftHeld = false;
+
+export async function initDragDrop(): Promise<void> {
+    if (!isTauri) return;
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Shift') shiftHeld = true;
+    }, true);
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'Shift') shiftHeld = false;
+    }, true);
+
+    const {getCurrentWebview} = await import('@tauri-apps/api/webview');
+    const webview = getCurrentWebview();
+
+    await webview.onDragDropEvent((e: any) => {
+        const type = e.payload?.type;
+        if (type === 'enter' || type === 'over') {
+            document.body.classList.add('is-drop-target');
+            return;
+        }
+        if (type === 'leave') {
+            document.body.classList.remove('is-drop-target');
+            return;
+        }
+        if (type === 'drop') {
+            document.body.classList.remove('is-drop-target');
+            const paths: string[] = e.payload?.paths ?? [];
+            handleDrop(paths);
+        }
+    });
+}
+
+function handleDrop(paths: string[]): void {
+    // MIDI takes precedence if present.
+    // Default: open the MIDI Lab pre-loaded so the user can tune options.
+    // Hold Shift while dropping to bypass the Lab and convert silently
+    // (the legacy fast path).
+    const midi = paths.find(p => MIDI_EXT.test(p));
+    if (midi) {
+        if (shiftHeld) {
+            flash(`Converting ${basename(midi)}…`);
+            void fileManager.importMidiPath(midi);
+        } else {
+            void midiLab.openWithFile(midi);
+        }
+        return;
+    }
+    const strudel = paths.find(p => STRUDEL_EXT.test(p));
+    if (strudel) {
+        void fileManager.openPath(strudel);
+        return;
+    }
+    flash(`Unsupported file. Drop .strudel, .js, or .mid.`);
+}
+
+function basename(path: string): string {
+    const parts = path.split(/[\\/]/);
+    return parts[parts.length - 1] || path;
+}
+
+/** Quick status toast via the existing status bar. */
+function flash(message: string): void {
+    const el = document.getElementById('status');
+    if (!el) return;
+    const prev = el.textContent;
+    el.textContent = message;
+    setTimeout(() => {
+        if (el.textContent === message) el.textContent = prev;
+    }, 2500);
+}

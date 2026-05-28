@@ -1,0 +1,22 @@
+setcpm(36)
+
+// Track 1: PERCUSSION (Drums)
+$: s(`<
+    [tb - tb tb tb - tb tb [tb,perc:G1] - [tb,perc:G1] - - - - -] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb]
+    [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb]>`).gain(0.60)
+
+// Track 2: ELECTRIC GRAND (C:major)
+$: note(`<
+    - [F5 A5 B5 - F5 A5 B5 -] [F5 A5 B5 E6 D6 - B5 C6] [B5 G5 E5 - - - - D5]
+    [E5 G5 E5 - - - - -] [F5 A5 B5 - F5 A5 B5 -] [F5 A5 B5 E6 D6 - B5 C6] [E6 B5 G5 - - - - B5]>`).sound("gm_epiano1").release(0.25)
+
+// Track 3: ELECTRIC GRAND (C:major)
+$: note(`<
+    - [- F5 - A5 - B5 - - - F5 - A5 - B5 - -] [- F5 - A5 - B5 - E6 - D6 - - - B5 - C6] [- B5 - G5 - E5 - - - - - - - - - D5]
+    [- E5 - G5 - E5 - - - - - - - - - -] [- F5 - A5 - B5 - - - F5 - A5 - B5 - -] [- F5 - A5 - B5 - E6 - D6 - - - B5 - C6] [- E6 - B5 - G5 - - - - - - - - - B5]>`).sound("gm_epiano1").release(0.25).pan(0.75)
+
+// Track 4: BASS (PICK) (C:major)
+$: note(`<
+    - [F3 [C4,A3] [C4,A3] [C4,A3] F3 [C4,A3] [C4,A3] [C4,A3]] [F3 [C4,A3] [C4,A3] [C4,A3] F3 [C4,A3] [C4,A3] [C4,A3]] [[E3,C3] [C4,G3] [C4,G3] [C4,G3] [E3,C3] [C4,G3] [C4,G3] [C4,G3]]
+    [[E3,C3] [C4,G3] [C4,G3] [C4,G3] [E3,C3] [C4,G3] [C4,G3] [C4,G3]] [F3 [C4,A3] [C4,A3] [C4,A3] F3 [C4,A3] [C4,A3] [C4,A3]] [F3 [C4,A3] [C4,A3] [C4,A3] F3 [C4,A3] [C4,A3] [C4,A3]] [[E3,C3] [C4,G3] [C4,G3] [C4,G3] [E3,C3] [C4,G3] [C4,G3] [C4,G3]]>`).sound("sine").release(0.06)
+
