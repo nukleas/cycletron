@@ -216,6 +216,8 @@
                     </div>
                 </div>
             </div>
+            <!-- Ambient visualization — fills the editor pane, sits behind #editor -->
+            <div id="fullscreenViz" class="fullscreen-viz" aria-hidden="true"></div>
             <div id="editor"></div>
             <div id="error"></div>
         </div>
@@ -303,6 +305,24 @@
                 <span><kbd>Enter</kbd> run</span>
                 <span><kbd>Esc</kbd> close</span>
             </div>
+        </div>
+    </div>
+
+
+    <!-- Compact auto-hiding HUD — sibling of the viz so it overlays the app -->
+    <div id="fullscreenVizHUD" class="fullscreen-viz-hud" hidden>
+        <div class="hud-left">
+            <span id="fsVizModeLabel">NEON CIRCUIT</span>
+            <span class="hud-divider">·</span>
+            <span id="fsBpm">120</span>
+            <span class="hud-unit">BPM</span>
+        </div>
+        <div class="hud-center">
+            <button id="fsVizPrev" class="hud-btn" title="Previous visualization ( [ )">◀</button>
+            <button id="fsVizNext" class="hud-btn" title="Next visualization ( ] )">▶</button>
+        </div>
+        <div class="hud-right">
+            <button id="fsVizExit" class="hud-btn hud-exit" title="Hide visualization (Cmd+Shift+V)">HIDE</button>
         </div>
     </div>
 

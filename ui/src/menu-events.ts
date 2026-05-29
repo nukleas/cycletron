@@ -60,6 +60,8 @@ export async function initMenuEvents(): Promise<void> {
         'menu:check_updates': () => { void checkForUpdates(true); },
         'menu:show_logs': () => { void logsModal.open(); },
         'menu:welcome': () => { void welcomeModal.openExplicit(); },
+        'menu:immersive_viz': () => { void (window as any).strudelApp?.toggleImmersiveViz?.(); },
+        'menu:next_viz': () => { void (window as any).strudelApp?.cycleImmersiveVizMode?.(); },
     };
 
     for (const [topic, handler] of Object.entries(simple)) {

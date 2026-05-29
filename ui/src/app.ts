@@ -12,6 +12,7 @@ import type {SampleLoader} from '../sample-loader.js';
 import {PlaybackState} from "./types/app.js";
 import {StrudelEditor} from './editor.js';
 import {PatternVisualizer, ScopeVisualizer, VizMode} from './visualizer.js';
+import {FullscreenVisualizer, FullscreenVizMode} from './fullscreen-viz.js';
 import {ExamplesBrowser} from './examples.js';
 
 interface AppElements {
@@ -30,6 +31,12 @@ interface AppElements {
     visualizer: HTMLDivElement;
     vizMode: HTMLSelectElement;
     scope: HTMLDivElement;
+
+    // -- Fullscreen Immersive Viz (added for cyberpunk music-reactive modes) --
+    fullscreenVizContainer: HTMLDivElement | null;
+    fsVizExitBtn: HTMLButtonElement | null;
+    fsVizPrevBtn: HTMLButtonElement | null;
+    fsVizNextBtn: HTMLButtonElement | null;
     cycleCount: HTMLDivElement;
     voiceCount: HTMLDivElement;
     sampleCount: HTMLDivElement;
@@ -49,6 +56,7 @@ export class StrudelApp {
     editor: StrudelEditor | null;
     visualizer: PatternVisualizer | null;
     scope: ScopeVisualizer | null;
+    fullscreenViz: FullscreenVisualizer | null = null;
     audioManager: StrudelAudioManager | null;
     scheduler: PatternScheduler | null;
     private sampleLoader: SampleLoader | null;
@@ -211,6 +219,10 @@ export class StrudelApp {
     }
 
     handleCycleUpdate = (cycle: number): void => {
+        // Forward cycle position to the fullscreen viz so its motion locks to
+        // musical time (cheap; bypasses the vizPending gate).
+        this.fullscreenViz?.updateCycle(cycle);
+
         // If a frame is already waiting, don't even update the cycle count!
         if (this.vizPending || !this.isInitialized) return;
         this.elements.cycleCount.textContent = cycle.toFixed(2);
@@ -295,6 +307,12 @@ export class StrudelApp {
             // -- Status bar --
             status: document.getElementById('status') as HTMLDivElement,
             liveIndicator: document.getElementById('liveIndicator') as HTMLSpanElement,
+
+            // -- Fullscreen Immersive Viz elements --
+            fullscreenVizContainer: document.getElementById('fullscreenViz') as HTMLDivElement | null,
+            fsVizExitBtn: document.getElementById('fsVizExit') as HTMLButtonElement | null,
+            fsVizPrevBtn: document.getElementById('fsVizPrev') as HTMLButtonElement | null,
+            fsVizNextBtn: document.getElementById('fsVizNext') as HTMLButtonElement | null,
         };
 
         // Event listener handlers
@@ -634,6 +652,15 @@ export class StrudelApp {
         this.scope.setAnalyser(analyser);
 
         this.visualizer.setAudioAnalyser(analyser);
+
+        // Ambient music-reactive visualization — lives behind #editor in the
+        // pattern console pane. Auto-starts and stays on by default.
+        if (this.elements.fullscreenVizContainer) {
+            this.fullscreenViz = new FullscreenVisualizer(this.elements.fullscreenVizContainer);
+            this.fullscreenViz.setAnalyser(analyser);
+            this.wireFullscreenHud();
+            this.startAmbientViz();
+        }
 
         // Capture pointers for active-note highlighting
         this._activeLocsBufPtr = wasmModule.getActiveLocsBufPtr();
@@ -1028,6 +1055,21 @@ export class StrudelApp {
         this.editor?.clearErrorDecoration();
     }
 
+    /** Toggle the ambient visualization on/off. Default is on. */
+    toggleImmersiveViz(): void {
+        const container = this.elements.fullscreenVizContainer;
+        if (!container || !this.fullscreenViz) return;
+
+        const isOff = container.hasAttribute('hidden');
+        if (isOff) this.startAmbientViz();
+        else this.stopAmbientViz();
+    }
+
+    /** Cycle to the next ambient viz mode. Fired from the View menu. */
+    cycleImmersiveVizMode(): void {
+        this.switchFullscreenMode(+1);
+    }
+
     /**
      * @param fn - The function to debounce.
      * @param delay - Delay in milliseconds.
@@ -1043,6 +1085,100 @@ export class StrudelApp {
         };
         debounced.cancel = () => clearTimeout(timeout);
         return debounced;
+    }
+
+    // ==================== Ambient Viz ====================
+
+    private fsHudHideTimer: ReturnType<typeof setTimeout> | null = null;
+    private fsKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+    /** Bind HUD controls and the bracket-key mode cycling. Called once at init. */
+    private wireFullscreenHud(): void {
+        const els = this.elements;
+        if (!els.fullscreenVizContainer || !this.fullscreenViz) return;
+
+        els.fsVizExitBtn?.addEventListener('click', () => this.toggleImmersiveViz());
+        els.fsVizPrevBtn?.addEventListener('click', () => this.switchFullscreenMode(-1));
+        els.fsVizNextBtn?.addEventListener('click', () => this.switchFullscreenMode(+1));
+
+        // [ / ] cycle viz modes — only when not typing. ESC is the menu's Stop.
+        this.fsKeyHandler = (e: KeyboardEvent) => {
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
+            const t = e.target as HTMLElement | null;
+            const inEditable = !!t && (
+                t.tagName === 'INPUT' ||
+                t.tagName === 'TEXTAREA' ||
+                t.isContentEditable ||
+                !!t.closest('.cm-editor')
+            );
+            if (inEditable) return;
+
+            if (e.key === '[') {
+                e.preventDefault();
+                this.switchFullscreenMode(-1);
+            } else if (e.key === ']') {
+                e.preventDefault();
+                this.switchFullscreenMode(+1);
+            }
+        };
+        document.addEventListener('keydown', this.fsKeyHandler);
+    }
+
+    /** Start the ambient viz (default state on app launch). */
+    private startAmbientViz(): void {
+        const container = this.elements.fullscreenVizContainer;
+        if (!container || !this.fullscreenViz) return;
+
+        container.removeAttribute('hidden');
+        document.body.classList.add('immersive-viz-active');
+        this.fullscreenViz.start();
+        this.updateFullscreenHudLabel();
+        this.updateFullscreenHudBpm();
+    }
+
+    /** Hide the ambient viz (toggled via Cmd+Shift+V / HUD HIDE button). */
+    private stopAmbientViz(): void {
+        const container = this.elements.fullscreenVizContainer;
+        if (!container) return;
+
+        this.fullscreenViz?.stop();
+        container.setAttribute('hidden', '');
+        document.body.classList.remove('immersive-viz-active');
+        document.getElementById('fullscreenVizHUD')?.setAttribute('hidden', '');
+    }
+
+    private switchFullscreenMode(delta: number): void {
+        if (!this.fullscreenViz) return;
+        this.fullscreenViz.cycleMode(delta);
+        this.updateFullscreenHudLabel();
+        this.flashFullscreenHud();
+    }
+
+    private updateFullscreenHudLabel(): void {
+        const label = document.getElementById('fsVizModeLabel');
+        if (!label || !this.fullscreenViz) return;
+
+        const names: Record<FullscreenVizMode, string> = {
+            [FullscreenVizMode.NeonCircuit]: 'NEON CIRCUIT',
+            [FullscreenVizMode.MarbleCore]: 'MARBLE CORE',
+            [FullscreenVizMode.MarbleDrop]: 'MARBLE DROP',
+        };
+        label.textContent = names[this.fullscreenViz.getMode()] ?? '';
+    }
+
+    private updateFullscreenHudBpm(): void {
+        const el = document.getElementById('fsBpm');
+        const slider = document.getElementById('bpmSlider') as HTMLInputElement | null;
+        if (el && slider) el.textContent = slider.value;
+    }
+
+    /** Reveal the HUD briefly (e.g. after a mode switch) then auto-hide it. */
+    private flashFullscreenHud(): void {
+        const hud = document.getElementById('fullscreenVizHUD');
+        if (!hud) return;
+        hud.removeAttribute('hidden');
+        if (this.fsHudHideTimer) clearTimeout(this.fsHudHideTimer);
+        this.fsHudHideTimer = setTimeout(() => hud.setAttribute('hidden', ''), 2000);
     }
 
     async dispose(): Promise<void> {

@@ -113,6 +113,16 @@ pub fn build_app_menu<R: Runtime>(
             &MenuItemBuilder::with_id("view.browse_examples", "Browse Examples").build(app)?,
         )
         .separator()
+        .item(
+            &MenuItemBuilder::with_id("view.immersive_viz", "Immersive Visualizer")
+                .accelerator("CmdOrCtrl+Shift+V")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("view.next_viz", "Next Visualization")
+                .accelerator("CmdOrCtrl+Shift+]")
+                .build(app)?,
+        )
         .item(&PredefinedMenuItem::fullscreen(app, None)?)
         .build()?;
 
@@ -209,6 +219,8 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "view.toggle_ai" => "menu:toggle_ai",
         "view.toggle_corpus" => "menu:toggle_corpus",
         "view.browse_examples" => "menu:browse_examples",
+        "view.immersive_viz" => "menu:immersive_viz",
+        "view.next_viz" => "menu:next_viz",
         "playback.toggle" => "menu:play_pause",
         "playback.stop" => "menu:stop",
         "playback.tempo_up" => "menu:tempo_up",
