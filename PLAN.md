@@ -569,3 +569,18 @@ robostrudel/
 | `strudel-corpus` | Knowledge base | Filesystem read/write at `../strudel-corpus/` |
 
 Both are local-first. No need for remote packages initially.
+
+## AI Environment Music Tooling (Grok sessions in this repo)
+
+As of 2026, the developer environment (Grok TUI + this workspace) includes dedicated support:
+
+- **Project skills** (`.grok/skills/`):
+  - `strudel-dsl` — authoritative DSL surface, validation, corpus rules (auto-invoked on Strudel tasks).
+  - `midi-strudel` — complete MIDI Lab conversion pipeline, options, drum banks.
+
+- **MCP servers** (`.grok/config.toml`, loaded in TUI `/mcps`):
+  - `midi-theory`, `music-theory`, `strudel-live` (see AGENTS.md for details and the three external packages that power them).
+
+These give the AI (both this Grok CLI and future agent iterations) live, callable music theory, MIDI generation/analysis, Strudel pattern tools, and rhythm generators far beyond static prompt knowledge. Use them aggressively when composing or reviewing patterns.
+
+See `.grok/config.toml`, the skills/ dirs, and AGENTS.md for usage.

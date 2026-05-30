@@ -54,3 +54,20 @@ cd ui && npm run build:wasm           # rebuild WASM package (needs nightly)
 - **strudel-rs** at `../strudel-rs/` — WASM audio package + Cargo path deps for validation
 - **strudel-corpus** at `../strudel-corpus/` — read directly from filesystem
 - No cpal, no native audio — WASM handles everything
+
+## AI Music Tooling (Grok / Claude environment)
+
+When working in this repo with Grok (or Claude), the following are available for superior music/MIDI/Strudel understanding:
+
+- **Project skills** (auto-loaded, highest priority):
+  - `/strudel-dsl` — exact ground-truth DSL surface from `docs/STRUDEL_RS_SUPPORTED.md`, mini-notation, methods, validation rules, corpus conventions.
+  - `/midi-strudel` — full details of the MIDI Lab conversion pipeline (`src-tauri/src/midi.rs`), ImportOptions, drum banks, channel filtering, auto-resolution.
+
+- **MCP servers** (configured in `.grok/config.toml` — visible in TUI via `/mcps` or `Ctrl+L`):
+  - `midi-theory` — remote MIDI generator + 7 music theory reference resources.
+  - `music-theory` — lightweight fast scales/chords/progressions/key tools.
+  - `strudel-live` — 27-tool Strudel live-coding MCP (music_theory, euclid/polyrhythm generators, audio analysis, MIDI I/O, genre templates). Requires the global npm package + Playwright Chromium (already installed in this dev env).
+
+Use `search_tool` + `use_tool` for the MCPs, and reference the skills explicitly or let them auto-trigger. These dramatically improve pattern quality and theory accuracy vs. prompt-only knowledge.
+
+See also: `.grok/skills/`, `.grok/config.toml`, `docs/STRUDEL_RS_SUPPORTED.md`, and the root PLAN.md.
