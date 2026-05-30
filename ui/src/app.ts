@@ -1162,6 +1162,13 @@ export class StrudelApp {
             [FullscreenVizMode.NeonCircuit]: 'NEON CIRCUIT',
             [FullscreenVizMode.MarbleCore]: 'MARBLE CORE',
             [FullscreenVizMode.MarbleDrop]: 'MARBLE DROP',
+            [FullscreenVizMode.FlameGraph]: 'FLAME GRAPH',
+            [FullscreenVizMode.Lissajous]: 'LISSAJOUS SCOPE',
+            [FullscreenVizMode.WaveTerrain]: 'WAVE TERRAIN',
+            [FullscreenVizMode.Tunnel]: 'TUNNEL',
+            [FullscreenVizMode.StrangeAttractor]: 'STRANGE ATTRACTOR',
+            [FullscreenVizMode.Plasma]: 'PLASMA',
+            [FullscreenVizMode.Kaleidoscope]: 'KALEIDOSCOPE',
         };
         label.textContent = names[this.fullscreenViz.getMode()] ?? '';
     }

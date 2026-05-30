@@ -21,9 +21,16 @@ export enum FullscreenVizMode {
     NeonCircuit = 0,
     MarbleCore = 1,
     MarbleDrop = 2,
+    FlameGraph = 3,
+    Lissajous = 4,
+    WaveTerrain = 5,
+    Tunnel = 6,
+    StrangeAttractor = 7,
+    Plasma = 8,
+    Kaleidoscope = 9,
 }
 
-const MODE_COUNT = 3;
+const MODE_COUNT = 10;
 const TAU = Math.PI * 2;
 
 interface Particle {
@@ -107,6 +114,54 @@ export class FullscreenVisualizer {
     private prevHighEnergy = 0;
     private prevMidEnergy = 0;
     private prevLowEnergy = 0;
+
+    // FlameGraph state — Winamp-style spectrum flame
+    // Each "bar" is one slice of the flame silhouette across the width. We
+    // sample raw FFT bins with log-frequency mapping (more resolution in the
+    // bass) so the shape reflects the actual mix.
+    private flameBars: Float32Array | null = null;   // smoothed heights 0..1
+    private flamePeaks: Float32Array | null = null;  // peak-hold positions 0..1
+    private readonly FLAME_BARS = 64;
+
+    // Lissajous state — phase-shift offset cycles on each musical beat so the
+    // curve folds into a new shape each beat. Hue rotates with the cycle.
+    private lissaOffset = 32;
+    private lissaLastBeatIndex = -1;
+
+    // WaveTerrain state — ring buffer of FFT history rows for the perspective
+    // landscape. Each row stores `TERRAIN_BARS` samples; head points to the
+    // newest row, render walks back-to-front for proper z ordering.
+    private terrainHistory: Float32Array | null = null;
+    private terrainHead = 0;
+    private terrainAccum = 0;
+    private readonly TERRAIN_ROWS = 36;
+    private readonly TERRAIN_BARS = 56;
+    private readonly TERRAIN_ROW_DT = 1 / 24;  // 24 rows/sec
+
+    // Tunnel state — rings recede along z; on each downbeat we boost zVel.
+    private tunnelRings: Array<{ z: number; angle: number; hueShift: number }> = [];
+    private tunnelZVel = 1.0;
+    private tunnelLastDownbeat = -1;
+
+    // StrangeAttractor state — Lorenz trail integrated each frame
+    private attrX = 0.1;
+    private attrY = 0;
+    private attrZ = 0;
+    private attrTrail: Float32Array | null = null;   // ring buffer of [x, y, z]
+    private attrTrailHead = 0;
+    private readonly ATTR_TRAIL_CAP = 720;
+
+    // Plasma state — additively-blended metaballs
+    private plasmaBalls: Array<{
+        x: number; y: number; vx: number; vy: number;
+        baseR: number; hue: number; phase: number;
+    }> = [];
+
+    // Kaleidoscope state — radial particles within one wedge, mirrored
+    private kaleidoParticles: Array<{
+        r: number; angle: number; vr: number; life: number; hue: number; size: number;
+    }> = [];
+    private readonly KALEIDO_SLICES = 8;
 
     private scanlineOffset = 0;
 
@@ -200,6 +255,23 @@ export class FullscreenVisualizer {
         this.prevHighEnergy = 0;
         this.prevMidEnergy = 0;
         this.prevLowEnergy = 0;
+        this.flameBars = null;
+        this.flamePeaks = null;
+        this.lissaOffset = 32;
+        this.lissaLastBeatIndex = -1;
+        this.terrainHistory = null;
+        this.terrainHead = 0;
+        this.terrainAccum = 0;
+        this.tunnelRings.length = 0;
+        this.tunnelZVel = 1.0;
+        this.tunnelLastDownbeat = -1;
+        this.attrX = 0.1;
+        this.attrY = 0;
+        this.attrZ = 0;
+        this.attrTrail = null;
+        this.attrTrailHead = 0;
+        this.plasmaBalls.length = 0;
+        this.kaleidoParticles.length = 0;
         this.scanlineOffset = 0;
     }
 
@@ -292,6 +364,87 @@ export class FullscreenVisualizer {
         if (this.mode === FullscreenVizMode.MarbleDrop) {
             this.initPegField();
         }
+
+        if (this.mode === FullscreenVizMode.FlameGraph) {
+            this.initFlameBars();
+        }
+
+        if (this.mode === FullscreenVizMode.WaveTerrain) {
+            this.initTerrain();
+        }
+
+        if (this.mode === FullscreenVizMode.Tunnel) {
+            this.initTunnel();
+        }
+
+        if (this.mode === FullscreenVizMode.StrangeAttractor) {
+            this.initAttractor();
+        }
+
+        if (this.mode === FullscreenVizMode.Plasma) {
+            this.initPlasma();
+        }
+    }
+
+    private initAttractor(): void {
+        this.attrX = 0.1;
+        this.attrY = 0;
+        this.attrZ = 0;
+        // Trail is [x, y, z] triples.
+        this.attrTrail = new Float32Array(this.ATTR_TRAIL_CAP * 3);
+        this.attrTrailHead = 0;
+    }
+
+    private initPlasma(): void {
+        this.plasmaBalls.length = 0;
+        const COUNT = 7;
+        const hues = [
+            this.theme.neonHue,
+            this.theme.secondaryHue,
+            this.theme.activeHue,
+            this.theme.neonHue + 40,
+            this.theme.secondaryHue - 30,
+            this.theme.activeHue - 20,
+            260, // violet
+        ];
+        for (let i = 0; i < COUNT; i++) {
+            const angle = (i / COUNT) * TAU;
+            const speed = 24 + Math.random() * 18;
+            this.plasmaBalls.push({
+                x: this.width * 0.5 + Math.cos(angle) * this.width * 0.18,
+                y: this.height * 0.5 + Math.sin(angle) * this.height * 0.18,
+                vx: Math.cos(angle + 1.5) * speed,
+                vy: Math.sin(angle + 1.5) * speed,
+                baseR: 60 + Math.random() * 30,
+                hue: hues[i],
+                phase: Math.random() * TAU,
+            });
+        }
+    }
+
+    private initTerrain(): void {
+        this.terrainHistory = new Float32Array(this.TERRAIN_ROWS * this.TERRAIN_BARS);
+        this.terrainHead = 0;
+        this.terrainAccum = 0;
+    }
+
+    private initTunnel(): void {
+        this.tunnelRings.length = 0;
+        const COUNT = 18;
+        for (let i = 0; i < COUNT; i++) {
+            this.tunnelRings.push({
+                z: (i + 1) / COUNT,        // 0 = at camera, 1 = vanishing point
+                angle: (i / COUNT) * TAU,  // staggered rotation phase
+                hueShift: (i % 4) * 22,
+            });
+        }
+        this.tunnelZVel = 1.0;
+        this.tunnelLastDownbeat = -1;
+    }
+
+    private initFlameBars(): void {
+        this.flameBars  = new Float32Array(this.FLAME_BARS);
+        this.flamePeaks = new Float32Array(this.FLAME_BARS);
     }
 
     /**
@@ -399,9 +552,287 @@ export class FullscreenVisualizer {
             case FullscreenVizMode.MarbleDrop:
                 this.updateMarbleDrop(dt, low, high);
                 break;
+            case FullscreenVizMode.FlameGraph:
+                this.updateFlameGraph(dt, low, mid, high);
+                break;
+            case FullscreenVizMode.Lissajous:
+                this.updateLissajous(dt);
+                break;
+            case FullscreenVizMode.WaveTerrain:
+                this.updateWaveTerrain(dt);
+                break;
+            case FullscreenVizMode.Tunnel:
+                this.updateTunnel(dt, low, energy);
+                break;
+            case FullscreenVizMode.StrangeAttractor:
+                this.updateAttractor(dt, low, mid, high);
+                break;
+            case FullscreenVizMode.Plasma:
+                this.updatePlasma(dt, low, energy);
+                break;
+            case FullscreenVizMode.Kaleidoscope:
+                this.updateKaleidoscope(dt, low, mid, high);
+                break;
         }
 
         this.scanlineOffset = (this.scanlineOffset + dt * 18) % 4;
+    }
+
+    /**
+     * Lorenz attractor integrated forward in time. FFT bands modulate the
+     * three parameters so the "shape" of the chaos breathes with the music:
+     *   sigma (10)  — bass mildly raises it (compresses spiral)
+     *   rho   (28)  — high band pushes butterfly wider
+     *   beta  (8/3) — mid keeps it stable
+     * Trail is a ring buffer of recent points; rendered as a fading polyline.
+     */
+    private updateAttractor(dt: number, low: number, mid: number, high: number): void {
+        if (!this.attrTrail) this.initAttractor();
+        if (!this.attrTrail) return;
+
+        const sigma = 10 + low * 4;
+        const rho   = 28 + high * 18;
+        const beta  = 8 / 3 + mid * 0.6;
+
+        // Sub-step the integration so trail is smooth even at low frame rate.
+        const subSteps = 6;
+        const h = Math.min(dt, 1 / 30) / subSteps;
+        for (let s = 0; s < subSteps; s++) {
+            const dx = sigma * (this.attrY - this.attrX);
+            const dy = this.attrX * (rho - this.attrZ) - this.attrY;
+            const dz = this.attrX * this.attrY - beta * this.attrZ;
+            this.attrX += dx * h;
+            this.attrY += dy * h;
+            this.attrZ += dz * h;
+            const head = this.attrTrailHead;
+            this.attrTrail[head * 3 + 0] = this.attrX;
+            this.attrTrail[head * 3 + 1] = this.attrY;
+            this.attrTrail[head * 3 + 2] = this.attrZ;
+            this.attrTrailHead = (head + 1) % this.ATTR_TRAIL_CAP;
+        }
+    }
+
+    /**
+     * Plasma metaballs — each ball drifts and bounces off the canvas edges.
+     * Bass + energy pulse each ball's radius; phase oscillates for slow breath.
+     */
+    private updatePlasma(dt: number, low: number, energy: number): void {
+        if (this.plasmaBalls.length === 0) this.initPlasma();
+
+        for (const b of this.plasmaBalls) {
+            b.x += b.vx * dt;
+            b.y += b.vy * dt;
+            b.phase += dt * (0.4 + energy * 0.5);
+
+            // Wall bounce with a slight velocity reset so balls don't get
+            // trapped along an edge.
+            if (b.x < b.baseR * 0.5) {
+                b.x = b.baseR * 0.5;
+                b.vx = Math.abs(b.vx);
+            } else if (b.x > this.width - b.baseR * 0.5) {
+                b.x = this.width - b.baseR * 0.5;
+                b.vx = -Math.abs(b.vx);
+            }
+            if (b.y < b.baseR * 0.5) {
+                b.y = b.baseR * 0.5;
+                b.vy = Math.abs(b.vy);
+            } else if (b.y > this.height - b.baseR * 0.5) {
+                b.y = this.height - b.baseR * 0.5;
+                b.vy = -Math.abs(b.vy);
+            }
+        }
+
+        // Single shared bass pulse — radii scale with low energy.
+        // Stored on each ball lazily via phase; updateBassPulse not needed.
+        // Kept here as a cheap "global" so render can read it.
+        this.plasmaBassPulse = low;
+    }
+
+    /**
+     * Kaleidoscope — spawn particles inside one angular wedge (1/8 of the
+     * circle), let them drift outward, then render the wedge 8 times mirrored
+     * around the center. FFT energy controls spawn rate.
+     */
+    private updateKaleidoscope(dt: number, low: number, mid: number, high: number): void {
+        const energy = (low + mid + high) / 3;
+        const wedge = TAU / this.KALEIDO_SLICES;
+        const maxR = Math.min(this.width, this.height) * 0.55;
+
+        // Spawn rate tracks total energy + a constant base so it's never empty
+        const spawnRate = (1.2 + energy * 6) * dt;
+        if (Math.random() < spawnRate) {
+            this.kaleidoParticles.push({
+                r: 12 + Math.random() * 24,
+                angle: Math.random() * wedge,
+                vr: 60 + Math.random() * 90 + low * 80,
+                life: 1.0 + Math.random() * 0.4,
+                hue: this.theme.neonHue + (Math.random() - 0.5) * 80,
+                size: 1.8 + Math.random() * 1.6 + high * 1.5,
+            });
+        }
+
+        // Drift outward, fade
+        for (let i = this.kaleidoParticles.length - 1; i >= 0; i--) {
+            const p = this.kaleidoParticles[i];
+            p.r += p.vr * dt;
+            p.life -= dt * 0.85;
+            if (p.life <= 0 || p.r > maxR) {
+                this.kaleidoParticles.splice(i, 1);
+            }
+        }
+
+        // Cap particle count
+        if (this.kaleidoParticles.length > 280) {
+            this.kaleidoParticles.splice(0, this.kaleidoParticles.length - 280);
+        }
+    }
+
+    private plasmaBassPulse = 0;
+
+    private updateLissajous(_dt: number): void {
+        // Phase shift bumps on each beat — gives the scope curve a fresh
+        // topology every quarter note instead of staying static.
+        const beatIndex = Math.floor(this.currentCycle * 4);
+        if (beatIndex !== this.lissaLastBeatIndex) {
+            this.lissaLastBeatIndex = beatIndex;
+            // Walk through offset values that produce visually distinct shapes.
+            const choices = [24, 48, 64, 96, 128, 160];
+            this.lissaOffset = choices[((beatIndex % choices.length) + choices.length) % choices.length];
+        }
+    }
+
+    private updateWaveTerrain(dt: number): void {
+        if (!this.terrainHistory) this.initTerrain();
+        if (!this.terrainHistory || !this.freqData) return;
+
+        // Throttle row writes so the terrain rolls at a fixed musical rate
+        // (independent of frame rate, like FlameGraph used to).
+        this.terrainAccum += dt;
+        if (this.terrainAccum < this.TERRAIN_ROW_DT) return;
+        this.terrainAccum -= this.TERRAIN_ROW_DT;
+
+        const bars = this.TERRAIN_BARS;
+        const binCount = this.freqData.length;
+        const usable = Math.max(8, Math.floor(binCount * 0.55));
+        const head = this.terrainHead;
+
+        // Sample raw FFT into this row with log-frequency mapping.
+        for (let i = 0; i < bars; i++) {
+            const t0 = i / bars;
+            const t1 = (i + 1) / bars;
+            const b0 = Math.floor(Math.pow(t0, 2) * usable);
+            const b1 = Math.max(b0 + 1, Math.floor(Math.pow(t1, 2) * usable));
+            let peak = 0;
+            for (let b = b0; b < b1 && b < binCount; b++) {
+                const v = this.freqData[b];
+                if (v > peak) peak = v;
+            }
+            this.terrainHistory[head * bars + i] = (peak / 255) * this.sensitivity;
+        }
+
+        this.terrainHead = (head + 1) % this.TERRAIN_ROWS;
+    }
+
+    private updateTunnel(dt: number, _low: number, energy: number): void {
+        // Constant forward drift + an instantaneous boost on the downbeat.
+        const downbeatIdx = Math.floor(this.currentCycle);
+        if (downbeatIdx !== this.tunnelLastDownbeat) {
+            this.tunnelLastDownbeat = downbeatIdx;
+            this.tunnelZVel = 3.6;
+        }
+        // Decay the boost smoothly so the tunnel lurches forward then settles.
+        this.tunnelZVel = Math.max(0.9, this.tunnelZVel - dt * 5.5);
+
+        // Audio energy mildly accelerates baseline drift.
+        const drift = this.tunnelZVel * (0.55 + energy * 0.8);
+
+        // Advance every ring; recycle ones past the camera back to the vanishing point.
+        for (const ring of this.tunnelRings) {
+            ring.z -= drift * dt * 0.45;
+            if (ring.z <= 0) ring.z += 1;
+        }
+    }
+
+    private updateFlameGraph(dt: number, _low: number, _mid: number, _high: number): void {
+        if (!this.flameBars || !this.flamePeaks) this.initFlameBars();
+        if (!this.flameBars || !this.flamePeaks || !this.freqData) return;
+
+        const N = this.flameBars.length;
+        const binCount = this.freqData.length;
+        // Above ~half the bins is mostly air, use the bottom half for legibility.
+        const usableBins = Math.max(8, Math.floor(binCount * 0.55));
+
+        // Sample raw FFT with a log-frequency curve so bass occupies more
+        // visual width (musical perception is logarithmic).
+        for (let i = 0; i < N; i++) {
+            const t0 = i / N;
+            const t1 = (i + 1) / N;
+            // pow(t, 2) gives bass more bars; ~1.6 is gentler if you want
+            // more even spread.
+            const b0 = Math.floor(Math.pow(t0, 2) * usableBins);
+            const b1 = Math.max(b0 + 1, Math.floor(Math.pow(t1, 2) * usableBins));
+
+            let peak = 0;
+            for (let b = b0; b < b1 && b < binCount; b++) {
+                const v = this.freqData[b];
+                if (v > peak) peak = v;
+            }
+            const target = (peak / 255) * this.sensitivity;
+
+            // Classic spectrum analyzer feel: instant rise, gradual fall.
+            const curr = this.flameBars[i];
+            this.flameBars[i] = target > curr
+                ? target
+                : Math.max(0, curr + (target - curr) * Math.min(1, dt * 4));
+
+            // Peak-hold: matches current bar on rise, decays slowly on fall.
+            const peakVal = this.flamePeaks[i];
+            if (this.flameBars[i] >= peakVal) {
+                this.flamePeaks[i] = this.flameBars[i];
+            } else {
+                this.flamePeaks[i] = Math.max(0, peakVal - dt * 0.55);
+            }
+        }
+
+        // Light spatial smoothing — averages each bar with neighbors so the
+        // flame silhouette flows instead of looking like a 32-pixel pixel art.
+        const smoothed = new Float32Array(N);
+        for (let i = 0; i < N; i++) {
+            const a = this.flameBars[Math.max(0, i - 1)];
+            const b = this.flameBars[i];
+            const c = this.flameBars[Math.min(N - 1, i + 1)];
+            smoothed[i] = a * 0.25 + b * 0.5 + c * 0.25;
+        }
+        this.flameBars.set(smoothed);
+
+        // Rising tongue particles — only on loud bars.
+        const spawnPx = this.height;
+        for (let i = 0; i < N; i++) {
+            const v = this.flameBars[i];
+            if (v > 0.45 && Math.random() < v * dt * 5) {
+                const px = ((i + 0.5) / N) * this.width;
+                this.particles.push({
+                    x: px + (Math.random() - 0.5) * 10,
+                    y: spawnPx - v * spawnPx * 0.7,
+                    vx: (Math.random() - 0.5) * 25,
+                    vy: -40 - Math.random() * 55,
+                    life: 0.45 + Math.random() * 0.35,
+                    size: 1.8 + Math.random() * 1.4,
+                    hue: barHue(i, N),
+                });
+            }
+        }
+
+        // Tongue physics — drift up, curl slightly, fade.
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vy *= 0.96;
+            p.vx *= 0.92;
+            p.life -= dt * 1.6;
+            if (p.life <= 0) this.particles.splice(i, 1);
+        }
     }
 
     private updateMarbleDrop(dt: number, low: number, high: number): void {
@@ -647,7 +1078,17 @@ export class FullscreenVisualizer {
     private render(): void {
         const { ctx, width, height } = this;
 
-        ctx.fillStyle = this.theme.bg;
+        // Lissajous + StrangeAttractor use a translucent fill instead of an
+        // opaque clear so their strokes leave a fading trail across frames.
+        // Plasma fades fast too — it composites additively, so a partial
+        // clear keeps a faint after-image without ghosting.
+        if (this.mode === FullscreenVizMode.Lissajous || this.mode === FullscreenVizMode.StrangeAttractor) {
+            ctx.fillStyle = 'rgba(5, 6, 10, 0.16)';
+        } else if (this.mode === FullscreenVizMode.Plasma) {
+            ctx.fillStyle = 'rgba(5, 6, 10, 0.35)';
+        } else {
+            ctx.fillStyle = this.theme.bg;
+        }
         ctx.fillRect(0, 0, width, height);
 
         this.drawScanlines(ctx, width, height);
@@ -662,9 +1103,482 @@ export class FullscreenVisualizer {
             case FullscreenVizMode.MarbleDrop:
                 this.renderMarbleDrop(ctx, width, height);
                 break;
+            case FullscreenVizMode.FlameGraph:
+                this.renderFlameGraph(ctx, width, height);
+                break;
+            case FullscreenVizMode.Lissajous:
+                this.renderLissajous(ctx, width, height);
+                break;
+            case FullscreenVizMode.WaveTerrain:
+                this.renderWaveTerrain(ctx, width, height);
+                break;
+            case FullscreenVizMode.Tunnel:
+                this.renderTunnel(ctx, width, height);
+                break;
+            case FullscreenVizMode.StrangeAttractor:
+                this.renderAttractor(ctx, width, height);
+                break;
+            case FullscreenVizMode.Plasma:
+                this.renderPlasma(ctx, width, height);
+                break;
+            case FullscreenVizMode.Kaleidoscope:
+                this.renderKaleidoscope(ctx, width, height);
+                break;
         }
 
         this.drawVignette(ctx, width, height);
+    }
+
+    /**
+     * Project the Lorenz trail to screen space and stroke it as a polyline
+     * with age-graded color. Most-recent end is brightest.
+     */
+    private renderAttractor(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+        if (!this.attrTrail) return;
+
+        const cx = w / 2;
+        const cy = h * 0.55;
+        // Lorenz coordinates roam roughly in [-30, 30] for x/y, [0, 50] for z.
+        // Scale to fit the canvas with some headroom.
+        const scale = Math.min(w, h) / 70;
+        const trailCap = this.ATTR_TRAIL_CAP;
+        const head = this.attrTrailHead;
+
+        const baseHue = this.theme.neonHue;
+        const secHue = this.theme.secondaryHue;
+        const cycleHue = (this.currentCycle * 18) % 360;
+
+        // Iterate oldest → newest so that newer segments paint over older.
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        let started = false;
+        for (let i = 0; i < trailCap; i++) {
+            const idx = (head + i) % trailCap;
+            const t = i / (trailCap - 1); // 0 = oldest, 1 = newest
+            const x = this.attrTrail[idx * 3 + 0];
+            const y = this.attrTrail[idx * 3 + 1];
+            const z = this.attrTrail[idx * 3 + 2];
+            // Project (x, y, z) → 2D. z shifts upward, y becomes vertical.
+            const sx = cx + x * scale;
+            const sy = cy + (y * 0.6 - z) * scale;
+
+            if (!started) {
+                ctx.moveTo(sx, sy);
+                started = true;
+            } else {
+                ctx.lineTo(sx, sy);
+            }
+
+            // Periodically stroke segments so we can recolor by age. Stroking
+            // every point is expensive; do it in batches.
+            if ((i & 31) === 31 || i === trailCap - 1) {
+                const hue = baseHue + (secHue - baseHue) * t * 0.6 + cycleHue;
+                ctx.strokeStyle = `hsla(${hue}, 95%, ${50 + t * 35}%, ${0.05 + t * 0.6})`;
+                ctx.lineWidth = 0.6 + t * 1.6;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(sx, sy);
+            }
+        }
+
+        // Bright head point — emphasizes "where we are now".
+        const hx = cx + this.attrX * scale;
+        const hy = cy + (this.attrY * 0.6 - this.attrZ) * scale;
+        ctx.fillStyle = `hsla(${baseHue + cycleHue}, 100%, 85%, 0.9)`;
+        ctx.beginPath();
+        ctx.arc(hx, hy, 3, 0, TAU);
+        ctx.fill();
+    }
+
+    /**
+     * Render plasma metaballs as additively-blended radial gradients. When
+     * two balls overlap, their gradients sum to give the classic "fused
+     * liquid" look without per-pixel field calculation.
+     */
+    private renderPlasma(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+        if (this.plasmaBalls.length === 0) {
+            this.initPlasma();
+            if (this.plasmaBalls.length === 0) return;
+        }
+        const low = this.plasmaBassPulse;
+
+        ctx.globalCompositeOperation = 'lighter';
+        for (const b of this.plasmaBalls) {
+            const breath = 1 + Math.sin(b.phase) * 0.12;
+            const pulse = 1 + low * 0.45;
+            const r = b.baseR * breath * pulse;
+
+            const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r);
+            grad.addColorStop(0,    `hsla(${b.hue}, 95%, 65%, 0.55)`);
+            grad.addColorStop(0.45, `hsla(${b.hue}, 95%, 55%, 0.18)`);
+            grad.addColorStop(1,    `hsla(${b.hue}, 95%, 50%, 0)`);
+            ctx.fillStyle = grad;
+            ctx.fillRect(b.x - r, b.y - r, r * 2, r * 2);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+
+        // Avoid lint warning by reading w/h without a no-op
+        void w; void h;
+    }
+
+    /**
+     * Kaleidoscope — render the single base wedge of particles, then rotate
+     * (and alternately reflect) around the center for N-fold symmetry.
+     */
+    private renderKaleidoscope(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+        const cx = w / 2;
+        const cy = h / 2;
+        const slices = this.KALEIDO_SLICES;
+
+        // Reusable lambda — draws all particles within the canonical wedge.
+        const drawWedge = (): void => {
+            for (const p of this.kaleidoParticles) {
+                const px = Math.cos(p.angle) * p.r;
+                const py = Math.sin(p.angle) * p.r;
+                const a = Math.max(0.05, p.life);
+
+                // Glow halo
+                ctx.fillStyle = `hsla(${p.hue}, 95%, 70%, ${a * 0.18})`;
+                ctx.beginPath();
+                ctx.arc(px, py, p.size * 3.2, 0, TAU);
+                ctx.fill();
+
+                // Core
+                ctx.fillStyle = `hsla(${p.hue}, 95%, 82%, ${a * 0.85})`;
+                ctx.beginPath();
+                ctx.arc(px, py, p.size, 0, TAU);
+                ctx.fill();
+            }
+
+            // A faint outline of the wedge boundary helps the symmetry read
+            const maxR = Math.min(w, h) * 0.5;
+            ctx.strokeStyle = `hsla(${this.theme.neonHue}, 92%, 70%, 0.06)`;
+            ctx.lineWidth = 0.6;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(maxR, 0);
+            ctx.stroke();
+        };
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        for (let s = 0; s < slices; s++) {
+            ctx.save();
+            ctx.rotate((s / slices) * TAU);
+            // Mirror every other wedge for a true kaleidoscope reflection.
+            if (s % 2 === 1) ctx.scale(1, -1);
+            drawWedge();
+            ctx.restore();
+        }
+        ctx.restore();
+
+        // Center pulse — soft glow that breathes with the cycle.
+        const pulse = beatEnv(this.currentCycle * 4);
+        const coreR = 6 + pulse * 14;
+        const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 2);
+        coreGrad.addColorStop(0, `hsla(${this.theme.neonHue}, 100%, 85%, ${0.4 + pulse * 0.4})`);
+        coreGrad.addColorStop(1, `hsla(${this.theme.neonHue}, 100%, 60%, 0)`);
+        ctx.fillStyle = coreGrad;
+        ctx.fillRect(cx - coreR * 2, cy - coreR * 2, coreR * 4, coreR * 4);
+    }
+
+    /**
+     * Lissajous Scope: plot the time-domain waveform against a delayed copy
+     * of itself (x[i], x[i + offset]). Folds into complex symmetric curves
+     * whose topology shifts on each beat. Trail-painted via the fading
+     * background so motion smears beautifully.
+     */
+    private renderLissajous(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+        if (!this.timeData) return;
+        const data = this.timeData;
+        const N = data.length;
+        const off = this.lissaOffset;
+        if (N < off + 4) return;
+
+        const cx = w / 2;
+        const cy = h / 2;
+        const scale = Math.min(w, h) * 0.42;
+
+        // Hue rotates slowly with the cycle for variety between beats.
+        const hue = (this.currentCycle * 30) % 360;
+        ctx.strokeStyle = `hsla(${hue}, 95%, 75%, 0.65)`;
+        ctx.lineWidth = 1.4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        for (let i = 0; i < N - off; i++) {
+            // Map 0..255 → -1..1, scale to fit
+            const x = ((data[i]       - 128) / 128) * scale + cx;
+            const y = ((data[i + off] - 128) / 128) * scale + cy;
+            if (i === 0) ctx.moveTo(x, y);
+            else         ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Subtle inner highlight stroke for a "phosphor" feel.
+        ctx.strokeStyle = `hsla(${hue + 20}, 100%, 90%, 0.35)`;
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
+    }
+
+    /**
+     * Wave Terrain: render the last ~1.5s of FFT history as a stack of
+     * polylines with fake perspective. Newest row at bottom-front, older
+     * rows recede toward a horizon. Reads like a topographic map of the
+     * song's spectrum as it scrolls toward the viewer.
+     */
+    private renderWaveTerrain(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+        if (!this.terrainHistory) {
+            this.initTerrain();
+            if (!this.terrainHistory) return;
+        }
+
+        const rows = this.TERRAIN_ROWS;
+        const bars = this.TERRAIN_BARS;
+        const head = this.terrainHead;
+        const horizon = h * 0.18;
+        const baseY = h * 0.92;
+        const baseHalfW = w * 0.46;
+        const horizonHalfW = w * 0.08;
+        const peakH = (baseY - horizon) * 0.65;
+
+        // Walk back-to-front so closer rows paint over farther ones.
+        for (let r = rows - 1; r >= 0; r--) {
+            // i = 0 is OLDEST (farthest, smallest), i = rows-1 is NEWEST (closest).
+            const i = r;
+            const idx = (head + i) % rows;
+            const t = i / (rows - 1);                   // 0..1 far→near
+            const rowY = horizon + (baseY - horizon) * t;
+            const halfW = horizonHalfW + (baseHalfW - horizonHalfW) * t;
+            const left = w / 2 - halfW;
+            const right = w / 2 + halfW;
+            const alpha = 0.15 + t * 0.55;
+            const hue = this.theme.neonHue + (1 - t) * 60;
+
+            // Build polyline across this row
+            ctx.beginPath();
+            for (let b = 0; b < bars; b++) {
+                const v = this.terrainHistory[idx * bars + b];
+                const x = left + (b / (bars - 1)) * (right - left);
+                const y = rowY - v * peakH * (0.4 + t * 0.6);
+                if (b === 0) ctx.moveTo(x, y);
+                else         ctx.lineTo(x, y);
+            }
+            // Close back along the row baseline so we can fill under the line
+            ctx.lineTo(right, rowY);
+            ctx.lineTo(left, rowY);
+            ctx.closePath();
+
+            // Fill under the curve — translucent so layers blend
+            ctx.fillStyle = `hsla(${hue}, 92%, 50%, ${alpha * 0.22})`;
+            ctx.fill();
+
+            // Stroke the top edge for ridgeline definition
+            ctx.beginPath();
+            for (let b = 0; b < bars; b++) {
+                const v = this.terrainHistory[idx * bars + b];
+                const x = left + (b / (bars - 1)) * (right - left);
+                const y = rowY - v * peakH * (0.4 + t * 0.6);
+                if (b === 0) ctx.moveTo(x, y);
+                else         ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = `hsla(${hue}, 92%, 75%, ${alpha})`;
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+        }
+
+        // Horizon glow — soft cyan band where the terrain meets the sky.
+        const skyGrad = ctx.createLinearGradient(0, horizon - 40, 0, horizon + 4);
+        skyGrad.addColorStop(0, `hsla(${this.theme.neonHue}, 92%, 60%, 0)`);
+        skyGrad.addColorStop(1, `hsla(${this.theme.neonHue}, 92%, 60%, 0.25)`);
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, horizon - 40, w, 44);
+    }
+
+    /**
+     * Tunnel: concentric octagons receding to a vanishing point. Cycle-locked
+     * rotation; on each downbeat a forward-velocity boost lurches the camera
+     * deeper into the tunnel before settling back to baseline drift.
+     */
+    private renderTunnel(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+        const cx = w / 2;
+        const cy = h / 2;
+        const maxR = Math.min(w, h) * 0.55;
+        const SIDES = 8;
+        const neonHue = this.theme.neonHue;
+        const secHue = this.theme.secondaryHue;
+
+        // Sort rings far-to-near so closer ones paint over farther ones.
+        const ringsByZ = [...this.tunnelRings].sort((a, b) => b.z - a.z);
+
+        const baseAngle = this.currentCycle * TAU * 0.25; // 1 full rotation per 4 bars
+
+        for (const ring of ringsByZ) {
+            // Perspective: scale falls off as z increases. Pinch near the
+            // vanishing point so rings really shrink to a dot.
+            const persp = 1 - ring.z;
+            if (persp <= 0.01) continue;
+            const r = maxR * persp;
+
+            // Mix between cyan and magenta along the depth axis
+            const hue = neonHue + (secHue - neonHue) * (1 - persp) * 0.6 + ring.hueShift;
+
+            // Per-ring rotation phase — half rings spin clockwise, half CCW
+            // for a "depth contrast" feel.
+            const dir = (ring.hueShift / 22) % 2 === 0 ? 1 : -1;
+            const angle = baseAngle * dir + ring.angle;
+
+            ctx.beginPath();
+            for (let s = 0; s <= SIDES; s++) {
+                const a = angle + (s / SIDES) * TAU;
+                const x = cx + Math.cos(a) * r;
+                const y = cy + Math.sin(a) * r;
+                if (s === 0) ctx.moveTo(x, y);
+                else         ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+
+            // Alpha + thickness rise toward the camera
+            ctx.strokeStyle = `hsla(${hue}, 92%, 72%, ${0.12 + persp * 0.55})`;
+            ctx.lineWidth = 0.6 + persp * 2.2;
+            ctx.stroke();
+
+            // Subtle radial spokes at the brightest rings — emphasizes depth
+            if (persp > 0.55) {
+                ctx.strokeStyle = `hsla(${hue}, 92%, 78%, ${(persp - 0.55) * 0.35})`;
+                ctx.lineWidth = 0.6;
+                ctx.beginPath();
+                for (let s = 0; s < SIDES; s++) {
+                    const a = angle + (s / SIDES) * TAU;
+                    const x1 = cx + Math.cos(a) * r * 0.78;
+                    const y1 = cy + Math.sin(a) * r * 0.78;
+                    const x2 = cx + Math.cos(a) * r;
+                    const y2 = cy + Math.sin(a) * r;
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                }
+                ctx.stroke();
+            }
+        }
+
+        // Vanishing-point glow — gives the tunnel a "light at the end" feel.
+        const vpGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR * 0.12);
+        vpGrad.addColorStop(0, `hsla(${neonHue}, 100%, 85%, 0.55)`);
+        vpGrad.addColorStop(1, `hsla(${neonHue}, 100%, 70%, 0)`);
+        ctx.fillStyle = vpGrad;
+        ctx.fillRect(cx - maxR * 0.12, cy - maxR * 0.12, maxR * 0.24, maxR * 0.24);
+    }
+
+    /**
+     * Winamp-style spectrum flame: one big silhouette across the canvas
+     * driven by FFT bins. Horizontal hue gradient assigns "track colors"
+     * (bass=red, mid=orange/yellow, high=cyan); vertical gradient gives the
+     * fire heat falloff. Peak-hold dots + rising tongue particles complete
+     * the campfire feel.
+     */
+    private renderFlameGraph(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+        if (!this.flameBars || !this.flamePeaks) {
+            this.initFlameBars();
+            if (!this.flameBars || !this.flamePeaks) return;
+        }
+
+        const N = this.flameBars.length;
+        const baseY = h - 6;
+        const maxH = h * 0.86;
+
+        // Ember bed — a soft red glow strip along the base. Always present so
+        // even silent passages show a faint hint of warmth.
+        const emberGrad = ctx.createLinearGradient(0, baseY, 0, baseY - 60);
+        emberGrad.addColorStop(0, 'hsla(10, 95%, 50%, 0.30)');
+        emberGrad.addColorStop(1, 'hsla(20, 95%, 50%, 0)');
+        ctx.fillStyle = emberGrad;
+        ctx.fillRect(0, baseY - 60, w, 60);
+
+        // Build the silhouette path — smooth quadratic curves between bar
+        // midpoints so the flame's edge undulates instead of stepping.
+        ctx.beginPath();
+        ctx.moveTo(0, baseY);
+        for (let i = 0; i < N; i++) {
+            const x = ((i + 0.5) / N) * w;
+            const y = baseY - this.flameBars[i] * maxH;
+            if (i === 0) {
+                ctx.lineTo(0, y);
+                ctx.lineTo(x, y);
+            } else {
+                const xPrev = ((i - 0.5) / N) * w;
+                const yPrev = baseY - this.flameBars[i - 1] * maxH;
+                const cx = (x + xPrev) * 0.5;
+                const cy = (y + yPrev) * 0.5;
+                ctx.quadraticCurveTo(xPrev, yPrev, cx, cy);
+            }
+        }
+        ctx.lineTo(w, baseY);
+        ctx.closePath();
+
+        // Pass 1: horizontal HUE gradient — these are the "track colors".
+        //   left  (low frequencies / bass)  → deep red
+        //   mid   (mids / melody)           → orange → yellow
+        //   right (highs / hats / cymbals)  → cyan
+        const hueGrad = ctx.createLinearGradient(0, 0, w, 0);
+        hueGrad.addColorStop(0.00, 'hsla(0,   95%, 50%, 0.85)');
+        hueGrad.addColorStop(0.25, 'hsla(20,  95%, 55%, 0.85)');
+        hueGrad.addColorStop(0.50, 'hsla(45,  95%, 65%, 0.80)');
+        hueGrad.addColorStop(0.75, 'hsla(120, 90%, 70%, 0.65)');
+        hueGrad.addColorStop(1.00, `hsla(${this.theme.neonHue}, 95%, 75%, 0.55)`);
+        ctx.fillStyle = hueGrad;
+        ctx.fill();
+
+        // Pass 2: vertical brightness fade via screen blend — burns the tips
+        // brighter and the base saturated, giving the heat falloff.
+        const heatGrad = ctx.createLinearGradient(0, baseY, 0, baseY - maxH);
+        heatGrad.addColorStop(0.00, 'hsla(0, 0%, 0%, 0)');
+        heatGrad.addColorStop(0.55, 'hsla(0, 0%, 100%, 0.18)');
+        heatGrad.addColorStop(1.00, 'hsla(0, 0%, 100%, 0.45)');
+        ctx.fillStyle = heatGrad;
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+
+        // Bright outline along the flame's top edge — same shape, just stroke.
+        ctx.beginPath();
+        for (let i = 0; i < N; i++) {
+            const x = ((i + 0.5) / N) * w;
+            const y = baseY - this.flameBars[i] * maxH;
+            if (i === 0) ctx.moveTo(x, y);
+            else {
+                const xPrev = ((i - 0.5) / N) * w;
+                const yPrev = baseY - this.flameBars[i - 1] * maxH;
+                const cx = (x + xPrev) * 0.5;
+                const cy = (y + yPrev) * 0.5;
+                ctx.quadraticCurveTo(xPrev, yPrev, cx, cy);
+            }
+        }
+        ctx.strokeStyle = 'hsla(50, 100%, 85%, 0.45)';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        // Peak-hold dots — small floating sparks along each bar's recent max.
+        for (let i = 0; i < N; i++) {
+            const p = this.flamePeaks[i];
+            if (p < 0.08) continue;
+            const x = ((i + 0.5) / N) * w;
+            const y = baseY - p * maxH;
+            const hue = barHue(i, N);
+            ctx.fillStyle = `hsla(${hue + 25}, 95%, 85%, 0.55)`;
+            ctx.beginPath();
+            ctx.arc(x, y, 1.8, 0, TAU);
+            ctx.fill();
+        }
+
+        // Rising tongue particles — fade as they climb.
+        for (const p of this.particles) {
+            const a = Math.max(0.08, p.life);
+            ctx.fillStyle = `hsla(${p.hue + 30}, 95%, 82%, ${a * 0.55})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, TAU);
+            ctx.fill();
+        }
     }
 
     private renderMarbleDrop(ctx: CanvasRenderingContext2D, w: number, h: number): void {
@@ -985,6 +1899,20 @@ export class FullscreenVisualizer {
         this.marbles.length = 0;
         this.pegs.length = 0;
     }
+}
+
+/**
+ * Map a bar index (0..N-1) to a hue along the FlameGraph "track palette":
+ * red (bass) → orange → yellow → green/cyan (highs). Matches the horizontal
+ * gradient used to fill the flame silhouette so particles + peak dots stay
+ * coherent with the column they came from.
+ */
+function barHue(i: number, N: number): number {
+    const t = N <= 1 ? 0 : i / (N - 1);
+    if (t < 0.25) return 0   + (t / 0.25) * 20;            // red → orange
+    if (t < 0.50) return 20  + ((t - 0.25) / 0.25) * 25;   // orange → yellow
+    if (t < 0.75) return 45  + ((t - 0.50) / 0.25) * 75;   // yellow → green
+    return                 120 + ((t - 0.75) / 0.25) * 65; // green → cyan
 }
 
 /**
