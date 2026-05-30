@@ -54,3 +54,9 @@ logs/
 *.tmp
 *.bak
 scratch/
+.scratch/
+tmp/
+
+# Agent / tooling dev state (local-only)
+.grok/
+.playwright-mcp/
