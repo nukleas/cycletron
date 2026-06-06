@@ -1,0 +1,16 @@
+// Acid bassline with high resonance filter sweep and TB-303 style phrasing.
+setbpm(130);
+
+stack(
+  note("c2 ~ c2 eb2 ~ c2 ~ bb1")
+    .s("sawtooth")
+    .cutoff(sine.slow(2).range(200, 3200))
+    .resonance(18)
+    .attack(0.005)
+    .decay(0.1)
+    .sustain(0.4)
+    .release(0.08)
+    .gain(0.72),
+  s("bd*4").gain(0.82),
+  s("~ cp ~ cp").gain(0.65)
+)
