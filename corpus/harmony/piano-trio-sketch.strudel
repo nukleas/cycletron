@@ -1,0 +1,19 @@
+// Jazz piano trio: voiced chords on piano, walking bass, brush rimshots.
+setbpm(108);
+
+stack(
+  chord("<Cmaj7 Am7 Dm7 G7>")
+    .voicing()
+    .s("gm_piano")
+    .slow(2)
+    .attack(0.02)
+    .release(1.1)
+    .gain(0.45)
+    .room(0.28),
+  note("<[c2 g2] [a2 e2] [d2 a2] [g2 d2]>")
+    .s("gm_acoustic_bass")
+    .slow(2)
+    .release(0.45)
+    .gain(0.62),
+  s("~ rs ~ rs").gain(0.2)
+)
