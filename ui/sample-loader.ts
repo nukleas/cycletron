@@ -21,6 +21,24 @@ const LOCAL_WAF_BASE = '/soundfonts';
 const LOCAL_SAMPLES_BASE = '/samples/';
 /** Remote drum kit, used as a fallback when a sample isn't bundled. */
 const DIRT_SAMPLES_BASE = 'https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/';
+/** Bundled drum machine kits in `ui/public/machines/`. */
+const LOCAL_MACHINES_BASE = '/machines/';
+
+/**
+ * All bundled drum machine voices.
+ * Naming: `{MachineName}_{voice}` — these are the canonical web-strudel names
+ * (what `.bank("RolandTR808")` + `s("bd")` resolves to once the strudel-rs engine
+ * supports `.bank()` prefix lookup). Until then, use the full name directly in `s("…")`.
+ *
+ * Grouped as [machineName, displayName, voices[]].
+ */
+export const BUNDLED_MACHINE_KITS: Array<[string, string, string[]]> = [
+    ['RolandTR808', 'TR-808',   ['bd','sd','hh','oh','cp','rim','lt','mt','ht','cb']],
+    ['RolandTR909', 'TR-909',   ['bd','sd','hh','oh','cp','rd','rim']],
+    ['RolandTR707', 'TR-707',   ['bd','sd','hh','oh','cp','lt','ht']],
+    ['LinnDrum',    'LinnDrum', ['bd','sd','hh','cp']],
+    ['BossDR55',    'DR-55',    ['bd','sd','hh','rim']],
+];
 
 /**
  * Fetch the first URL that responds OK, trying each in order. Used for
@@ -202,6 +220,26 @@ export class SampleLoader {
 
         const result = await this._loadKitBatch(essentials, 'Essential Drums');
         return result.loaded;
+    }
+
+    /**
+     * Load all bundled drum machine kits from `ui/public/machines/` (offline-first).
+     * Each voice is registered under `{MachineName}_{voice}`, e.g. `RolandTR808_bd`.
+     * These are the canonical web-strudel `.bank()` equivalents — use them directly
+     * in patterns as `s("RolandTR808_bd")` until strudel-rs adds `.bank()` prefixing.
+     * Returns the total number of voices loaded.
+     */
+    async loadMachineKits(): Promise<number> {
+        let total = 0;
+        for (const [machine, displayName, voices] of BUNDLED_MACHINE_KITS) {
+            const samples = voices.map(v => ({
+                name: `${machine}_${v}`,
+                url:  `${LOCAL_MACHINES_BASE}${machine}_${v}.wav`,
+            }));
+            const {loaded} = await this._loadKitBatch(samples, displayName);
+            total += loaded;
+        }
+        return total;
     }
 
     async loadTR808(): Promise<LoadKitResult> {

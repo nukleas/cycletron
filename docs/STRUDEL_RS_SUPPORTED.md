@@ -238,6 +238,34 @@ chains.
 `tremolo(rate)` (`trem`), `tremolodepth(depth)` (`tremdepth`),
 `tremoloshape(s)` (`tremshape`), `detune(cents)` (`det`).
 
+### Chorus
+
+`chorus(depth)` (`choruspeed(rate)`) — short modulated delay (LFO depth 0–1,
+rate in Hz). Depth also controls wet/dry mix. Alias: pass both together with
+colon notation `chorus("0.5:1.2")`.
+
+### Vowel filter
+
+`vowel(v)` — three parallel bandpass filters approximating vocal formants.
+`v` is 0=A, 1=E, 2=I, 3=O, 4=U (or a pattern cycling through them).
+
+### Granular synthesis
+
+`grainsize(ms)` (`grain`) — activates granular playback of a sample. Each note
+spawns a cloud of up to 8 overlapping grains windowed with a Hann envelope.
+- `scatter(0..1)` — position scatter around `begin` (default 0.5).
+- Colon shorthand: `grainsize("100:0.5")` sets size + scatter in one call.
+- `begin` sets the cloud centre. `speed` controls grain playback rate.
+
+Works on any `s("...")` sample trigger. Synth voices are unaffected.
+
+### Impulse-response reverb
+
+`ir(v)` — applies a short convolution reverb using a pre-baked impulse
+response. `v` selects the character: 0=small room, 1=hall, 2=plate.
+Applied as an **insert** (per-voice), not a send. Use alongside or instead of
+`room()`. The IRs are 512-sample synthetic responses baked at build time.
+
 ### Sample playback
 
 `speed(v)`, `begin(0..1)`, `end(0..1)` (canonical name is `end`,
@@ -279,6 +307,26 @@ From `crates/strudel-sounds/src/synths.rs`. Pass to `s(...)` / `.sound(...)`.
 | `brown`, `red` | Brown noise |
 | `crackle` | Granular crackle |
 | `sbd` | Subtractive bass-drum synth |
+| `wt_sine` | Wavetable — pure sine |
+| `wt_tri` | Wavetable — triangle (odd harmonics) |
+| `wt_square` | Wavetable — square wave |
+| `wt_saw` | Wavetable — sawtooth |
+| `wt_flute` | Wavetable — flute timbre |
+| `wt_clarinet` | Wavetable — clarinet timbre |
+| `wt_oboe` | Wavetable — oboe timbre |
+| `wt_violin` | Wavetable — violin timbre |
+| `wt_cello` | Wavetable — cello timbre |
+| `wt_trumpet` | Wavetable — trumpet timbre |
+| `wt_bassoon` | Wavetable — bassoon timbre |
+| `wt_organ` | Wavetable — pipe organ |
+| `wt_piano` | Wavetable — piano timbre |
+| `wt_bell` | Wavetable — bell / metallic |
+| `wt_pluck` | Wavetable — plucked string |
+| `wt_bass` | Wavetable — electric bass |
+| `wt_lead` | Wavetable — synth lead |
+| `wt_pad` | Wavetable — warm pad |
+| `wt_choir` | Wavetable — choir / vocal |
+| `wt_strings` | Wavetable — string ensemble |
 
 ## 6. Samples
 
@@ -345,9 +393,7 @@ inspection — re-check when upgrading):
 
 - No inline JavaScript / arbitrary expressions inside patterns.
 - No `$:` track / labelled section syntax.
-- No convolution / impulse-response reverb (only the `room` algorithmic verb).
-- No user-defined synths or wavetable engine.
-- No granular / spectral effects.
+- Spectral effects not implemented.
 - No MIDI input (MIDI **file** parsing exists via `midi-to-strudel`).
 - Sample registry is host-driven; the engine doesn't fetch samples itself.
 

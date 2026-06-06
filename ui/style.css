@@ -1257,6 +1257,67 @@ button.danger:hover:not(:disabled) {
     color: var(--neon-bright);
 }
 
+/* Sounds panel — accurate, clickable list of playable sounds. */
+.sounds-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.sound-group-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.sound-group-count {
+    font-size: 8px;
+    font-weight: 400;
+    color: var(--neon);
+    opacity: 0.7;
+}
+
+.sound-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    align-items: center;
+}
+
+.sound-chip {
+    background: var(--bg);
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    font-size: 9px;
+    font-family: inherit;
+    color: var(--neon-bright);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.sound-chip:hover {
+    border-color: var(--neon);
+    box-shadow: 0 0 6px var(--neon-glow);
+    color: #fff;
+}
+
+.sound-hint,
+.sounds-empty {
+    font-size: 8px;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+    font-style: italic;
+}
+
 
 /* =========================================================
    Examples Modal

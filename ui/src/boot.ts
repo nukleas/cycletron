@@ -13,6 +13,7 @@ import {fileManager} from './file-manager.js';
 import {initMenuEvents} from './menu-events.js';
 import {initDragDrop} from './drag-drop.js';
 import {corpusBrowser} from './corpus-browser.js';
+import {soundsBrowser} from './sounds-browser.js';
 import {fileExplorer} from './file-explorer.js';
 import {midiLab} from './midi-lab.js';
 import {aboutModal} from './about-modal.js';
@@ -169,6 +170,7 @@ async function boot(): Promise<void> {
         initMenuEvents(),
         initDragDrop(),
         corpusBrowser.init(),
+        soundsBrowser.init(),
         fileManager.init(),
         fileExplorer.init(),
         initTrayBridge(),

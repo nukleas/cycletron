@@ -211,8 +211,17 @@ Band-pass:
 
 ## Sounds available (sample names)
 
-Common drum sounds: bd, sd, hh, oh, cp, cb, cr, lt, mt, ht, rim, clap, tom
-Synths: sine, sawtooth, triangle, square, pulse, supersaw
+Common drum sounds (default kit): bd, sd, sn, hh, oh, cp, cr, lt, mt, ht, cb, rs
+Drum machines (bundled offline — use full name in s("…")):
+  TR-808:   RolandTR808_bd  RolandTR808_sd  RolandTR808_hh  RolandTR808_oh  RolandTR808_cp  RolandTR808_rim  RolandTR808_lt  RolandTR808_mt  RolandTR808_ht  RolandTR808_cb
+  TR-909:   RolandTR909_bd  RolandTR909_sd  RolandTR909_hh  RolandTR909_oh  RolandTR909_cp  RolandTR909_rd  RolandTR909_rim
+  TR-707:   RolandTR707_bd  RolandTR707_sd  RolandTR707_hh  RolandTR707_oh  RolandTR707_cp  RolandTR707_lt  RolandTR707_ht
+  LinnDrum: LinnDrum_bd     LinnDrum_sd     LinnDrum_hh     LinnDrum_cp
+  DR-55:    BossDR55_bd     BossDR55_sd     BossDR55_hh     BossDR55_rim
+Note: .bank() is not yet supported in strudel-rs. Use the full name, e.g. s("RolandTR808_bd").
+Synths: sine, sawtooth, triangle, square, pulse, fm, supersaw, supersquare, superpwm, superzow, sbd, white, pink, brown, crackle
+Wavetable synths (richer timbres, use with note()): wt_flute, wt_clarinet, wt_oboe, wt_violin, wt_cello, wt_trumpet, wt_bassoon, wt_organ, wt_piano, wt_bell, wt_pluck, wt_bass, wt_lead, wt_pad, wt_choir, wt_strings
+New effects: .chorus(depth) .chorusspeed(hz) .vowel(0-4: A/E/I/O/U) .grainsize(ms) .scatter(0-1) .ir(0-2: room/hall/plate)
 
 General MIDI instruments (loaded on demand from soundfonts — use with note()/n() for
 real multisampled melodic voices): gm_piano, gm_epiano1, gm_harpsichord, gm_acoustic_bass,

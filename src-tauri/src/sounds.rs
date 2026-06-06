@@ -200,15 +200,36 @@ pub fn register_sound_banks(names: Vec<String>, state: State<'_, AppState>) -> R
     Ok(())
 }
 
-/// The 15 built-in synth/oscillator names (from `strudel-sounds`).
+/// Built-in synth/oscillator names (from `strudel-sounds` + new wavetables).
 pub const SYNTHS: &[&str] = &[
     "sine", "triangle", "sawtooth", "square", "pulse", "fm", "supersaw", "supersquare",
     "superpwm", "superzow", "white", "pink", "brown", "crackle", "sbd",
 ];
 
+/// Wavetable synths — richer timbres, 20 tables baked at WASM compile time.
+/// Use with `note("…").s("wt_flute")` etc.
+pub const WAVETABLES: &[&str] = &[
+    "wt_flute", "wt_clarinet", "wt_oboe", "wt_violin", "wt_cello",
+    "wt_trumpet", "wt_bassoon", "wt_organ", "wt_piano", "wt_bell",
+    "wt_pluck", "wt_bass", "wt_lead", "wt_pad", "wt_choir", "wt_strings",
+    "wt_sine", "wt_tri", "wt_square", "wt_saw",
+];
+
 /// Drum sample banks loaded by default at startup.
 pub const DEFAULT_DRUMS: &[&str] = &[
     "bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs",
+];
+
+/// Bundled drum machine kits and their voices.
+/// Bank names are `{MachineName}_{voice}`, e.g. `s("RolandTR808_bd")`.
+/// (Equivalent to web-strudel's `s("bd").bank("RolandTR808")` once strudel-rs
+/// implements `.bank()` prefix lookup in `apply_control_to_event`.)
+pub const MACHINE_KITS: &[(&str, &str, &[&str])] = &[
+    ("RolandTR808", "TR-808",   &["bd","sd","hh","oh","cp","rim","lt","mt","ht","cb"]),
+    ("RolandTR909", "TR-909",   &["bd","sd","hh","oh","cp","rd","rim"]),
+    ("RolandTR707", "TR-707",   &["bd","sd","hh","oh","cp","lt","ht"]),
+    ("LinnDrum",    "LinnDrum", &["bd","sd","hh","cp"]),
+    ("BossDR55",    "DR-55",    &["bd","sd","hh","rim"]),
 ];
 
 /// A representative slice of the General MIDI soundfont instruments that load on
@@ -224,11 +245,22 @@ pub const GM_INSTRUMENTS: &[&str] = &[
 /// Everything currently playable, for the UI and the agent's `list_sounds` tool.
 pub fn sound_catalog(state: &AppState) -> serde_json::Value {
     let user_banks = state.loaded_sample_banks.lock().unwrap().clone();
+    let machines: Vec<serde_json::Value> = MACHINE_KITS.iter().map(|(machine, display, voices)| {
+        let banks: Vec<String> = voices.iter().map(|v| format!("{machine}_{v}")).collect();
+        serde_json::json!({
+            "machine": machine,
+            "display": display,
+            "banks": banks,
+        })
+    }).collect();
     serde_json::json!({
         "synths": SYNTHS,
+        "wavetables": WAVETABLES,
         "drums": DEFAULT_DRUMS,
+        "drum_machines": machines,
+        "drum_machine_note": "Use s(\"RolandTR808_bd\") etc. Bank prefix .bank() not yet supported by the engine.",
         "gm_instruments": GM_INSTRUMENTS,
-        "gm_note": "Any General MIDI name (gm_*) works; instruments stream in on first use, so the first cycle may be silent.",
+        "gm_note": "Any General MIDI name (gm_*) works; streams in on first use, first cycle may be silent.",
         "user_sample_banks": user_banks,
     })
 }

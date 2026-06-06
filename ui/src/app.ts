@@ -704,11 +704,19 @@ export class StrudelApp {
 
         try {
             this.elements.sampleCount.textContent = 'Loading...';
-            const loaded = await this.sampleLoader!.loadEssentialDrums();
-            // Safety guard: If app was disposed during the await, stop here.
+            const drums = await this.sampleLoader!.loadEssentialDrums();
             if (!this.isInitialized) return;
 
-            this.elements.sampleCount.textContent = `${loaded} drums`;
+            // Load bundled drum machine kits in the background after essentials are ready.
+            void this.sampleLoader!.loadMachineKits().then(machineCount => {
+                if (!this.isInitialized) return;
+                const total = drums + machineCount;
+                this.elements.sampleCount.textContent = `${total}`;
+                // Refresh Sounds panel with newly available machine banks.
+                document.dispatchEvent(new CustomEvent('sounds:changed'));
+            });
+
+            this.elements.sampleCount.textContent = `${drums} drums`;
         } catch (e) {
             if (!this.isInitialized) return;
             this.elements.sampleCount.textContent = 'Failed';
@@ -826,6 +834,8 @@ export class StrudelApp {
 
             if (loadedNames.length) {
                 await invoke('register_sound_banks', {names: loadedNames});
+                // Tell the Sounds panel new banks are available.
+                document.dispatchEvent(new CustomEvent('sounds:changed'));
             }
 
             this.elements.sampleCount.textContent = `${total} samples`;

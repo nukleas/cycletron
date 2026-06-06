@@ -302,6 +302,64 @@ export class StrudelEditor {
         });
     }
 
+    /** Insert text at the cursor (replacing any selection), then focus. */
+    insertAtCursor(text: string): void {
+        const sel = this.view.state.selection.main;
+        this.view.dispatch({
+            changes: {from: sel.from, to: sel.to, insert: text},
+            selection: {anchor: sel.from + text.length},
+        });
+        this.view.focus();
+    }
+
+    /**
+     * If the cursor sits inside or adjacent to an `s("…")` call (including
+     * chained `.s("…")`), replace just the quoted sound name and return true.
+     * Otherwise return false so the caller can fall back to a full insert.
+     *
+     * Scans ±400 chars around the cursor so multi-line patterns work fine.
+     * Picks the candidate whose quoted range is closest to the cursor.
+     */
+    replaceNearestSound(name: string): boolean {
+        const state = this.view.state;
+        const cursor = state.selection.main.head;
+        const doc = state.doc.toString();
+
+        const lo = Math.max(0, cursor - 400);
+        const hi = Math.min(doc.length, cursor + 400);
+        const window = doc.slice(lo, hi);
+        const cursorInWindow = cursor - lo;
+
+        // Match both `s("…")` top-level and `.s("…")` chained forms.
+        // Captures: [full match, quote char, content]
+        const re = /\.?s\((['"]) *([\w:#.]*) *\1\)/g;
+        let best: { from: number; to: number; dist: number } | null = null;
+
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(window)) !== null) {
+            // Position of the quoted content (inside the quotes)
+            const q = m[1];
+            const qStart = m.index + m[0].indexOf(q) + 1;
+            const qEnd   = qStart + m[2].length;
+            // Distance from cursor to this match (0 if cursor is inside it)
+            const dist = cursorInWindow >= qStart && cursorInWindow <= qEnd
+                ? 0
+                : Math.min(Math.abs(cursorInWindow - qStart), Math.abs(cursorInWindow - qEnd));
+            if (!best || dist < best.dist) {
+                best = {from: lo + qStart, to: lo + qEnd, dist};
+            }
+        }
+
+        if (!best || best.dist > 80) return false;
+
+        this.view.dispatch({
+            changes: {from: best.from, to: best.to, insert: name},
+            selection: {anchor: best.from + name.length},
+        });
+        this.view.focus();
+        return true;
+    }
+
     evaluate(): void {
         const code = this.getCode();
         this.onEvaluate(code);
