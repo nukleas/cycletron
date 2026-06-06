@@ -108,6 +108,60 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "list_sounds".to_string(),
+            description:
+                "List the sounds currently playable: built-in synth/oscillator names, the \
+                default drum sample banks, common General MIDI instruments (gm_*, which stream \
+                in on first use), and any custom sample banks the user has loaded from their \
+                own folders. Call this before writing `s(...)` if unsure what's available, so \
+                you don't reference a name that falls back to a sine."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "generate_pattern".to_string(),
+            description:
+                "Generate a ready-to-play strudel pattern from an algorithmic-composition \
+                primitive. Returns complete `.strudel` code (comment + setbpm + chain) that \
+                already passes validation — a strong starting point you can play directly or \
+                edit further. Generators (and the params each uses):\n\
+                - 'infinity' (melody): Per Nørgård's self-similar series. Params: count (notes, \
+                  default 16), root (root MIDI note, default 60 = C4).\n\
+                - 'hexbeat' (rhythm): a hex string is decoded to a 1-bar kick pattern, 4 steps \
+                  per digit. Param: hex (e.g. 'a4f2', default 'a4f2').\n\
+                - 'numerals' (harmony): a Roman-numeral progression becomes diatonic chords. \
+                  Params: key (e.g. 'C', 'F#', default 'C'), numerals (e.g. 'ii V I vi').\n\
+                - 'palindrome' (form): mirror a motif into a symmetric arch. Param: motif \
+                  (space-separated notes, e.g. 'c4 e4 g4 b4').\n\
+                - 'automaton' (motion): a Wolfram cellular automaton drives an evolving hat \
+                  line, one row per cycle. Params: rule (0-255, default 90), width (default 8), \
+                  gens (cycles, default 4)."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "generator": {
+                        "type": "string",
+                        "enum": ["infinity", "hexbeat", "numerals", "palindrome", "automaton"],
+                        "description": "Which generator to run"
+                    },
+                    "count": { "type": "integer", "description": "infinity: number of notes (default 16)" },
+                    "root": { "type": "integer", "description": "infinity: root MIDI note (default 60)" },
+                    "hex": { "type": "string", "description": "hexbeat: hex string, e.g. 'a4f2'" },
+                    "key": { "type": "string", "description": "numerals: key root, e.g. 'C' or 'F#' (default 'C')" },
+                    "numerals": { "type": "string", "description": "numerals: Roman-numeral progression, e.g. 'ii V I vi'" },
+                    "motif": { "type": "string", "description": "palindrome: space-separated notes, e.g. 'c4 e4 g4 b4'" },
+                    "rule": { "type": "integer", "description": "automaton: Wolfram rule 0-255 (default 90)" },
+                    "width": { "type": "integer", "description": "automaton: number of steps per cycle (default 8)" },
+                    "gens": { "type": "integer", "description": "automaton: number of cycles/generations (default 4)" }
+                },
+                "required": ["generator"]
+            }),
+        },
+        ToolDefinition {
             name: "validate_pattern".to_string(),
             description: "Validate strudel pattern code. Returns 'valid' or error details."
                 .to_string(),

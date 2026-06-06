@@ -289,9 +289,28 @@ URL. Sample indices select variants: `bd:3` picks the 4th sample in the bd
 bank. Names are case-insensitive.
 
 Soundfont / WebAudioFont support exists in `crates/strudel-soundfont` and is
-wired through `patternhandle.queryMissingBanks()`, but the host has to
-actually load the SF2/WAF data — the UI side of that is **not yet wired
-in robostrudel**.
+wired through `patternhandle.queryMissingBanks()`. **This is now wired up in
+robostrudel**: the scheduler scans a lookahead window for missing banks
+(`ui/scheduler.ts` `onMissingBanks`), and General MIDI instruments referenced
+as `s("gm_piano")`, `s("gm_violin")`, etc. stream in on demand from the
+WebAudioFont CDN (`ui/sample-loader.ts` `loadWebAudioFont`, driven by
+`ui/src/app.ts` `_loadMissingBanks` + `ui/soundfont-tables.ts`). The first
+cycle that references an instrument may be silent while its soundfont loads.
+Custom `strudel.json` sample-map banks are **not yet** wired (GM only for now).
+
+**Offline bundling:** the default drum kit and ~21 common GM instruments are
+vendored into `ui/public/{samples,soundfonts}/` and served same-origin, so they
+load with no network. `ui/sample-loader.ts` is offline-first (bundled path →
+CDN fallback), so other GM instruments and the TR-808/909 kits still stream from
+the network when referenced.
+
+**Local sample folders (desktop):** users can load their own samples from disk
+via the command palette → "Load Sample Folder…" (`ui/src/app.ts`
+`loadSampleFolder` → Rust `scan_sample_folder` + `read_audio_file` in
+`src-tauri/src/sounds.rs`). Each subfolder becomes a bank `s("<folder>")` (files
+indexed alphabetically, `<folder>:1` etc.); loose audio files become one-shot
+banks named after the file stem. Bank names are sanitized to ≤31 bytes. Loaded
+bank names are reported to the agent via the `list_sounds` tool.
 
 ## 7. Notes, scales, chords
 

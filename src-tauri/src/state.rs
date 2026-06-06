@@ -26,6 +26,9 @@ pub struct AppState {
     pub app_data_dir: Mutex<Option<PathBuf>>,
     /// Timestamp of the last successful autosave. Populated/read by persistence.
     pub last_autosave: Mutex<Option<std::time::Instant>>,
+    /// Sample bank names the frontend has loaded from the user's disk (so the
+    /// agent's `list_sounds` tool can report which custom sounds are playable).
+    pub loaded_sample_banks: Mutex<Vec<String>>,
 }
 
 impl AppState {
@@ -45,6 +48,7 @@ impl AppState {
             user_settings: Mutex::new(UserSettings::default()),
             app_data_dir: Mutex::new(None),
             last_autosave: Mutex::new(None),
+            loaded_sample_banks: Mutex::new(Vec::new()),
         }
     }
 

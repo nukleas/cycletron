@@ -9,11 +9,13 @@ import type {MainThreadProcessor, PatternHandle} from '../pkg';
 import type {StrudelAudioManager} from '../audio-manager.js';
 import type {PatternScheduler} from '../scheduler.js';
 import type {SampleLoader} from '../sample-loader.js';
+import {GM_FONT_FILES, GM_BANK_NAMES} from '../soundfont-tables.js';
 import {PlaybackState} from "./types/app.js";
 import {StrudelEditor} from './editor.js';
 import {PatternVisualizer, ScopeVisualizer, VizMode} from './visualizer.js';
 import {FullscreenVisualizer, FullscreenVizMode} from './fullscreen-viz.js';
 import {ExamplesBrowser} from './examples.js';
+import {notify} from './notifications.js';
 
 interface AppElements {
     // -- Header controls --
@@ -94,6 +96,12 @@ export class StrudelApp {
     private _activeLocsBufPtr: number;
     private _wasmMemory: WebAssembly.Memory | null;
     private bpmView: Float64Array | null;
+    /** 128-bit set (4×u32) of GM instruments referenced but not yet loaded. */
+    private gmBitsView: Uint32Array | null;
+    /** Per-instrument 32-bit set of which soundfont variants are missing. */
+    private gmSampleBitsView: Uint32Array | null;
+    /** De-dupe key `(instrumentIndex << 16) | sampleIdx` for in-flight/loaded soundfonts. */
+    private _loadedSoundfonts: Set<number>;
     private _suppressNextCodeChange: boolean;
     /** Cached byte→char offset map for the current code. */
     private _byteToChar: Uint32Array | null;
@@ -127,6 +135,9 @@ export class StrudelApp {
         this._activeLocsBufPtr = 0;
         this._wasmMemory = null;
         this.bpmView = null;
+        this.gmBitsView = null;
+        this.gmSampleBitsView = null;
+        this._loadedSoundfonts = new Set();
         this._suppressNextCodeChange = false;
         this._byteToChar = null;
         this._byteToCharCode = '';
@@ -671,6 +682,12 @@ export class StrudelApp {
         const currentBpmPtr = wasmModule.getCurrentBpmPtr();
         this.bpmView = new Float64Array(this._wasmMemory.buffer, currentBpmPtr, 1);
 
+        // Missing-soundfont bitsets, populated by pattern.queryMissingBanks().
+        // gmBits: 4×u32 = 128 GM instruments. gmSampleBits: one u32 per
+        // instrument selecting which soundfont variants are referenced.
+        this.gmBitsView = new Uint32Array(this._wasmMemory.buffer, wasmModule.getMissingGMBitsPtr(), 4);
+        this.gmSampleBitsView = new Uint32Array(this._wasmMemory.buffer, wasmModule.getMissingGMSampleBitsPtr(), 128);
+
         this.hideError();
         this.isInitialized = true;
 
@@ -680,6 +697,10 @@ export class StrudelApp {
             audioContext,
             this.audioManager
         );
+
+        // When the scheduler scans ahead and finds GM instruments that aren't
+        // loaded yet (e.g. `s("piano")`), fetch + register their soundfonts.
+        this.scheduler.onMissingBanks = () => this._loadMissingBanks();
 
         try {
             this.elements.sampleCount.textContent = 'Loading...';
@@ -705,6 +726,116 @@ export class StrudelApp {
     startStatsUpdate(): void {
         if (this.statsInterval) clearInterval(this.statsInterval);
         this.statsInterval = setInterval(this.updateStats, 100);
+    }
+
+    /**
+     * Scheduler callback: read the missing-GM-instrument bitsets the engine
+     * populated via `queryMissingBanks`, and kick off a soundfont load for each
+     * referenced (instrument, variant) that isn't already loaded/in-flight.
+     */
+    private _loadMissingBanks(): void {
+        if (!this.sampleLoader || !this.gmBitsView || !this.gmSampleBitsView) return;
+        const instBits = this.gmBitsView;
+        const sampleBits = this.gmSampleBitsView;
+
+        for (let i = 0; i < 128; i++) {
+            if ((instBits[i >> 5] & (1 << (i & 31))) === 0) continue;
+            const needed = sampleBits[i];
+            if (needed === 0) continue;
+            for (let s = 0; s < 32; s++) {
+                if ((needed >> s) & 1) {
+                    this._triggerLoadByInstrumentAndSampleIdx(i, s);
+                }
+            }
+        }
+    }
+
+    /**
+     * Load one GM instrument variant's WebAudioFont, de-duped so the same font
+     * is never fetched twice. On failure the de-dupe key is cleared so a later
+     * tick can retry.
+     */
+    private _triggerLoadByInstrumentAndSampleIdx(index: number, sampleIdx: number): void {
+        if (index < 0 || index >= GM_BANK_NAMES.length) return;
+        const fonts = GM_FONT_FILES[index];
+        if (!fonts || sampleIdx >= fonts.length) return;
+        const fontFile = fonts[sampleIdx];
+        if (!fontFile) return;
+
+        // Numeric key: instrument index in high bits, variant in low bits.
+        const key = (index << 16) | sampleIdx;
+        if (this._loadedSoundfonts.has(key)) return;
+        this._loadedSoundfonts.add(key);
+
+        const bankName = GM_BANK_NAMES[index];
+        void this.sampleLoader!.loadWebAudioFont(bankName, fontFile, sampleIdx)
+            .catch((e: unknown) => {
+                console.warn(`[App] soundfont load failed for '${bankName}:${sampleIdx}':`, e);
+                this._loadedSoundfonts.delete(key);
+            });
+    }
+
+    /**
+     * Desktop feature: let the user pick one of their own sample folders and
+     * load it into the engine. Each subfolder becomes a bank (`s("<folder>")`)
+     * and loose audio files become one-shot banks. The Rust backend scans the
+     * folder and streams each file's bytes; we decode + register them, then tell
+     * the backend which banks exist so the AI's `list_sounds` tool knows.
+     */
+    async loadSampleFolder(): Promise<void> {
+        if (!this.sampleLoader || !this.isInitialized) return;
+        const invoke = (window as any).__TAURI__?.core?.invoke as
+            | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
+            | undefined;
+        if (!invoke) return;
+
+        let dir: string | null = null;
+        try {
+            const {open} = await import('@tauri-apps/plugin-dialog');
+            const picked = await open({directory: true, multiple: false, title: 'Choose a sample folder'});
+            dir = typeof picked === 'string' ? picked : null;
+        } catch (e) {
+            console.warn('[App] folder picker failed', e);
+            return;
+        }
+        if (!dir) return;
+
+        try {
+            const folder = await invoke<{ root: string; banks: Array<{ name: string; files: string[] }> }>(
+                'scan_sample_folder', {path: dir},
+            );
+            if (!folder.banks.length) {
+                void notify('No samples found', 'That folder has no audio files.');
+                return;
+            }
+
+            this.elements.sampleCount.textContent = 'Loading…';
+            let total = 0;
+            const loadedNames: string[] = [];
+            for (const bank of folder.banks) {
+                const datas = await Promise.all(
+                    bank.files.map(p => invoke<ArrayBuffer>('read_audio_file', {path: p})),
+                );
+                const n = await this.sampleLoader!.loadLocalBank(bank.name, datas);
+                if (!this.isInitialized) return; // disposed mid-load
+                if (n > 0) {
+                    total += n;
+                    loadedNames.push(bank.name);
+                }
+            }
+
+            if (loadedNames.length) {
+                await invoke('register_sound_banks', {names: loadedNames});
+            }
+
+            this.elements.sampleCount.textContent = `${total} samples`;
+            const preview = loadedNames.slice(0, 8).join(', ') + (loadedNames.length > 8 ? '…' : '');
+            void notify('Samples loaded', `${total} samples in ${loadedNames.length} banks: ${preview}`);
+        } catch (e) {
+            if (!this.isInitialized) return;
+            console.warn('[App] sample folder load failed', e);
+            void notify('Sample load failed', String(e));
+        }
     }
 
     debouncedEvaluate = this.debounce((code: string) => {
@@ -1224,6 +1355,12 @@ export class StrudelApp {
 
         this.processor = null;
         this.sampleLoader = null;
+
+        // Views point into WASM memory that's about to be dropped; clear them
+        // and the soundfont de-dupe set so a re-init reloads into a fresh arena.
+        this.gmBitsView = null;
+        this.gmSampleBitsView = null;
+        this._loadedSoundfonts.clear();
 
         // Force the ES module to drop the memory
         this.wasm?.__drop_wasm();

@@ -16,6 +16,13 @@ import type {StrudelAudioManager} from './audio-manager.js';
 
 const INV_240 = 1 / 240;
 
+/**
+ * How far ahead (in cycles) to scan for sound banks that aren't loaded yet.
+ * Wider than the audio `lookahead` so soundfonts have time to fetch + decode
+ * before the notes that reference them are due.
+ */
+const SOUNDFONT_LOOKAHEAD_CYCLES = 4;
+
 export class PatternScheduler {
     private processor: MainThreadProcessor | null;
     private readonly audioContext: AudioContext;
@@ -35,6 +42,13 @@ export class PatternScheduler {
     private pausedCycle: number = 0;
 
     onCycleUpdate: ((cycle: number) => void) | null = null;
+
+    /**
+     * Called each tick after scanning the lookahead window for sound banks that
+     * the engine reports missing (e.g. `s("piano")` before its soundfont is
+     * loaded). The host reads the missing-bank bitsets and kicks off loads.
+     */
+    onMissingBanks: (() => void) | null = null;
 
     private _animationId: number | null = null;
     private _scheduleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -241,6 +255,13 @@ export class PatternScheduler {
             this.scheduledTo = queryEnd;
         }
 
+        // Scan further ahead for sound banks not yet loaded (soundfonts/samples)
+        // so the host can fetch them before their notes are due.
+        if (this.onMissingBanks) {
+            this.pattern.queryMissingBanks(currentCycle, currentCycle + SOUNDFONT_LOOKAHEAD_CYCLES);
+            this.onMissingBanks();
+        }
+
         this._scheduleTimer = setTimeout(this.scheduleTick, 100);
     };
 
@@ -294,6 +315,7 @@ export class PatternScheduler {
     dispose(): void {
         this.stop();
         this.onCycleUpdate = null;
+        this.onMissingBanks = null;
         this.processor = null;
         this.audioManager = null;
     }

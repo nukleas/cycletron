@@ -25,11 +25,18 @@ pub fn build_app_menu<R: Runtime>(
     // File → Open Recent submenu (dynamic)
     let mut open_recent = SubmenuBuilder::new(app, "Open Recent");
     if recents.is_empty() {
-        open_recent = open_recent.item(
-            &MenuItemBuilder::with_id("file.recent_empty", "(no recent files)")
-                .enabled(false)
-                .build(app)?,
-        );
+        // Even when empty, expose a working "Open File…" item so the submenu
+        // never feels broken on first launch.
+        open_recent = open_recent
+            .item(
+                &MenuItemBuilder::with_id("file.recent_empty", "No recent files")
+                    .enabled(false)
+                    .build(app)?,
+            )
+            .separator()
+            .item(
+                &MenuItemBuilder::with_id("file.recent_open", "Open File…").build(app)?,
+            );
     } else {
         for (idx, p) in recents.iter().take(10).enumerate() {
             let label = display_recent(p);
@@ -170,6 +177,7 @@ pub fn build_app_menu<R: Runtime>(
 /// tell the frontend to do the work.
 pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     let id = event.id().as_ref();
+    tracing::info!(target: "robostrudel::menu", menu_id = id, "menu event received");
 
     // Dynamic recents submenu: each item id is `file.recent.{idx}`. We look
     // the path up in current state (so a stale menu still resolves correctly
@@ -209,7 +217,7 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "app.about" | "help.about" => "menu:about",
         "app.preferences" => "menu:preferences",
         "file.new" => "menu:new",
-        "file.open" => "menu:open",
+        "file.open" | "file.recent_open" => "menu:open",
         "file.save" => "menu:save",
         "file.save_as" => "menu:save_as",
         "file.import_midi" => "menu:import_midi",
@@ -231,7 +239,10 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "help.check_updates" => "menu:check_updates",
         _ => return,
     };
-    let _ = app.emit(topic, ());
+    match app.emit(topic, ()) {
+        Ok(_) => tracing::info!(target: "robostrudel::menu", topic, "emitted menu topic"),
+        Err(e) => tracing::error!(target: "robostrudel::menu", topic, error = ?e, "failed to emit menu topic"),
+    }
 }
 
 /// Rebuild the application menu from the current recents list and apply it.

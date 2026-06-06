@@ -141,13 +141,17 @@ class CommandPalette {
 
     private render(): void {
         if (!this.listEl) return;
+        const q = (this.input?.value ?? '').trim();
+        const headerHint = !q
+            ? '<div class="cmd-palette-tip">Tip: drag files in, press ⌘O to open, or type to filter.</div>'
+            : '';
         if (this.filtered.length === 0) {
-            this.listEl.innerHTML = '<div class="cmd-palette-empty">No matches.</div>';
+            this.listEl.innerHTML = headerHint + '<div class="cmd-palette-empty">No matches.</div>';
             return;
         }
         // Group consecutive items by section.
         let lastSection: Item['section'] | null = null;
-        let html = '';
+        let html = headerHint;
         this.filtered.forEach((item, idx) => {
             if (item.section !== lastSection) {
                 html += `<div class="cmd-palette-section">${item.section}</div>`;
@@ -181,6 +185,7 @@ const COMMANDS: Item[] = [
     {id: 'cmd.stop',        title: 'Stop Playback',         section: 'Commands', hint: 'Esc',    run: () => window.strudelApp?.stop?.()},
     {id: 'cmd.record',      title: 'Toggle Recording',      section: 'Commands',                 run: () => { void audioRecorder.toggle(); }},
     {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => { void midiLab.openEmpty(); }},
+    {id: 'cmd.load_samples',title: 'Load Sample Folder…',   section: 'Commands',                 run: () => { void window.strudelApp?.loadSampleFolder?.(); }},
     {id: 'cmd.preferences', title: 'Preferences…',          section: 'Commands', hint: '⌘,',     run: () => { void preferencesModal.open(); }},
     {id: 'cmd.about',       title: 'About Robostrudel',     section: 'Commands',                 run: () => { void aboutModal.open(); }},
     {id: 'cmd.updates',     title: 'Check for Updates',     section: 'Commands',                 run: () => { void checkForUpdates(true); }},

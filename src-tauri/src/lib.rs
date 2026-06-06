@@ -9,6 +9,7 @@ mod persistence;
 mod settings;
 mod shortcuts;
 mod snapshots;
+mod sounds;
 mod state;
 mod strudel;
 mod tray;
@@ -292,8 +293,13 @@ pub fn run() {
             commands::read_snapshot,
             commands::get_logs,
             commands::clear_logs,
+            commands::log_diagnostic,
             commands::diagnostic_dump,
             commands::set_dock_badge,
+            sounds::scan_sample_folder,
+            sounds::read_audio_file,
+            sounds::register_sound_banks,
+            sounds::list_sounds,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

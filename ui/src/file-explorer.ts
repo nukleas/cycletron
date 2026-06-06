@@ -34,6 +34,8 @@ export class FileExplorer {
     private expanded: Set<string> = new Set();
     private activePath: string | null = null;
     private dirty: boolean = false;
+    private recents: string[] = [];
+    private recentsCollapsed: boolean = false;
 
     async init(): Promise<void> {
         this.panel = document.getElementById('filesPanel');
@@ -53,8 +55,35 @@ export class FileExplorer {
             return;
         }
 
+        this.loadRecentsCollapsed();
         await this.refreshRoot();
+        await this.refreshRecents();
         await this.listenLibraryChanged();
+
+        document.addEventListener('file:changed', () => {
+            void this.refreshRecents();
+        });
+    }
+
+    private async refreshRecents(): Promise<void> {
+        try {
+            this.recents = await fileManager.getRecents();
+        } catch {
+            this.recents = [];
+        }
+        this.render();
+    }
+
+    private loadRecentsCollapsed(): void {
+        try {
+            this.recentsCollapsed = localStorage.getItem('file-explorer-recents-collapsed') === '1';
+        } catch { /* ignore */ }
+    }
+
+    private persistRecentsCollapsed(): void {
+        try {
+            localStorage.setItem('file-explorer-recents-collapsed', this.recentsCollapsed ? '1' : '0');
+        } catch { /* ignore */ }
     }
 
     // ------------------------------------------------------------------
@@ -116,23 +145,97 @@ export class FileExplorer {
 
     private render(): void {
         if (!this.treeEl) return;
+        this.treeEl.innerHTML = '';
+
+        // Recent section — Zed/VSCode style pseudo-folder at top of tree.
+        if (this.recents.length > 0) {
+            this.renderRecentSection(this.treeEl);
+        }
+
         const entries = this.childrenCache.get(this.root) ?? [];
         if (entries.length === 0) {
-            this.treeEl.innerHTML = `
-                <div class="file-tree-empty">
-                    Library is empty.<br>
-                    Create your first pattern.
-                    <br>
-                    <button id="fileEmptyNew">+ New File</button>
-                </div>
+            const empty = document.createElement('div');
+            empty.className = 'file-tree-empty';
+            empty.innerHTML = `
+                Library is empty.<br>
+                Create your first pattern.
+                <br>
+                <button id="fileEmptyNew">+ New File</button>
             `;
-            this.treeEl.querySelector('#fileEmptyNew')?.addEventListener('click', () => {
+            this.treeEl.appendChild(empty);
+            empty.querySelector('#fileEmptyNew')?.addEventListener('click', () => {
                 void this.newFile(this.root);
             });
             return;
         }
-        this.treeEl.innerHTML = '';
         this.renderInto(this.treeEl, entries, 0);
+    }
+
+    private renderRecentSection(parent: HTMLElement): void {
+        const header = document.createElement('div');
+        header.className = 'file-tree-row file-tree-recent-header';
+        if (!this.recentsCollapsed) header.classList.add('expanded');
+        header.setAttribute('role', 'treeitem');
+        header.title = 'Recently opened files';
+        header.style.paddingLeft = '8px';
+
+        const chevron = document.createElement('span');
+        chevron.className = 'chevron';
+        chevron.textContent = '▸';
+        header.appendChild(chevron);
+
+        const icon = document.createElement('span');
+        icon.className = 'file-tree-icon';
+        icon.textContent = '↻';
+        icon.style.color = 'var(--neon)';
+        header.appendChild(icon);
+
+        const name = document.createElement('span');
+        name.className = 'file-tree-name';
+        name.textContent = 'Recent';
+        header.appendChild(name);
+
+        header.addEventListener('click', () => {
+            this.recentsCollapsed = !this.recentsCollapsed;
+            this.persistRecentsCollapsed();
+            this.render();
+        });
+        parent.appendChild(header);
+
+        if (this.recentsCollapsed) return;
+
+        for (const path of this.recents.slice(0, 5)) {
+            const row = document.createElement('div');
+            row.className = 'file-tree-row is-file file-tree-recent-row';
+            row.dataset.path = path;
+            row.style.paddingLeft = '28px';
+            row.title = path;
+            row.setAttribute('role', 'treeitem');
+            if (this.activePath === path) {
+                row.classList.add('active');
+                if (this.dirty) row.classList.add('dirty');
+            }
+
+            const iconEl = document.createElement('span');
+            iconEl.className = 'file-tree-icon';
+            iconEl.innerHTML = fileSvg();
+            row.appendChild(iconEl);
+
+            const nameEl = document.createElement('span');
+            nameEl.className = 'file-tree-name';
+            nameEl.textContent = basename(path);
+            row.appendChild(nameEl);
+
+            row.addEventListener('click', () => {
+                void fileManager.openPath(path);
+            });
+            parent.appendChild(row);
+        }
+
+        // Visual separator between Recent and library tree.
+        const sep = document.createElement('div');
+        sep.className = 'file-tree-recent-separator';
+        parent.appendChild(sep);
     }
 
     private renderInto(parent: HTMLElement, entries: DirEntry[], depth: number): void {
@@ -588,6 +691,11 @@ async function showError(msg: string): Promise<void> {
     }
     const {message} = await import('@tauri-apps/plugin-dialog');
     await message(msg, {title: 'Robostrudel', kind: 'error'});
+}
+
+function basename(path: string): string {
+    const parts = path.split(/[\\/]/);
+    return parts[parts.length - 1] || path;
 }
 
 function folderSvg(): string {

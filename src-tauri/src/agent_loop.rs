@@ -139,6 +139,8 @@ async fn execute_tool(
     match name {
         "search_corpus" => tool_search_corpus(input, state),
         "get_example" => tool_get_example(input, state),
+        "list_sounds" => tool_list_sounds(state),
+        "generate_pattern" => tool_generate_pattern(input),
         "validate_pattern" => tool_validate_pattern(input),
         "play_pattern" => tool_play_pattern(input, state, event_tx),
         "stop" => tool_stop(state, event_tx),
@@ -191,6 +193,52 @@ fn tool_get_example(input: &serde_json::Value, state: &AppState) -> Result<Strin
     match &*corpus {
         Some(index) => index.get_source(id).map_err(|e| e.to_string()),
         None => Err("corpus not loaded".to_string()),
+    }
+}
+
+/// Report the sounds currently playable (synths, drums, GM instruments, and
+/// any user-loaded sample banks) so the agent picks names that actually exist.
+fn tool_list_sounds(state: &AppState) -> Result<String, String> {
+    serde_json::to_string_pretty(&crate::sounds::sound_catalog(state)).map_err(|e| e.to_string())
+}
+
+/// Generate ready-to-play strudel code from an algorithmic-composition
+/// primitive (`robostrudel_gen`). Returns complete `.strudel` source the agent
+/// can then validate / play / edit. Missing params fall back to the same
+/// defaults as the `gen-pattern` CLI.
+fn tool_generate_pattern(input: &serde_json::Value) -> Result<String, String> {
+    let generator = input["generator"]
+        .as_str()
+        .ok_or("missing 'generator' parameter")?;
+
+    match generator {
+        "infinity" => {
+            let count = input["count"].as_u64().unwrap_or(16) as usize;
+            let root = input["root"].as_i64().unwrap_or(60) as i32;
+            Ok(robostrudel_gen::infinity(count, root))
+        }
+        "hexbeat" => {
+            let hex = input["hex"].as_str().unwrap_or("a4f2");
+            robostrudel_gen::hexbeat(hex)
+        }
+        "numerals" => {
+            let key = input["key"].as_str().unwrap_or("C");
+            let numerals = input["numerals"].as_str().unwrap_or("ii V I vi");
+            robostrudel_gen::numerals(key, numerals)
+        }
+        "palindrome" => {
+            let motif = input["motif"].as_str().unwrap_or("c4 e4 g4 b4");
+            Ok(robostrudel_gen::palindrome(motif))
+        }
+        "automaton" => {
+            let rule = input["rule"].as_u64().unwrap_or(90).min(255) as u8;
+            let width = input["width"].as_u64().unwrap_or(8) as usize;
+            let gens = input["gens"].as_u64().unwrap_or(4) as usize;
+            robostrudel_gen::automaton(rule, width, gens)
+        }
+        other => Err(format!(
+            "unknown generator '{other}'; supported: infinity, hexbeat, numerals, palindrome, automaton"
+        )),
     }
 }
 

@@ -9,6 +9,7 @@
 
 import {fileManager} from './file-manager.js';
 import {midiLab} from './midi-lab.js';
+import {diag} from './diagnostics.js';
 
 const isTauri = !!(window as any).__TAURI__;
 const STRUDEL_EXT = /\.(strudel|js)$/i;
@@ -19,7 +20,10 @@ const MIDI_EXT = /\.(mid|midi)$/i;
 let shiftHeld = false;
 
 export async function initDragDrop(): Promise<void> {
-    if (!isTauri) return;
+    if (!isTauri) {
+        void diag('info', 'drag-drop', 'init skipped: not in Tauri');
+        return;
+    }
 
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Shift') shiftHeld = true;
@@ -28,25 +32,31 @@ export async function initDragDrop(): Promise<void> {
         if (e.key === 'Shift') shiftHeld = false;
     }, true);
 
-    const {getCurrentWebview} = await import('@tauri-apps/api/webview');
-    const webview = getCurrentWebview();
+    try {
+        const {getCurrentWebview} = await import('@tauri-apps/api/webview');
+        const webview = getCurrentWebview();
 
-    await webview.onDragDropEvent((e: any) => {
-        const type = e.payload?.type;
-        if (type === 'enter' || type === 'over') {
-            document.body.classList.add('is-drop-target');
-            return;
-        }
-        if (type === 'leave') {
-            document.body.classList.remove('is-drop-target');
-            return;
-        }
-        if (type === 'drop') {
-            document.body.classList.remove('is-drop-target');
-            const paths: string[] = e.payload?.paths ?? [];
-            handleDrop(paths);
-        }
-    });
+        await webview.onDragDropEvent((e: any) => {
+            const type = e.payload?.type;
+            if (type === 'enter' || type === 'over') {
+                document.body.classList.add('is-drop-target');
+                return;
+            }
+            if (type === 'leave') {
+                document.body.classList.remove('is-drop-target');
+                return;
+            }
+            if (type === 'drop') {
+                document.body.classList.remove('is-drop-target');
+                const paths: string[] = e.payload?.paths ?? [];
+                void diag('info', 'drag-drop', `drop received: ${paths.length} path(s) [${paths.join(', ')}]`);
+                handleDrop(paths);
+            }
+        });
+        void diag('info', 'drag-drop', 'onDragDropEvent listener registered');
+    } catch (e: any) {
+        void diag('error', 'drag-drop', `init failed: ${e?.message ?? e}`);
+    }
 }
 
 function handleDrop(paths: string[]): void {

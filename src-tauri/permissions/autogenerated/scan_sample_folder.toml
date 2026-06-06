@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-scan-sample-folder"
+description = "Enables the scan_sample_folder command without any pre-configured scope."
+commands.allow = ["scan_sample_folder"]
+
+[[permission]]
+identifier = "deny-scan-sample-folder"
+description = "Denies the scan_sample_folder command without any pre-configured scope."
+commands.deny = ["scan_sample_folder"]

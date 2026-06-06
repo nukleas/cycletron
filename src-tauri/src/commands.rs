@@ -728,6 +728,21 @@ pub fn clear_logs() {
     logs::clear()
 }
 
+/// Append a frontend-originated event into the same in-memory log ring
+/// that powers the Logs modal. Used to capture drag-drop / menu / dialog
+/// events from the webview so we can debug release builds where the JS
+/// console isn't visible.
+#[tauri::command]
+pub fn log_diagnostic(level: String, target: String, message: String) {
+    let tgt = if target.is_empty() { "robostrudel::frontend".to_string() } else { target };
+    match level.as_str() {
+        "error" => tracing::error!(target: "robostrudel::frontend", source = %tgt, "{}", message),
+        "warn" => tracing::warn!(target: "robostrudel::frontend", source = %tgt, "{}", message),
+        "debug" => tracing::debug!(target: "robostrudel::frontend", source = %tgt, "{}", message),
+        _ => tracing::info!(target: "robostrudel::frontend", source = %tgt, "{}", message),
+    }
+}
+
 /// Produce a copy-and-paste diagnostic dump: app + OS version followed
 /// by the recent log buffer. Useful for bug reports.
 #[tauri::command]

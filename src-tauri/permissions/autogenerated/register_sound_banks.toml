@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-register-sound-banks"
+description = "Enables the register_sound_banks command without any pre-configured scope."
+commands.allow = ["register_sound_banks"]
+
+[[permission]]
+identifier = "deny-register-sound-banks"
+description = "Denies the register_sound_banks command without any pre-configured scope."
+commands.deny = ["register_sound_banks"]

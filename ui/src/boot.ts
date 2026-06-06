@@ -28,6 +28,9 @@ import {checkForUpdates} from './updater.js';
 import {notify} from './notifications.js';
 import {initTrayBridge} from './tray-bridge.js';
 import {initShortcutBridge} from './shortcut-bridge.js';
+import {diag} from './diagnostics.js';
+import {fileMenuButton} from './file-menu-button.js';
+import {editorEmptyState} from './editor-empty-state.js';
 import type {SessionSnapshot, UserSettings} from './types/tauri-commands.js';
 
 const isTauri = !!(window as any).__TAURI__;
@@ -153,6 +156,8 @@ async function boot(): Promise<void> {
     metronome.init();
     welcomeModal.init();
     logsModal.init();
+    fileMenuButton.init();
+    editorEmptyState.init();
     void midiInput.init();
     void applyPhase4Settings();
     setupMidiLabTriggers();
@@ -212,6 +217,7 @@ function setupOpenFilesListener(): void {
     if (!event?.listen) return;
     void event.listen('open-files', async (e: any) => {
         const paths: string[] = e.payload ?? [];
+        void diag('info', 'open-files', `received ${paths.length} path(s): ${paths.join(', ')}`);
         for (const p of paths) {
             if (/\.(mid|midi)$/i.test(p)) {
                 await midiLab.openWithFile(p);

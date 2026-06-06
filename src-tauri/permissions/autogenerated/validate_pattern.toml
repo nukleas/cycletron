@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-validate-pattern"
+description = "Enables the validate_pattern command without any pre-configured scope."
+commands.allow = ["validate_pattern"]
+
+[[permission]]
+identifier = "deny-validate-pattern"
+description = "Denies the validate_pattern command without any pre-configured scope."
+commands.deny = ["validate_pattern"]

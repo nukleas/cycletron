@@ -231,6 +231,133 @@ header {
     flex-shrink: 0;
 }
 
+.file-menu-group {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.file-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.file-menu-btn:hover {
+    border-color: var(--neon-subtle);
+    background: var(--accent-subtle);
+    box-shadow: 0 0 0 1px rgba(71, 246, 255, 0.14), 0 0 8px var(--neon-glow);
+}
+
+.file-menu-btn[aria-expanded="true"] {
+    border-color: var(--neon);
+    color: var(--neon);
+    background: rgba(71, 246, 255, 0.08);
+}
+
+.file-menu-btn-label {
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.file-menu-btn-caret {
+    opacity: 0.7;
+    font-size: 10px;
+}
+
+.file-menu-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 240px;
+    max-width: 360px;
+    z-index: 9000;
+    background: rgba(10, 10, 12, 0.97);
+    border: 1px solid var(--neon-subtle);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(71, 246, 255, 0.08);
+    backdrop-filter: blur(12px);
+    padding: 4px 0;
+    animation: fileMenuFade 100ms ease-out;
+}
+
+.file-menu-popover--sub {
+    top: 0;
+    left: 0;
+    /* position is set inline via JS */
+}
+
+@keyframes fileMenuFade {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.file-menu-list {
+    display: flex;
+    flex-direction: column;
+    min-width: 220px;
+}
+
+.file-menu-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 14px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 80ms ease, color 80ms ease;
+}
+
+.file-menu-row:hover:not(.is-disabled),
+.file-menu-row:focus-visible {
+    background: rgba(71, 246, 255, 0.10);
+    color: var(--neon);
+    outline: none;
+}
+
+.file-menu-row.is-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.file-menu-row-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-menu-row-hint {
+    color: var(--text-dim, rgba(255, 255, 255, 0.4));
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+}
+
+.file-menu-row-caret {
+    color: var(--text-dim, rgba(255, 255, 255, 0.4));
+    font-size: 10px;
+}
+
+.file-menu-separator {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--border);
+}
+
 .slider-group {
     display: flex;
     gap: 12px;
@@ -509,6 +636,113 @@ button.danger:hover:not(:disabled) {
     container-type: inline-size;
     container-name: editor;
     border-right: 1px solid rgba(71, 246, 255, 0.08);
+}
+
+.editor-empty-state {
+    position: absolute;
+    inset: 38px 0 0 0;   /* below panel header */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 5;
+    padding: 24px;
+}
+
+.editor-empty-state[hidden] {
+    display: none;
+}
+
+.editor-empty-state-inner {
+    pointer-events: auto;
+    max-width: 420px;
+    padding: 24px 28px;
+    background: rgba(10, 10, 14, 0.78);
+    border: 1px dashed rgba(71, 246, 255, 0.25);
+    backdrop-filter: blur(6px);
+    text-align: center;
+    color: var(--text);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+}
+
+.editor-empty-state-icon {
+    color: var(--neon);
+    opacity: 0.85;
+    margin-bottom: 10px;
+}
+
+.editor-empty-state-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--neon);
+    margin-bottom: 8px;
+}
+
+.editor-empty-state-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim, rgba(255, 255, 255, 0.65));
+    margin-bottom: 16px;
+}
+
+.editor-empty-state-text code {
+    background: rgba(71, 246, 255, 0.10);
+    color: var(--neon);
+    padding: 1px 6px;
+    font-size: 12px;
+}
+
+.editor-empty-state-text kbd {
+    display: inline-block;
+    min-width: 18px;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 1.4;
+    margin: 0 1px;
+}
+
+.editor-empty-state-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.editor-empty-state-btn {
+    padding: 7px 14px;
+    border: 1px solid var(--neon);
+    background: rgba(71, 246, 255, 0.08);
+    color: var(--neon);
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 100ms ease, color 100ms ease, box-shadow 100ms ease;
+}
+
+.editor-empty-state-btn:hover {
+    background: var(--neon);
+    color: #0a0a0c;
+    box-shadow: 0 0 12px var(--neon-glow);
+}
+
+.editor-empty-state-btn--ghost {
+    border-color: var(--border);
+    background: transparent;
+    color: var(--text);
+}
+
+.editor-empty-state-btn--ghost:hover {
+    border-color: var(--neon-subtle);
+    background: rgba(71, 246, 255, 0.08);
+    color: var(--neon);
+    box-shadow: none;
 }
 
 .panel-header {
@@ -1573,10 +1807,10 @@ button.danger:hover:not(:disabled) {
    ========================================================= */
 
 body.is-drop-target::after {
-    content: 'Drop .strudel or .js file';
+    content: 'Drop to open .strudel, .js or .mid file';
     position: fixed;
     inset: 0;
-    background: rgba(0, 200, 180, 0.1);
+    background: rgba(0, 200, 180, 0.12);
     border: 2px dashed var(--neon);
     color: var(--neon);
     display: flex;
@@ -1587,6 +1821,7 @@ body.is-drop-target::after {
     text-transform: uppercase;
     pointer-events: none;
     z-index: 999;
+    backdrop-filter: blur(2px);
 }
 
 /* =========================================================
@@ -2158,6 +2393,30 @@ body.is-drop-target::after {
     white-space: nowrap;
     overflow: hidden;
     position: relative;
+}
+
+.file-tree-recent-header {
+    color: var(--text);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+}
+
+.file-tree-recent-header .file-tree-name {
+    color: var(--neon);
+    opacity: 0.85;
+}
+
+.file-tree-recent-row {
+    font-size: 12px;
+}
+
+.file-tree-recent-separator {
+    height: 1px;
+    margin: 6px 6px 4px 6px;
+    background: var(--border);
+    opacity: 0.6;
 }
 .file-tree-row:hover {
     background: var(--accent-subtle);
@@ -3057,6 +3316,14 @@ body.is-drop-target::after {
     color: var(--text-muted);
     font-size: 11px;
     letter-spacing: 0.08em;
+}
+.cmd-palette-tip {
+    padding: 8px 16px;
+    color: var(--text-muted);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border);
+    background: rgba(71, 246, 255, 0.04);
 }
 .cmd-palette-section {
     padding: 4px 16px 2px;

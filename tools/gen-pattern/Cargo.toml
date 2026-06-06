@@ -1,0 +1,11 @@
+[package]
+name = "gen-pattern"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "gen-pattern"
+path = "main.rs"
+
+[dependencies]
+robostrudel-gen = { workspace = true }

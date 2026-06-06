@@ -10,6 +10,7 @@ import {preferencesModal} from './preferences.js';
 import {checkForUpdates} from './updater.js';
 import {logsModal} from './logs-modal.js';
 import {welcomeModal} from './welcome-modal.js';
+import {diag} from './diagnostics.js';
 
 const isTauri = !!(window as any).__TAURI__;
 
@@ -65,15 +66,21 @@ export async function initMenuEvents(): Promise<void> {
     };
 
     for (const [topic, handler] of Object.entries(simple)) {
-        await listen(topic, () => { void handler(); });
+        await listen(topic, () => {
+            void diag('info', 'menu', `received ${topic}`);
+            void handler();
+        });
     }
 
     // Recent-files picker — the backend sends the list, we show a simple overlay.
     await listen('menu:open_recent', async (e: any) => {
         const list = (e.payload as string[] | null) ?? [];
+        void diag('info', 'menu', `received menu:open_recent (${list.length} entries)`);
         const picked = await pickFromList('Open Recent', list);
         if (picked) await fileManager.openPath(picked);
     });
+
+    void diag('info', 'menu', `menu listeners installed (${Object.keys(simple).length} topics)`);
 }
 
 function adjustBpm(delta: number): void {

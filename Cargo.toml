@@ -3,11 +3,13 @@ members = [
     "crates/robostrudel-core",
     "crates/robostrudel-agent",
     "crates/robostrudel-corpus",
+    "crates/robostrudel-gen",
     "src-tauri",
     "tools/parity/dsl-eval",
     "tools/parity/corpus-scan",
     "tools/corpus-check",
     "tools/midi-inspect",
+    "tools/gen-pattern",
 ]
 resolver = "2"
 
@@ -21,6 +23,7 @@ repository = "https://github.com/nukleas/robostrudel"
 robostrudel-core = { path = "crates/robostrudel-core" }
 robostrudel-agent = { path = "crates/robostrudel-agent" }
 robostrudel-corpus = { path = "crates/robostrudel-corpus" }
+robostrudel-gen = { path = "crates/robostrudel-gen" }
 # strudel-rs crates (for pattern validation in the backend)
 strudel-core = { path = "../strudel-rs/crates/strudel-core" }
 strudel-mini = { path = "../strudel-rs/crates/strudel-mini", default-features = false }

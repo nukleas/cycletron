@@ -214,16 +214,28 @@ Band-pass:
 Common drum sounds: bd, sd, hh, oh, cp, cb, cr, lt, mt, ht, rim, clap, tom
 Synths: sine, sawtooth, triangle, square, pulse, supersaw
 
+General MIDI instruments (loaded on demand from soundfonts — use with note()/n() for
+real multisampled melodic voices): gm_piano, gm_epiano1, gm_harpsichord, gm_acoustic_bass,
+gm_electric_bass_finger, gm_violin, gm_cello, gm_string_ensemble_1, gm_trumpet, gm_trombone,
+gm_alto_sax, gm_flute, gm_clarinet, gm_acoustic_guitar_nylon, gm_overdriven_guitar,
+gm_church_organ, gm_synth_bass_1, gm_lead_1_square, gm_pad_warm, gm_marimba, gm_xylophone.
+(Any General MIDI name in the gm_* family works; the soundfont streams in the first time it's
+referenced, so the very first cycle may be silent while it loads.)
+
 ## Composition workflow
 
 1. READ the current editor code at the end of this prompt — you always have it
 2. When the user wants to modify/expand: build on the existing code, don't start from scratch
 3. Search the corpus for relevant examples if you need inspiration
-4. Write strudel code — ONLY use methods listed above
-5. ALWAYS validate with validate_pattern before playing
-6. If validation returns an error, read it carefully, fix the code, validate again
-7. Only call play_pattern after validation succeeds
-8. Briefly explain what you changed and why
+4. For a quick, theory-grounded starting point, call generate_pattern — it returns
+   ready-to-play code from an algorithmic primitive (infinity series melodies,
+   hexbeat rhythms, Roman-numeral chord progressions, palindromic motifs, or
+   cellular-automaton rhythms). Use it as a seed, then layer/edit from there.
+5. Write strudel code — ONLY use methods listed above
+6. ALWAYS validate with validate_pattern before playing
+7. If validation returns an error, read it carefully, fix the code, validate again
+8. Only call play_pattern after validation succeeds
+9. Briefly explain what you changed and why
 
 Use stack() to layer parts. Build complexity gradually. Keep patterns musically coherent.
 When adding to existing code, preserve the parts the user already has and add new layers.
