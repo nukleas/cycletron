@@ -26,6 +26,27 @@ Exception: simple root-only names like `chord("<C G Am F>")` happen to parse as 
 `note("0 2 4").scale("C4:minor")` — correct.
 `.scale()` only quantizes numeric scale degrees (integers), not absolute note names like c4, eb4.
 
+**`pickRestart` sections last only 1 cycle (~1–2s) unless you add `.slow(n)` to the selector.**
+Without `.slow()`, the selector `"<intro chorus drop>"` cycles through one label per cycle —
+at 140 BPM that's ~1.7 seconds per section. Always add `.slow(n)` to the selector string.
+
+`.slow(8)` is the default sweet spot (~14s per label at 140 BPM). Timing formula:
+  `slow_factor = (desired_seconds × BPM) / (60 × 4)`
+
+| Section length | At 140 BPM |
+|---|---|
+| ~7s | `.slow(4)` |
+| ~14s | `.slow(8)` ← default |
+| ~27s | `.slow(16)` |
+
+```strudel
+// CORRECT — each label lasts 8 cycles (~14s at 140 BPM)
+"<intro chorus drop outro>".slow(8).pickRestart({ intro: ..., chorus: ..., drop: ..., outro: ... })
+
+// WRONG — each label lasts 1 cycle (~1.7s), sections flash by
+"<intro chorus drop>".pickRestart({ ... })
+```
+
 **Arrow function params must NOT have parentheses.**
 `.every(2, x => x.fast(2))` — correct.
 `.every(2, (x) => x.fast(2))` — WRONG, parse error.
@@ -380,10 +401,13 @@ note("<[c3,e3,g3] [f3,a3,c4] [g3,b3,d4] [c3,e3,g3]>")
   .s("gm_epiano1").slow(2).gain(0.45).room(0.3)
 ```
 
-Section switching with pickRestart:
+Section switching with pickRestart (note the required .slow(n) on the selector):
 ```
-"<a a b b>".pickRestart({
-  a: note("c4 e4").s("sine"),
-  b: note("c4 e4 g4 b4").s("sine")
+// Each label lasts 8 cycles (~14s at 120 BPM). Omitting .slow() = 1-cycle flash.
+"<intro verse chorus chorus outro>".slow(8).pickRestart({
+  intro:  s("bd ~ bd ~").gain(0.7),
+  verse:  stack(s("bd ~ bd ~"), note("c4 e4 g4").s("sine").gain(0.4)),
+  chorus: stack(s("bd*4"), s("~ sd ~ sd"), note("<c4 g4 a4 f4>").s("triangle").gain(0.5)),
+  outro:  note("c3 e3 g3").s("sine").slow(2).room(0.5).gain(0.35)
 })
 ```
