@@ -1,0 +1,14 @@
+// Slow Euclidean pulse with long decay tones and gentle degradation.
+setbpm(75);
+
+stack(
+  s("bd(3,8)").gain(0.48),
+  s("hh(5,8)").gain(0.18).degrade,
+  note("c3 g3 eb3 ab3")
+    .slow(2)
+    .s("sine")
+    .attack(0.35)
+    .release(3.0)
+    .gain(0.42)
+    .cutoff(sine.slow(16).range(400, 2000))
+)

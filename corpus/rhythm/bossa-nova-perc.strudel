@@ -1,0 +1,9 @@
+// Bossa nova percussion with syncopated kick, rimshot (rs), and brushed hats.
+setbpm(108);
+
+stack(
+  s("bd ~ ~ bd ~ bd ~ ~").gain(0.55),
+  s("~ ~ rs ~ ~ ~ rs ~").gain(0.42),
+  s("hh*8").gain(0.22),
+  s("~ ~ ~ oh ~ ~ ~ oh").gain(0.32)
+)
