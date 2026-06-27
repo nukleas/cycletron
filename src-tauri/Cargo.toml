@@ -10,6 +10,7 @@ robostrudel-agent = { workspace = true }
 robostrudel-corpus = { workspace = true }
 robostrudel-gen = { workspace = true }
 strudel-dsl = { workspace = true }
+strudel-core = { workspace = true }
 strudel-mini = { workspace = true, default-features = false }
 midi-to-strudel = { workspace = true }
 tauri = { version = "2.11", features = ["tray-icon"] }

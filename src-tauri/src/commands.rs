@@ -86,6 +86,49 @@ pub fn validate_pattern(code: String) -> Result<String, String> {
     }
 }
 
+/// Inspect a pattern: evaluate it and return a structured digest of what it
+/// actually emits (events per cycle, sounds, pitch range, loop length, silent
+/// cycles). Lets the editor "see" a pattern, mirroring the agent's tool.
+#[tauri::command]
+pub fn inspect_pattern(code: String, cycles: Option<usize>) -> Result<strudel::PatternDigest, String> {
+    strudel::inspect_code(&code, cycles.unwrap_or(8))
+}
+
+/// Analyze a pattern's arrangement: detect the loop period and segment it into
+/// sections by active instrumentation, with the song form and wall-clock
+/// lengths. Scans up to `max_cycles` (default 32).
+#[tauri::command]
+pub fn analyze_arrangement(
+    code: String,
+    max_cycles: Option<usize>,
+) -> Result<strudel::ArrangementAnalysis, String> {
+    strudel::analyze_code(&code, max_cycles.unwrap_or(32))
+}
+
+/// Critique a pattern: heuristic musical lint (clipping, silent cycles, mono
+/// image, semitone clashes, missing low end, static pitch). Not correctness —
+/// that's validate_pattern — but whether it's likely to sound good.
+#[tauri::command]
+pub fn critique_pattern(code: String, cycles: Option<usize>) -> Result<strudel::Critique, String> {
+    strudel::critique_code(&code, cycles.unwrap_or(16))
+}
+
+/// Genre recipes. With no `genre`, returns every loaded recipe (for a picker);
+/// with a `genre`, returns the matching recipe(s) by name or alias.
+#[tauri::command]
+pub fn genre_recipe(
+    genre: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<robostrudel_corpus::Recipe>, String> {
+    let recipes = state.recipes.lock().unwrap();
+    match genre {
+        Some(q) if !q.trim().is_empty() => {
+            Ok(recipes.iter().filter(|r| r.matches(&q)).cloned().collect())
+        }
+        _ => Ok(recipes.clone()),
+    }
+}
+
 /// Search the corpus.
 #[tauri::command]
 pub fn search_corpus(

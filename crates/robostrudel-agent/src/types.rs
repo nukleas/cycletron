@@ -56,6 +56,12 @@ pub struct MessagesResponse {
     pub id: String,
     pub content: Vec<ContentBlock>,
     pub stop_reason: Option<String>,
+    /// True when a tool_use block's argument JSON was truncated mid-stream
+    /// (max_tokens cutoff). Not part of the API wire format — set by the
+    /// stream accumulator. Defaults to false on the `message_start` event,
+    /// which deserializes into this same struct.
+    #[serde(default)]
+    pub incomplete_tool_input: bool,
     pub usage: Usage,
 }
 

@@ -7,6 +7,10 @@
 const COMMANDS: &[&str] = &[
     "send_message",
     "validate_pattern",
+    "inspect_pattern",
+    "analyze_arrangement",
+    "critique_pattern",
+    "genre_recipe",
     "search_corpus",
     "get_corpus_source",
     "get_pattern_history",

@@ -9,6 +9,7 @@ members = [
     "tools/parity/corpus-scan",
     "tools/corpus-check",
     "tools/midi-inspect",
+    "tools/agent-stats",
     "tools/gen-pattern",
 ]
 resolver = "2"

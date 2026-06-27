@@ -4,7 +4,7 @@ use crate::settings::UserSettings;
 use robostrudel_agent::ClaudeClient;
 use robostrudel_core::config::AppConfig;
 use robostrudel_core::session::Session;
-use robostrudel_corpus::InMemoryCorpusIndex;
+use robostrudel_corpus::{InMemoryCorpusIndex, Recipe};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -29,6 +29,9 @@ pub struct AppState {
     /// Sample bank names the frontend has loaded from the user's disk (so the
     /// agent's `list_sounds` tool can report which custom sounds are playable).
     pub loaded_sample_banks: Mutex<Vec<String>>,
+    /// Genre recipes loaded from `<corpus>/genres/*.md` — the knowledge base
+    /// behind the `genre_recipe` tool.
+    pub recipes: Mutex<Vec<Recipe>>,
 }
 
 impl AppState {
@@ -49,6 +52,7 @@ impl AppState {
             app_data_dir: Mutex::new(None),
             last_autosave: Mutex::new(None),
             loaded_sample_banks: Mutex::new(Vec::new()),
+            recipes: Mutex::new(Vec::new()),
         }
     }
 
@@ -82,6 +86,16 @@ impl AppState {
             Ok(corpus) => *self.corpus.lock().unwrap() = Some(corpus),
             Err(e) => tracing::warn!("corpus failed to load: {e}"),
         }
+
+        // Genre recipes live under `<corpus>/genres/` — prefer the curated dir
+        // (the repo's hand-gated corpus), falling back to the bulk corpus path.
+        let genres_dir = curated_path
+            .clone()
+            .unwrap_or_else(|| corpus_path.clone())
+            .join("genres");
+        let recipes = robostrudel_corpus::recipes::load_recipes(&genres_dir);
+        tracing::info!("loaded {} genre recipe(s) from {}", recipes.len(), genres_dir.display());
+        *self.recipes.lock().unwrap() = recipes;
 
         // Claude client
         let api_key = config

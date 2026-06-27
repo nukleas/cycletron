@@ -34,6 +34,12 @@ impl ClaudeClient {
         }
     }
 
+    /// The configured per-response output token limit. Used to phrase
+    /// truncation feedback to the model.
+    pub fn max_tokens(&self) -> u32 {
+        self.max_tokens
+    }
+
     /// Send a streaming request and emit AgentEvents via the channel.
     /// Returns the accumulated response (content blocks + stop reason).
     pub async fn stream_message(

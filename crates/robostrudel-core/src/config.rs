@@ -62,7 +62,10 @@ fn default_model() -> String {
 }
 
 fn default_max_tokens() -> u32 {
-    8192
+    // Multi-section patterns are large backtick strings emitted alongside
+    // prose; 8192 routinely truncated the tool-call JSON mid-stream, which
+    // surfaced as empty `{}` tool inputs and a validate retry loop.
+    32000
 }
 
 fn default_tempo() -> f64 {

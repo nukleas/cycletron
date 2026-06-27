@@ -1,7 +1,7 @@
 use crate::client::AgentError;
 use crate::types::*;
 use tokio::sync::mpsc;
-use tracing::debug;
+use tracing::{debug, warn};
 
 /// Accumulates streaming SSE events into a complete MessagesResponse.
 pub struct StreamAccumulator {
@@ -12,6 +12,11 @@ pub struct StreamAccumulator {
     message_id: Option<String>,
     input_tokens: u32,
     output_tokens: u32,
+    /// Set when a tool_use block's accumulated JSON failed to parse — almost
+    /// always because the response was truncated at `max_tokens` mid-stream.
+    /// Without this the input silently stayed `{}` and the agent shipped a
+    /// tool call with no arguments.
+    incomplete_tool_input: bool,
 }
 
 impl StreamAccumulator {
@@ -23,6 +28,7 @@ impl StreamAccumulator {
             message_id: None,
             input_tokens: 0,
             output_tokens: 0,
+            incomplete_tool_input: false,
         }
     }
 
@@ -59,11 +65,26 @@ impl StreamAccumulator {
 
             StreamEvent::ContentBlockStop { index } => {
                 // If this was a tool_use block, parse the accumulated JSON
-                if let Some(ContentBlock::ToolUse { input, .. }) =
+                if let Some(ContentBlock::ToolUse { name, input, .. }) =
                     self.content_blocks.get_mut(*index)
                 {
-                    if let Ok(parsed) = serde_json::from_str(&self.tool_input_buffer) {
-                        *input = parsed;
+                    match serde_json::from_str(&self.tool_input_buffer) {
+                        Ok(parsed) => *input = parsed,
+                        Err(e) => {
+                            // Buffer is non-empty but won't parse → the JSON was
+                            // cut off mid-stream. Leaving `input` as `{}` here is
+                            // what produced the "missing 'code' parameter" loop.
+                            // Flag it so the loop can give the model honest
+                            // feedback instead of a misleading arg error.
+                            if !self.tool_input_buffer.is_empty() {
+                                warn!(
+                                    "tool '{name}' input JSON truncated/unparseable ({e}); \
+                                     {} bytes buffered — likely max_tokens cutoff",
+                                    self.tool_input_buffer.len()
+                                );
+                                self.incomplete_tool_input = true;
+                            }
+                        }
                     }
                     // Emit tool call event
                     if let Some(ContentBlock::ToolUse { name, input, .. }) =
@@ -106,6 +127,7 @@ impl StreamAccumulator {
             id: self.message_id.unwrap_or_default(),
             content: self.content_blocks,
             stop_reason: self.stop_reason,
+            incomplete_tool_input: self.incomplete_tool_input,
             usage: Usage {
                 input_tokens: self.input_tokens,
                 output_tokens: self.output_tokens,

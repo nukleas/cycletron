@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-analyze-arrangement"
+description = "Enables the analyze_arrangement command without any pre-configured scope."
+commands.allow = ["analyze_arrangement"]
+
+[[permission]]
+identifier = "deny-analyze-arrangement"
+description = "Denies the analyze_arrangement command without any pre-configured scope."
+commands.deny = ["analyze_arrangement"]

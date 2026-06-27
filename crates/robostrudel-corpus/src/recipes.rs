@@ -1,0 +1,447 @@
+//! Genre recipes: a living, version-controlled knowledge base of how to make a
+//! given style in *strudel-rs terms*. Each recipe is a markdown file under
+//! `corpus/genres/` with YAML-ish frontmatter (constraints + sources) and a
+//! body of prose sections, each carrying complete, playable ```strudel
+//! fragments.
+//!
+//! The fragments are the trust anchor: `corpus-check` extracts and validates
+//! every one through the real engine, so a recipe can never claim a pattern
+//! that doesn't actually parse and emit on strudel-rs.
+
+use serde::{Deserialize, Serialize};
+use std::path::Path;
+
+/// A parsed genre recipe.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Recipe {
+    /// Canonical genre name (kebab-case), from the filename if absent in frontmatter.
+    pub genre: String,
+    /// Alternate names this recipe answers to (for lookup).
+    pub aliases: Vec<String>,
+    /// Tempo range in BPM, if given.
+    pub bpm: Option<(f64, f64)>,
+    /// Typical swing amount (0..1), if given.
+    pub swing: Option<f64>,
+    /// Scales / modes idiomatic to the genre.
+    pub scales: Vec<String>,
+    /// Defining sounds / instruments.
+    pub key_sounds: Vec<String>,
+    /// One-line description of the sound.
+    pub signature: Option<String>,
+    /// Reference artists / tracks.
+    pub artists: Vec<String>,
+    /// Source URLs the recipe was researched from (provenance).
+    pub sources: Vec<String>,
+    /// Prose sections, each with any playable fragments under it.
+    pub sections: Vec<RecipeSection>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecipeSection {
+    pub title: String,
+    pub prose: String,
+    pub fragments: Vec<Fragment>,
+}
+
+/// A complete, playable strudel-rs snippet. `label` is the section it lives
+/// under (plus an index when a section has several).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Fragment {
+    pub label: String,
+    pub code: String,
+}
+
+impl Recipe {
+    /// Does this recipe answer to `query` (case-insensitive match on genre or
+    /// an alias, exact or substring)?
+    pub fn matches(&self, query: &str) -> bool {
+        let q = query.trim().to_lowercase();
+        if q.is_empty() {
+            return false;
+        }
+        let names = std::iter::once(&self.genre).chain(self.aliases.iter());
+        names.into_iter().any(|n| {
+            let n = n.to_lowercase();
+            n == q || n.contains(&q) || q.contains(&n)
+        })
+    }
+
+    /// Every fragment across all sections, in order.
+    pub fn fragments(&self) -> impl Iterator<Item = &Fragment> {
+        self.sections.iter().flat_map(|s| s.fragments.iter())
+    }
+}
+
+/// Parse a recipe from markdown text. `name` is the fallback genre (the file
+/// stem). Returns an error only for structurally unusable input.
+pub fn parse_recipe(name: &str, text: &str) -> Result<Recipe, String> {
+    let (frontmatter, body) = split_frontmatter(text);
+    let fm = parse_frontmatter(frontmatter);
+
+    let genre = fm.scalar("genre").unwrap_or_else(|| name.to_string());
+    let bpm = fm.array("bpm").and_then(|v| {
+        let nums: Vec<f64> = v.iter().filter_map(|s| s.parse().ok()).collect();
+        match nums.as_slice() {
+            [lo, hi, ..] => Some((*lo, *hi)),
+            [only] => Some((*only, *only)),
+            _ => None,
+        }
+    });
+
+    let sections = parse_sections(body);
+
+    Ok(Recipe {
+        genre,
+        aliases: fm.array("aliases").unwrap_or_default(),
+        bpm,
+        swing: fm.scalar("swing").and_then(|s| s.parse().ok()),
+        scales: fm.array("scales").unwrap_or_default(),
+        key_sounds: fm.array("key_sounds").unwrap_or_default(),
+        signature: fm.scalar("signature"),
+        artists: fm.array("artists").unwrap_or_default(),
+        sources: fm.array("sources").unwrap_or_default(),
+        sections,
+    })
+}
+
+/// Load every `*.md` recipe under `dir`. Missing dir → empty (not an error).
+pub fn load_recipes(dir: &Path) -> Vec<Recipe> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return out;
+    };
+    let mut paths: Vec<_> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("md"))
+        .filter(|p| !is_doc_file(p))
+        .collect();
+    paths.sort();
+    for path in paths {
+        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("recipe");
+        if let Ok(text) = std::fs::read_to_string(&path) {
+            if let Ok(recipe) = parse_recipe(stem, &text) {
+                out.push(recipe);
+            }
+        }
+    }
+    out
+}
+
+/// Extract every ```strudel fenced code block from markdown, paired with the
+/// nearest preceding `##` heading as a label. Used by the validation gate.
+pub fn extract_strudel_blocks(text: &str) -> Vec<Fragment> {
+    let mut out = Vec::new();
+    let mut current_heading = String::from("(intro)");
+    let mut in_block = false;
+    let mut buf: Vec<&str> = Vec::new();
+    let mut seen_in_section = 0usize;
+
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        if in_block {
+            if trimmed.starts_with("```") {
+                seen_in_section += 1;
+                let label = if seen_in_section > 1 {
+                    format!("{current_heading} #{seen_in_section}")
+                } else {
+                    current_heading.clone()
+                };
+                out.push(Fragment {
+                    label,
+                    code: buf.join("\n"),
+                });
+                buf.clear();
+                in_block = false;
+            } else {
+                buf.push(line);
+            }
+        } else if trimmed.starts_with("```strudel") {
+            in_block = true;
+        } else if let Some(h) = trimmed.strip_prefix("## ") {
+            current_heading = h.trim().to_string();
+            seen_in_section = 0;
+        }
+    }
+    out
+}
+
+/// Markdown files that document the directory rather than being recipes
+/// (`README.md`, `_template.md`, …) are skipped by the loader.
+fn is_doc_file(path: &Path) -> bool {
+    path.file_stem()
+        .and_then(|s| s.to_str())
+        .map(|stem| stem.starts_with('_') || stem.eq_ignore_ascii_case("readme"))
+        .unwrap_or(false)
+}
+
+// --- internals ----------------------------------------------------------
+
+/// Split leading `---`-fenced frontmatter from the markdown body.
+fn split_frontmatter(text: &str) -> (&str, &str) {
+    let trimmed = text.trim_start_matches(['\u{feff}', '\n', '\r']);
+    if let Some(rest) = trimmed.strip_prefix("---") {
+        // Find the closing `---` on its own line.
+        if let Some(end) = rest.find("\n---") {
+            let fm = &rest[..end];
+            let body = &rest[end + 4..];
+            return (fm.trim_start_matches(['\n', '\r']), body);
+        }
+    }
+    ("", text)
+}
+
+#[derive(Default)]
+struct Frontmatter {
+    scalars: std::collections::HashMap<String, String>,
+    arrays: std::collections::HashMap<String, Vec<String>>,
+}
+
+impl Frontmatter {
+    fn scalar(&self, key: &str) -> Option<String> {
+        self.scalars.get(key).cloned()
+    }
+    fn array(&self, key: &str) -> Option<Vec<String>> {
+        self.arrays.get(key).cloned()
+    }
+}
+
+/// Parse the controlled YAML subset our recipes use: `key: scalar`,
+/// `key: [a, b, c]`, and block arrays (`key:` then indented `- item` lines).
+fn parse_frontmatter(text: &str) -> Frontmatter {
+    let mut fm = Frontmatter::default();
+    let lines: Vec<&str> = text.lines().collect();
+    let mut i = 0;
+    while i < lines.len() {
+        let line = lines[i];
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            i += 1;
+            continue;
+        }
+        // Block-array continuation handled inside the key branch below.
+        if let Some((key, value)) = trimmed.split_once(':') {
+            let key = key.trim().to_string();
+            let value = value.trim();
+            if value.is_empty() {
+                // Possibly a block array on following indented `- ` lines.
+                let mut items = Vec::new();
+                let mut j = i + 1;
+                while j < lines.len() {
+                    let t = lines[j].trim();
+                    if let Some(item) = t.strip_prefix("- ") {
+                        items.push(unquote(item.trim()));
+                        j += 1;
+                    } else if t.is_empty() {
+                        j += 1;
+                    } else {
+                        break;
+                    }
+                }
+                if items.is_empty() {
+                    fm.scalars.insert(key, String::new());
+                } else {
+                    fm.arrays.insert(key, items);
+                }
+                i = j;
+                continue;
+            } else if value.starts_with('[') && value.ends_with(']') {
+                let inner = &value[1..value.len() - 1];
+                let items = split_inline_array(inner);
+                fm.arrays.insert(key, items);
+            } else {
+                fm.scalars.insert(key, unquote(value));
+            }
+        }
+        i += 1;
+    }
+    fm
+}
+
+/// Split an inline-array body on commas, respecting quoted strings.
+fn split_inline_array(inner: &str) -> Vec<String> {
+    let mut items = Vec::new();
+    let mut buf = String::new();
+    let mut quote: Option<char> = None;
+    for c in inner.chars() {
+        match quote {
+            Some(q) => {
+                if c == q {
+                    quote = None;
+                } else {
+                    buf.push(c);
+                }
+            }
+            None => match c {
+                '"' | '\'' => quote = Some(c),
+                ',' => {
+                    let t = buf.trim().to_string();
+                    if !t.is_empty() {
+                        items.push(t);
+                    }
+                    buf.clear();
+                }
+                _ => buf.push(c),
+            },
+        }
+    }
+    let t = buf.trim().to_string();
+    if !t.is_empty() {
+        items.push(t);
+    }
+    items
+}
+
+fn unquote(s: &str) -> String {
+    let s = s.trim();
+    if (s.starts_with('"') && s.ends_with('"') && s.len() >= 2)
+        || (s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2)
+    {
+        s[1..s.len() - 1].to_string()
+    } else {
+        s.to_string()
+    }
+}
+
+/// Parse the markdown body into sections by `##` headings, pulling ```strudel
+/// fragments into the section they sit under.
+fn parse_sections(body: &str) -> Vec<RecipeSection> {
+    let mut sections: Vec<RecipeSection> = Vec::new();
+    let mut title = String::from("Overview");
+    let mut prose: Vec<String> = Vec::new();
+    let mut frags: Vec<Fragment> = Vec::new();
+    let mut in_block = false;
+    let mut buf: Vec<&str> = Vec::new();
+    let mut frag_idx = 0usize;
+
+    let flush = |title: &str,
+                 prose: &mut Vec<String>,
+                 frags: &mut Vec<Fragment>,
+                 sections: &mut Vec<RecipeSection>| {
+        let text = prose.join("\n").trim().to_string();
+        if !text.is_empty() || !frags.is_empty() {
+            sections.push(RecipeSection {
+                title: title.to_string(),
+                prose: text,
+                fragments: std::mem::take(frags),
+            });
+        }
+        prose.clear();
+    };
+
+    for line in body.lines() {
+        let trimmed = line.trim_start();
+        if in_block {
+            if trimmed.starts_with("```") {
+                frag_idx += 1;
+                let label = if frag_idx > 1 {
+                    format!("{title} #{frag_idx}")
+                } else {
+                    title.clone()
+                };
+                frags.push(Fragment {
+                    label,
+                    code: buf.join("\n"),
+                });
+                buf.clear();
+                in_block = false;
+            } else {
+                buf.push(line);
+            }
+        } else if trimmed.starts_with("```strudel") {
+            in_block = true;
+        } else if trimmed.starts_with("```") {
+            // Non-strudel fenced block: skip its contents but keep as prose marker.
+            in_block = false;
+        } else if let Some(h) = trimmed.strip_prefix("## ") {
+            flush(&title, &mut prose, &mut frags, &mut sections);
+            title = h.trim().to_string();
+            frag_idx = 0;
+        } else {
+            prose.push(line.to_string());
+        }
+    }
+    flush(&title, &mut prose, &mut frags, &mut sections);
+    sections
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SAMPLE: &str = r#"---
+genre: acid-techno
+aliases: [acid, acid house]
+bpm: [130, 150]
+swing: 0.1
+scales: [phrygian, minor]
+key_sounds: [sawtooth, bd]
+signature: Squelchy 303 over a relentless four-on-the-floor
+artists: [Hardfloor, Plastikman]
+sources:
+  - https://example.com/acid
+  - "https://example.com/303, the box"
+---
+
+Intro prose.
+
+## Drum core
+
+Four on the floor.
+
+```strudel
+s("bd*4")
+```
+
+## 303 bassline
+
+```strudel
+note("c2 c2").s("sawtooth").lpf(400)
+```
+"#;
+
+    #[test]
+    fn parses_frontmatter_and_sections() {
+        let r = parse_recipe("fallback", SAMPLE).unwrap();
+        assert_eq!(r.genre, "acid-techno");
+        assert_eq!(r.aliases, vec!["acid", "acid house"]);
+        assert_eq!(r.bpm, Some((130.0, 150.0)));
+        assert_eq!(r.swing, Some(0.1));
+        assert_eq!(r.scales, vec!["phrygian", "minor"]);
+        // Quoted source with an embedded comma stays one item.
+        assert_eq!(r.sources.len(), 2);
+        assert!(r.sources[1].contains("the box"));
+        // Sections: Overview (intro prose) + Drum core + 303 bassline.
+        let titles: Vec<&str> = r.sections.iter().map(|s| s.title.as_str()).collect();
+        assert!(titles.contains(&"Drum core"));
+        assert!(titles.contains(&"303 bassline"));
+        // Two fragments total.
+        assert_eq!(r.fragments().count(), 2);
+    }
+
+    #[test]
+    fn matches_genre_and_aliases() {
+        let r = parse_recipe("x", SAMPLE).unwrap();
+        assert!(r.matches("acid-techno"));
+        assert!(r.matches("ACID"));
+        assert!(r.matches("house")); // substring of "acid house"
+        assert!(!r.matches("jazz"));
+    }
+
+    #[test]
+    fn doc_files_are_excluded() {
+        assert!(is_doc_file(Path::new("genres/README.md")));
+        assert!(is_doc_file(Path::new("genres/readme.md")));
+        assert!(is_doc_file(Path::new("genres/_template.md")));
+        assert!(!is_doc_file(Path::new("genres/acid-techno.md")));
+    }
+
+    #[test]
+    fn extract_blocks_labels_by_heading() {
+        let frags = extract_strudel_blocks(SAMPLE);
+        assert_eq!(frags.len(), 2);
+        assert_eq!(frags[0].label, "Drum core");
+        assert_eq!(frags[0].code, r#"s("bd*4")"#);
+        assert_eq!(frags[1].label, "303 bassline");
+    }
+}

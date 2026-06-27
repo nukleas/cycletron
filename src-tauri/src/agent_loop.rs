@@ -6,7 +6,7 @@ use robostrudel_core::traits::CorpusIndex;
 use robostrudel_core::types::{ChatMessage, ChatRole, CorpusQuery, MusicalRole, PlaybackState};
 use std::sync::LazyLock;
 use tokio::sync::mpsc;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// System prompt loaded from prompts/system.md at runtime or embedded.
 static SYSTEM_PROMPT: LazyLock<String> = LazyLock::new(|| {
@@ -52,6 +52,10 @@ pub async fn run_agent_loop(
     };
 
     let mut full_text = String::new();
+    // Run id groups all tool calls made for this one user message, so the
+    // telemetry analyzer can see retries within a single request.
+    let run = crate::telemetry::now_millis();
+    let telemetry_dir = state.app_data_dir();
     // 20 leaves the agent room to call tools several times (each tool round
     // is one iteration) before the loop forces an answer. 10 was tight
     // enough that complex prompts would get cut mid-thought.
@@ -89,26 +93,68 @@ pub async fn run_agent_loop(
             content: response.content.clone(),
         });
 
+        // Did this response get cut off at the token limit mid-tool-call? If
+        // so the tool's argument JSON never finished and `input` is an empty
+        // `{}`. Executing it just yields "missing 'code' parameter", which the
+        // model can't act on — it retries, truncates again, and loops. Detect
+        // it here and feed back an honest, actionable error instead.
+        let truncated = response.stop_reason.as_deref() == Some("max_tokens")
+            || response.incomplete_tool_input;
+
         let mut tool_results = Vec::new();
         for (id, name, input) in &tool_calls {
-            info!("executing tool: {name}");
-            let result = execute_tool(name, input, state, &event_tx).await;
-            let (content, is_error) = match result {
-                Ok(r) => {
-                    let _ = event_tx.send(AgentEvent::ToolResult {
-                        name: name.clone(),
-                        result: r.clone(),
-                    });
-                    (r, None)
-                }
-                Err(e) => {
-                    let _ = event_tx.send(AgentEvent::ToolResult {
-                        name: name.clone(),
-                        result: format!("error: {e}"),
-                    });
-                    (e, Some(true))
+            let input_empty = input.as_object().is_none_or(|o| o.is_empty());
+            let (content, is_error) = if truncated && input_empty {
+                warn!("tool '{name}' arguments truncated at token limit; not executing");
+                let msg = format!(
+                    "Your previous message hit the {} token output limit before the \
+                     arguments to `{name}` finished streaming, so the tool received no \
+                     input. Emit a more compact pattern — use `*n` for repeats, `@n` for \
+                     holds, and `slowcat`/`<...>` instead of fully expanding every event — \
+                     and keep the whole reply shorter so the tool call completes.",
+                    client.max_tokens()
+                );
+                let _ = event_tx.send(AgentEvent::ToolResult {
+                    name: name.clone(),
+                    result: format!("error: {msg}"),
+                });
+                (msg, Some(true))
+            } else {
+                info!("executing tool: {name}");
+                match execute_tool(name, input, state, &event_tx).await {
+                    Ok(r) => {
+                        let _ = event_tx.send(AgentEvent::ToolResult {
+                            name: name.clone(),
+                            result: r.clone(),
+                        });
+                        (r, None)
+                    }
+                    Err(e) => {
+                        let _ = event_tx.send(AgentEvent::ToolResult {
+                            name: name.clone(),
+                            result: format!("error: {e}"),
+                        });
+                        (e, Some(true))
+                    }
                 }
             };
+
+            crate::telemetry::record(
+                telemetry_dir.as_deref(),
+                &crate::telemetry::ToolEvent {
+                    ts: crate::telemetry::now_millis(),
+                    run,
+                    turn: iteration,
+                    tool: name.clone(),
+                    ok: is_error.is_none(),
+                    input: crate::telemetry::truncate(
+                        &serde_json::to_string(input).unwrap_or_default(),
+                        240,
+                    ),
+                    result: crate::telemetry::truncate(&content, 200),
+                },
+            );
+
             tool_results.push(ContentBlock::ToolResult {
                 tool_use_id: id.clone(),
                 content,
@@ -142,6 +188,10 @@ async fn execute_tool(
         "list_sounds" => tool_list_sounds(state),
         "generate_pattern" => tool_generate_pattern(input),
         "validate_pattern" => tool_validate_pattern(input),
+        "inspect_pattern" => tool_inspect_pattern(input),
+        "analyze_arrangement" => tool_analyze_arrangement(input),
+        "critique_pattern" => tool_critique_pattern(input),
+        "genre_recipe" => tool_genre_recipe(input, state),
         "play_pattern" => tool_play_pattern(input, state, event_tx),
         "stop" => tool_stop(state, event_tx),
         "set_tempo" => tool_set_tempo(input, state, event_tx),
@@ -251,6 +301,129 @@ fn tool_validate_pattern(input: &serde_json::Value) -> Result<String, String> {
             "INVALID: {e}\n\nFix the error and validate again before playing."
         )),
     }
+}
+
+fn tool_inspect_pattern(input: &serde_json::Value) -> Result<String, String> {
+    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let cycles = input["cycles"].as_u64().unwrap_or(8) as usize;
+
+    match strudel::inspect_code(code, cycles) {
+        Ok(digest) => Ok(strudel::digest_to_text(&digest)),
+        Err(e) => Ok(format!(
+            "Could not inspect — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and inspect again."
+        )),
+    }
+}
+
+fn tool_analyze_arrangement(input: &serde_json::Value) -> Result<String, String> {
+    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let max_cycles = input["max_cycles"].as_u64().unwrap_or(32) as usize;
+
+    match strudel::analyze_code(code, max_cycles) {
+        Ok(analysis) => Ok(strudel::analyze_to_text(&analysis)),
+        Err(e) => Ok(format!(
+            "Could not analyze — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and analyze again."
+        )),
+    }
+}
+
+fn tool_critique_pattern(input: &serde_json::Value) -> Result<String, String> {
+    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let cycles = input["cycles"].as_u64().unwrap_or(16) as usize;
+
+    match strudel::critique_code(code, cycles) {
+        Ok(critique) => Ok(strudel::critique_to_text(&critique)),
+        Err(e) => Ok(format!(
+            "Could not critique — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and critique again."
+        )),
+    }
+}
+
+fn tool_genre_recipe(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
+    let recipes = state.recipes.lock().unwrap();
+    if recipes.is_empty() {
+        return Ok("No genre recipes are loaded yet (corpus/genres/ is empty).".to_string());
+    }
+
+    let query = input["genre"].as_str().unwrap_or("").trim();
+    if query.is_empty() {
+        // List mode.
+        let mut s = String::from("Genre recipes available (call genre_recipe with one):\n");
+        for r in recipes.iter() {
+            let bpm = r
+                .bpm
+                .map(|(lo, hi)| format!(" [{lo:.0}–{hi:.0} BPM]"))
+                .unwrap_or_default();
+            let sig = r.signature.as_deref().unwrap_or("");
+            s.push_str(&format!("- {}{bpm} — {sig}\n", r.genre));
+        }
+        return Ok(s);
+    }
+
+    let matches: Vec<_> = recipes.iter().filter(|r| r.matches(query)).collect();
+    if matches.is_empty() {
+        let names: Vec<&str> = recipes.iter().map(|r| r.genre.as_str()).collect();
+        return Ok(format!(
+            "No recipe matches '{query}'. Available: {}.",
+            names.join(", ")
+        ));
+    }
+    Ok(matches
+        .iter()
+        .map(|r| format_recipe(r))
+        .collect::<Vec<_>>()
+        .join("\n\n---\n\n"))
+}
+
+/// Render a recipe as agent-readable markdown-ish text: constraints header,
+/// then each section's prose + playable fragments, then sources.
+fn format_recipe(r: &robostrudel_corpus::Recipe) -> String {
+    use std::fmt::Write;
+    let mut s = String::new();
+
+    let aliases = if r.aliases.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", r.aliases.join(", "))
+    };
+    let _ = writeln!(s, "# {}{aliases}", r.genre);
+    if let Some(sig) = &r.signature {
+        let _ = writeln!(s, "{sig}");
+    }
+    let mut facts: Vec<String> = Vec::new();
+    if let Some((lo, hi)) = r.bpm {
+        facts.push(format!("BPM {lo:.0}–{hi:.0}"));
+    }
+    if let Some(sw) = r.swing {
+        facts.push(format!("swing {sw}"));
+    }
+    if !r.scales.is_empty() {
+        facts.push(format!("scales: {}", r.scales.join(", ")));
+    }
+    if !r.key_sounds.is_empty() {
+        facts.push(format!("sounds: {}", r.key_sounds.join(", ")));
+    }
+    if !facts.is_empty() {
+        let _ = writeln!(s, "{}", facts.join(" · "));
+    }
+    if !r.artists.is_empty() {
+        let _ = writeln!(s, "Artists: {}", r.artists.join(", "));
+    }
+
+    for sec in &r.sections {
+        let _ = writeln!(s, "\n## {}", sec.title);
+        if !sec.prose.is_empty() {
+            let _ = writeln!(s, "{}", sec.prose);
+        }
+        for frag in &sec.fragments {
+            let _ = writeln!(s, "```strudel\n{}\n```", frag.code);
+        }
+    }
+
+    if !r.sources.is_empty() {
+        let _ = writeln!(s, "\nSources: {}", r.sources.join(", "));
+    }
+    s
 }
 
 /// Instead of playing directly, emit a "set_code" event to the frontend.

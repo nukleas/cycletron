@@ -12,6 +12,7 @@ mod snapshots;
 mod sounds;
 mod state;
 mod strudel;
+mod telemetry;
 mod tray;
 
 
@@ -256,6 +257,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::send_message,
             commands::validate_pattern,
+            commands::inspect_pattern,
+            commands::analyze_arrangement,
+            commands::critique_pattern,
+            commands::genre_recipe,
             commands::search_corpus,
             commands::get_corpus_source,
             commands::get_pattern_history,
