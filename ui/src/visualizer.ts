@@ -10,6 +10,7 @@
 import type {PatternHandle} from '../pkg';
 import type {PatternScheduler} from '../scheduler.js';
 import {VizMode} from './types/visualizer.js';
+import {measure} from '../query-profiler.js';
 
 export {VizMode};
 
@@ -372,7 +373,8 @@ export class PatternVisualizer {
 
         if (startCycle !== this._lastStartCycle) {
             // Query uses detected period if known - avoids over-allocating in Rust
-            pattern.queryCycleViewData(Math.floor(startCycle), snapUnit);
+            measure('queryCycleViewData', currentCycle, () =>
+                pattern.queryCycleViewData(Math.floor(startCycle), snapUnit));
             this._lastStartCycle = startCycle;
             this._staticDirty = true;
         }
@@ -619,7 +621,8 @@ export class PatternVisualizer {
 
         // SAFETY: this is fine to store since the view is dedicated specifically for this callsite
         const startCycle = Math.floor(currentCycle / cycles) * cycles;
-        const len = pattern.queryVizRectsView(startCycle, currentCycle, cycles, drawWidth, height);
+        const len = measure('queryVizRectsView', currentCycle, () =>
+            pattern.queryVizRectsView(startCycle, currentCycle, cycles, drawWidth, height));
         const rects = this.pianoRectsBuf!;
 
         // rects[0] = number of inactive rects; stride is 4: [x, y, w, h]

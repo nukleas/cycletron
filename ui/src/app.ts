@@ -10,6 +10,7 @@ import type {StrudelAudioManager} from '../audio-manager.js';
 import type {PatternScheduler} from '../scheduler.js';
 import type {SampleLoader} from '../sample-loader.js';
 import {GM_FONT_FILES, GM_BANK_NAMES} from '../soundfont-tables.js';
+import {measure, setWasmMemory} from '../query-profiler.js';
 import {PlaybackState} from "./types/app.js";
 import {StrudelEditor} from './editor.js';
 import {PatternVisualizer, ScopeVisualizer, VizMode} from './visualizer.js';
@@ -189,7 +190,14 @@ export class StrudelApp {
     private updateActiveNotes(cycle: number): void {
         if (!this.scheduler?.pattern || !this.editor || !this._wasmMemory) return;
 
-        const count = this.scheduler.pattern.queryActiveLocations(cycle, cycle + 0.5);
+        // queryActiveLocations(now, lookahead) — the 2nd arg is a RELATIVE
+        // duration (Rust queries [now, now + lookahead]), not an absolute end.
+        // Passing `cycle + 0.5` made the window grow with the cycle index, so
+        // every frame queried tens of thousands of haps after a few minutes of
+        // playback — the source of the progressive choppiness. 0.5 = look half
+        // a cycle ahead for active notes.
+        const count = measure('queryActiveLocations', cycle, () =>
+            this.scheduler!.pattern!.queryActiveLocations(cycle, 0.5));
 
         if (count === 0) {
             this.editor.clearActiveNotes();
@@ -676,6 +684,7 @@ export class StrudelApp {
         // Capture pointers for active-note highlighting
         this._activeLocsBufPtr = wasmModule.getActiveLocsBufPtr();
         this._wasmMemory = this.audioManager.getWasmMemory()!;
+        setWasmMemory(this._wasmMemory);
 
         // BPM is published by parsePattern into a single-f64 cell; we just keep
         // a view over it and read `[0]` after each parse. NaN = no value in code.

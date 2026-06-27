@@ -13,6 +13,7 @@
 
 import type {MainThreadProcessor, PatternHandle} from './pkg';
 import type {StrudelAudioManager} from './audio-manager.js';
+import {measure} from './query-profiler.js';
 
 const INV_240 = 1 / 240;
 
@@ -251,14 +252,17 @@ export class PatternScheduler {
         const queryEnd = currentCycle + this.lookahead;
 
         if (queryEnd > this.scheduledTo) {
-            this.processor.queryEventsPacked(this.scheduledTo, queryEnd, cps);
+            const from = this.scheduledTo;
+            measure('queryEventsPacked', currentCycle, () =>
+                this.processor!.queryEventsPacked(from, queryEnd, cps));
             this.scheduledTo = queryEnd;
         }
 
         // Scan further ahead for sound banks not yet loaded (soundfonts/samples)
         // so the host can fetch them before their notes are due.
         if (this.onMissingBanks) {
-            this.pattern.queryMissingBanks(currentCycle, currentCycle + SOUNDFONT_LOOKAHEAD_CYCLES);
+            measure('queryMissingBanks', currentCycle, () =>
+                this.pattern!.queryMissingBanks(currentCycle, currentCycle + SOUNDFONT_LOOKAHEAD_CYCLES));
             this.onMissingBanks();
         }
 
