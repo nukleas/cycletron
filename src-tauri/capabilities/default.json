@@ -76,6 +76,10 @@
     "allow-scan-sample-folder",
     "allow-read-audio-file",
     "allow-register-sound-banks",
-    "allow-list-sounds"
+    "allow-list-sounds",
+    "allow-list-midi-input-devices",
+    "allow-start-midi-input-listening",
+    "allow-stop-midi-input-listening",
+    "allow-get-midi-input-status"
   ]
 }

@@ -9,6 +9,26 @@
 
 import type {MainThreadProcessor} from './pkg';
 import type {DecodedSample, StrudelAudioManager} from './audio-manager.js';
+import {GM_BANK_NAMES, GM_FONT_FILES} from './soundfont-tables.js';
+
+/**
+ * A decoded soundfont zone retained on the JS side for the live MIDI monitor
+ * ([`ui/src/midi-monitor.ts`]). Unlike [`DecodedSample`], these `AudioBuffer`s
+ * are NOT shipped to the WASM engine — they're played directly on the main
+ * thread via `AudioBufferSourceNode`, independent of the strudel scheduler.
+ */
+export interface MonitorZone {
+    audioBuffer: AudioBuffer;
+    /** Exact recording pitch in cents (e.g. 6000 = MIDI 60). */
+    baseDetuneCents: number;
+    /** Nearest MIDI note the sample was recorded at. */
+    midiNote: number;
+    keyRangeLow: number;
+    keyRangeHigh: number;
+    /** Loop start in decoded-rate samples, or 0xFFFFFFFF if the sample doesn't loop. */
+    loopStart: number;
+    loopEnd: number;
+}
 
 /** Marker for an unpitched sample (drum). */
 const UNPITCHED = 0xFFFF_FFFF;
@@ -339,6 +359,61 @@ export class SampleLoader {
         this.audioManager.sendSampleBatch(valid);
         console.log(`[SampleLoader] ${fontFile}: ${valid.length}/${zones.length} zones → "${fullName}"`);
         return valid.length;
+    }
+
+    /**
+     * Decode a GM instrument's primary soundfont into [`MonitorZone`]s for the
+     * live MIDI monitor. Reuses the same fetch/parse/decode path as
+     * [`loadWebAudioFont`] but keeps the `AudioBuffer`s on the JS side instead
+     * of shipping PCM to the WASM engine. Returns `[]` if the instrument is
+     * unknown or the soundfont can't be fetched.
+     */
+    async loadMonitorInstrument(bankName: string): Promise<MonitorZone[]> {
+        const idx = GM_BANK_NAMES.indexOf(bankName);
+        const fonts = idx >= 0 ? GM_FONT_FILES[idx] : null;
+        const fontFile = fonts && fonts.length > 0 ? fonts[0] : null;
+        if (!fontFile) {
+            console.warn(`[SampleLoader] no soundfont for monitor instrument "${bankName}"`);
+            return [];
+        }
+
+        const resp = await fetchFirstOk([
+            `${LOCAL_WAF_BASE}/${fontFile}.js`,
+            `${WAF_BASE_URL}/${fontFile}.js`,
+        ]);
+        if (!resp?.ok) return [];
+        const zones = parseWafJs(await resp.text());
+
+        const out: MonitorZone[] = [];
+        for (const zone of zones) {
+            try {
+                const binary = atob(zone.fileData);
+                const bytes = new Uint8Array(binary.length);
+                for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+                const audioBuffer = await this.audioContext.decodeAudioData(bytes.buffer);
+
+                const baseDetuneCents = zone.originalPitch - 100.0 * zone.coarseTune - zone.fineTune;
+                const midiNote = Math.round(baseDetuneCents / 100);
+                const hasLoop = zone.loopStart > 1 && zone.loopStart < zone.loopEnd;
+                const scale = audioBuffer.sampleRate / zone.sampleRate;
+                const loopStart = hasLoop ? Math.round(zone.loopStart * scale) : 0xFFFF_FFFF;
+                const loopEnd = hasLoop ? Math.round(zone.loopEnd * scale) : 0;
+
+                out.push({
+                    audioBuffer,
+                    baseDetuneCents,
+                    midiNote,
+                    keyRangeLow: zone.keyRangeLow,
+                    keyRangeHigh: zone.keyRangeHigh,
+                    loopStart,
+                    loopEnd,
+                });
+            } catch {
+                // skip undecodable zone
+            }
+        }
+        console.log(`[SampleLoader] monitor "${bankName}": ${out.length}/${zones.length} zones`);
+        return out;
     }
 
     /**

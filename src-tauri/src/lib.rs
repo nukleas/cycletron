@@ -5,6 +5,7 @@ mod library;
 mod logs;
 mod menu;
 mod midi;
+mod midi_input;
 mod persistence;
 mod settings;
 mod shortcuts;
@@ -152,6 +153,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(app_state)
         .manage(tray::TrayStateHolder::new())
+        .manage(midi_input::MidiInputState::new())
         .setup(|app| {
             // Resolve the app data dir (e.g. ~/Library/Application Support/com.nukleas.robostrudel)
             // and hand it to AppState so recents + session snapshots can persist.
@@ -305,6 +307,10 @@ pub fn run() {
             sounds::read_audio_file,
             sounds::register_sound_banks,
             sounds::list_sounds,
+            midi_input::list_midi_input_devices,
+            midi_input::start_midi_input_listening,
+            midi_input::stop_midi_input_listening,
+            midi_input::get_midi_input_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

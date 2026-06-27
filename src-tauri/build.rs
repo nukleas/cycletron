@@ -55,6 +55,10 @@ const COMMANDS: &[&str] = &[
     "read_audio_file",
     "register_sound_banks",
     "list_sounds",
+    "list_midi_input_devices",
+    "start_midi_input_listening",
+    "stop_midi_input_listening",
+    "get_midi_input_status",
 ];
 
 fn main() {

@@ -109,10 +109,32 @@ export interface MetronomeSettings {
     volume: number;
 }
 
+export interface MidiDeviceInfo {
+    id: string;
+    name: string;
+}
+
+export interface PadTrigger {
+    /// "cc" or "note".
+    kind: 'cc' | 'note';
+    /// CC number or note number.
+    value: number;
+}
+
+export interface PadAssignment {
+    trigger: PadTrigger;
+    /// Action id, e.g. "togglePlay", "stop", "hush", "evaluate", "commit", "clear", "newTrack".
+    action: string;
+}
+
 export interface MidiInputSettings {
     device_id: string | null;
     cc_gain: number;
     cc_bpm: number;
+    monitor_enabled: boolean;
+    monitor_instrument: string;
+    monitor_gain: number;
+    pad_assignments: PadAssignment[];
 }
 
 export interface UserSettings {
