@@ -9,6 +9,8 @@
  * tracking, and recents stay consistent with Cmd+O / Cmd+S flows.
  */
 
+import {invoke} from './tauri.js';
+import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
 
 interface DirEntry {
@@ -640,16 +642,6 @@ export class FileExplorer {
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 function cssEscape(s: string): string {
     if (typeof (window as any).CSS?.escape === 'function') {

@@ -384,6 +384,31 @@ Scale melody (numeric degrees — .scale() only works on numbers, not note names
 note("0 2 4 7 4 2 0 ~").scale("C4:minor").s("wt_lead").release(0.3)
 ```
 
+**Melodic development — do NOT loop one bar through a long section.**
+A 1-bar melody under `.slow(8)` — or inside an 8-cycle `pickRestart` label — just
+repeats 8 times and sounds robotic. `.slow(n)` sets section LENGTH; it adds no
+melodic motion. Give the line somewhere to go: write a multi-bar phrase, or vary
+a short motif across cycles. Prefer these over a single repeating bar:
+
+4-bar developing phrase — each `[ ]` group is one bar (same idiom as the walking
+bass, applied to a lead). NO commas inside `< >`:
+```
+note("<[0 2 4 7] [7 4 2 0] [4 5 7 9] [7 4 2 0]>")
+  .scale("C4:major").s("wt_lead").release(0.3).gain(0.4)
+```
+
+Vary a short motif across cycles so a 1-bar idea becomes a 2-bar call-and-response:
+```
+note("0 2 4 7 4 2 0 ~").scale("C4:major").s("wt_lead")
+  .every(2, x => x.rev).gain(0.4)
+```
+
+Add motion with an octave echo (`off` stacks a shifted, transposed copy):
+```
+note("0 2 4 7").scale("C4:major").s("wt_lead")
+  .off(0.25, x => x.add(12)).gain(0.4)
+```
+
 Walking bass — one note per cycle:
 ```
 note("<c2 f2 g2 c2>").s("gm_acoustic_bass").gain(0.7).release(0.5)
@@ -404,10 +429,12 @@ note("<[c3,e3,g3] [f3,a3,c4] [g3,b3,d4] [c3,e3,g3]>")
 Section switching with pickRestart (note the required .slow(n) on the selector):
 ```
 // Each label lasts 8 cycles (~14s at 120 BPM). Omitting .slow() = 1-cycle flash.
+// Each section plays for 8 cycles, so its melody must DEVELOP across those bars
+// (multi-bar phrase or every()-varied motif) — not loop a single bar 8 times.
 "<intro verse chorus chorus outro>".slow(8).pickRestart({
   intro:  s("bd ~ bd ~").gain(0.7),
-  verse:  stack(s("bd ~ bd ~"), note("c4 e4 g4").s("sine").gain(0.4)),
-  chorus: stack(s("bd*4"), s("~ sd ~ sd"), note("<c4 g4 a4 f4>").s("triangle").gain(0.5)),
+  verse:  stack(s("bd ~ bd ~"), note("0 2 4 7 4 2 0 ~").scale("C4:major").s("sine").every(2, x => x.rev).gain(0.4)),
+  chorus: stack(s("bd*4"), s("~ sd ~ sd"), note("<[7 9 11 12] [11 9 7 4] [4 5 7 9] [7 4 2 0]>").scale("C4:major").s("triangle").gain(0.5)),
   outro:  note("c3 e3 g3").s("sine").slow(2).room(0.5).gain(0.35)
 })
 ```

@@ -9,6 +9,8 @@ members = [
     "tools/parity/corpus-scan",
     "tools/corpus-check",
     "tools/midi-inspect",
+    "tools/midi-ingest",
+    "tools/strudel-search",
     "tools/agent-stats",
     "tools/gen-pattern",
 ]

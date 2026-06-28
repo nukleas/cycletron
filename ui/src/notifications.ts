@@ -6,6 +6,7 @@
  * from being told about *while away from the window*. Don't flood.
  */
 
+import {invoke} from './tauri.js';
 import type {UserSettings} from './types/tauri-commands.js';
 
 const isTauri = !!(window as any).__TAURI__;
@@ -52,10 +53,4 @@ export async function notify(title: string, body: string): Promise<void> {
     } catch (e) {
         console.warn('[notify] failed:', e);
     }
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
 }

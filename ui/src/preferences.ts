@@ -7,11 +7,23 @@
  *   - The "Change…" buttons from other modals (e.g. Library root in here)
  */
 
-import type {UserSettings} from './types/tauri-commands.js';
+import {invoke} from './tauri.js';
+import type {UserSettings, PadAssignment} from './types/tauri-commands.js';
 import {dismissibleModal} from './modal-utils.js';
 import {setNotificationsEnabled} from './notifications.js';
 import {metronome} from './metronome.js';
 import {midiInput} from './midi-input.js';
+import {midiPads, PAD_ACTIONS} from './midi-pads.js';
+import {midiToNoteName} from './midi-capture.js';
+import {midiMonitor} from './midi-monitor.js';
+
+/** Subset of the `list_sounds` catalog the monitor instrument picker needs. */
+interface SoundCatalog {
+    synths: string[];
+    wavetables: string[];
+    gm_instruments: string[];
+    user_sample_banks: string[];
+}
 
 const isTauri = !!(window as any).__TAURI__;
 
@@ -33,6 +45,10 @@ export class PreferencesModal {
     private midiInputSelect: HTMLSelectElement | null = null;
     private midiCcGain: HTMLInputElement | null = null;
     private midiCcBpm: HTMLInputElement | null = null;
+    private midiMonitorEnabled: HTMLInputElement | null = null;
+    private midiMonitorInstrument: HTMLSelectElement | null = null;
+    private midiMonitorGain: HTMLInputElement | null = null;
+    private midiPadsContainer: HTMLElement | null = null;
     /** The most recently loaded settings — used to preserve fields the
      *  modal doesn't explicitly edit. */
     private loaded: UserSettings | null = null;
@@ -54,8 +70,17 @@ export class PreferencesModal {
         this.midiInputSelect = document.getElementById('prefsMidiInput') as HTMLSelectElement;
         this.midiCcGain = document.getElementById('prefsMidiCcGain') as HTMLInputElement;
         this.midiCcBpm = document.getElementById('prefsMidiCcBpm') as HTMLInputElement;
+        this.midiMonitorEnabled = document.getElementById('prefsMidiMonitorEnabled') as HTMLInputElement;
+        this.midiMonitorInstrument = document.getElementById('prefsMidiMonitorInstrument') as HTMLSelectElement;
+        this.midiMonitorGain = document.getElementById('prefsMidiMonitorGain') as HTMLInputElement;
+        this.midiPadsContainer = document.getElementById('prefsMidiPads');
+        // Refresh the instrument list when user sample banks change.
+        document.addEventListener('sounds:changed', () => void this.populateMonitorInstruments());
         document.getElementById('prefsAudioRefresh')?.addEventListener('click', () => void this.refreshAudioDevices());
         document.getElementById('prefsMidiRefresh')?.addEventListener('click', () => void this.refreshMidiDevices());
+
+        // Re-render the pad table after a successful "learn".
+        midiPads.onLearned = () => this.renderPads();
 
         document.getElementById('prefsSave')?.addEventListener('click', () => void this.save());
         document.getElementById('prefsChangeLibrary')?.addEventListener('click', () => void this.changeLibrary());
@@ -74,6 +99,7 @@ export class PreferencesModal {
 
     close(): void {
         if (!this.root) return;
+        midiPads.cancelLearn();
         this.root.hidden = true;
         this.cleanup?.();
         this.cleanup = null;
@@ -105,6 +131,13 @@ export class PreferencesModal {
             }
             if (this.midiCcGain) this.midiCcGain.value = String(settings.midi_input?.cc_gain ?? 7);
             if (this.midiCcBpm)  this.midiCcBpm.value  = String(settings.midi_input?.cc_bpm  ?? 74);
+            if (this.midiMonitorEnabled) this.midiMonitorEnabled.checked = settings.midi_input?.monitor_enabled ?? false;
+            await this.populateMonitorInstruments();
+            if (this.midiMonitorInstrument) this.midiMonitorInstrument.value = settings.midi_input?.monitor_instrument ?? 'sawtooth';
+            if (this.midiMonitorGain) this.midiMonitorGain.value = String(Math.round((settings.midi_input?.monitor_gain ?? 0.8) * 100));
+            // Seed the live pad matcher from persisted settings, then render rows.
+            midiPads.setAssignments(settings.midi_input?.pad_assignments ?? []);
+            this.renderPads();
 
             await this.refreshAudioDevices();
             await this.refreshMidiDevices();
@@ -124,12 +157,13 @@ export class PreferencesModal {
             return Number.isFinite(v) ? v : null;
         };
         const baseMetronome = this.loaded?.metronome ?? {enabled: false, volume: 0.4};
-        const baseMidi = this.loaded?.midi_input ?? {device_id: null, cc_gain: 7, cc_bpm: 74};
+        const baseMidi = this.loaded?.midi_input;
         const firstRunDone = this.loaded?.first_run_done ?? false;
         const volPct = numOrNull(this.metronomeVolume);
         const ccGain = numOrNull(this.midiCcGain);
         const ccBpm  = numOrNull(this.midiCcBpm);
-        const midiDevice = this.midiInputSelect?.value ?? baseMidi.device_id ?? null;
+        const midiDevice = this.midiInputSelect?.value ?? baseMidi?.device_id ?? null;
+        const monitorGainPct = numOrNull(this.midiMonitorGain);
         return {
             anthropic: {
                 api_key: trimOrNull(this.apiKey?.value),
@@ -151,8 +185,12 @@ export class PreferencesModal {
             },
             midi_input: {
                 device_id: midiDevice && midiDevice.length > 0 ? midiDevice : null,
-                cc_gain: ccGain != null ? Math.max(0, Math.min(127, Math.round(ccGain))) : baseMidi.cc_gain,
-                cc_bpm:  ccBpm  != null ? Math.max(0, Math.min(127, Math.round(ccBpm)))  : baseMidi.cc_bpm,
+                cc_gain: ccGain != null ? Math.max(0, Math.min(127, Math.round(ccGain))) : (baseMidi?.cc_gain ?? 7),
+                cc_bpm:  ccBpm  != null ? Math.max(0, Math.min(127, Math.round(ccBpm)))  : (baseMidi?.cc_bpm ?? 74),
+                monitor_enabled: !!this.midiMonitorEnabled?.checked,
+                monitor_instrument: this.midiMonitorInstrument?.value || (baseMidi?.monitor_instrument ?? 'gm_piano'),
+                monitor_gain: monitorGainPct != null ? Math.max(0, Math.min(1, monitorGainPct / 100)) : (baseMidi?.monitor_gain ?? 0.8),
+                pad_assignments: midiPads.getAssignments(),
             },
             first_run_done: firstRunDone,
         };
@@ -185,28 +223,119 @@ export class PreferencesModal {
 
     private async refreshMidiDevices(): Promise<void> {
         if (!this.midiInputSelect) return;
-        if (!('requestMIDIAccess' in navigator)) {
-            this.midiInputSelect.innerHTML = '<option value="">Web MIDI not supported</option>';
-            this.midiInputSelect.disabled = true;
-            return;
-        }
         try {
-            const access = await (navigator as any).requestMIDIAccess({sysex: false});
-            const inputs: any[] = [...access.inputs.values()];
+            const devices = await midiInput.listDevices();
             const prev = this.midiInputSelect.value || this.loaded?.midi_input?.device_id || '';
             this.midiInputSelect.innerHTML = '<option value="">All inputs</option>';
-            for (const port of inputs) {
+            for (const dev of devices) {
                 const opt = document.createElement('option');
-                opt.value = port.id;
-                opt.textContent = port.name ?? port.id;
+                opt.value = dev.id;
+                opt.textContent = dev.name;
                 this.midiInputSelect.appendChild(opt);
             }
             if (prev) this.midiInputSelect.value = prev;
             this.midiInputSelect.disabled = false;
         } catch (e) {
-            console.warn('[prefs] requestMIDIAccess failed:', e);
-            this.midiInputSelect.innerHTML = '<option value="">Permission denied</option>';
+            console.warn('[prefs] list MIDI devices failed:', e);
+            this.midiInputSelect.innerHTML = '<option value="">No MIDI devices</option>';
             this.midiInputSelect.disabled = true;
+        }
+    }
+
+    /**
+     * Fill the monitor instrument dropdown from the `list_sounds` catalog — the
+     * single source of truth. Voices the monitor can't synth (wavetables, fm,
+     * noise, user banks) are listed but disabled with a "(pattern only)" tag.
+     * Refreshed on `sounds:changed` so user sample banks appear once loaded.
+     */
+    private async populateMonitorInstruments(): Promise<void> {
+        const sel = this.midiMonitorInstrument;
+        if (!sel) return;
+        let cat: SoundCatalog;
+        try {
+            cat = await invoke<SoundCatalog>('list_sounds');
+        } catch {
+            return; // not under Tauri / engine not ready — leave whatever's there
+        }
+        const prev = sel.value || this.loaded?.midi_input?.monitor_instrument || 'sawtooth';
+        const titleCase = (s: string) =>
+            s.replace(/^(gm_|wt_)/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+        const addGroup = (label: string, names: string[]) => {
+            if (names.length === 0) return;
+            const group = document.createElement('optgroup');
+            group.label = label;
+            for (const name of names) {
+                const opt = document.createElement('option');
+                opt.value = name;
+                const playable = midiMonitor.canPlay(name);
+                opt.textContent = playable ? titleCase(name) : `${titleCase(name)} (pattern only)`;
+                opt.disabled = !playable;
+                group.appendChild(opt);
+            }
+            sel.appendChild(group);
+        };
+
+        sel.innerHTML = '';
+        addGroup('Synths', cat.synths ?? []);
+        addGroup('Wavetables', cat.wavetables ?? []);
+        addGroup('General MIDI', cat.gm_instruments ?? []);
+        addGroup('Your Samples', cat.user_sample_banks ?? []);
+
+        // Preserve a previously-saved instrument that the catalog doesn't list
+        // (e.g. an off-list GM the monitor can still play), so we don't reset it.
+        if (prev && midiMonitor.canPlay(prev) && ![...sel.options].some((o) => o.value === prev)) {
+            const opt = document.createElement('option');
+            opt.value = prev;
+            opt.textContent = titleCase(prev);
+            sel.appendChild(opt);
+        }
+
+        // Restore prior selection if it's still a valid, enabled option.
+        const match = [...sel.options].find((o) => o.value === prev && !o.disabled);
+        sel.value = match ? prev : 'sawtooth';
+    }
+
+    /** Render one row per pad action with its current binding + Learn/Clear. */
+    private renderPads(): void {
+        const container = this.midiPadsContainer;
+        if (!container) return;
+        container.innerHTML = '';
+        for (const action of PAD_ACTIONS) {
+            const assignment = midiPads.assignmentFor(action.id);
+            const row = document.createElement('div');
+            row.className = 'prefs-pad-row';
+
+            const label = document.createElement('span');
+            label.className = 'prefs-pad-label';
+            label.textContent = action.label;
+            label.title = action.hint;
+
+            const binding = document.createElement('span');
+            binding.className = 'prefs-pad-binding';
+            binding.textContent = assignment ? bindingLabel(assignment) : '—';
+
+            const learn = document.createElement('button');
+            learn.className = 'prefs-inline-btn';
+            learn.type = 'button';
+            learn.textContent = 'Learn';
+            learn.addEventListener('click', () => {
+                midiPads.startLearn(action.id);
+                binding.textContent = 'Press a pad/key…';
+            });
+
+            const clear = document.createElement('button');
+            clear.className = 'prefs-inline-btn';
+            clear.type = 'button';
+            clear.textContent = '✕';
+            clear.title = 'Remove binding';
+            clear.addEventListener('click', () => {
+                midiPads.setAssignments(midiPads.getAssignments().filter((a) => a.action !== action.id));
+                this.renderPads();
+            });
+
+            row.append(label, binding, learn, clear);
+            container.appendChild(row);
         }
     }
 
@@ -259,10 +388,11 @@ export class PreferencesModal {
     }
 }
 
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
+/** Human-readable label for a pad binding, e.g. "CC 12" or "C4". */
+function bindingLabel(a: PadAssignment): string {
+    return a.trigger.kind === 'cc'
+        ? `CC ${a.trigger.value}`
+        : midiToNoteName(a.trigger.value).toUpperCase();
 }
 
 async function applyAudioSinkId(deviceId: string): Promise<void> {

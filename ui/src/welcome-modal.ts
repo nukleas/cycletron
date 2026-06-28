@@ -5,6 +5,7 @@
  * flag on Finish or any explicit dismiss.
  */
 
+import {invoke} from './tauri.js';
 import {dismissibleModal} from './modal-utils.js';
 import type {UserSettings} from './types/tauri-commands.js';
 
@@ -133,12 +134,6 @@ class WelcomeModal {
             console.warn('[welcome] set_library_root failed:', e);
         }
     }
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
 }
 
 export const welcomeModal = new WelcomeModal();

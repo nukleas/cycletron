@@ -116,6 +116,29 @@ export class StrudelAudioManager {
     private gainNode: GainNode | null = null;
     private processor: MainThreadProcessor | null = null;
 
+    // --- Analyser stall watchdog -------------------------------------------
+    // An output-device change (OBS / BlackHole capture, Bluetooth connect,
+    // unplugging headphones, …) resets WebKit's audio render thread. The
+    // AudioContext keeps reporting state "running" and sound keeps playing,
+    // but the AnalyserNode stops being pulled and getByteTimeDomainData()
+    // returns all-zeros — which freezes every analyser-fed visualizer while
+    // the WASM-data grid keeps working. This watchdog detects that exact
+    // signature and re-pulls the node without disturbing playback.
+    private _watchdogTimer: ReturnType<typeof setInterval> | null = null;
+    private _watchdogBuf: Uint8Array | null = null;
+    private _deadTicks = 0;
+    private _recoverCount = 0;
+    private _gaveUp = false;
+    /** Poll period. Cheap: one fill + an early-exit scan per tick. */
+    private static readonly WATCHDOG_INTERVAL_MS = 500;
+    /** Consecutive dead polls before acting (~1s) — avoids reacting to the
+     *  momentary all-zero window right as playback starts. */
+    private static readonly DEAD_TICKS_TO_RECOVER = 2;
+    /** Stop *attempting* recovery after this many consecutive failures so a
+     *  genuinely unrecoverable graph can't turn into a reconnect storm. The
+     *  timer keeps watching and self-heals if audio ever returns. */
+    private static readonly MAX_RECOVERIES = 8;
+
     /** The one shared WebAssembly.Memory used by both threads. */
     private sharedMem: WebAssembly.Memory | null = null;
 
@@ -517,7 +540,111 @@ export class StrudelAudioManager {
     }
 
 
+    /**
+     * Begin watching the analyser for the device-reset stall described above.
+     * Idempotent and safe to call when audio isn't ready (it just no-ops).
+     * The caller should only run this while playback is active so legitimate
+     * silence on stop/pause is never mistaken for a stall.
+     */
+    startAnalyserWatchdog(): void {
+        if (this._watchdogTimer !== null || !this.analyserNode) return;
+        // One reusable buffer — no per-tick allocation.
+        this._watchdogBuf = new Uint8Array(this.analyserNode.fftSize);
+        this._deadTicks = 0;
+        this._recoverCount = 0;
+        this._gaveUp = false;
+        this._watchdogTimer = setInterval(
+            this._watchdogTick, StrudelAudioManager.WATCHDOG_INTERVAL_MS,
+        );
+    }
+
+    stopAnalyserWatchdog(): void {
+        if (this._watchdogTimer !== null) {
+            clearInterval(this._watchdogTimer);
+            this._watchdogTimer = null;
+        }
+        this._watchdogBuf = null;
+        this._deadTicks = 0;
+    }
+
+    private _watchdogTick = (): void => {
+        const an = this.analyserNode;
+        const buf = this._watchdogBuf;
+        if (!an || !buf) return;
+
+        an.getByteTimeDomainData(buf as Uint8Array<ArrayBuffer>);
+
+        // "Dead" == every sample is exactly 0. Genuine silence sits at 128, so
+        // quiet or empty musical passages never match; only a stalled (un-pulled)
+        // analyser produces literal zeros. The early-exit keeps the healthy path
+        // O(1) in practice — it bails on the first non-zero sample.
+        let dead = true;
+        for (let i = 0; i < buf.length; i++) {
+            if (buf[i] !== 0) { dead = false; break; }
+        }
+
+        if (!dead) {
+            // Healthy tick clears all state, so the recovery budget only
+            // depletes on *consecutive* failed recoveries, and protection
+            // resumes automatically after any self-heal.
+            this._deadTicks = 0;
+            this._recoverCount = 0;
+            this._gaveUp = false;
+            return;
+        }
+
+        if (++this._deadTicks < StrudelAudioManager.DEAD_TICKS_TO_RECOVER) return;
+        this._deadTicks = 0;
+
+        if (this._recoverCount >= StrudelAudioManager.MAX_RECOVERIES) {
+            if (!this._gaveUp) {
+                this._gaveUp = true;
+                console.warn(
+                    `[AudioManager] analyser still stalled after ${this._recoverCount} ` +
+                    `recovery attempts; pausing recovery (will retry if audio returns)`,
+                );
+            }
+            return;
+        }
+
+        this._recoverCount++;
+        this._recoverAnalyser();
+    };
+
+    /**
+     * Re-pull a stalled analyser. Sound flows gain → analyser → destination,
+     * so the node is clearly being pulled (you still hear audio) yet its
+     * analysis buffer is stuck — a known WebKit post-device-reset state.
+     * Toggling the input edge forces the node to re-initialise. The
+     * disconnect + reconnect happen synchronously in one tick, so the next
+     * render quantum sees a fully wired graph and there's no audible gap.
+     */
+    private _recoverAnalyser(): void {
+        const ctx = this.audioContext;
+        const gain = this.gainNode;
+        const an = this.analyserNode;
+        if (!ctx || !gain || !an) return;
+
+        console.warn(
+            `[AudioManager] analyser stalled (all-zero); re-pulling graph ` +
+            `(attempt ${this._recoverCount})`,
+        );
+
+        // Some WebKit builds leave the context suspended after a device reset
+        // while still reporting "running"; resume() is a cheap no-op otherwise.
+        if (ctx.state !== 'running') void ctx.resume();
+
+        try {
+            gain.disconnect(an);
+        } catch {
+            // Edge may already be gone (teardown race) — reconnect re-establishes it.
+        }
+        gain.connect(an);
+    }
+
     async dispose(): Promise<void> {
+        this.stopAnalyserWatchdog();
+
         if (this.workletNode) {
             await new Promise<void>((resolve) => {
                 const t = setTimeout(resolve, 800);

@@ -13,6 +13,9 @@
  * still reachable via Shift+drag-drop (see drag-drop.ts).
  */
 
+import {invoke} from './tauri.js';
+import {escapeHtml} from './html.js';
+import {dismissibleModal} from './modal-utils.js';
 import {fileManager} from './file-manager.js';
 import type {
     ImportMidiOptions,
@@ -38,7 +41,7 @@ export class MidiLab {
     private excluded: Set<number> = new Set();
 
     private inited = false;
-    private escListener: ((e: KeyboardEvent) => void) | null = null;
+    private cleanup: (() => void) | null = null;
 
     init(): void {
         if (this.inited) return;
@@ -51,9 +54,8 @@ export class MidiLab {
         if (!this.root) return;
 
         const $ = (id: string) => document.getElementById(id);
-        $('midiLabBackdrop')?.addEventListener('click', () => this.close());
-        $('midiLabClose')?.addEventListener('click', () => this.close());
-        $('midiLabCancel')?.addEventListener('click', () => this.close());
+        // Backdrop click, the [data-dismiss] Close/Cancel buttons, and Esc are
+        // all handled by dismissibleModal() (wired in show()).
         $('midiLabBrowse')?.addEventListener('click', () => void this.browse());
         $('midiLabPreviewBtn')?.addEventListener('click', () => void this.previewConversion());
         $('midiLabOpen')?.addEventListener('click', () => void this.openInEditor());
@@ -93,23 +95,14 @@ export class MidiLab {
     private show(): void {
         if (!this.root) return;
         this.root.hidden = false;
-        // Esc to dismiss while open.
-        this.escListener = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.stopPropagation();
-                this.close();
-            }
-        };
-        document.addEventListener('keydown', this.escListener, true);
+        this.cleanup = dismissibleModal(this.root, () => this.close());
     }
 
     private close(): void {
         if (!this.root) return;
         this.root.hidden = true;
-        if (this.escListener) {
-            document.removeEventListener('keydown', this.escListener, true);
-            this.escListener = null;
-        }
+        this.cleanup?.();
+        this.cleanup = null;
     }
 
     private reset(): void {
@@ -321,12 +314,6 @@ export class MidiLab {
 // Helpers
 // ------------------------------------------------------------------
 
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
-}
-
 function basename(path: string): string {
     const parts = path.split(/[\\/]/);
     return parts[parts.length - 1] || path;
@@ -335,10 +322,6 @@ function basename(path: string): string {
 function deriveFileName(path: string): string {
     const stem = basename(path).replace(/\.(mid|midi)$/i, '');
     return `${stem}.strudel`;
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 export const midiLab = new MidiLab();

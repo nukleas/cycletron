@@ -9,6 +9,7 @@
  *   - global shortcuts (app-local): Cmd+O/S/Shift+S/N
  */
 
+import {invoke} from './tauri.js';
 import {fileManager} from './file-manager.js';
 import {initMenuEvents} from './menu-events.js';
 import {initDragDrop} from './drag-drop.js';
@@ -35,10 +36,6 @@ import {editorEmptyState} from './editor-empty-state.js';
 import type {SessionSnapshot, UserSettings} from './types/tauri-commands.js';
 
 const isTauri = !!(window as any).__TAURI__;
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    return (window as any).__TAURI__.core.invoke(cmd, args);
-}
 
 document.addEventListener('DOMContentLoaded', () => {
     // Scrub any coi-serviceworker left over from previous dev sessions.
@@ -281,7 +278,11 @@ async function applyPhase4Settings(): Promise<void> {
     try {
         const settings = await invoke<UserSettings>('get_user_settings');
         metronome.applyFromSettings(settings.metronome ?? {enabled: false, volume: 0.4});
-        midiInput.applyFromSettings(settings.midi_input ?? {device_id: null, cc_gain: 7, cc_bpm: 74});
+        midiInput.applyFromSettings(settings.midi_input ?? {
+            device_id: null, cc_gain: 7, cc_bpm: 74,
+            monitor_enabled: false, monitor_instrument: 'sawtooth', monitor_gain: 0.8,
+            pad_assignments: [],
+        });
     } catch (e) {
         console.warn('[boot] Phase 4 settings restore failed:', e);
     }

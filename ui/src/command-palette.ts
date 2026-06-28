@@ -11,6 +11,8 @@
  * or matches a command title.
  */
 
+import {invoke} from './tauri.js';
+import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
 import {aboutModal} from './about-modal.js';
 import {preferencesModal} from './preferences.js';
@@ -294,16 +296,6 @@ function adjustBpm(delta: number): void {
 function basename(path: string): string {
     const parts = path.split(/[\\/]/);
     return parts[parts.length - 1] || path;
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
 }
 
 export const commandPalette = new CommandPalette();

@@ -6,6 +6,7 @@
  * and push code into it on open.
  */
 
+import {invoke} from './tauri.js';
 import type {FileDoc, CurrentFile, MidiImport, ImportMidiOptions} from './types/tauri-commands.js';
 
 const isTauri = !!(window as any).__TAURI__;
@@ -291,12 +292,6 @@ export class FileManager {
 function basename(path: string): string {
     const parts = path.split(/[\\/]/);
     return parts[parts.length - 1] || path;
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
 }
 
 // Singleton — the app expects one instance.

@@ -5,6 +5,8 @@
  * into a clipboard payload designed for pasting into a bug report.
  */
 
+import {invoke} from './tauri.js';
+import {escapeHtml} from './html.js';
 import {dismissibleModal} from './modal-utils.js';
 
 const isTauri = !!(window as any).__TAURI__;
@@ -116,16 +118,6 @@ function classForLevel(level: string): string {
     if (upper === 'WARN') return 'log-warn';
     if (upper === 'DEBUG' || upper === 'TRACE') return 'log-debug';
     return '';
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
 }
 
 export const logsModal = new LogsModal();

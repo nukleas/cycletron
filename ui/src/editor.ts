@@ -7,7 +7,9 @@ import {
     lineNumbers,
     highlightActiveLine,
     highlightActiveLineGutter,
-    drawSelection
+    drawSelection,
+    showPanel,
+    type Panel
 } from '@codemirror/view';
 import {Decoration, type DecorationSet} from '@codemirror/view';
 import {EditorState, Compartment, StateEffect, StateField} from '@codemirror/state';
@@ -127,6 +129,55 @@ const flashTheme = EditorView.baseTheme({
         backgroundColor: 'rgba(255, 43, 214, 0.18)',
         borderRadius: '0',
         transition: 'background-color 0.4s ease-out',
+    },
+});
+
+/** Set (or clear, with null) the inline inspect-readout panel content (HTML). */
+const setInspect = StateEffect.define<string | null>();
+
+/** Holds the current inspect-readout HTML; null hides the panel entirely. */
+const inspectField = StateField.define<string | null>({
+    create() {
+        return null;
+    },
+    update(value, tr) {
+        for (const effect of tr.effects) {
+            if (effect.is(setInspect)) value = effect.value;
+        }
+        return value;
+    },
+    provide: (f) => showPanel.from(f, (content) => (content ? createInspectPanel : null)),
+});
+
+/** Bottom panel docked inside the editor, showing the pattern readout. */
+function createInspectPanel(view: EditorView): Panel {
+    const dom = document.createElement('div');
+    dom.className = 'cm-inspect-panel';
+    dom.innerHTML = view.state.field(inspectField) ?? '';
+    return {
+        dom,
+        update(update) {
+            const content = update.state.field(inspectField);
+            if (content !== update.startState.field(inspectField)) {
+                dom.innerHTML = content ?? '';
+            }
+        },
+    };
+}
+
+/** Styling for the inspect panel (inner .insp-* spans come from style.css). */
+const inspectTheme = EditorView.baseTheme({
+    '.cm-inspect-panel': {
+        padding: '5px 10px',
+        fontSize: '11px',
+        lineHeight: '1.5',
+        color: 'var(--text-secondary)',
+        background: 'var(--accent-subtle)',
+        borderTop: '1px solid var(--border)',
+        borderLeft: '2px solid var(--accent)',
+        whiteSpace: 'nowrap',
+        overflowX: 'auto',
+        fontFamily: 'inherit',
     },
 });
 
@@ -259,6 +310,10 @@ export class StrudelEditor {
                 activeNoteField,
                 activeNoteTheme,
 
+                // Inline pattern readout (bottom panel)
+                inspectField,
+                inspectTheme,
+
                 // Lint
                 lintGutter(),
 
@@ -308,6 +363,45 @@ export class StrudelEditor {
         this.view.dispatch({
             changes: {from: sel.from, to: sel.to, insert: text},
             selection: {anchor: sel.from + text.length},
+        });
+        this.view.focus();
+    }
+
+    /** Append `text` as a fresh line at the end of the document; cursor lands on it. */
+    appendLine(text: string): void {
+        const state = this.view.state;
+        const end = state.doc.length;
+        const prefix = end > 0 && !state.doc.toString().endsWith('\n') ? '\n' : '';
+        const insert = prefix + text;
+        this.view.dispatch({
+            changes: {from: end, insert},
+            selection: {anchor: end + insert.length},
+        });
+        this.view.focus();
+    }
+
+    /** Replace the text of the line the cursor sits on. */
+    replaceCurrentLine(text: string): void {
+        const state = this.view.state;
+        const line = state.doc.lineAt(state.selection.main.head);
+        this.view.dispatch({
+            changes: {from: line.from, to: line.to, insert: text},
+            selection: {anchor: line.from + text.length},
+        });
+        this.view.focus();
+    }
+
+    /** Delete the line the cursor sits on, including its line break. */
+    deleteCurrentLine(): void {
+        const state = this.view.state;
+        const line = state.doc.lineAt(state.selection.main.head);
+        let from = line.from;
+        let to = line.to;
+        if (to < state.doc.length) to += 1;       // eat the following newline
+        else if (from > 0) from -= 1;             // last line: eat the preceding newline
+        this.view.dispatch({
+            changes: {from, to, insert: ''},
+            selection: {anchor: from},
         });
         this.view.focus();
     }
@@ -453,6 +547,16 @@ export class StrudelEditor {
      */
     clearErrorDecoration(): void {
         this.view.dispatch(setDiagnostics(this.view.state, []));
+    }
+
+    /** Show the inline pattern readout as a panel docked at the editor bottom. */
+    setInspect(html: string): void {
+        this.view.dispatch({effects: setInspect.of(html)});
+    }
+
+    /** Remove the inline readout panel. */
+    clearInspect(): void {
+        this.view.dispatch({effects: setInspect.of(null)});
     }
 
     focus(): void {

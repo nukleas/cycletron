@@ -11,4 +11,5 @@ path = "main.rs"
 strudel-dsl = { workspace = true }
 strudel-mini = { workspace = true }
 strudel-core = { workspace = true }
+robostrudel-corpus = { workspace = true }
 walkdir = "2"

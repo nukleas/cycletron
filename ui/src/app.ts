@@ -55,6 +55,21 @@ declare module '../pkg/strudel_audio_wasm.js' {
 
 type WasmModule = typeof import('../pkg/strudel_audio_wasm.js');
 
+/** Mirrors the Rust `PatternDigest` returned by the `inspect_pattern` command. */
+interface PatternDigest {
+    cycles_queried: number;
+    bpm: number | null;
+    seconds_per_cycle: number | null;
+    total_events: number;
+    period_cycles: number | null;
+    silent_cycles: number[];
+    max_voices: number;
+    sounds: string[];
+    note_low: {name: string; midi: number} | null;
+    note_high: {name: string; midi: number} | null;
+    uses_pan: boolean;
+}
+
 export class StrudelApp {
     editor: StrudelEditor | null;
     visualizer: PatternVisualizer | null;
@@ -62,7 +77,7 @@ export class StrudelApp {
     fullscreenViz: FullscreenVisualizer | null = null;
     audioManager: StrudelAudioManager | null;
     scheduler: PatternScheduler | null;
-    private sampleLoader: SampleLoader | null;
+    sampleLoader: SampleLoader | null;
     processor: MainThreadProcessor | null;
 
     playbackState: PlaybackState;
@@ -914,6 +929,7 @@ export class StrudelApp {
         }
 
         this.hideError();
+        void this.updateInspect(code);
     }
 
     async ensureAudioInitialized(): Promise<boolean> {
@@ -965,6 +981,9 @@ export class StrudelApp {
         this.elements.stopBtn.disabled = false;
         this.scope?.startAnimation();
         this.visualizer?.startAnimation();
+        // Guard the analyser-fed visualizers against output-device resets
+        // (OBS capture, Bluetooth, etc.) that silently stall the AnalyserNode.
+        this.audioManager?.startAnalyserWatchdog();
 
         this.elements.liveIndicator.classList.remove('indicator-paused');
         this.elements.liveIndicator.classList.add('active');
@@ -997,6 +1016,7 @@ export class StrudelApp {
 
         this.elements.stopBtn.disabled = false;
         this.scope!.pauseAnimation();
+        this.audioManager?.stopAnalyserWatchdog();
 
         this.elements.liveIndicator.classList.remove('active');
         this.elements.liveIndicator.classList.add('indicator-paused');
@@ -1137,9 +1157,11 @@ export class StrudelApp {
         this.elements.liveIndicator.classList.remove('active', 'indicator-paused');
 
         this.elements.cycleCount.textContent = '0.00';
+        this.editor?.clearInspect();
         this.editor?.clearActiveNotes();
         this.scope!.stopAnimation();
         this.visualizer!.stopAnimation();
+        this.audioManager?.stopAnalyserWatchdog();
         // Pattern was freed by scheduler.stop() above, so render() will
         // clearRect and return early - leaving the canvas blank, matching
         // the Play -> Stop behaviour where the rAF loop does this naturally.
@@ -1174,6 +1196,7 @@ export class StrudelApp {
     showError(message: string, decorate = true): void {
         this.elements.error.textContent = message;
         this.elements.error.classList.add('error--visible');
+        this.editor?.clearInspect();
 
         if (decorate && this.editor) {
             const doc = this.editor.view.state.doc;
@@ -1203,6 +1226,68 @@ export class StrudelApp {
     hideError(): void {
         this.elements.error.classList.remove('error--visible');
         this.editor?.clearErrorDecoration();
+    }
+
+    /**
+     * Refresh the inline readout: ask the Rust `inspect_pattern` command what
+     * the current code actually emits and render a one-line summary under the
+     * editor. Fire-and-forget; failures just hide the strip.
+     */
+    async updateInspect(code: string): Promise<void> {
+        const invoke = (window as any).__TAURI__?.core?.invoke as
+            | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
+            | undefined;
+        if (!invoke || !code.trim()) {
+            this.editor?.clearInspect();
+            return;
+        }
+
+        try {
+            const d = await invoke<PatternDigest>('inspect_pattern', {code, cycles: 8});
+            this.editor?.setInspect(this.renderInspect(d));
+        } catch (e) {
+            // Code didn't evaluate (a real error surfaces via showError); keep
+            // the panel out of the way rather than showing stale info.
+            console.warn('inspect_pattern failed:', e);
+            this.editor?.clearInspect();
+        }
+    }
+
+    private renderInspect(d: PatternDigest): string {
+        const esc = (s: string) =>
+            s.replace(/[&<>]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c] as string));
+        const key = (s: string) => `<span class="insp-key">${esc(s)}</span>`;
+
+        const parts: string[] = [];
+
+        if (d.period_cycles !== null) {
+            const secs =
+                d.seconds_per_cycle !== null
+                    ? ` (${(d.period_cycles * d.seconds_per_cycle).toFixed(1)}s)`
+                    : '';
+            parts.push(`${key(String(d.period_cycles))}-cycle loop${secs}`);
+        } else {
+            parts.push(`no loop in ${d.cycles_queried} cyc`);
+        }
+
+        parts.push(`${key(String(d.total_events))} events`);
+        if (d.max_voices > 1) parts.push(`${key(String(d.max_voices))} voices`);
+        if (d.sounds.length) parts.push(esc(d.sounds.join(' ')));
+        if (d.note_low && d.note_high) {
+            const range =
+                d.note_low.midi === d.note_high.midi
+                    ? d.note_low.name
+                    : `${d.note_low.name}–${d.note_high.name}`;
+            parts.push(esc(range));
+        }
+        if (d.uses_pan) parts.push('stereo');
+        if (d.silent_cycles.length) {
+            parts.push(
+                `<span class="insp-warn">⚠ silent ${esc(d.silent_cycles.join(','))}</span>`,
+            );
+        }
+
+        return parts.join('<span class="insp-sep">·</span>');
     }
 
     /** Toggle the ambient visualization on/off. Default is on. */

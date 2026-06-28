@@ -3,6 +3,8 @@
  * to the appropriate frontend module.
  */
 
+import {invoke} from './tauri.js';
+import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
 import {midiLab} from './midi-lab.js';
 import {aboutModal} from './about-modal.js';
@@ -90,10 +92,6 @@ function adjustBpm(delta: number): void {
     window.strudelApp?.applyBpm?.(next);
 }
 
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    return (window as any).__TAURI__.core.invoke(cmd, args);
-}
-
 /**
  * Minimal list picker overlay — used by `Open Recent`. Stays DOM-only
  * (no modals library) to keep bundle size down.
@@ -176,8 +174,4 @@ function pickFromList(title: string, items: string[]): Promise<string | null> {
 function basename(path: string): string {
     const parts = path.split(/[\\/]/);
     return parts[parts.length - 1] || path;
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

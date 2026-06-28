@@ -53,6 +53,14 @@
     --viz-active: #f7ff5a;
     --viz-hot: #ff2bd6;
 
+    /* Composite cyberpunk effects reused across components. Exact values are
+       preserved so rendering is unchanged; per-element decorative variants
+       (other alphas/glow sizes) stay inline where they're intentionally tuned. */
+    --text-glitch: 2px 0 0 rgba(255, 43, 214, 0.45), 0 0 6px var(--neon-glow);
+    --edge-3d: 3px 3px 0 rgba(255, 43, 214, 0.45);
+    --edge-3d-strong: 3px 3px 0 rgba(255, 43, 214, 0.55);
+    --backdrop-scanlines: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.18) 2px, rgba(0, 0, 0, 0.18) 4px);
+
     /* AI panel aliases (kept for backwards compat) */
     --ai-bg: var(--bg);
     --ai-panel: var(--bg-light);
@@ -89,6 +97,17 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    animation: crt-boot 0.7s ease-out;
+}
+
+/* One-shot CRT power-on flicker (reduced-motion media query zeroes it out) */
+@keyframes crt-boot {
+    0% { filter: brightness(0.1) saturate(0.2); }
+    25% { filter: brightness(1.55) saturate(1.3); }
+    40% { filter: brightness(0.65); }
+    60% { filter: brightness(1.2); }
+    75% { filter: brightness(0.92); }
+    100% { filter: brightness(1); }
 }
 
 body::before {
@@ -108,7 +127,7 @@ body::after {
     content: '';
     position: fixed;
     inset: 0;
-    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.18) 2px, rgba(0, 0, 0, 0.18) 4px);
+    background: var(--backdrop-scanlines);
     pointer-events: none;
     z-index: 9999;
 }
@@ -125,6 +144,15 @@ body::after {
 body.is-resizing {
     cursor: col-resize;
     user-select: none;
+}
+
+/* Keyboard-focus glow for interactive controls */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 1px solid var(--neon);
+    outline-offset: 1px;
+    box-shadow: 0 0 8px var(--neon-glow);
 }
 
 
@@ -188,34 +216,40 @@ header {
     text-transform: uppercase;
     letter-spacing: 0.18em;
     text-shadow: 2px 0 0 rgba(255, 43, 214, 0.55), 0 0 8px var(--neon-glow);
+    animation: logo-glitch 9s infinite;
 }
 
-.badge {
-    background: transparent;
+/* Solid terminal cursor after the wordmark (the status bar owns the blink) */
+.logo h1::after {
+    content: '▮';
+    margin-left: 4px;
     color: var(--neon);
-    padding: 2px 8px;
-    border-radius: 0;
-    border: 1px solid var(--neon-subtle);
-    font-size: 9px;
-    font-weight: 700;
-    white-space: nowrap;
-    flex-shrink: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    box-shadow: inset 0 -2px 0 rgba(71, 246, 255, 0.08);
+    text-shadow: 0 0 8px var(--neon-glow);
 }
 
-.badge.rust {
-    background: transparent;
-    color: #ff5e3a;
-    border-color: rgba(255, 94, 58, 0.55);
-    text-shadow: 0 0 6px rgba(255, 94, 58, 0.65);
-    box-shadow: inset 0 -2px 0 rgba(255, 94, 58, 0.18);
+/* Rare chromatic-aberration jitter — a couple of frames every 9s */
+@keyframes logo-glitch {
+    0%, 93%, 100% {
+        text-shadow: 2px 0 0 rgba(255, 43, 214, 0.55), 0 0 8px var(--neon-glow);
+        transform: none;
+    }
+    94% {
+        text-shadow: -3px 0 0 rgba(255, 43, 214, 0.85), 3px 0 0 rgba(71, 246, 255, 0.85);
+        transform: translateX(1px);
+    }
+    95% {
+        text-shadow: 3px 0 0 rgba(255, 43, 214, 0.85), -3px 0 0 rgba(71, 246, 255, 0.85);
+        transform: translateX(-1px) skewX(-6deg);
+    }
+    96% {
+        text-shadow: 2px 0 0 rgba(255, 43, 214, 0.55), 0 0 8px var(--neon-glow);
+        transform: none;
+    }
 }
 
-.badge-live {
-    color: var(--green-bright);
-    border-color: rgba(82, 255, 159, 0.35);
+@keyframes cursor-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
 }
 
 .controls {
@@ -538,7 +572,7 @@ button.primary {
 button.primary:hover:not(:disabled) {
     background: var(--neon);
     color: #0a0a0c;
-    box-shadow: 0 0 12px var(--neon-glow), 0 0 24px var(--neon-subtle), 3px 3px 0 rgba(255, 43, 214, 0.55);
+    box-shadow: 0 0 12px var(--neon-glow), 0 0 24px var(--neon-subtle), var(--edge-3d-strong);
 }
 
 button.danger {
@@ -564,6 +598,12 @@ button.danger:hover:not(:disabled) {
     border-color: var(--neon);
     color: var(--neon);
     box-shadow: 0 0 8px var(--neon-glow);
+    animation: transport-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes transport-pulse {
+    0%, 100% { box-shadow: 0 0 8px var(--neon-glow); }
+    50% { box-shadow: 0 0 16px var(--neon-glow), 0 0 30px var(--neon-subtle); }
 }
 
 #transportBtn.transport--playing:hover:not(:disabled) {
@@ -602,10 +642,6 @@ button.danger:hover:not(:disabled) {
     transition: all 0.2s;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-}
-
-.copy-btn svg {
-    flex-shrink: 0;
 }
 
 .copy-btn:hover {
@@ -665,10 +701,15 @@ button.danger:hover:not(:disabled) {
     box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
 }
 
-.editor-empty-state-icon {
+.editor-empty-state-wave {
     color: var(--neon);
-    opacity: 0.85;
-    margin-bottom: 10px;
+    font-size: 15px;
+    letter-spacing: 1px;
+    line-height: 1;
+    margin-bottom: 12px;
+    text-shadow: 2px 0 0 rgba(255, 43, 214, 0.4), 0 0 10px var(--neon-glow);
+    opacity: 0.9;
+    user-select: none;
 }
 
 .editor-empty-state-title {
@@ -745,21 +786,60 @@ button.danger:hover:not(:disabled) {
     box-shadow: none;
 }
 
-.panel-header {
+/* Shared header shell across editor / AI / files panels and modal dialogs:
+   flex layout, fixed 32px height, neon underline. Per-header typography
+   (font, color, padding, letter-spacing, glitch shadow) stays in each rule. */
+.panel-header,
+.ai-panel-header,
+.files-panel-header,
+.app-modal-header,
+.ex-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     height: 32px;
+    border-bottom: 1px solid var(--neon-subtle);
+    flex-shrink: 0;
+}
+
+.panel-header {
     background: var(--surface-glass);
     padding: 0 12px;
-    border-bottom: 1px solid var(--neon-subtle);
     font-size: 9px;
     font-weight: 700;
     color: var(--neon);
     text-transform: uppercase;
     letter-spacing: 0.18em;
     text-shadow: 2px 0 0 rgba(255, 43, 214, 0.42), 0 0 6px var(--neon-glow);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
+}
+
+/* Slow neon sweep along the bottom edge of every panel header */
+.panel-header,
+.ai-panel-header,
+.files-panel-header {
+    position: relative;
+    overflow: hidden;
+}
+
+.panel-header::after,
+.ai-panel-header::after,
+.files-panel-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 60%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--neon) 40%, var(--neon-secondary) 60%, transparent);
+    opacity: 0.6;
+    transform: translateX(-100%);
+    animation: header-sweep 10s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes header-sweep {
+    0%, 55% { transform: translateX(-100%); }
+    85%, 100% { transform: translateX(280%); }
 }
 
 .panel-header .shortcuts {
@@ -1026,6 +1106,22 @@ button.danger:hover:not(:disabled) {
     display: none;
 }
 
+/* Inline pattern readout — a quiet summary of what the current code actually
+   emits, refreshed on each evaluate. Rendered as a CodeMirror bottom panel
+   (.cm-inspect-panel, styled in editor.ts); these style its inner spans. */
+.cm-inspect-panel .insp-sep {
+    color: var(--text-muted);
+    margin: 0 8px;
+}
+
+.cm-inspect-panel .insp-key {
+    color: var(--accent);
+}
+
+.cm-inspect-panel .insp-warn {
+    color: var(--orange-bright);
+}
+
 #error.error--visible {
     display: block;
 }
@@ -1101,6 +1197,12 @@ button.danger:hover:not(:disabled) {
     margin-bottom: 6px;
     font-weight: 700;
     text-shadow: 2px 0 0 rgba(255, 43, 214, 0.36), 0 0 4px var(--neon-glow);
+}
+
+.sidebar-section h3::before {
+    content: '// ';
+    color: var(--neon-secondary);
+    text-shadow: 0 0 6px var(--neon-secondary-glow);
 }
 
 /* Visualization */
@@ -1215,11 +1317,6 @@ button.danger:hover:not(:disabled) {
     background: var(--accent-subtle);
     border-color: var(--neon);
     box-shadow: 0 0 10px var(--neon-glow), inset 0 0 10px var(--accent-subtle);
-}
-
-.browse-icon {
-    font-size: 8px;
-    color: var(--neon);
 }
 
 .browse-hint {
@@ -1355,13 +1452,7 @@ button.danger:hover:not(:disabled) {
 }
 
 .ex-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     padding: 0 12px;
-    height: 32px;
-    border-bottom: 1px solid var(--neon-subtle);
-    flex-shrink: 0;
 }
 
 .ex-title {
@@ -1527,6 +1618,21 @@ button.danger:hover:not(:disabled) {
     text-overflow: ellipsis;
 }
 
+/* Terminal prompt + blinking cursor around the status readout */
+.status-bar #status::before {
+    content: '> ';
+    color: var(--neon);
+    text-shadow: 0 0 4px var(--neon-glow);
+}
+
+.status-bar #status::after {
+    content: '▊';
+    margin-left: 3px;
+    color: var(--neon);
+    opacity: 0.75;
+    animation: cursor-blink 1.2s steps(1) infinite;
+}
+
 .status-bar .live {
     display: none;
     font-size: 12px;
@@ -1544,6 +1650,7 @@ button.danger:hover:not(:disabled) {
 .status-bar .live.active::before {
     content: '●';
     font-size: 9px;
+    animation: rec-pulse 2s infinite ease-in-out;
 }
 
 .status-bar .live.active::after {
@@ -1737,23 +1844,6 @@ button.danger:hover:not(:disabled) {
     color: var(--text-secondary);
     font-size: 8.5px;
     padding-left: 2px;
-}
-
-/* Source type badge — makes the rs-compatible vs js-needing distinction immediately visible in the list */
-.corpus-source {
-    font-size: 7.5px;
-    padding: 0 3px;
-    border-radius: 0;
-    border: 1px solid currentColor;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-right: 4px;
-    opacity: 0.85;
-}
-.corpus-source.good {
-    color: var(--neon);
-    border-color: rgba(71, 246, 255, 0.35);
-    background: rgba(71, 246, 255, 0.06);
 }
 
 /* (js-song / tidal rows are no longer loaded — the Rust corpus loader drops anything
@@ -2072,12 +2162,6 @@ body.is-drop-target::after {
     }
 }
 
-@media (max-width: 350px) {
-    .badge {
-        display: none;
-    }
-}
-
 /* ===== AI CHAT PANEL — CYBERPUNK ===== */
 
 .ai-panel {
@@ -2110,20 +2194,14 @@ body.is-drop-target::after {
 
 /* Header */
 .ai-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    height: 32px;
     padding: 0 10px;
-    border-bottom: 1px solid var(--ai-neon-subtle);
     background: rgba(5, 6, 10, 0.70);
     font-size: 9px;
     font-weight: 700;
     color: var(--ai-neon);
     text-transform: uppercase;
     letter-spacing: 0.25em;
-    flex-shrink: 0;
-    text-shadow: 2px 0 0 rgba(255, 43, 214, 0.45), 0 0 6px var(--ai-neon-glow);
+    text-shadow: var(--text-glitch);
 }
 
 .ai-panel-actions { display: flex; align-items: center; gap: 6px; }
@@ -2146,8 +2224,6 @@ body.is-drop-target::after {
     border-color: var(--ai-neon);
     box-shadow: 0 0 8px var(--ai-neon-glow), inset 0 0 8px var(--accent-subtle);
 }
-.ai-action-btn svg { stroke: var(--ai-neon); }
-
 .ai-toggle {
     background: none;
     border: 1px solid var(--ai-border);
@@ -2181,7 +2257,7 @@ body.is-drop-target::after {
     align-self: flex-end;
     background: var(--ai-neon); color: #05060a;
     font-weight: 600;
-    box-shadow: 3px 3px 0 rgba(255, 43, 214, 0.55), 0 0 12px var(--ai-neon-glow);
+    box-shadow: var(--edge-3d-strong), 0 0 12px var(--ai-neon-glow);
 }
 
 .ai-msg-assistant {
@@ -2353,20 +2429,14 @@ body.is-drop-target::after {
 
 /* Header */
 .files-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    height: 32px;
     padding: 0 10px;
-    border-bottom: 1px solid var(--neon-subtle);
     background: rgba(5, 6, 10, 0.70);
     font-size: 9px;
     font-weight: 700;
     color: var(--neon);
     text-transform: uppercase;
     letter-spacing: 0.25em;
-    flex-shrink: 0;
-    text-shadow: 2px 0 0 rgba(255, 43, 214, 0.45), 0 0 6px var(--neon-glow);
+    text-shadow: var(--text-glitch);
     position: relative;
     z-index: 2;
 }
@@ -2626,71 +2696,9 @@ body.is-drop-target::after {
    MIDI LAB MODAL — CYBERPUNK
    ========================================================= */
 
-.midi-lab {
-    position: fixed;
-    inset: 0;
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-}
-.midi-lab[hidden] { display: none !important; }
-
-.midi-lab-backdrop {
-    position: absolute;
-    inset: 0;
-    background:
-        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.18) 2px, rgba(0, 0, 0, 0.18) 4px),
-        rgba(5, 6, 10, 0.82);
-}
-
-.midi-lab-window {
-    position: relative;
-    width: min(760px, 92vw);
-    max-height: 86vh;
-    display: flex;
-    flex-direction: column;
-    background: var(--surface-glass);
-    border: 1px solid var(--neon-subtle);
-    box-shadow:
-        0 0 30px var(--neon-glow),
-        6px 6px 0 rgba(255, 43, 214, 0.18),
-        inset 0 0 0 1px rgba(71, 246, 255, 0.05);
-}
-
-.midi-lab-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 32px;
-    padding: 0 10px;
-    border-bottom: 1px solid var(--neon-subtle);
-    background: rgba(5, 6, 10, 0.70);
-    font-size: 10px;
-    font-weight: 700;
-    color: var(--neon);
-    text-transform: uppercase;
-    letter-spacing: 0.3em;
-    text-shadow: 2px 0 0 rgba(255, 43, 214, 0.45), 0 0 6px var(--neon-glow);
-}
-.midi-lab-close {
-    background: transparent;
-    border: 1px solid var(--neon-subtle);
-    color: var(--neon);
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    font-size: 16px;
-    line-height: 1;
-    cursor: pointer;
-    border-radius: 0;
-    transition: all 0.15s;
-}
-.midi-lab-close:hover {
-    background: var(--accent-subtle);
-    box-shadow: 0 0 10px var(--neon-glow);
-}
+/* MIDI Lab reuses the canonical .app-modal shell (wrapper / backdrop /
+   window / header / close); only its body layout is bespoke below.
+   The window uses .app-modal-window--wide for its 760px width. */
 
 .midi-lab-fileline {
     display: flex;
@@ -2935,16 +2943,16 @@ body.is-drop-target::after {
     background: var(--neon);
     color: #05060a;
     border-color: var(--neon);
-    box-shadow: 0 0 12px var(--neon-glow), 3px 3px 0 rgba(255, 43, 214, 0.45);
+    box-shadow: 0 0 12px var(--neon-glow), var(--edge-3d);
 }
 .midi-lab-actions button.midi-lab-primary:hover:not(:disabled) {
     background: var(--neon-bright);
-    box-shadow: 0 0 18px var(--neon-glow), 3px 3px 0 rgba(255, 43, 214, 0.55);
+    box-shadow: 0 0 18px var(--neon-glow), var(--edge-3d-strong);
 }
 .midi-lab-spacer { flex: 1; }
 
 @media (max-width: 900px) {
-    .midi-lab-window { width: 96vw; max-height: 92vh; }
+    .app-modal-window--wide { width: 96vw; max-height: 92vh; }
     .midi-lab-body {
         grid-template-columns: 1fr;
         grid-auto-rows: minmax(180px, auto);
@@ -3275,9 +3283,20 @@ body.is-drop-target::after {
     align-items: center;
     gap: 4px;
 }
-.record-btn svg { color: var(--red); transition: color 0.18s; }
-.record-btn.is-recording svg {
+/* Red record dot, replacing the global button pixel-square decoration */
+.record-btn::before {
+    content: '●';
+    position: static;
+    width: auto;
+    height: auto;
+    background: none;
+    opacity: 1;
     color: var(--red);
+    font-size: 8px;
+    line-height: 1;
+    text-shadow: 0 0 5px rgba(255, 69, 108, 0.55);
+}
+.record-btn.is-recording::before {
     animation: rec-pulse 1.1s infinite ease-in-out;
 }
 .record-btn.is-recording {
@@ -3337,7 +3356,7 @@ body.is-drop-target::after {
     position: absolute;
     inset: 0;
     background:
-        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.18) 2px, rgba(0, 0, 0, 0.18) 4px),
+        var(--backdrop-scanlines),
         rgba(5, 6, 10, 0.74);
 }
 .cmd-palette-window {
@@ -3480,7 +3499,7 @@ body.is-drop-target::after {
     position: absolute;
     inset: 0;
     background:
-        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.18) 2px, rgba(0, 0, 0, 0.18) 4px),
+        var(--backdrop-scanlines),
         rgba(5, 6, 10, 0.82);
 }
 .app-modal-window {
@@ -3497,23 +3516,22 @@ body.is-drop-target::after {
         inset 0 0 0 1px rgba(71, 246, 255, 0.05);
 }
 .app-modal-window--small { width: min(420px, 90vw); }
+.app-modal-window--wide { width: min(760px, 92vw); }
 
 .app-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 32px;
     padding: 0 10px;
-    border-bottom: 1px solid var(--neon-subtle);
     background: rgba(5, 6, 10, 0.70);
     font-size: 10px;
     font-weight: 700;
     color: var(--neon);
     text-transform: uppercase;
     letter-spacing: 0.3em;
-    text-shadow: 2px 0 0 rgba(255, 43, 214, 0.45), 0 0 6px var(--neon-glow);
+    text-shadow: var(--text-glitch);
 }
 .app-modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: transparent;
     border: 1px solid var(--neon-subtle);
     color: var(--neon);
@@ -3522,6 +3540,8 @@ body.is-drop-target::after {
     padding: 0;
     font-size: 16px;
     line-height: 1;
+    /* header sets a glitch text-shadow that doubles the glyph; neutralize it here */
+    text-shadow: none;
     cursor: pointer;
     border-radius: 0;
     transition: all 0.15s;
@@ -3564,11 +3584,11 @@ body.is-drop-target::after {
     background: var(--neon);
     color: #05060a;
     border-color: var(--neon);
-    box-shadow: 0 0 12px var(--neon-glow), 3px 3px 0 rgba(255, 43, 214, 0.45);
+    box-shadow: 0 0 12px var(--neon-glow), var(--edge-3d);
 }
 .app-modal-actions button.app-modal-primary:hover:not(:disabled) {
     background: var(--neon-bright);
-    box-shadow: 0 0 18px var(--neon-glow), 3px 3px 0 rgba(255, 43, 214, 0.55);
+    box-shadow: 0 0 18px var(--neon-glow), var(--edge-3d-strong);
 }
 .app-modal-spacer { flex: 1; }
 
@@ -3726,6 +3746,42 @@ body.is-drop-target::after {
 .prefs-inline-btn:hover {
     background: var(--accent-subtle);
     box-shadow: 0 0 10px var(--neon-glow);
+}
+.prefs-hint {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    text-transform: none;
+    opacity: 0.7;
+}
+.prefs-midi-pads {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+}
+.prefs-pad-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.prefs-pad-label {
+    flex: 1;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+}
+.prefs-pad-binding {
+    min-width: 88px;
+    text-align: right;
+    font-size: 10px;
+    color: var(--neon);
+    font-family: inherit;
+}
+.prefs-pad-row .prefs-inline-btn {
+    padding: 3px 8px;
+    height: 22px;
 }
 .prefs-check {
     justify-content: flex-start;

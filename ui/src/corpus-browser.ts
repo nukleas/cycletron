@@ -6,6 +6,8 @@
  * Backed by `search_corpus` / `get_corpus_source`.
  */
 
+import {invoke} from './tauri.js';
+import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
 import type {CorpusEntry, CorpusQuery} from './types/tauri-commands.js';
 
@@ -93,13 +95,12 @@ export class CorpusBrowser {
             const tempo = entry.tempo ? `<span class="corpus-tempo">${Math.round(entry.tempo)} bpm</span>` : '';
             const isCurated = entry.tags.includes('curated') ? 'true' : 'false';
             const ft = (entry.file_type || '').toLowerCase();
-            // All entries that reach the UI are now guaranteed strudel-rs compatible
-            // (js-song / tidal etc. are filtered at load time in the Rust corpus loader).
-            const sourceLabel = isCurated === 'true' ? 'curated' : 'rs';
+            // All entries that reach the UI are guaranteed strudel-rs compatible, and
+            // curated rows already get the magenta edge bar — no source badge needed.
             return `
                 <button class="corpus-entry" data-idx="${idx}" data-curated="${isCurated}" data-source="${ft || (isCurated==='true'?'curated':'strudel')}">
                     <span class="corpus-entry-title">${escapeHtml(title)}</span>
-                    <span class="corpus-entry-meta"><span class="corpus-source good">${sourceLabel}</span>${tags}${tempo}</span>
+                    <span class="corpus-entry-meta">${tags}${tempo}</span>
                 </button>
             `;
         }).join('');
@@ -132,14 +133,6 @@ export class CorpusBrowser {
             console.error('[corpus] get_corpus_source failed:', e);
         }
     }
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    return (window as any).__TAURI__.core.invoke(cmd, args);
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 export const corpusBrowser = new CorpusBrowser();

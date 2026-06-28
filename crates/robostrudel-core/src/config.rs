@@ -35,10 +35,19 @@ pub struct CorpusConfig {
     /// Loaded ahead of the bulk corpus so curated entries surface first.
     #[serde(default = "default_curated_path")]
     pub curated_path: Option<PathBuf>,
+    /// Path to the ingested-idiom store produced by `midi-ingest` (holds the
+    /// `*.index.json` manifests + converted `.strudel` snippets). Queried by
+    /// `strudel-search` and the research pipeline. Lives outside the repo.
+    #[serde(default = "default_ingested_path")]
+    pub ingested_path: Option<PathBuf>,
 }
 
 fn default_curated_path() -> Option<PathBuf> {
     Some(PathBuf::from("corpus"))
+}
+
+fn default_ingested_path() -> Option<PathBuf> {
+    Some(PathBuf::from("../strudel-training/ingested"))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,8 +73,12 @@ fn default_model() -> String {
 fn default_max_tokens() -> u32 {
     // Multi-section patterns are large backtick strings emitted alongside
     // prose; 8192 routinely truncated the tool-call JSON mid-stream, which
-    // surfaced as empty `{}` tool inputs and a validate retry loop.
-    32000
+    // surfaced as empty `{}` tool inputs and a validate retry loop. 32000
+    // still left songs/recipes truncating, so use the full Sonnet 4.6 output
+    // ceiling (64K). Responses stream over SSE, so the non-streaming HTTP
+    // timeout that caps large one-shot requests doesn't apply here. This also
+    // stays valid for Opus/Fable (128K ceiling) if the model is changed.
+    64000
 }
 
 fn default_tempo() -> f64 {
@@ -109,6 +122,7 @@ impl Default for AppConfig {
                 metadata_index: None,
                 parts_index: None,
                 curated_path: default_curated_path(),
+                ingested_path: default_ingested_path(),
             },
             audio: AudioConfig {
                 default_tempo: default_tempo(),

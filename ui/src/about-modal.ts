@@ -3,6 +3,7 @@
  * command. Triggered by Help → About and the `ui:about` custom event.
  */
 
+import {invoke} from './tauri.js';
 import type {AppInfo} from './types/tauri-commands.js';
 import {dismissibleModal} from './modal-utils.js';
 
@@ -69,12 +70,6 @@ export class AboutModal {
     private set(el: HTMLElement | null, text: string): void {
         if (el) el.textContent = text;
     }
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
 }
 
 async function openExternal(url: string): Promise<void> {

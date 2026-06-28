@@ -52,9 +52,10 @@ fn default_metronome_volume() -> f32 {
     0.4
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MidiInputSettings {
-    /// Selected input device id (Web MIDI port id). `None` = listen on all.
+    /// Selected input device id (native `midir` port index, as a string).
+    /// `None` = listen on all inputs.
     #[serde(default)]
     pub device_id: Option<String>,
     /// MIDI CC number that drives master gain (default: 7).
@@ -63,10 +64,58 @@ pub struct MidiInputSettings {
     /// MIDI CC number that drives BPM (default: 74).
     #[serde(default = "default_cc_bpm")]
     pub cc_bpm: u8,
+    /// Play notes through a separate GM-soundfont synth as the keyboard is
+    /// played (live monitoring), independent of the strudel scheduler.
+    #[serde(default)]
+    pub monitor_enabled: bool,
+    /// Bank name of the monitor instrument (e.g. `"gm_piano"`).
+    #[serde(default = "default_monitor_instrument")]
+    pub monitor_instrument: String,
+    /// Monitor output gain (0.0 – 1.0).
+    #[serde(default = "default_monitor_gain")]
+    pub monitor_gain: f32,
+    /// Pad/key → action bindings configured via "learn" mode.
+    #[serde(default)]
+    pub pad_assignments: Vec<PadAssignment>,
+}
+
+impl Default for MidiInputSettings {
+    fn default() -> Self {
+        Self {
+            device_id: None,
+            cc_gain: default_cc_gain(),
+            cc_bpm: default_cc_bpm(),
+            monitor_enabled: false,
+            monitor_instrument: default_monitor_instrument(),
+            monitor_gain: default_monitor_gain(),
+            pad_assignments: Vec::new(),
+        }
+    }
+}
+
+/// A single pad/key → action binding. The `trigger` is the MIDI message that
+/// fires the `action`; both are matched/dispatched on the frontend.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PadAssignment {
+    pub trigger: PadTrigger,
+    /// Action id, e.g. `"togglePlay"`, `"stop"`, `"hush"`, `"evaluate"`,
+    /// `"commit"`, `"clear"`, `"newTrack"`.
+    pub action: String,
+}
+
+/// The MIDI message that triggers a pad action.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PadTrigger {
+    /// `"cc"` or `"note"`.
+    pub kind: String,
+    /// CC number or note number.
+    pub value: u8,
 }
 
 fn default_cc_gain() -> u8 { 7 }
 fn default_cc_bpm() -> u8 { 74 }
+fn default_monitor_instrument() -> String { "sawtooth".to_string() }
+fn default_monitor_gain() -> f32 { 0.8 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotificationSettings {

@@ -16,18 +16,11 @@
     <header>
         <div class="logo">
             <h1>Robostrudel</h1>
-            <span class="badge rust">RUST</span>
-            <span class="badge">WASM</span>
-            <span class="badge badge-live">SAB</span>
         </div>
 
         <div class="controls">
             <div class="file-menu-group">
                 <button id="fileMenuBtn" class="file-menu-btn" title="File menu (New, Open, Save, Recent)" aria-haspopup="menu" aria-expanded="false">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                    </svg>
                     <span class="file-menu-btn-label">File</span>
                     <span class="file-menu-btn-caret" aria-hidden="true">▾</span>
                 </button>
@@ -78,10 +71,7 @@
             <div class="ai-panel-header">
                 <span>AI Operator</span>
                 <div class="ai-panel-actions">
-                    <button id="aiClear" class="ai-action-btn" title="New song / clear chat">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-                        New
-                    </button>
+                    <button id="aiClear" class="ai-action-btn" title="New song / clear chat">New</button>
                     <button id="aiToggle" class="ai-toggle" title="Toggle AI panel">&#9664;</button>
                 </div>
             </div>
@@ -168,56 +158,19 @@
                 </div>
                 <div class="panel-header-right">
                     <button id="historyBtn" class="copy-btn" title="Snapshots of this file (saved on every save)">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 3v6h6"/>
-                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                            <path d="M12 7v5l3 2"/>
-                        </svg>
                         <span class="btn-text">History</span>
                     </button>
                     <div class="record-group" title="Record live audio to WAV. Leave bars empty for manual stop.">
                         <button id="recordBtn" class="copy-btn record-btn">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <circle cx="12" cy="12" r="6"/>
-                            </svg>
                             <span class="btn-text">Rec</span>
                         </button>
                         <input id="recordBars" type="number" min="0" step="1" placeholder="bars" class="record-bars" aria-label="Auto-stop after N bars">
                         <span id="recordStatus" class="record-status" aria-live="polite"></span>
                     </div>
                     <button id="editorMidiBtn" class="copy-btn" title="Open MIDI Lab — convert .mid files to Strudel">
-                        <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <rect x="2" y="6" width="20" height="12" rx="1"/>
-                            <line x1="7" y1="6" x2="7" y2="14"/>
-                            <line x1="11" y1="6" x2="11" y2="14"/>
-                            <line x1="15" y1="6" x2="15" y2="14"/>
-                            <line x1="19" y1="6" x2="19" y2="14"/>
-                        </svg>
                         <span class="btn-text">MIDI</span>
                     </button>
                     <button id="copyBtn" class="copy-btn" title="Copy to clipboard">
-                        <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                        </svg>
                         <span class="btn-text">Copy</span>
                     </button>
                     <div class="editor-zoom">
@@ -232,12 +185,7 @@
             <div id="editor"></div>
             <div id="editorEmptyState" class="editor-empty-state" hidden>
                 <div class="editor-empty-state-inner">
-                    <svg class="editor-empty-state-icon" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="12" y1="12" x2="12" y2="18"/>
-                        <line x1="9" y1="15" x2="15" y2="15"/>
-                    </svg>
+                    <div class="editor-empty-state-wave" aria-hidden="true">▁▂▄▆█▆▄▂▁▂▄▆█▆▄▂▁</div>
                     <div class="editor-empty-state-title">No file open</div>
                     <div class="editor-empty-state-text">
                         Drop a <code>.strudel</code> or <code>.mid</code> file here, or use
@@ -310,7 +258,6 @@
 
             <div class="sidebar-section sidebar-browse">
                 <button id="browseExamples" class="browse-btn">
-                    <span class="browse-icon">&#9654;</span>
                     Browse Examples
                     <span class="browse-hint" id="examplesCount"></span>
                 </button>
@@ -500,11 +447,11 @@
                     </label>
                     <label class="prefs-field">
                         <span>Model</span>
-                        <input type="text" id="prefsModel" placeholder="claude-sonnet-4-20250514" autocomplete="off" spellcheck="false">
+                        <input type="text" id="prefsModel" placeholder="claude-sonnet-4-6" autocomplete="off" spellcheck="false">
                     </label>
                     <label class="prefs-field">
                         <span>Max tokens</span>
-                        <input type="number" id="prefsMaxTokens" min="256" max="32000" step="256" placeholder="4096">
+                        <input type="number" id="prefsMaxTokens" min="256" max="128000" step="1000" placeholder="64000">
                     </label>
                 </section>
                 <section class="prefs-section">
@@ -546,6 +493,25 @@
                         <span>CC → BPM</span>
                         <input type="number" id="prefsMidiCcBpm" min="0" max="127" step="1" placeholder="74">
                     </label>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsMidiMonitorEnabled">
+                        <span>Live monitor — hear the keyboard as you play</span>
+                    </label>
+                    <label class="prefs-field">
+                        <span>Monitor instrument</span>
+                        <select id="prefsMidiMonitorInstrument"></select>
+                    </label>
+                    <label class="prefs-field">
+                        <span>Monitor volume</span>
+                        <input type="range" id="prefsMidiMonitorGain" min="0" max="100" step="1" value="80">
+                    </label>
+                    <div class="prefs-field prefs-field-wide">
+                        <div class="prefs-row">
+                            <span>Pad / key actions</span>
+                            <span class="prefs-hint" id="prefsMidiPadsHint">Click Learn, then press a pad or key</span>
+                        </div>
+                        <div id="prefsMidiPads" class="prefs-midi-pads"></div>
+                    </div>
                 </section>
                 <section class="prefs-section">
                     <h4>Library</h4>
@@ -582,12 +548,12 @@
     </div>
 
     <!-- MIDI Lab modal -->
-    <div id="midiLab" class="midi-lab" hidden role="dialog" aria-modal="true" aria-labelledby="midiLabTitle">
-        <div class="midi-lab-backdrop" id="midiLabBackdrop"></div>
-        <div class="midi-lab-window" role="document">
-            <div class="midi-lab-header">
+    <div id="midiLab" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="midiLabTitle">
+        <div class="app-modal-backdrop" id="midiLabBackdrop"></div>
+        <div class="app-modal-window app-modal-window--wide" role="document">
+            <div class="app-modal-header">
                 <span id="midiLabTitle">MIDI LAB</span>
-                <button class="midi-lab-close" id="midiLabClose" aria-label="Close">×</button>
+                <button class="app-modal-close" id="midiLabClose" data-dismiss aria-label="Close">×</button>
             </div>
             <div class="midi-lab-fileline">
                 <button id="midiLabBrowse" class="midi-lab-browse">Browse…</button>
@@ -654,7 +620,7 @@
                 <pre id="midiLabPreview"></pre>
             </div>
             <div class="midi-lab-actions">
-                <button id="midiLabCancel">Cancel</button>
+                <button id="midiLabCancel" data-dismiss>Cancel</button>
                 <span class="midi-lab-spacer"></span>
                 <button id="midiLabPreviewBtn">Preview</button>
                 <button id="midiLabOpen">Open in Editor</button>

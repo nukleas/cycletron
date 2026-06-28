@@ -8,6 +8,7 @@
  * The WASM REPL handles all audio — the Tauri backend never touches audio.
  */
 
+import {escapeHtml} from './html.js';
 import {notify} from './notifications.js';
 import {addTask, removeTask} from './dock-badge.js';
 
@@ -49,10 +50,6 @@ function renderMarkdown(text: string): string {
     html = html.replace(/<\/p><p>/g, '</p>\n<p>');
 
     return html;
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // --- Main Init ---

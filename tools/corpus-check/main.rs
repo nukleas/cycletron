@@ -1,8 +1,11 @@
 //! Strict validator for the robostrudel curated corpus.
 //!
-//! Walks `corpus/` and runs every `.strudel` file through the same pipeline
-//! `src-tauri/src/strudel.rs::validate_code` uses. Exits non-zero if ANY file
-//! fails — this is meant to gate CI and the AI corpus-extension loop.
+//! Walks `corpus/` and runs every `.strudel` file — and every ```strudel
+//! fragment inside `corpus/genres/*.md` recipes — through the same pipeline
+//! `src-tauri/src/strudel.rs::validate_code` uses. Exits non-zero if ANY unit
+//! fails. This gates CI, the AI corpus-extension loop, and the genre-recipe
+//! research pipeline: a recipe can never ship a fragment that doesn't actually
+//! run on strudel-rs.
 //!
 //! Usage:
 //!     corpus-check                   # walk ./corpus
@@ -11,6 +14,12 @@
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+
+/// A thing to validate: a display label plus its strudel code.
+struct Unit {
+    label: String,
+    code: String,
+}
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -24,35 +33,55 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
-    let files = collect_strudel_files(&root);
-    if files.is_empty() {
-        eprintln!("corpus-check: no .strudel files under {}", root.display());
-        return ExitCode::from(2);
-    }
+    let mut units: Vec<Unit> = Vec::new();
+    let mut failures: Vec<(String, String)> = Vec::new();
 
-    let mut failures: Vec<(PathBuf, String)> = Vec::new();
-    for path in &files {
-        let code = match std::fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(e) => {
-                failures.push((path.clone(), format!("io: {e}")));
-                continue;
-            }
-        };
-        if let Err(e) = validate(&code) {
-            failures.push((path.clone(), e));
+    // 1. Curated `.strudel` files.
+    for path in collect_strudel_files(&root) {
+        match std::fs::read_to_string(&path) {
+            Ok(code) => units.push(Unit { label: short(&path), code }),
+            Err(e) => failures.push((short(&path), format!("io: {e}"))),
         }
     }
 
-    let total = files.len();
+    // 2. ```strudel fragments inside `*.md` genre recipes.
+    for path in collect_recipe_files(&root) {
+        match std::fs::read_to_string(&path) {
+            Ok(text) => {
+                for frag in robostrudel_corpus::recipes::extract_strudel_blocks(&text) {
+                    units.push(Unit {
+                        label: format!("{} [{}]", short(&path), frag.label),
+                        code: frag.code,
+                    });
+                }
+            }
+            Err(e) => failures.push((short(&path), format!("io: {e}"))),
+        }
+    }
+
+    if units.is_empty() && failures.is_empty() {
+        eprintln!(
+            "corpus-check: no .strudel files or recipe fragments under {}",
+            root.display()
+        );
+        return ExitCode::from(2);
+    }
+
+    for unit in &units {
+        if let Err(e) = validate(&unit.code) {
+            failures.push((unit.label.clone(), e));
+        }
+    }
+
+    let total = units.len();
     let failing = failures.len();
-    let passing = total - failing;
+    let passing = total.saturating_sub(failing);
     println!("corpus-check: {passing}/{total} ok");
 
     if failing > 0 {
         println!();
-        for (path, err) in &failures {
-            println!("FAIL {}", short(path));
+        for (label, err) in &failures {
+            println!("FAIL {label}");
             for line in err.lines() {
                 println!("     {line}");
             }
@@ -61,6 +90,34 @@ fn main() -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+/// Collect `*.md` recipe files under `root` (skipped when `root` is a single
+/// non-markdown file).
+fn collect_recipe_files(root: &Path) -> Vec<PathBuf> {
+    if root.is_file() {
+        return if root.extension().and_then(|s| s.to_str()) == Some("md") {
+            vec![root.to_path_buf()]
+        } else {
+            Vec::new()
+        };
+    }
+    let mut out: Vec<PathBuf> = walkdir::WalkDir::new(root)
+        .into_iter()
+        .flatten()
+        .filter(|e| e.file_type().is_file())
+        .map(|e| e.path().to_path_buf())
+        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("md"))
+        .filter(|p| {
+            // Skip directory docs (README.md, _template.md) — only recipes are gated.
+            p.file_stem()
+                .and_then(|s| s.to_str())
+                .map(|stem| !(stem.starts_with('_') || stem.eq_ignore_ascii_case("readme")))
+                .unwrap_or(true)
+        })
+        .collect();
+    out.sort();
+    out
 }
 
 fn default_corpus_dir() -> PathBuf {

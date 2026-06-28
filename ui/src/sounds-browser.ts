@@ -6,6 +6,9 @@
  * insert a starter snippet at the editor cursor.
  */
 
+import {invoke} from './tauri.js';
+import {escapeHtml} from './html.js';
+
 const isTauri = !!(window as any).__TAURI__;
 
 interface DrumMachine {
@@ -121,14 +124,6 @@ export class SoundsBrowser {
         editor.insertAtCursor(snippet);
     }
 
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    return (window as any).__TAURI__.core.invoke(cmd, args);
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 export const soundsBrowser = new SoundsBrowser();

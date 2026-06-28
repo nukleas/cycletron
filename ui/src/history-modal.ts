@@ -5,6 +5,7 @@
  * `replaceCodeAndPlay`, so playback continues seamlessly).
  */
 
+import {invoke} from './tauri.js';
 import {fileManager} from './file-manager.js';
 import {dismissibleModal} from './modal-utils.js';
 import type {Snapshot} from './types/tauri-commands.js';
@@ -150,12 +151,6 @@ function formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
 }
 
 export const historyModal = new HistoryModal();

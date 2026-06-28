@@ -5,6 +5,8 @@
  * in sync.
  */
 
+import {invoke} from './tauri.js';
+
 const isTauri = !!(window as any).__TAURI__;
 
 const active = new Set<string>();
@@ -28,10 +30,4 @@ function sync(): void {
     void invoke<void>('set_dock_badge', {count}).catch((e) => {
         console.warn('[dock-badge] set failed:', e);
     });
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const api = (window as any).__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
-    return api.invoke(cmd, args);
 }
