@@ -60,3 +60,9 @@ tmp/
 # Agent / tooling dev state (local-only)
 .grok/
 .playwright-mcp/
+
+# Local Supabase corpus cache (derived data)
+.corpus-cache/
+
+# Rendered audio (regenerate with strudio render — see exports/agency/README)
+/exports/
