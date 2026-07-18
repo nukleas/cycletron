@@ -15,6 +15,19 @@
 //!   [`palindrome`] form     mirror a motif into a symmetric phrase
 //!   [`automaton`]  motion   elementary cellular automaton → evolving rhythm
 
+pub mod compose;
+pub mod factor;
+pub mod genres;
+pub mod grid;
+pub mod map;
+pub mod melody;
+pub mod mini;
+pub mod repair;
+pub mod scale;
+pub mod song;
+pub mod spec;
+pub mod verify;
+
 /// Lowercase pitch-class names with sharps — strudel-rs note grammar (C4 = 60).
 const PC_LOWER: [&str; 12] = [
     "c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b",

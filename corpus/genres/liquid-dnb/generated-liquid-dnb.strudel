@@ -1,0 +1,9 @@
+// liquid drum & bass in E minor (generated) — two-step break, deep sub, Rhodes wash, floating lead
+setbpm(174);
+
+stack(
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh*16").gain(0.9),
+  note("e1 ~ ~ ~ ~ ~ ~ ~ ~ ~ e1 ~ ~ ~ ~ ~").s("sine").attack(0.02).release(0.5).gain(0.58),
+  note("<[e3, g3, b3, d4] [a3, c4, e4, g4] [c4, e4, g4, b4] [b3, d4, f#4, a4]>").s("gm_epiano1").release(0.5).gain(0.38).room(0.5).pan(0.42),
+  note("e5 ~ ~ ~ d5 ~ ~ ~").s("wt_flute").delay(0.35).room(0.5).gain(0.3).pan(0.62)
+)
