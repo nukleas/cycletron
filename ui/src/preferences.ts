@@ -8,7 +8,8 @@
  */
 
 import {invoke} from './tauri.js';
-import type {UserSettings, PadAssignment} from './types/tauri-commands.js';
+import type {UserSettings, PadAssignment, LlmSettings} from './types/tauri-commands.js';
+import {presetById, presetProfile, defaultLlmSettings, normalizeLlm} from './providers.js';
 import {dismissibleModal} from './modal-utils.js';
 import {setNotificationsEnabled} from './notifications.js';
 import {metronome} from './metronome.js';
@@ -33,9 +34,18 @@ export class PreferencesModal {
     private cleanup: (() => void) | null = null;
 
     // Form refs
+    private provider: HTMLSelectElement | null = null;
     private apiKey: HTMLInputElement | null = null;
+    private keyStatus: HTMLElement | null = null;
+    private baseUrl: HTMLInputElement | null = null;
+    private baseUrlField: HTMLElement | null = null;
+    private providerNote: HTMLElement | null = null;
     private model: HTMLInputElement | null = null;
     private maxTokens: HTMLInputElement | null = null;
+    /** In-memory LLM config (active provider + per-provider profiles). */
+    private llm: LlmSettings = defaultLlmSettings();
+    /** Which provider's fields the form currently shows. */
+    private currentProviderId = 'anthropic';
     private defaultTempo: HTMLInputElement | null = null;
     private libraryRoot: HTMLElement | null = null;
     private autoCheck: HTMLInputElement | null = null;
@@ -58,9 +68,15 @@ export class PreferencesModal {
         this.root = document.getElementById('prefsModal');
         if (!this.root) return;
 
+        this.provider = document.getElementById('prefsProvider') as HTMLSelectElement;
         this.apiKey = document.getElementById('prefsApiKey') as HTMLInputElement;
+        this.keyStatus = document.getElementById('prefsKeyStatus');
+        this.baseUrl = document.getElementById('prefsBaseUrl') as HTMLInputElement;
+        this.baseUrlField = document.getElementById('prefsBaseUrlField');
+        this.providerNote = document.getElementById('prefsProviderNote');
         this.model = document.getElementById('prefsModel') as HTMLInputElement;
         this.maxTokens = document.getElementById('prefsMaxTokens') as HTMLInputElement;
+        this.provider?.addEventListener('change', () => void this.onProviderChange());
         this.defaultTempo = document.getElementById('prefsDefaultTempo') as HTMLInputElement;
         this.libraryRoot = document.getElementById('prefsLibraryRoot');
         this.autoCheck = document.getElementById('prefsAutoCheck') as HTMLInputElement;
@@ -113,12 +129,15 @@ export class PreferencesModal {
                 invoke<string>('get_library_root').catch(() => ''),
             ]);
             this.loaded = settings;
-            if (this.apiKey) this.apiKey.value = settings.anthropic.api_key ?? '';
-            if (this.model) this.model.value = settings.anthropic.model ?? '';
-            if (this.maxTokens) {
-                this.maxTokens.value = settings.anthropic.max_tokens != null
-                    ? String(settings.anthropic.max_tokens) : '';
-            }
+            // AI: seed the in-memory provider map, select the active provider,
+            // and paint its fields. Keys are write-only (kept in the keychain),
+            // so the key input starts empty and a status line reports whether one
+            // exists.
+            this.llm = normalizeLlm(settings.llm);
+            this.currentProviderId = this.llm.active;
+            if (this.provider) this.provider.value = this.currentProviderId;
+            this.applyProviderToForm(this.currentProviderId);
+            await this.refreshKeyStatus(this.currentProviderId);
             if (this.defaultTempo) {
                 this.defaultTempo.value = settings.audio.default_tempo != null
                     ? String(settings.audio.default_tempo) : '';
@@ -146,11 +165,68 @@ export class PreferencesModal {
         }
     }
 
-    private collect(): UserSettings {
-        const trimOrNull = (v: string | undefined): string | null => {
-            const s = (v ?? '').trim();
-            return s.length === 0 ? null : s;
+    /** Provider dropdown changed: stash the old provider's edits, show the new. */
+    private async onProviderChange(): Promise<void> {
+        const next = this.provider?.value ?? 'anthropic';
+        if (next === this.currentProviderId) return;
+        this.captureFormToProvider(this.currentProviderId);
+        this.currentProviderId = next;
+        this.llm.active = next;
+        this.applyProviderToForm(next);
+        if (this.apiKey) this.apiKey.value = '';
+        await this.refreshKeyStatus(next);
+    }
+
+    /** Paint the model / base-URL / max-tokens fields for a provider, plus its
+     *  placeholder, base-URL visibility, and note. */
+    private applyProviderToForm(id: string): void {
+        const preset = presetById(id);
+        const prof = this.llm.providers[id] ?? presetProfile(id);
+        if (this.model) this.model.value = prof.model ?? '';
+        if (this.maxTokens) this.maxTokens.value = prof.max_tokens != null ? String(prof.max_tokens) : '';
+        if (this.baseUrl) this.baseUrl.value = prof.base_url ?? '';
+        if (this.baseUrlField) this.baseUrlField.hidden = !(preset?.showBaseUrl ?? prof.codec === 'openai');
+        if (this.apiKey) this.apiKey.placeholder = preset?.keyPlaceholder ?? 'API key';
+        if (this.model) this.model.placeholder = preset?.model || 'model id';
+        if (this.providerNote) {
+            const note = preset?.note ?? '';
+            this.providerNote.textContent = note;
+            this.providerNote.hidden = note.length === 0;
+        }
+    }
+
+    /** Read the currently-shown fields back into a provider's in-memory profile. */
+    private captureFormToProvider(id: string): void {
+        const preset = presetById(id);
+        const base = (this.baseUrl?.value ?? '').trim();
+        const model = (this.model?.value ?? '').trim();
+        const mt = parseInt(this.maxTokens?.value ?? '', 10);
+        const prev = this.llm.providers[id] ?? presetProfile(id);
+        this.llm.providers[id] = {
+            codec: preset?.codec ?? prev.codec,
+            base_url: (preset?.showBaseUrl ?? prev.codec === 'openai')
+                ? (base.length > 0 ? base : null)
+                : null,
+            model: model.length > 0 ? model : prev.model,
+            max_tokens: Number.isFinite(mt) ? mt : prev.max_tokens,
         };
+    }
+
+    /** Reflect whether a key is stored for this provider (never shows the key). */
+    private async refreshKeyStatus(id: string): Promise<void> {
+        if (!this.keyStatus) return;
+        let has = false;
+        try {
+            has = await invoke<boolean>('has_provider_key', {provider: id});
+        } catch { /* ignore */ }
+        const required = presetById(id)?.keyRequired ?? true;
+        this.keyStatus.textContent = has
+            ? 'Key saved ✓'
+            : (required ? 'No key set' : 'No key (optional)');
+        this.keyStatus.classList.toggle('is-ok', has);
+    }
+
+    private collect(): UserSettings {
         const numOrNull = (el: HTMLInputElement | null): number | null => {
             if (!el) return null;
             const v = parseFloat(el.value);
@@ -164,12 +240,14 @@ export class PreferencesModal {
         const ccBpm  = numOrNull(this.midiCcBpm);
         const midiDevice = this.midiInputSelect?.value ?? baseMidi?.device_id ?? null;
         const monitorGainPct = numOrNull(this.midiMonitorGain);
+        // Fold the currently-shown fields back into the active provider's
+        // profile, then ship the whole map. Keys are handled separately.
+        this.captureFormToProvider(this.currentProviderId);
+        this.llm.active = this.currentProviderId;
         return {
-            anthropic: {
-                api_key: trimOrNull(this.apiKey?.value),
-                model: trimOrNull(this.model?.value),
-                max_tokens: numOrNull(this.maxTokens),
-            },
+            llm: this.llm,
+            // Legacy block, now always empty — keys live in the keychain.
+            anthropic: {api_key: null, model: null, max_tokens: null},
             audio: {
                 default_tempo: numOrNull(this.defaultTempo),
             },
@@ -343,7 +421,15 @@ export class PreferencesModal {
         if (!isTauri) return;
         try {
             const next = this.collect();
+            // Persist a newly-typed key into the keychain first, so the client
+            // rebuild inside set_user_settings picks it up. Empty = leave as-is.
+            const typedKey = (this.apiKey?.value ?? '').trim();
+            if (typedKey.length > 0) {
+                await invoke<void>('set_provider_key', {provider: this.currentProviderId, key: typedKey});
+                if (this.apiKey) this.apiKey.value = '';
+            }
             await invoke<void>('set_user_settings', {settings: next});
+            await this.refreshKeyStatus(this.currentProviderId);
             this.flash('Saved');
             // Reflect immediate-effect prefs in the running UI without a reload.
             const tempo = parseFloat(this.defaultTempo?.value ?? '');

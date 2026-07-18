@@ -128,6 +128,15 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                 primitive. Returns complete `.strudel` code (comment + setbpm + chain) that \
                 already passes validation — a strong starting point you can play directly or \
                 edit further. Generators (and the params each uses):\n\
+                - 'genre' (full piece): a complete, musically-coherent arrangement — aligned \
+                  drum grid, in-key bass, diatonic chords, and a generated melody/arp — built \
+                  from music-theory primitives and round-trip verified, so it is never \
+                  rhythmically misaligned or out of key. PREFER THIS for a full genre pattern. \
+                  60+ genres across the whole electronic map are supported (house, techno, \
+                  trance, dnb, dubstep, uk-garage, gabber, hardstyle, trap, phonk, amapiano, \
+                  footwork, synthwave, chiptune, dub, idm, ebm, italo-disco, …); family names \
+                  and common aliases route too. Params: genre (kebab-case name), seed \
+                  (integer, varies the melodic parts; default 7).\n\
                 - 'infinity' (melody): Per Nørgård's self-similar series. Params: count (notes, \
                   default 16), root (root MIDI note, default 60 = C4).\n\
                 - 'hexbeat' (rhythm): a hex string is decoded to a 1-bar kick pattern, 4 steps \
@@ -145,9 +154,11 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                 "properties": {
                     "generator": {
                         "type": "string",
-                        "enum": ["infinity", "hexbeat", "numerals", "palindrome", "automaton"],
+                        "enum": ["genre", "infinity", "hexbeat", "numerals", "palindrome", "automaton"],
                         "description": "Which generator to run"
                     },
+                    "genre": { "type": "string", "description": "genre: kebab-case name from the genre map (e.g. deep-house, psytrance, gabber, amapiano, synthwave); family names and aliases also route" },
+                    "seed": { "type": "integer", "description": "genre: varies the generated melodic parts (default 7)" },
                     "count": { "type": "integer", "description": "infinity: number of notes (default 16)" },
                     "root": { "type": "integer", "description": "infinity: root MIDI note (default 60)" },
                     "hex": { "type": "string", "description": "hexbeat: hex string, e.g. 'a4f2'" },
@@ -163,14 +174,46 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "validate_pattern".to_string(),
-            description: "Validate strudel pattern code. Returns 'valid' or error details."
-                .to_string(),
+            description:
+                "Validate strudel pattern code. Returns 'valid' or error details — and, when \
+                the syntax is fine, also lints for SILENT failures that parse but never sound: \
+                unknown sound names (silent layer), a chord symbol used without .voicing(), \
+                pan outside 0..1 (negative pan = NaN = silence), and expected gm_* first-cycle \
+                streaming silence. Treat every [warn] as a dead layer to fix before playing."
+                    .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
                         "description": "Strudel pattern code to validate"
+                    }
+                },
+                "required": ["code"]
+            }),
+        },
+        ToolDefinition {
+            name: "review_pattern".to_string(),
+            description:
+                "The combined quality gate — ONE call that runs the whole pre-play checklist: \
+                validation, a compact digest (bpm, events, loop period, voices, sounds), the \
+                silence lint (unknown sounds / unvoiced chords / bad pan / gm first-cycle), the \
+                mix critique (clipping, mono, clashes, low-end), and — when the code uses \
+                pickRestart or arrange — the form critique (section lengths, energy arc, \
+                robotic loops). PREFER THIS over separate validate/critique/critique_form calls \
+                when reviewing a full pattern or multi-section song: it cuts the round-trip tax \
+                to a single turn. Ends with a verdict; fix every warn before playing."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Strudel pattern code to review"
+                    },
+                    "cycles": {
+                        "type": "integer",
+                        "description": "How many cycles to scan (default 8, max 64). Raise for long song forms."
                     }
                 },
                 "required": ["code"]
@@ -200,6 +243,13 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                         "type": "integer",
                         "description": "How many cycles to query (default 8, max 64). \
                             Use more to see longer song forms / slowcat variation."
+                    },
+                    "verbosity": {
+                        "type": "string",
+                        "enum": ["auto", "summary", "events"],
+                        "description": "auto (default): full event log for ≤4 cycles, summary \
+                            beyond. summary: high-level facts + per-cycle event counts only. \
+                            events: always the full per-event log."
                     }
                 },
                 "required": ["code"]
@@ -257,6 +307,36 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                     "cycles": {
                         "type": "integer",
                         "description": "How many cycles to scan (default 16, max 64)."
+                    }
+                },
+                "required": ["code"]
+            }),
+        },
+        ToolDefinition {
+            name: "critique_form".to_string(),
+            description:
+                "Critique a pattern's FORM — whether it's arranged like a song, not one looping \
+                bar. (Use critique_pattern for mix issues, analyze_arrangement for the raw \
+                structure.) Reports: sections whose length isn't a whole number of 4-bar phrases; \
+                no energy contrast (every section the same density); the busiest section being \
+                first instead of building to a peak; a melody that repeats the same 1-bar phrase \
+                under a long section (robotic loop); and — when pickRestart labels are present — a \
+                low-energy section (intro/break/outro) as busy as the drop, or a drop that doesn't \
+                step up from the section before it. Call it after writing a multi-section song \
+                (especially with pickRestart) to check the arrangement earns its sections; fix any \
+                'warn' before playing."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Strudel pattern code to critique for form"
+                    },
+                    "cycles": {
+                        "type": "integer",
+                        "description": "How many cycles to scan for the full form (default 32, \
+                            max 64). Raise for long songs."
                     }
                 },
                 "required": ["code"]

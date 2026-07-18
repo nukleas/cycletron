@@ -3761,7 +3761,8 @@ body.is-drop-target::after {
 .prefs-field span { white-space: nowrap; }
 .prefs-field input[type="text"],
 .prefs-field input[type="password"],
-.prefs-field input[type="number"] {
+.prefs-field input[type="number"],
+.prefs-field select#prefsProvider {
     background: rgba(5, 6, 10, 0.78);
     color: var(--neon-bright);
     border: 1px solid var(--border);
@@ -3772,11 +3773,22 @@ body.is-drop-target::after {
     min-width: 220px;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
-.prefs-field input:focus {
+.prefs-field input:focus,
+.prefs-field select#prefsProvider:focus {
     outline: none;
     border-color: var(--neon-subtle);
     box-shadow: 0 0 6px var(--neon-glow);
 }
+/* Small secondary line under an AI field (key status / provider note). */
+.prefs-field-hint {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    text-align: right;
+    margin-top: -4px;
+}
+.prefs-field-hint.is-ok { color: var(--neon); }
 .prefs-field-wide {
     flex-direction: column;
     align-items: stretch;

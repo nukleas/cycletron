@@ -92,6 +92,22 @@ export interface AnthropicOverrides {
     max_tokens: number | null;
 }
 
+/** One provider's settings. The API key lives in the OS keychain, not here. */
+export interface ProviderProfile {
+    /** Wire codec: "anthropic" or "openai" (OpenAI-compatible). */
+    codec: string;
+    /** Base URL for OpenAI-compatible providers; null for the Anthropic codec. */
+    base_url: string | null;
+    model: string;
+    max_tokens: number;
+}
+
+/** Multi-provider LLM config: active provider id + per-provider profiles. */
+export interface LlmSettings {
+    active: string;
+    providers: Record<string, ProviderProfile>;
+}
+
 export interface AudioOverrides {
     default_tempo: number | null;
 }
@@ -138,6 +154,8 @@ export interface MidiInputSettings {
 }
 
 export interface UserSettings {
+    llm: LlmSettings;
+    /** Legacy single-provider block; migrated into `llm` + keychain on launch. */
     anthropic: AnthropicOverrides;
     audio: AudioOverrides;
     updater: UpdaterSettings;

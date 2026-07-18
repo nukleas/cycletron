@@ -7,7 +7,7 @@ use crate::settings::UserSettings;
 use crate::snapshots::{self, Snapshot};
 use crate::state::AppState;
 use crate::strudel;
-use midi_to_strudel::{InstrumentMode, drums::DrumBank};
+use midi_to_strudel::{InstrumentMode, SectionNamingStrategy, drums::DrumBank};
 use robostrudel_core::traits::CorpusIndex;
 use robostrudel_core::types::*;
 use serde::Deserialize;
@@ -35,7 +35,7 @@ pub async fn send_message(
     let client = match state.agent_client.lock().unwrap().clone() {
         Some(c) => c,
         None => {
-            let msg = "AI not configured. Set ANTHROPIC_API_KEY environment variable.";
+            let msg = "AI not configured. Open Preferences → AI to pick a provider and add a key.";
             let mut session = state.session.lock().unwrap();
             session.add_assistant_message(msg.to_string());
             return Ok(msg.to_string());
@@ -56,7 +56,7 @@ pub async fn send_message(
         }
     });
 
-    let result = agent_loop::run_agent_loop(&client, &messages, &state, event_tx).await;
+    let result = agent_loop::run_agent_loop(client.as_ref(), &messages, &state, event_tx).await;
     let _ = forwarder.await;
 
     match result {
@@ -111,6 +111,14 @@ pub fn analyze_arrangement(
 #[tauri::command]
 pub fn critique_pattern(code: String, cycles: Option<usize>) -> Result<strudel::Critique, String> {
     strudel::critique_code(&code, cycles.unwrap_or(16))
+}
+
+/// Critique a pattern's FORM: section-length grid, energy contrast/build,
+/// robotic 1-bar loops under long sections, and (with pickRestart labels)
+/// name-vs-density sanity. Reuses the `Critique` shape as `critique_pattern`.
+#[tauri::command]
+pub fn critique_form(code: String, cycles: Option<usize>) -> Result<strudel::Critique, String> {
+    strudel::critique_form_code(&code, cycles.unwrap_or(32))
 }
 
 /// Genre recipes. With no `genre`, returns every loaded recipe (for a picker);
@@ -367,6 +375,8 @@ pub struct ImportMidiOptions {
     pub auto_resolution: Option<bool>,
     pub bar_limit: Option<usize>,
     pub compact: Option<bool>,
+    pub compose: Option<bool>,
+    pub section_naming: Option<String>,
     pub detect_drum_names: Option<bool>,
     pub instrument_mode: Option<String>,
     pub drum_bank: Option<String>,
@@ -389,6 +399,16 @@ fn build_import_options(input: Option<ImportMidiOptions>) -> Result<midi::Import
     }
     if let Some(b) = input.compact {
         opts.compact = b;
+    }
+    if let Some(b) = input.compose {
+        opts.compose = b;
+    }
+    if let Some(s) = input.section_naming.as_deref() {
+        opts.section_naming = match s.to_ascii_lowercase().as_str() {
+            "heuristic" => SectionNamingStrategy::Heuristic,
+            "generic" => SectionNamingStrategy::Generic,
+            other => return Err(format!("unknown section_naming: {other}")),
+        };
     }
     if let Some(b) = input.detect_drum_names {
         opts.detect_drum_names = b;
@@ -675,7 +695,9 @@ pub fn get_user_settings(state: State<'_, AppState>) -> UserSettings {
     state.user_settings.lock().unwrap().clone()
 }
 
-/// Persist `settings` and rebuild dependent state (e.g. the Claude client).
+/// Persist `settings` and rebuild dependent state (e.g. the AI client).
+/// API keys are NOT part of `settings` — they go through `set_provider_key`
+/// into the OS keychain.
 #[tauri::command]
 pub fn set_user_settings(
     settings: UserSettings,
@@ -684,14 +706,11 @@ pub fn set_user_settings(
     // Apply to the in-memory config so the rest of the app sees the change.
     {
         let mut config = state.config.lock().unwrap();
-        // Reset anthropic to the bundled-default key (None) before re-applying
-        // so an unset api_key actually clears it.
-        config.anthropic.api_key = None;
         settings.apply_to(&mut config);
     }
-    state.rebuild_agent_client();
 
-    // Persist to disk.
+    // Persist to disk and swap in the new settings before rebuilding, so the
+    // rebuild reads the just-selected provider profile.
     {
         let mut current = state.user_settings.lock().unwrap();
         *current = settings;
@@ -699,7 +718,29 @@ pub fn set_user_settings(
             current.save(&dir).map_err(|e| e.to_string())?;
         }
     }
+    state.rebuild_agent_client();
     Ok(())
+}
+
+/// Store (or clear, when `key` is empty) a provider's API key in the OS
+/// keychain, then rebuild the client so the change takes effect immediately.
+/// `provider` is the provider id: `"anthropic"`, `"grok"`, `"openai"`, etc.
+#[tauri::command]
+pub fn set_provider_key(
+    provider: String,
+    key: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    crate::secrets::set_key(&provider, &key)?;
+    state.rebuild_agent_client();
+    Ok(())
+}
+
+/// Whether a usable key exists for `provider` (keychain or env fallback). The
+/// key value itself is never returned to the frontend.
+#[tauri::command]
+pub fn has_provider_key(provider: String) -> bool {
+    crate::secrets::has_key(&provider)
 }
 
 // ---------------------------------------------------------------------------

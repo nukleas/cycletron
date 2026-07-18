@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-critique-form"
+description = "Enables the critique_form command without any pre-configured scope."
+commands.allow = ["critique_form"]
+
+[[permission]]
+identifier = "deny-critique-form"
+description = "Denies the critique_form command without any pre-configured scope."
+commands.deny = ["critique_form"]

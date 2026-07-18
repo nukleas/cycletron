@@ -115,6 +115,23 @@ impl ClaudeClient {
     }
 }
 
+#[async_trait::async_trait]
+impl crate::provider::LlmProvider for ClaudeClient {
+    async fn stream_message(
+        &self,
+        system: &str,
+        messages: &[ApiMessage],
+        tools: &[ToolDefinition],
+        event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    ) -> Result<MessagesResponse, AgentError> {
+        ClaudeClient::stream_message(self, system, messages, tools, event_tx).await
+    }
+
+    fn max_tokens(&self) -> u32 {
+        self.max_tokens
+    }
+}
+
 /// Errors specific to the agent.
 #[derive(Debug, thiserror::Error)]
 pub enum AgentError {

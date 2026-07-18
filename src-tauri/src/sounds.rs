@@ -200,49 +200,23 @@ pub fn register_sound_banks(names: Vec<String>, state: State<'_, AppState>) -> R
     Ok(())
 }
 
-/// Built-in synth/oscillator names (from `strudel-sounds` + new wavetables).
-pub const SYNTHS: &[&str] = &[
-    "sine", "triangle", "sawtooth", "square", "pulse", "fm", "supersaw", "supersquare",
-    "superpwm", "superzow", "white", "pink", "brown", "crackle", "sbd",
-];
-
-/// Wavetable synths — richer timbres, 20 tables baked at WASM compile time.
-/// Use with `note("…").s("wt_flute")` etc.
-pub const WAVETABLES: &[&str] = &[
-    "wt_flute", "wt_clarinet", "wt_oboe", "wt_violin", "wt_cello",
-    "wt_trumpet", "wt_bassoon", "wt_organ", "wt_piano", "wt_bell",
-    "wt_pluck", "wt_bass", "wt_lead", "wt_pad", "wt_choir", "wt_strings",
-    "wt_sine", "wt_tri", "wt_square", "wt_saw",
-];
-
-/// Drum sample banks loaded by default at startup.
-pub const DEFAULT_DRUMS: &[&str] = &[
-    "bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs",
-];
-
-/// Bundled drum machine kits and their voices.
-/// Bank names are `{MachineName}_{voice}`, e.g. `s("RolandTR808_bd")`.
-/// (Equivalent to web-strudel's `s("bd").bank("RolandTR808")` once strudel-rs
-/// implements `.bank()` prefix lookup in `apply_control_to_event`.)
-pub const MACHINE_KITS: &[(&str, &str, &[&str])] = &[
-    ("RolandTR808", "TR-808",   &["bd","sd","hh","oh","cp","rim","lt","mt","ht","cb"]),
-    ("RolandTR909", "TR-909",   &["bd","sd","hh","oh","cp","rd","rim"]),
-    ("RolandTR707", "TR-707",   &["bd","sd","hh","oh","cp","lt","ht"]),
-    ("LinnDrum",    "LinnDrum", &["bd","sd","hh","cp"]),
-    ("BossDR55",    "DR-55",    &["bd","sd","hh","rim"]),
-];
-
-/// A representative slice of the General MIDI soundfont instruments that load on
-/// demand. (Any `gm_*` General MIDI name works; these are common picks.)
-pub const GM_INSTRUMENTS: &[&str] = &[
-    "gm_piano", "gm_epiano1", "gm_harpsichord", "gm_acoustic_bass",
-    "gm_electric_bass_finger", "gm_violin", "gm_cello", "gm_string_ensemble_1",
-    "gm_trumpet", "gm_trombone", "gm_alto_sax", "gm_flute", "gm_clarinet",
-    "gm_acoustic_guitar_nylon", "gm_overdriven_guitar", "gm_church_organ",
-    "gm_synth_bass_1", "gm_lead_1_square", "gm_pad_warm", "gm_marimba", "gm_xylophone",
-];
+// Built-in sound catalog lives in the shared analysis crate so CLI tools use
+// the same known-sound set; user-loaded banks are layered on here.
+pub use robostrudel_analysis::sounds::{
+    builtin_sound_set, DEFAULT_DRUMS, GM_INSTRUMENTS, MACHINE_KITS, SYNTHS, WAVETABLES,
+};
 
 /// Everything currently playable, for the UI and the agent's `list_sounds` tool.
+/// Flat set of every sound name that resolves today: the built-in catalog plus
+/// user-loaded banks. `gm_*` names are NOT enumerated here (any GM name streams
+/// on demand) — callers should treat the `gm_` prefix as known. Used by the
+/// silence linter.
+pub fn known_sound_set(state: &AppState) -> std::collections::HashSet<String> {
+    let mut set = builtin_sound_set();
+    set.extend(state.loaded_sample_banks.lock().unwrap().iter().cloned());
+    set
+}
+
 pub fn sound_catalog(state: &AppState) -> serde_json::Value {
     let user_banks = state.loaded_sample_banks.lock().unwrap().clone();
     let machines: Vec<serde_json::Value> = MACHINE_KITS.iter().map(|(machine, display, voices)| {

@@ -4,6 +4,7 @@ members = [
     "crates/robostrudel-agent",
     "crates/robostrudel-corpus",
     "crates/robostrudel-gen",
+    "crates/robostrudel-analysis",
     "src-tauri",
     "tools/parity/dsl-eval",
     "tools/parity/corpus-scan",
@@ -13,6 +14,7 @@ members = [
     "tools/strudel-search",
     "tools/agent-stats",
     "tools/gen-pattern",
+    "tools/song-check",
 ]
 resolver = "2"
 
@@ -27,6 +29,7 @@ robostrudel-core = { path = "crates/robostrudel-core" }
 robostrudel-agent = { path = "crates/robostrudel-agent" }
 robostrudel-corpus = { path = "crates/robostrudel-corpus" }
 robostrudel-gen = { path = "crates/robostrudel-gen" }
+robostrudel-analysis = { path = "crates/robostrudel-analysis" }
 # strudel-rs crates (for pattern validation in the backend)
 strudel-core = { path = "../strudel-rs/crates/strudel-core" }
 strudel-mini = { path = "../strudel-rs/crates/strudel-mini", default-features = false }

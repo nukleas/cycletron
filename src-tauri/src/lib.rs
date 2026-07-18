@@ -7,6 +7,7 @@ mod menu;
 mod midi;
 mod midi_input;
 mod persistence;
+mod secrets;
 mod settings;
 mod shortcuts;
 mod snapshots;
@@ -262,6 +263,7 @@ pub fn run() {
             commands::inspect_pattern,
             commands::analyze_arrangement,
             commands::critique_pattern,
+            commands::critique_form,
             commands::genre_recipe,
             commands::search_corpus,
             commands::get_corpus_source,
@@ -294,6 +296,8 @@ pub fn run() {
             commands::save_midi_to_library,
             commands::get_user_settings,
             commands::set_user_settings,
+            commands::set_provider_key,
+            commands::has_provider_key,
             commands::get_app_info,
             commands::write_binary_file,
             commands::list_snapshots,

@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use crate::strudel;
-use robostrudel_agent::ClaudeClient;
+use robostrudel_agent::LlmProvider;
 use robostrudel_agent::types::*;
 use robostrudel_core::traits::CorpusIndex;
 use robostrudel_core::types::{ChatMessage, ChatRole, CorpusQuery, MusicalRole, PlaybackState};
@@ -27,7 +27,7 @@ static SYSTEM_PROMPT: LazyLock<String> = LazyLock::new(|| {
 
 /// Run the full agent loop: conversation with Claude, tool execution, return final text.
 pub async fn run_agent_loop(
-    client: &ClaudeClient,
+    client: &dyn LlmProvider,
     session_messages: &[ChatMessage],
     state: &AppState,
     event_tx: mpsc::UnboundedSender<AgentEvent>,
@@ -67,7 +67,7 @@ pub async fn run_agent_loop(
         let response = client
             .stream_message(&system_prompt, &api_messages, &tool_defs, &event_tx)
             .await
-            .map_err(|e| format!("Claude API error: {e}"))?;
+            .map_err(|e| format!("AI provider error: {e}"))?;
 
         let mut response_text = String::new();
         let mut tool_calls: Vec<(String, String, serde_json::Value)> = Vec::new();
@@ -187,10 +187,12 @@ async fn execute_tool(
         "get_example" => tool_get_example(input, state),
         "list_sounds" => tool_list_sounds(state),
         "generate_pattern" => tool_generate_pattern(input),
-        "validate_pattern" => tool_validate_pattern(input),
+        "validate_pattern" => tool_validate_pattern(input, state),
+        "review_pattern" => tool_review_pattern(input, state),
         "inspect_pattern" => tool_inspect_pattern(input),
         "analyze_arrangement" => tool_analyze_arrangement(input),
         "critique_pattern" => tool_critique_pattern(input),
+        "critique_form" => tool_critique_form(input),
         "genre_recipe" => tool_genre_recipe(input, state),
         "play_pattern" => tool_play_pattern(input, state, event_tx),
         "stop" => tool_stop(state, event_tx),
@@ -262,6 +264,39 @@ fn tool_generate_pattern(input: &serde_json::Value) -> Result<String, String> {
         .ok_or("missing 'generator' parameter")?;
 
     match generator {
+        "genre" => {
+            let genre = input["genre"].as_str().unwrap_or("house");
+            let seed = input["seed"].as_u64().unwrap_or(7);
+            robostrudel_gen::compose::by_name(genre, seed).map(|piece| {
+                let code = piece.to_strudel();
+                // Family names and aliases route to one flagship — say so, and
+                // name the siblings, so "trance" → uplifting-trance is a
+                // visible choice rather than a silent collapse.
+                let requested = genre.trim().to_ascii_lowercase().replace([' ', '_'], "-");
+                match robostrudel_gen::spec::find(genre) {
+                    Some(spec) if spec.name != requested => {
+                        let siblings: Vec<String> = robostrudel_gen::map::families()
+                            .iter()
+                            .find(|f| f.genres.iter().any(|g| g.name == spec.name))
+                            .map(|f| {
+                                f.genres
+                                    .iter()
+                                    .filter(|g| g.name != spec.name)
+                                    .map(|g| g.name.clone())
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        let others = if siblings.is_empty() {
+                            String::new()
+                        } else {
+                            format!("; the map also has: {}", siblings.join(", "))
+                        };
+                        format!("// routed '{requested}' → {}{others}\n{code}", spec.name)
+                    }
+                    _ => code,
+                }
+            })
+        }
         "infinity" => {
             let count = input["count"].as_u64().unwrap_or(16) as usize;
             let root = input["root"].as_i64().unwrap_or(60) as i32;
@@ -287,27 +322,159 @@ fn tool_generate_pattern(input: &serde_json::Value) -> Result<String, String> {
             robostrudel_gen::automaton(rule, width, gens)
         }
         other => Err(format!(
-            "unknown generator '{other}'; supported: infinity, hexbeat, numerals, palindrome, automaton"
+            "unknown generator '{other}'; supported: genre, infinity, hexbeat, numerals, palindrome, automaton"
         )),
     }
 }
 
-fn tool_validate_pattern(input: &serde_json::Value) -> Result<String, String> {
+fn tool_validate_pattern(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
     let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
 
     match strudel::validate_code(code) {
-        Ok(_) => Ok("valid — safe to play".to_string()),
+        Ok(_) => {
+            // Syntax is fine — now hunt the silent-failure class: events that
+            // evaluate but will never sound (unknown sounds, unvoiced chords,
+            // NaN pan). Lint over a short window; failures here never block.
+            let mut lint = strudel::lint_source(code);
+            lint.extend(
+                strudel::inspect_code(code, 4)
+                    .map(|d| strudel::lint_digest(&d, &crate::sounds::known_sound_set(state)))
+                    .unwrap_or_default(),
+            );
+            if lint.is_empty() {
+                Ok("valid — safe to play".to_string())
+            } else {
+                let mut out = String::from("valid syntax, BUT with audibility issues:\n");
+                for f in &lint {
+                    out.push_str(&format!("  [{}] {}: {}\n", f.severity, f.code, f.message));
+                }
+                out.push_str("\nFix the warns (they mean silent layers) before playing.");
+                Ok(out)
+            }
+        }
         Err(e) => Ok(format!(
-            "INVALID: {e}\n\nFix the error and validate again before playing."
+            "INVALID: {e}{}\n\nFix the error and validate again before playing.",
+            error_context(code, &e.to_string())
         )),
     }
+}
+
+/// If an engine error carries a byte span ("… at 16..20"), render the
+/// offending line with a caret under it so nobody counts characters by hand.
+fn error_context(code: &str, err: &str) -> String {
+    let Some(pos) = err
+        .rsplit_once(" at ")
+        .and_then(|(_, span)| span.split("..").next())
+        .and_then(|s| s.trim().trim_end_matches(|c: char| !c.is_ascii_digit()).parse::<usize>().ok())
+    else {
+        return String::new();
+    };
+    let pos = pos.min(code.len());
+    let line_start = code[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line_end = code[pos..].find('\n').map(|i| pos + i).unwrap_or(code.len());
+    let line_no = code[..line_start].matches('\n').count() + 1;
+    let col = code[line_start..pos].chars().count();
+    let line = &code[line_start..line_end];
+    format!("\n  line {line_no}: {line}\n  {}^ here", " ".repeat(col + "line : ".len() + line_no.to_string().len()))
+}
+
+/// The combined quality gate: validate + silence lint + mix critique + (for
+/// multi-section songs) form critique, in ONE call — cuts the
+/// validate→critique→critique_form round-trip tax for full songs.
+fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
+    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let cycles = input["cycles"].as_u64().unwrap_or(8) as usize;
+
+    if let Err(e) = strudel::validate_code(code) {
+        return Ok(format!("INVALID: {e}\n\nFix the error and review again."));
+    }
+    let digest = match strudel::inspect_code(code, cycles) {
+        Ok(d) => d,
+        Err(e) => return Ok(format!("Could not inspect — the code did not evaluate: {e}")),
+    };
+
+    let mut out = String::from("REVIEW\n== digest ==\n");
+    out.push_str(&format!(
+        "  bpm {}  ·  {} events / {} cycles  ·  period {}  ·  max {} voices  ·  sounds: {}\n",
+        digest.bpm.map(|b| b.to_string()).unwrap_or_else(|| "unset".into()),
+        digest.total_events,
+        digest.cycles_queried,
+        digest
+            .period_cycles
+            .map(|p| format!("{p} cycle(s)"))
+            .unwrap_or_else(|| "none detected".into()),
+        digest.max_voices,
+        digest.sounds.join(", "),
+    ));
+
+    let mut warns = 0usize;
+    let section = |title: &str, findings: &[strudel::Finding], out: &mut String| {
+        out.push_str(&format!("== {title} ==\n"));
+        if findings.is_empty() {
+            out.push_str("  clean\n");
+        }
+        for f in findings {
+            out.push_str(&format!("  [{}] {}: {}\n", f.severity, f.code, f.message));
+        }
+    };
+
+    let mut lint = strudel::lint_source(code);
+    lint.extend(strudel::lint_digest(&digest, &crate::sounds::known_sound_set(state)));
+    warns += lint.iter().filter(|f| f.severity == "warn").count();
+    section("silence lint", &lint, &mut out);
+
+    if let Ok(c) = strudel::critique_code(code, cycles) {
+        warns += c.findings.iter().filter(|f| f.severity == "warn").count();
+        section("mix critique", &c.findings, &mut out);
+    }
+
+    if code.contains("pickRestart") || code.contains("arrange") {
+        // Section→label map so the form is visible without a separate
+        // analyze_arrangement call (labels come from the pickRestart selector).
+        if let Ok(a) = strudel::analyze_code(code, cycles) {
+            out.push_str("== form map ==\n");
+            for s in &a.sections {
+                out.push_str(&format!(
+                    "  {:<10} cyc {:>2}–{:<3} {:>5.1} ev/cyc  {}\n",
+                    s.label,
+                    s.start_cycle,
+                    s.end_cycle,
+                    s.avg_events_per_cycle,
+                    s.instruments.join(", ")
+                ));
+            }
+        }
+        match strudel::critique_form_code(code, cycles) {
+            Ok(c) => {
+                warns += c.findings.iter().filter(|f| f.severity == "warn").count();
+                section("form critique", &c.findings, &mut out);
+            }
+            Err(e) => out.push_str(&format!("== form critique ==\n  (unavailable: {e})\n")),
+        }
+    }
+
+    out.push_str(&if warns == 0 {
+        "\nVERDICT: ready to play.".to_string()
+    } else {
+        format!("\nVERDICT: {warns} warning(s) — fix the warns, then play.")
+    });
+    Ok(out)
 }
 
 fn tool_inspect_pattern(input: &serde_json::Value) -> Result<String, String> {
     let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
     let cycles = input["cycles"].as_u64().unwrap_or(8) as usize;
+    // "auto": full event log for short windows, summary for long forms (a
+    // 64-cycle dump is thousands of lines nobody can scan).
+    let verbosity = input["verbosity"].as_str().unwrap_or("auto");
+    let want_events = match verbosity {
+        "events" => true,
+        "summary" => false,
+        _ => cycles <= 4,
+    };
 
     match strudel::inspect_code(code, cycles) {
+        Ok(digest) if !want_events => Ok(strudel::digest_to_summary(&digest)),
         Ok(digest) => Ok(strudel::digest_to_text(&digest)),
         Err(e) => Ok(format!(
             "Could not inspect — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and inspect again."
@@ -335,6 +502,18 @@ fn tool_critique_pattern(input: &serde_json::Value) -> Result<String, String> {
         Ok(critique) => Ok(strudel::critique_to_text(&critique)),
         Err(e) => Ok(format!(
             "Could not critique — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and critique again."
+        )),
+    }
+}
+
+fn tool_critique_form(input: &serde_json::Value) -> Result<String, String> {
+    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let cycles = input["cycles"].as_u64().unwrap_or(32) as usize;
+
+    match strudel::critique_form_code(code, cycles) {
+        Ok(critique) => Ok(strudel::form_critique_to_text(&critique)),
+        Err(e) => Ok(format!(
+            "Could not critique the form — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and try again."
         )),
     }
 }

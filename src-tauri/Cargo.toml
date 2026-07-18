@@ -9,6 +9,7 @@ robostrudel-core = { workspace = true }
 robostrudel-agent = { workspace = true }
 robostrudel-corpus = { workspace = true }
 robostrudel-gen = { workspace = true }
+robostrudel-analysis = { workspace = true }
 strudel-dsl = { workspace = true }
 strudel-core = { workspace = true }
 strudel-mini = { workspace = true, default-features = false }
@@ -23,6 +24,9 @@ tauri-plugin-updater = "2.10"
 tauri-plugin-notification = "2.3"
 tauri-plugin-store = "2.4"
 midir = "0.10"
+# OS keychain for API-key storage. `apple-native` is the macOS backend; add
+# `windows-native` / `sync-secret-service` when building for those platforms.
+keyring = { version = "3", features = ["apple-native"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

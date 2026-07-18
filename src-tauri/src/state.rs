@@ -1,12 +1,12 @@
 use crate::files::Recents;
 use crate::library::{self, LibrarySettings};
 use crate::settings::UserSettings;
-use robostrudel_agent::ClaudeClient;
+use robostrudel_agent::{ClaudeClient, LlmProvider, OpenAiClient};
 use robostrudel_core::config::AppConfig;
 use robostrudel_core::session::Session;
 use robostrudel_corpus::{InMemoryCorpusIndex, Recipe};
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 /// Shared application state managed by Tauri.
 /// Audio is handled by the WASM REPL in the frontend — the backend
@@ -15,7 +15,10 @@ pub struct AppState {
     pub config: Mutex<AppConfig>,
     pub session: Mutex<Session>,
     pub corpus: Mutex<Option<InMemoryCorpusIndex>>,
-    pub agent_client: Mutex<Option<ClaudeClient>>,
+    /// Active LLM backend. Boxed behind the [`LlmProvider`] trait so the
+    /// selected provider (Claude, Grok, OpenAI-compatible, local) is swappable
+    /// without the rest of the app knowing which one is live.
+    pub agent_client: Mutex<Option<Arc<dyn LlmProvider>>>,
     pub recents: Mutex<Recents>,
     /// User library settings (root path for the in-app file explorer).
     pub library: Mutex<LibrarySettings>,
@@ -62,7 +65,26 @@ impl AppState {
         *self.app_data_dir.lock().unwrap() = Some(data_dir.clone());
 
         // User settings overlay first so the rest of init sees the merged config.
-        let user = UserSettings::load(&data_dir);
+        let mut user = UserSettings::load(&data_dir);
+
+        // Migrate a pre-multiprovider plaintext API key out of settings.json and
+        // into the OS keychain, then persist the blanked settings so the key
+        // never sits in plaintext again.
+        if let Some(key) = user.migrate_legacy_anthropic() {
+            match crate::secrets::set_key("anthropic", &key) {
+                Ok(()) => {
+                    tracing::info!("migrated plaintext API key into the OS keychain");
+                    let _ = user.save(&data_dir);
+                }
+                Err(e) => {
+                    // Keep the key in memory (put it back) so AI still works this
+                    // session; don't persist plaintext beyond what already exists.
+                    tracing::warn!("could not migrate API key to keychain: {e}");
+                    user.anthropic.api_key = Some(key);
+                }
+            }
+        }
+
         {
             let mut config = self.config.lock().unwrap();
             user.apply_to(&mut config);
@@ -97,21 +119,14 @@ impl AppState {
         tracing::info!("loaded {} genre recipe(s) from {}", recipes.len(), genres_dir.display());
         *self.recipes.lock().unwrap() = recipes;
 
-        // Claude client
-        let api_key = config
-            .anthropic
-            .api_key
-            .clone()
-            .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok());
-
-        if let Some(key) = api_key {
-            let client =
-                ClaudeClient::new(&key, &config.anthropic.model, config.anthropic.max_tokens);
-            *self.agent_client.lock().unwrap() = Some(client);
-        } else {
-            tracing::warn!("no ANTHROPIC_API_KEY configured — AI features disabled");
-        }
         drop(config);
+
+        // AI backend, built from the active provider profile + its keychain key.
+        let client = self.build_agent_client();
+        if client.is_none() {
+            tracing::warn!("no AI provider configured — AI features disabled");
+        }
+        *self.agent_client.lock().unwrap() = client;
 
         // Recents
         let mut recents = Recents::load(&data_dir);
@@ -136,20 +151,52 @@ impl AppState {
         self.library.lock().unwrap().root.clone()
     }
 
-    /// Rebuild the Anthropic client from current config. Called after the
-    /// user changes their API key / model / max-tokens via Preferences.
+    /// Rebuild the AI client from the active provider profile + keychain key.
+    /// Called after the user changes provider / model / key via Preferences.
     pub fn rebuild_agent_client(&self) {
-        let config = self.config.lock().unwrap();
-        let api_key = config
-            .anthropic
-            .api_key
-            .clone()
-            .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok());
-        let new_client = api_key.map(|key| {
-            ClaudeClient::new(&key, &config.anthropic.model, config.anthropic.max_tokens)
-        });
-        drop(config);
+        let new_client = self.build_agent_client();
         *self.agent_client.lock().unwrap() = new_client;
+    }
+
+    /// Construct the client for the active provider, pulling its key from the
+    /// keychain (env fallback). Returns `None` when the provider can't run —
+    /// Anthropic with no key, or an OpenAI-compatible provider with no base URL.
+    fn build_agent_client(&self) -> Option<Arc<dyn LlmProvider>> {
+        let (active, profile) = {
+            let us = self.user_settings.lock().unwrap();
+            (us.llm.active.clone(), us.llm.active_profile())
+        };
+        let key = crate::secrets::get_key(&active);
+
+        match profile.codec.as_str() {
+            "anthropic" => {
+                // Anthropic authenticates every request — no key means disabled.
+                let key = key?;
+                Some(Arc::new(ClaudeClient::new(
+                    &key,
+                    &profile.model,
+                    profile.max_tokens,
+                )))
+            }
+            "openai" => {
+                let base = profile.base_url.clone().unwrap_or_default();
+                if base.is_empty() {
+                    tracing::warn!("provider '{active}' has no base URL configured — AI disabled");
+                    return None;
+                }
+                // Key is optional here so local servers (Ollama) work unauthenticated.
+                Some(Arc::new(OpenAiClient::new(
+                    key.as_deref().unwrap_or(""),
+                    &base,
+                    &profile.model,
+                    profile.max_tokens,
+                )))
+            }
+            other => {
+                tracing::warn!("unknown provider codec '{other}' — AI disabled");
+                None
+            }
+        }
     }
 
     pub fn app_data_dir(&self) -> Option<PathBuf> {
