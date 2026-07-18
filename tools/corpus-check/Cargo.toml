@@ -13,3 +13,4 @@ strudel-mini = { workspace = true }
 strudel-core = { workspace = true }
 robostrudel-corpus = { workspace = true }
 walkdir = "2"
+serde_json = "1"

@@ -23,6 +23,19 @@ struct Unit {
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
+
+    // Batch mode: `corpus-check patterns.jsonl` validates a corpus export.
+    // Each line is {"id": "...", "code": "..."} (frontmatter tolerated & stripped).
+    // Reuses the exact same `validate()` pipeline the gate uses, so pass ==
+    // "runs on strudel-rs". Writes <input>.results.jsonl and prints a summary
+    // plus a failure-reason histogram. Never fails the process (it's a survey,
+    // not a gate).
+    if let Some(arg) = args.get(1)
+        && arg.ends_with(".jsonl")
+    {
+        return batch_validate(Path::new(arg));
+    }
+
     let root = args
         .get(1)
         .map(PathBuf::from)
@@ -150,6 +163,123 @@ fn collect_strudel_files(root: &Path) -> Vec<PathBuf> {
     }
     out.sort();
     out
+}
+
+/// Validate a JSONL corpus export against the strudel-rs pipeline and report a
+/// compatibility survey. Input lines: {"id": string, "code": string}.
+fn batch_validate(path: &Path) -> ExitCode {
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("corpus-check: cannot read {}: {e}", path.display());
+            return ExitCode::from(2);
+        }
+    };
+
+    // Some malformed patterns make the strudel-rs parser panic (e.g. integer
+    // overflow) rather than return an Err. Silence the default panic print and
+    // catch each one so a single bad pattern can't abort the survey.
+    std::panic::set_hook(Box::new(|_| {}));
+
+    let mut total = 0usize;
+    let mut passing = 0usize;
+    let mut buckets: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    let mut results = String::new();
+
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let v: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("?");
+        let raw = v.get("code").and_then(|x| x.as_str()).unwrap_or("");
+        let code = strip_frontmatter(raw);
+        total += 1;
+
+        let outcome = std::panic::catch_unwind(|| validate(code))
+            .unwrap_or_else(|_| Err("parser panicked (strudel-rs bug)".to_string()));
+        match outcome {
+            Ok(()) => {
+                passing += 1;
+                results.push_str(&format!("{{\"id\":\"{id}\",\"ok\":true}}\n"));
+            }
+            Err(e) => {
+                let reason = classify_error(&e);
+                *buckets.entry(reason.to_string()).or_default() += 1;
+                let esc = e.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ");
+                results.push_str(&format!(
+                    "{{\"id\":\"{id}\",\"ok\":false,\"reason\":\"{reason}\",\"error\":\"{esc}\"}}\n"
+                ));
+            }
+        }
+    }
+
+    let out_path = path.with_extension("results.jsonl");
+    if let Err(e) = std::fs::write(&out_path, &results) {
+        eprintln!("corpus-check: cannot write {}: {e}", out_path.display());
+    }
+
+    let failing = total - passing;
+    let pct = if total > 0 {
+        100.0 * passing as f64 / total as f64
+    } else {
+        0.0
+    };
+    println!("corpus-check batch: {passing}/{total} pass ({pct:.1}%), {failing} fail");
+    println!("results → {}", out_path.display());
+    if failing > 0 {
+        println!("\nfailure reasons:");
+        let mut sorted: Vec<_> = buckets.iter().collect();
+        sorted.sort_by(|a, b| b.1.cmp(a.1));
+        for (reason, n) in sorted {
+            println!("  {n:>5}  {reason}");
+        }
+    }
+    ExitCode::SUCCESS
+}
+
+/// Strip a leading `---\n … \n---\n` YAML frontmatter block (bakery exports
+/// carry one; strudel-rs does not parse it).
+fn strip_frontmatter(code: &str) -> &str {
+    let t = code.trim_start_matches(['\u{feff}', ' ', '\n', '\r', '\t']);
+    if let Some(rest) = t.strip_prefix("---") {
+        // find the closing fence at a line start
+        if let Some(end) = rest.find("\n---") {
+            let after = &rest[end + 4..];
+            // skip to end of that line
+            return after.strip_prefix('\n').unwrap_or(after.trim_start_matches(['\r', '\n']));
+        }
+    }
+    code
+}
+
+/// Coarse-bucket a validation error into a comparable reason so the histogram
+/// points at which JS-strudel features to port next.
+fn classify_error(e: &str) -> &'static str {
+    let l = e.to_lowercase();
+    if l.contains("panic") {
+        "parser panic (bug)"
+    } else if l.contains("silent") || l.contains("no events") {
+        "silent (no haps)"
+    } else if l.contains("unknown") && l.contains("function") {
+        "unknown function"
+    } else if l.contains("unknown") && (l.contains("method") || l.contains("control")) {
+        "unknown method/control"
+    } else if l.contains("unexpected") || l.contains("expected") || l.contains("parse") {
+        "parse error"
+    } else if l.contains("arrow") || l.contains("=>") {
+        "arrow/lambda"
+    } else if l.contains("scale") {
+        "scale/chord"
+    } else if l.contains("sample") || l.contains("bank") {
+        "sample/bank"
+    } else {
+        "other"
+    }
 }
 
 /// Mirror of `src-tauri/src/strudel.rs::validate_code`, plus a non-emptiness
