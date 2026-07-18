@@ -6,6 +6,7 @@
 import {invoke} from './tauri.js';
 import type {AppInfo} from './types/tauri-commands.js';
 import {dismissibleModal} from './modal-utils.js';
+import {openExternal} from './external-link.js';
 
 const isTauri = !!(window as any).__TAURI__;
 
@@ -69,18 +70,6 @@ export class AboutModal {
 
     private set(el: HTMLElement | null, text: string): void {
         if (el) el.textContent = text;
-    }
-}
-
-async function openExternal(url: string): Promise<void> {
-    if (!isTauri) {
-        window.open(url, '_blank', 'noopener');
-        return;
-    }
-    try {
-        await (window as any).__TAURI__.core.invoke('plugin:opener|open_url', {url});
-    } catch (e) {
-        console.warn('[about] open external failed:', e);
     }
 }
 

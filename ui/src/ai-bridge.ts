@@ -8,49 +8,12 @@
  * The WASM REPL handles all audio — the Tauri backend never touches audio.
  */
 
-import {escapeHtml} from './html.js';
 import {notify} from './notifications.js';
 import {addTask, removeTask} from './dock-badge.js';
+import {renderMarkdownToHtml, enhanceCodeBlocks} from './markdown.js';
+import {openExternal} from './external-link.js';
 
 const isTauri = !!(window as any).__TAURI__;
-
-// --- Minimal Markdown Renderer ---
-
-function renderMarkdown(text: string): string {
-    let html = escapeHtml(text);
-
-    // Fenced code blocks: ```lang\n...\n```
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g,
-        (_m, _lang, code) => `<pre class="ai-code-block"><code>${code.trim()}</code></pre>`);
-
-    // Inline code: `code`
-    html = html.replace(/`([^`\n]+)`/g, '<code class="ai-inline-code">$1</code>');
-
-    // Bold: **text**
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-
-    // Italic: *text*
-    html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
-
-    // Bullet lists: lines starting with - or *
-    html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-
-    // Numbered lists: lines starting with 1. 2. etc
-    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
-
-    // Paragraphs: double newlines
-    html = html.replace(/\n\n+/g, '</p><p>');
-    html = `<p>${html}</p>`;
-
-    // Clean up empty paragraphs
-    html = html.replace(/<p>\s*<\/p>/g, '');
-
-    // Single newlines → <br> (but not inside pre/code)
-    html = html.replace(/<\/p><p>/g, '</p>\n<p>');
-
-    return html;
-}
 
 // --- Main Init ---
 
@@ -83,7 +46,8 @@ async function initAiBridge() {
         div.className = `ai-msg ai-msg-${role}`;
 
         if (role === 'assistant') {
-            div.innerHTML = renderMarkdown(content);
+            div.innerHTML = renderMarkdownToHtml(content);
+            enhanceCodeBlocks(div);
         } else {
             div.textContent = content;
         }
@@ -136,7 +100,8 @@ async function initAiBridge() {
             });
             removeTask('ai-response');
             if (streamingEl) {
-                streamingEl.innerHTML = renderMarkdown(response || streamingText);
+                streamingEl.innerHTML = renderMarkdownToHtml(response || streamingText);
+                enhanceCodeBlocks(streamingEl);
             }
             // If the AI took more than ~6s and the user has switched away,
             // ping them with a system notification so they don't miss it.
@@ -196,6 +161,15 @@ async function initAiBridge() {
         }
     });
 
+    // --- Markdown Links (open externally) ---
+
+    messagesEl.addEventListener('click', (e) => {
+        const link = (e.target as HTMLElement).closest('.ai-msg-assistant a') as HTMLAnchorElement | null;
+        if (!link) return;
+        e.preventDefault();
+        void openExternal(link.href);
+    });
+
     // --- Streaming Agent Events ---
 
     await listen('agent-event', (event: any) => {
@@ -206,7 +180,7 @@ async function initAiBridge() {
             case 'text_delta':
                 streamingText += data.text;
                 if (streamingEl) {
-                    streamingEl.innerHTML = renderMarkdown(streamingText);
+                    streamingEl.innerHTML = renderMarkdownToHtml(streamingText);
                     messagesEl.scrollTop = messagesEl.scrollHeight;
                 }
                 break;
