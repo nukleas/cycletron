@@ -2265,6 +2265,10 @@ body.is-drop-target::after {
     background: rgba(11, 15, 24, 0.82); color: var(--ai-text);
     border: 1px solid var(--ai-border);
     border-left: 2px solid var(--ai-neon);
+    /* Content is real HTML block elements from marked now, not
+       plain text — the parent's pre-wrap would render marked's
+       inter-tag newlines as extra visible line breaks. */
+    white-space: normal;
 }
 
 .ai-msg-system {
@@ -2286,7 +2290,41 @@ body.is-drop-target::after {
 .ai-msg-assistant ul, .ai-msg-assistant ol { margin: 4px 0; padding-left: 16px; }
 .ai-msg-assistant li { margin-bottom: 2px; }
 
+.ai-msg-assistant h1, .ai-msg-assistant h2, .ai-msg-assistant h3,
+.ai-msg-assistant h4, .ai-msg-assistant h5, .ai-msg-assistant h6 {
+    color: var(--ai-neon-bright);
+    text-shadow: var(--text-glitch);
+    margin: 10px 0 6px 0;
+    letter-spacing: 0.03em;
+}
+.ai-msg-assistant h1 { font-size: 15px; border-bottom: 1px solid var(--ai-neon-subtle); padding-bottom: 4px; }
+.ai-msg-assistant h2 { font-size: 13px; }
+.ai-msg-assistant h3, .ai-msg-assistant h4,
+.ai-msg-assistant h5, .ai-msg-assistant h6 { font-size: 12px; color: var(--ai-neon); text-shadow: none; }
+.ai-msg-assistant h1:first-child, .ai-msg-assistant h2:first-child,
+.ai-msg-assistant h3:first-child { margin-top: 0; }
+
+.ai-msg-assistant blockquote {
+    margin: 6px 0; padding: 4px 10px;
+    border-left: 2px solid var(--ai-magenta);
+    background: rgba(255, 43, 214, 0.06);
+    color: var(--ai-text-muted); font-style: italic;
+}
+
+.ai-msg-assistant a {
+    color: var(--ai-neon); text-decoration: underline;
+    text-decoration-color: var(--ai-neon-subtle); cursor: pointer;
+}
+.ai-msg-assistant a:hover { color: var(--ai-neon-bright); text-shadow: 0 0 6px var(--ai-neon-glow); }
+
+.ai-msg-assistant table { border-collapse: collapse; margin: 6px 0; font-size: 10px; width: 100%; }
+.ai-msg-assistant th, .ai-msg-assistant td { border: 1px solid var(--ai-border); padding: 3px 6px; text-align: left; }
+.ai-msg-assistant th { color: var(--ai-neon); background: rgba(71, 246, 255, 0.05); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.ai-msg-assistant hr { border: none; border-top: 1px solid var(--ai-neon-subtle); margin: 8px 0; }
+
 .ai-code-block {
+    position: relative;
     background: #08080a;
     border: 1px solid var(--ai-border);
     border-left: 2px solid var(--ai-neon-subtle);
@@ -2296,7 +2334,7 @@ body.is-drop-target::after {
     font-size: 11px; line-height: 1.5;
     color: var(--ai-text);
 }
-.ai-code-block code { background: none; padding: 0; }
+.ai-code-block code { background: none; padding: 0; white-space: pre-wrap; }
 
 .ai-inline-code {
     background: #18181c;
@@ -2304,6 +2342,41 @@ body.is-drop-target::after {
     padding: 0 4px; border-radius: 0;
     font-size: 11px; color: var(--ai-neon-bright);
 }
+
+.ai-code-copy-btn {
+    position: absolute; top: 4px; right: 4px;
+    padding: 1px 6px; height: 18px;
+    border: 1px solid var(--ai-border);
+    background: rgba(5, 6, 10, 0.85);
+    color: var(--ai-text-dim);
+    font-family: inherit; font-size: 8px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    cursor: pointer; opacity: 0;
+    transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.ai-code-block:hover .ai-code-copy-btn { opacity: 1; }
+.ai-code-copy-btn:hover { color: var(--ai-neon); border-color: var(--ai-neon-subtle); box-shadow: 0 0 6px var(--ai-neon-glow); }
+.ai-code-copy-btn--flash { color: var(--ai-green); border-color: var(--ai-green); opacity: 1; }
+
+/* Syntax token classes — reuse the existing :root palette (also used by
+   theme.ts's strudelHighlight) so chat code blocks match the editor. */
+.ai-tok-keyword { color: var(--magenta); font-weight: bold; }
+.ai-tok-string { color: var(--green-bright); }
+.ai-tok-number { color: var(--yellow); }
+.ai-tok-bool { color: var(--purple); }
+.ai-tok-comment { color: var(--text-muted); font-style: italic; }
+.ai-tok-function { color: var(--cyan); }
+.ai-tok-variable { color: var(--ai-text); }
+.ai-tok-property { color: var(--pink); }
+.ai-tok-operator { color: var(--magenta); }
+.ai-tok-bracket, .ai-tok-paren { color: var(--ai-text); }
+.ai-tok-squareBracket { color: var(--cyan); }
+.ai-tok-brace { color: var(--magenta); }
+.ai-tok-type { color: var(--cyan); font-style: italic; }
+.ai-tok-regexp { color: var(--pink); }
+.ai-tok-escape { color: var(--red); }
+.ai-tok-invalid { color: var(--red); text-decoration: underline wavy; }
+.ai-tok-null { color: var(--purple); }
 
 /* Quick Prompts */
 .ai-quick-prompts {
