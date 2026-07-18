@@ -26,6 +26,10 @@
                 </button>
                 <div id="fileMenuPopover" class="file-menu-popover" role="menu" hidden></div>
             </div>
+            <div class="header-menu">
+                <button id="visualsMenuBtn" class="header-menu-btn" aria-haspopup="menu" aria-expanded="false">Visuals ▾</button>
+                <div id="visualsMenu" class="dropdown-menu" role="menu" aria-labelledby="visualsMenuBtn" hidden></div>
+            </div>
             <div class="transport-group">
                 <button id="transportBtn" class="primary" disabled>▶ Play</button>
                 <button id="stopBtn" class="danger" disabled>■ Stop</button>
@@ -206,14 +210,6 @@
             <div class="sidebar-section">
                 <h3>Sequence Grid</h3>
                 <div id="visualizer"></div>
-                <div class="viz-controls">
-                    <label for="vizMode" class="sr-only">Visualization mode</label>
-                    <select id="vizMode" aria-label="Visualization mode">
-                        <option value="cycle">Cycle View</option>
-                        <option value="piano">Piano Roll</option>
-                        <option value="waveform">Waveform</option>
-                    </select>
-                </div>
             </div>
 
             <div class="sidebar-section">
@@ -298,6 +294,7 @@
         <div class="hud-center">
             <button id="fsVizPrev" class="hud-btn" title="Previous visualization ( [ )">◀</button>
             <button id="fsVizNext" class="hud-btn" title="Next visualization ( ] )">▶</button>
+            <button id="fsVizAuto" class="hud-btn" title="Auto-cycle visualizations every 16 cycles">AUTO</button>
         </div>
         <div class="hud-right">
             <button id="fsVizExit" class="hud-btn hud-exit" title="Hide visualization (Cmd+Shift+V)">HIDE</button>

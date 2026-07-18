@@ -4019,3 +4019,241 @@ body.immersive-viz-active #editor .cm-gutters {
     z-index: 1;
     mix-blend-mode: screen;
 }
+
+/* =========================================================
+   VISUALS MENU — header "Visuals ▾" dropdown, ported from
+   strudio (visuals-menu.ts / ambient-viz.ts / dropdown.ts).
+   Additive: does not touch the existing .file-menu-* rules.
+   ========================================================= */
+
+.header-menu {
+    position: relative;
+}
+
+.header-menu-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    color: var(--text-muted);
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.12s;
+}
+
+.header-menu-btn:hover,
+.header-menu-btn[aria-expanded="true"] {
+    border-color: var(--neon-subtle);
+    color: var(--neon);
+    text-shadow: 0 0 6px var(--neon-glow);
+    box-shadow: 0 0 8px var(--neon-glow);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 100;
+    min-width: 240px;
+    max-width: calc(100vw - 24px);
+    max-height: min(70vh, 480px);
+    overflow-y: auto;
+    background: var(--surface-glass);
+    border: 1px solid var(--neon-subtle);
+    box-shadow: 0 0 18px var(--neon-glow), 4px 4px 0 rgba(255, 43, 214, 0.18);
+    padding: 4px 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.dropdown-menu[hidden] { display: none !important; }
+
+.dropdown-menu .menu-section {
+    padding: 8px 12px 3px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.dropdown-menu hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 4px 0;
+}
+
+/* Items are flex rows: check gutter | label | hint */
+.dropdown-menu button,
+.dropdown-menu a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    background: none;
+    border: 0;
+    color: var(--text-secondary);
+    text-align: left;
+    padding: 5px 12px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    height: auto;
+    transition: all 0.12s;
+}
+
+.dropdown-menu button:hover,
+.dropdown-menu button:focus-visible,
+.dropdown-menu a:hover,
+.dropdown-menu a:focus-visible {
+    background: var(--accent-subtle);
+    color: var(--neon-bright);
+    text-shadow: 0 0 6px var(--neon-glow);
+    outline: none;
+}
+
+/* Repurpose a fixed-width check gutter for radio-style items */
+.dropdown-menu button::before,
+.dropdown-menu a::before {
+    content: '▸';
+    position: static;
+    width: 10px;
+    height: auto;
+    background: none;
+    opacity: 0;
+    flex-shrink: 0;
+}
+
+.dropdown-menu button[aria-checked="true"] {
+    color: var(--neon);
+}
+
+.dropdown-menu button[aria-checked="true"]::before {
+    opacity: 1;
+    text-shadow: 0 0 6px var(--neon-glow);
+}
+
+.dropdown-menu .menu-item-label {
+    flex: 1 1 auto;
+    white-space: nowrap;
+}
+
+.dropdown-menu .menu-item-hint {
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    text-transform: none;
+    white-space: nowrap;
+}
+
+/* Checkbox menu items render a track+thumb switch instead of the
+   radio check glyph. */
+.dropdown-menu button[role="menuitemcheckbox"] {
+    position: relative;
+    padding-left: 12px;
+}
+
+.dropdown-menu button[role="menuitemcheckbox"]::before {
+    content: '';
+    position: static;
+    width: 22px;
+    height: 12px;
+    flex-shrink: 0;
+    opacity: 1;
+    background: rgba(5, 6, 10, 0.82);
+    border: 1px solid var(--border);
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.dropdown-menu button[role="menuitemcheckbox"]::after {
+    content: '';
+    position: absolute;
+    left: 15px;
+    width: 8px;
+    height: 8px;
+    background: var(--text-muted);
+    transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.dropdown-menu button[role="menuitemcheckbox"][aria-checked="true"]::before {
+    border-color: var(--neon);
+    background: rgba(71, 246, 255, 0.15);
+    box-shadow: 0 0 6px rgba(71, 246, 255, 0.25), inset 0 0 4px rgba(71, 246, 255, 0.08);
+}
+
+.dropdown-menu button[role="menuitemcheckbox"][aria-checked="true"]::after {
+    transform: translateX(10px);
+    background: var(--neon);
+    box-shadow: 0 0 6px rgba(71, 246, 255, 0.6), 2px 2px 0 rgba(255, 43, 214, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dropdown-menu button[role="menuitemcheckbox"]::before,
+    .dropdown-menu button[role="menuitemcheckbox"]::after { transition: none; }
+}
+
+/* =========================================================
+   READABLE MODE (opt-in, Visuals menu → Display)
+   Bigger floor sizes, dampened running-text glow, strong focus
+   halo. Display glow (logo, stats, viz) stays.
+   ========================================================= */
+
+.readable-mode {
+    --text-muted: #97a5c4;
+    --text-secondary: #c0cde8;
+}
+
+.readable-mode .menu-section,
+.readable-mode .cmd-palette-hint,
+.readable-mode .files-panel-footer,
+.readable-mode .status-bar,
+.readable-mode .hud-unit { font-size: 11px; }
+
+.readable-mode .bpm-control,
+.readable-mode .gain-control,
+.readable-mode .shortcuts,
+.readable-mode .file-context-menu button,
+.readable-mode .dropdown-menu button,
+.readable-mode .dropdown-menu a,
+.readable-mode .header-menu-btn,
+.readable-mode .stat-label,
+.readable-mode .menu-item-hint,
+.readable-mode .cmd-palette-subtitle,
+.readable-mode .file-tree { font-size: 12px; }
+
+.readable-mode .cmd-palette-title { font-size: 13px; }
+
+.readable-mode .cm-editor { text-shadow: none; }
+.readable-mode .cm-content { text-shadow: 0 0 2px rgba(71, 246, 255, 0.08); }
+
+.readable-mode :focus-visible {
+    outline: 2px solid var(--neon);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(71, 246, 255, 0.22);
+}
+
+.readable-mode .logo h1 { animation: none; }
+.readable-mode .files-panel::after { display: none; }
+
+/* =========================================================
+   SCANLINES TOGGLE (Visuals menu → Display; on by default)
+   .no-scanlines removes the CRT overlays for a cleaner read
+   while keeping the rest of the aesthetic intact.
+   ========================================================= */
+
+.no-scanlines body::after { display: none; }
+
+.no-scanlines .files-panel::after {
+    background: linear-gradient(270deg, rgba(255, 43, 214, 0.05), transparent 26%, transparent);
+}
+
+.no-scanlines .app-modal-backdrop { background: rgba(5, 6, 10, 0.82); }
+.no-scanlines .fullscreen-viz::after { display: none; }

@@ -17,6 +17,8 @@
  * - Canvas 2D only — no extra runtime deps.
  */
 
+import artRaw from './assets/art.txt?raw';
+
 export enum FullscreenVizMode {
     NeonCircuit = 0,
     MarbleCore = 1,
@@ -28,10 +30,76 @@ export enum FullscreenVizMode {
     StrangeAttractor = 7,
     Plasma = 8,
     Kaleidoscope = 9,
+    AsciiArt = 10,
+    MatrixRain = 11,
 }
 
-const MODE_COUNT = 10;
+export const MODE_COUNT = 12;
 const TAU = Math.PI * 2;
+
+/** Glyph pool for MatrixRain — katakana + digits + latin, drawn per cell. */
+const RAIN_GLYPHS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン0123456789ABCDEFGHJKLMNPQRSTUVWXYZ$+*:;.<>=';
+
+interface RainStream {
+    /** Column index. */
+    col: number;
+    /** Head position in fractional rows. */
+    y: number;
+    /** Rows per second. */
+    speed: number;
+    /** Rows left to live — stream dies after this distance or off-screen. */
+    remaining: number;
+    /** 1 on downbeat-accented streams: brighter head, brighter body. */
+    accent: number;
+}
+
+/**
+ * Glyph ramp of the ASCII artwork, ascending ink coverage. Index = sprite
+ * column in the atlas; density drives sprite hue (denser glyph = hotter).
+ */
+const ART_GLYPHS = ['.', ':', ';', '+', 'x', 'X', '$', '&'] as const;
+const ART_DENSITY: Record<string, number> = {
+    '.': 0.10,
+    ':': 0.20,
+    ';': 0.30,
+    '+': 0.45,
+    'x': 0.58,
+    'X': 0.70,
+    '$': 0.85,
+    '&': 1.00,
+};
+
+interface ArtGrid {
+    rows: number;
+    cols: number;
+    /** row-major glyph index into ART_GLYPHS, -1 for blank cells */
+    glyph: Int16Array;
+}
+
+let cachedArtGrid: ArtGrid | null = null;
+
+function getArtGrid(): ArtGrid {
+    if (cachedArtGrid) return cachedArtGrid;
+
+    const lines = artRaw.replace(/\r/g, '').split('\n');
+    while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
+
+    const rows = lines.length;
+    let cols = 0;
+    for (const line of lines) cols = Math.max(cols, line.length);
+
+    const glyphIndex = new Map<string, number>(ART_GLYPHS.map((g, i) => [g, i]));
+    const glyph = new Int16Array(rows * cols).fill(-1);
+    for (let r = 0; r < rows; r++) {
+        const line = lines[r];
+        for (let c = 0; c < line.length; c++) {
+            glyph[r * cols + c] = glyphIndex.get(line[c]) ?? -1;
+        }
+    }
+
+    cachedArtGrid = {rows, cols, glyph};
+    return cachedArtGrid;
+}
 
 interface Particle {
     x: number;
@@ -163,6 +231,51 @@ export class FullscreenVisualizer {
     }> = [];
     private readonly KALEIDO_SLICES = 8;
 
+    // AsciiArt state — a Lissajous-style phosphor scope that etches the
+    // artwork. The beam is the time-domain signal plotted against a delayed
+    // copy of itself (delay re-picked each beat, same trick as the Lissajous
+    // mode); wherever it passes it deposits that cell's glyph onto a
+    // persistent etch layer that decays like CRT phosphor. The image only
+    // exists where the music has recently drawn. `artAtlas` holds one
+    // cell-sized sprite per glyph so splatting is drawImage, not fillText.
+    // Etch layer + atlas live in device pixels (no transform).
+    private artEtch: HTMLCanvasElement | null = null;
+    private artEtchCtx: CanvasRenderingContext2D | null = null;
+    private artAtlas: HTMLCanvasElement | null = null;
+    private artSpriteW = 0;
+    private artSpriteH = 0;
+    private artBox = {x: 0, y: 0, w: 0, h: 0};
+    private artCellW = 0;
+    private artCellH = 0;
+    private artOffset = 48;
+    private artLastBeatIndex = -1;
+    /**
+     * Auto-gain peak tracker (byte deviation units, 8..128). Rises instantly
+     * to the loudest sample, falls slowly — normalizes the beam so quiet
+     * passages still sweep the whole portrait instead of a center blob.
+     */
+    private artPeak = 20;
+    /** Seconds of continuous silence — drives the fade-out-then-clear. */
+    private artSilence = 0;
+    /** False while the signal is below the beam gate; render skips the trace. */
+    private artBeamOn = false;
+
+    // MatrixRain state — green glyph streams on a persistent phosphor layer
+    // (destination-out fade gives the trails). Spawn timing borrows the
+    // MarbleDrop drum-lane idea: kicks burst streams in the left third of the
+    // columns, snares center, hats right, plus an eighth-note baseline while
+    // audio is active. Layer lives in device pixels.
+    private rainCanvas: HTMLCanvasElement | null = null;
+    private rainCtx: CanvasRenderingContext2D | null = null;
+    private rainStreams: RainStream[] = [];
+    private rainCellW = 0;
+    private rainCellH = 0;
+    private rainCols = 0;
+    private rainRows = 0;
+    private rainSilence = 0;
+    /** theme.bg as rgb components — the trail-fade fill and silence fill. */
+    private rainBg: [number, number, number] = [5, 6, 10];
+
     private scanlineOffset = 0;
 
     private theme: Theme = {
@@ -272,6 +385,18 @@ export class FullscreenVisualizer {
         this.attrTrailHead = 0;
         this.plasmaBalls.length = 0;
         this.kaleidoParticles.length = 0;
+        this.artEtch = null;
+        this.artEtchCtx = null;
+        this.artAtlas = null;
+        this.artOffset = 48;
+        this.artLastBeatIndex = -1;
+        this.artPeak = 20;
+        this.artSilence = 0;
+        this.artBeamOn = false;
+        this.rainCanvas = null;
+        this.rainCtx = null;
+        this.rainStreams.length = 0;
+        this.rainSilence = 0;
         this.scanlineOffset = 0;
     }
 
@@ -384,6 +509,112 @@ export class FullscreenVisualizer {
         if (this.mode === FullscreenVizMode.Plasma) {
             this.initPlasma();
         }
+
+        if (this.mode === FullscreenVizMode.AsciiArt) {
+            this.initAsciiArt();
+        }
+
+        if (this.mode === FullscreenVizMode.MatrixRain) {
+            this.initMatrixRain();
+        }
+    }
+
+    /**
+     * Size the rain grid to the canvas and allocate the persistent trail
+     * layer. Cell size scales with the canvas so an editor-sized viz gets a
+     * readable grid and a fullscreen one doesn't look blown up.
+     */
+    private initMatrixRain(): void {
+        if (this.width === 0 || this.height === 0) return;
+
+        const cellH = Math.max(14, Math.min(22, this.height / 42));
+        const cellW = cellH * 0.62;
+        this.rainCellW = cellW;
+        this.rainCellH = cellH;
+        this.rainCols = Math.max(4, Math.floor(this.width / cellW));
+        this.rainRows = Math.max(4, Math.ceil(this.height / cellH));
+        this.rainStreams.length = 0;
+
+        const layer = document.createElement('canvas');
+        layer.width = Math.max(1, Math.ceil(this.width * this.dpr));
+        layer.height = Math.max(1, Math.ceil(this.height * this.dpr));
+        this.rainCanvas = layer;
+        const ctx = layer.getContext('2d', {alpha: false})!;
+        // Device-pixel space; font state persists across frames.
+        ctx.font = `${(cellH * 0.9 * this.dpr).toFixed(2)}px "JetBrains Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        this.rainCtx = ctx;
+
+        // Opaque layer faded by painting translucent bg over it each frame:
+        // trails converge to exactly the background color, so nothing ever
+        // lingers as a ghost (destination-out on an alpha layer stalls at low
+        // alpha and slowly builds a gray curtain).
+        this.rainBg = rgbOf(this.theme.bg, [5, 6, 10]);
+        ctx.fillStyle = `rgb(${this.rainBg[0]}, ${this.rainBg[1]}, ${this.rainBg[2]})`;
+        ctx.fillRect(0, 0, layer.width, layer.height);
+    }
+
+    /**
+     * Fit the ASCII grid to the canvas (contain, centered), bake the glyph
+     * sprite atlas, and allocate the persistent phosphor layer. Rebuilt on
+     * resize and on mode entry (which clears any existing etch — the music
+     * redraws it within a couple of bars).
+     */
+    private initAsciiArt(): void {
+        if (this.width === 0 || this.height === 0) return;
+        const grid = getArtGrid();
+        if (grid.rows === 0 || grid.cols === 0) return;
+
+        // Monospace cell aspect (advance width / line height) as the art
+        // would read in an editor — keeps the image proportions intact.
+        const CHAR_ASPECT = 0.52;
+        // Overscan past the contain fit so the portrait dominates the screen;
+        // centered, so the overflow crops equally on opposite edges. Capped
+        // at cover-fit — no point growing past filling the whole canvas.
+        const GROW = 1.6;
+        const containCellH = Math.min(this.height / grid.rows, this.width / (grid.cols * CHAR_ASPECT));
+        const coverCellH = Math.max(this.height / grid.rows, this.width / (grid.cols * CHAR_ASPECT));
+        const cellH = Math.min(containCellH * GROW, coverCellH);
+        const cellW = cellH * CHAR_ASPECT;
+        const boxW = cellW * grid.cols;
+        const boxH = cellH * grid.rows;
+        this.artBox = {
+            x: (this.width - boxW) / 2,
+            y: (this.height - boxH) / 2,
+            w: boxW,
+            h: boxH,
+        };
+        this.artCellW = cellW;
+        this.artCellH = cellH;
+
+        // Sprite atlas: one cell at full phosphor brightness per glyph, hue
+        // drifting toward secondary with ink density so the portrait's
+        // structure reads in two-tone neon as it gets etched.
+        const sw = Math.max(1, Math.ceil(cellW * this.dpr));
+        const sh = Math.max(1, Math.ceil(cellH * this.dpr));
+        this.artSpriteW = sw;
+        this.artSpriteH = sh;
+        const atlas = document.createElement('canvas');
+        atlas.width = sw * ART_GLYPHS.length;
+        atlas.height = sh;
+        const actx = atlas.getContext('2d')!;
+        actx.font = `${(cellH * 0.92 * this.dpr).toFixed(2)}px "JetBrains Mono", ui-monospace, monospace`;
+        actx.textAlign = 'center';
+        actx.textBaseline = 'middle';
+        for (let i = 0; i < ART_GLYPHS.length; i++) {
+            const d = ART_DENSITY[ART_GLYPHS[i]];
+            const hue = this.theme.neonHue + (this.theme.secondaryHue - this.theme.neonHue) * d * 0.7;
+            actx.fillStyle = `hsl(${hue}, 80%, ${50 + d * 24}%)`;
+            actx.fillText(ART_GLYPHS[i], (i + 0.5) * sw, sh * 0.52);
+        }
+        this.artAtlas = atlas;
+
+        const etch = document.createElement('canvas');
+        etch.width = Math.max(1, Math.ceil(boxW * this.dpr));
+        etch.height = Math.max(1, Math.ceil(boxH * this.dpr));
+        this.artEtch = etch;
+        this.artEtchCtx = etch.getContext('2d')!;
     }
 
     private initAttractor(): void {
@@ -573,6 +804,12 @@ export class FullscreenVisualizer {
             case FullscreenVizMode.Kaleidoscope:
                 this.updateKaleidoscope(dt, low, mid, high);
                 break;
+            case FullscreenVizMode.AsciiArt:
+                this.updateAsciiArt(dt);
+                break;
+            case FullscreenVizMode.MatrixRain:
+                this.updateMatrixRain(dt, low, mid, high);
+                break;
         }
 
         this.scanlineOffset = (this.scanlineOffset + dt * 18) % 4;
@@ -688,6 +925,250 @@ export class FullscreenVisualizer {
     }
 
     private plasmaBassPulse = 0;
+
+    /**
+     * ASCII scope beam. Phosphor decay (destination-out fade), then splat the
+     * Lissajous curve — (signal[i], signal[i+offset]) mapped onto the art
+     * grid — depositing each hit cell's glyph sprite at full brightness.
+     * Beats re-pick the delay offset so the curve folds into a new shape and
+     * etches a different region of the portrait; beat energy brightens the
+     * deposit. A silent signal collapses to a center point, so the beam gates
+     * on RMS to avoid burning a blob into the middle.
+     */
+    private updateAsciiArt(dt: number): void {
+        if (!this.artEtchCtx) this.initAsciiArt();
+        const ectx = this.artEtchCtx;
+        if (!ectx || !this.artEtch || !this.artAtlas) return;
+
+        // Beam gate + auto-gain input — strided RMS and peak of the deviation
+        // from center (128).
+        let rms = 0;
+        let maxDev = 0;
+        if (this.timeData) {
+            const td = this.timeData;
+            let sumSq = 0;
+            let count = 0;
+            for (let i = 0; i < td.length; i += 16) {
+                const d = Math.abs(td[i] - 128);
+                sumSq += d * d;
+                count++;
+                if (d > maxDev) maxDev = d;
+            }
+            rms = Math.sqrt(sumSq / count);
+        }
+        // Peak falls slowly so the scale doesn't pump; floor keeps a whisper
+        // of signal from being amplified into a full-screen scribble.
+        this.artPeak = Math.min(128, Math.max(8, maxDev, this.artPeak - dt * 30));
+        this.artBeamOn = rms >= 2.5;
+
+        if (!this.artBeamOn) {
+            // Silence: fade out fast, then hard-clear — destination-out
+            // quantizes at low alpha and would otherwise leave a permanent
+            // ghost hanging behind the editor.
+            this.artSilence += dt;
+            if (this.artSilence > 1.5) {
+                ectx.clearRect(0, 0, this.artEtch.width, this.artEtch.height);
+                return;
+            }
+            const fadeOut = 1 - Math.exp(-dt * 4);
+            ectx.globalCompositeOperation = 'destination-out';
+            ectx.fillStyle = `rgba(0, 0, 0, ${fadeOut.toFixed(4)})`;
+            ectx.fillRect(0, 0, this.artEtch.width, this.artEtch.height);
+            ectx.globalCompositeOperation = 'source-over';
+            return;
+        }
+        this.artSilence = 0;
+
+        // Phosphor decay — exponential, frame-rate independent.
+        const fade = 1 - Math.exp(-dt * 1.5);
+        ectx.globalCompositeOperation = 'destination-out';
+        ectx.fillStyle = `rgba(0, 0, 0, ${fade.toFixed(4)})`;
+        ectx.fillRect(0, 0, this.artEtch.width, this.artEtch.height);
+        ectx.globalCompositeOperation = 'source-over';
+
+        // Beat-switched delay offset — same topology trick as the Lissajous
+        // scope: each beat the curve folds into a new figure.
+        const beatIndex = Math.floor(this.currentCycle * 4);
+        if (beatIndex !== this.artLastBeatIndex) {
+            this.artLastBeatIndex = beatIndex;
+            const choices = [24, 48, 64, 96, 128, 160];
+            this.artOffset = choices[((beatIndex % choices.length) + choices.length) % choices.length];
+        }
+
+        const data = this.timeData!;
+        const N = data.length;
+        const off = this.artOffset;
+        if (N < off + 8) return;
+
+        const grid = getArtGrid();
+        const beat = beatEnv(this.currentCycle * 4);
+        const sw = this.artSpriteW;
+        const sh = this.artSpriteH;
+        const cellWDev = this.artCellW * this.dpr;
+        const cellHDev = this.artCellH * this.dpr;
+        const usable = N - off;
+        const step = Math.max(1, Math.floor(usable / 600));
+        const amp = 0.49;
+        const norm = 1 / this.artPeak;
+
+        // Kept well under 1.0 so the etch reads as a glow behind the editor
+        // rather than competing with the code for attention.
+        ectx.globalAlpha = 0.30 + beat * 0.25;
+        let lastCell = -1;
+        for (let i = 0; i < usable; i += step) {
+            const x = Math.max(-1, Math.min(1, (data[i] - 128) * norm));
+            const y = Math.max(-1, Math.min(1, (data[i + off] - 128) * norm));
+            const c = Math.floor((0.5 + x * amp) * grid.cols);
+            const r = Math.floor((0.5 + y * amp) * grid.rows);
+            if (c < 0 || c >= grid.cols || r < 0 || r >= grid.rows) continue;
+            const cell = r * grid.cols + c;
+            if (cell === lastCell) continue;
+            lastCell = cell;
+            const g = grid.glyph[cell];
+            if (g < 0) continue;
+            ectx.drawImage(this.artAtlas, g * sw, 0, sw, sh,
+                Math.round(c * cellWDev), Math.round(r * cellHDev), sw, sh);
+        }
+        ectx.globalAlpha = 1;
+    }
+
+    /**
+     * Matrix rain, drum-machine style. Streams fall at rows/sec and stamp a
+     * random glyph into each cell they cross; the layer's destination-out
+     * fade turns those stamps into the classic dissolving tail. Spawning is
+     * musical: an eighth-note baseline in the middle columns (downbeats
+     * accented and burstier), plus MarbleDrop's per-band transient lanes —
+     * kick bursts left, snare center, hats right. Silence fades the layer
+     * out fast and hard-clears it so nothing lingers behind the editor.
+     */
+    private updateMatrixRain(dt: number, low: number, mid: number, high: number): void {
+        if (!this.rainCtx) this.initMatrixRain();
+        const rctx = this.rainCtx;
+        if (!rctx || !this.rainCanvas) return;
+
+        const totalEnergy = low + mid + high;
+        const isActive = totalEnergy > 0.12;
+
+        const [br, bg, bb] = this.rainBg;
+        if (!isActive) {
+            this.rainSilence += dt;
+            this.rainStreams.length = 0;
+            this.lastBeatIndex = -1;
+            if (this.rainSilence > 1.5) {
+                rctx.fillStyle = `rgb(${br}, ${bg}, ${bb})`;
+                rctx.fillRect(0, 0, this.rainCanvas.width, this.rainCanvas.height);
+                return;
+            }
+            const fadeOut = 1 - Math.exp(-dt * 4);
+            rctx.fillStyle = `rgba(${br}, ${bg}, ${bb}, ${fadeOut.toFixed(4)})`;
+            rctx.fillRect(0, 0, this.rainCanvas.width, this.rainCanvas.height);
+            return;
+        }
+        this.rainSilence = 0;
+
+        // Trail fade — slower than the transient cooldowns so tails stretch
+        // several rows behind the head.
+        const fade = 1 - Math.exp(-dt * 2.0);
+        rctx.fillStyle = `rgba(${br}, ${bg}, ${bb}, ${fade.toFixed(4)})`;
+        rctx.fillRect(0, 0, this.rainCanvas.width, this.rainCanvas.height);
+
+        // ---- Spawning — every stream is a musical event ----
+        // No ambient baseline: rain only falls because something in the mix
+        // hit. Kick = burst on the left, snare = center, hats = right, and
+        // the bar downbeat throws a wide accented volley across the screen.
+        const spawn = (x0: number, x1: number, speedMul: number, len: number, accent: number): void => {
+            this.rainStreams.push({
+                col: Math.min(this.rainCols - 1, Math.floor((x0 + Math.random() * (x1 - x0)) * this.rainCols)),
+                y: -1,
+                speed: (9 + Math.random() * 6) * speedMul,
+                remaining: len + Math.random() * 8,
+                accent,
+            });
+        };
+
+        // Lengths scale with the grid so streams actually traverse the screen
+        // instead of dying halfway and leaving the bottom permanently dark.
+        const R = this.rainRows;
+        const downbeatIndex = Math.floor(this.currentCycle);
+        if (downbeatIndex !== this.lastBeatIndex) {
+            this.lastBeatIndex = downbeatIndex;
+            for (let i = 0; i < 5; i++) {
+                spawn(0.02 + i * 0.19, 0.02 + i * 0.19 + 0.15, 1.4, R * 0.9, 1);
+            }
+        }
+
+        // Per-band transient lanes (same detection thresholds as MarbleDrop).
+        this.highTransientCooldown = Math.max(0, this.highTransientCooldown - dt);
+        this.midTransientCooldown = Math.max(0, this.midTransientCooldown - dt);
+        this.lowTransientCooldown = Math.max(0, this.lowTransientCooldown - dt);
+
+        if (low - this.prevLowEnergy > 0.08 && low > 0.25 && this.lowTransientCooldown <= 0) {
+            spawn(0.0, 0.33, 1.6, R * 1.1, 1);
+            spawn(0.0, 0.33, 1.4, R * 0.9, 0);
+            spawn(0.0, 0.33, 1.2, R * 0.7, 0);
+            this.lowTransientCooldown = 0.1;
+        }
+        if (mid - this.prevMidEnergy > 0.09 && mid > 0.28 && this.midTransientCooldown <= 0) {
+            spawn(0.33, 0.66, 1.3, R * 0.6, 0);
+            spawn(0.33, 0.66, 1.2, R * 0.5, 0);
+            this.midTransientCooldown = 0.08;
+        }
+        if (high - this.prevHighEnergy > 0.06 && high > 0.20 && this.highTransientCooldown <= 0) {
+            spawn(0.66, 1.0, 1.9, R * 0.4, 0);
+            this.highTransientCooldown = 0.04;
+        }
+        this.prevLowEnergy = low;
+        this.prevMidEnergy = mid;
+        this.prevHighEnergy = high;
+
+        const MAX_STREAMS = 120;
+        if (this.rainStreams.length > MAX_STREAMS) {
+            this.rainStreams.splice(0, this.rainStreams.length - MAX_STREAMS);
+        }
+
+        // ---- Advance streams, stamping glyphs into crossed cells ----
+        // The whole field surges on every quarter note and crawls between
+        // them — the tempo lock is the loudest visual cue that the rain is
+        // listening. Head brightness pumps with the same envelope.
+        const beat = beatEnv(this.currentCycle * 4);
+        const tempo = 0.45 + beat * 1.1 + totalEnergy * 0.35;
+        const cellWDev = this.rainCellW * this.dpr;
+        const cellHDev = this.rainCellH * this.dpr;
+        for (let i = this.rainStreams.length - 1; i >= 0; i--) {
+            const s = this.rainStreams[i];
+            const prevRow = Math.floor(s.y);
+            const advance = s.speed * tempo * dt;
+            s.y += advance;
+            s.remaining -= advance;
+            const headRow = Math.floor(s.y);
+            const x = (s.col + 0.5) * cellWDev;
+
+            // Body glyphs — one stamp per newly-entered cell, matrix green.
+            rctx.fillStyle = s.accent
+                ? 'hsla(125, 90%, 62%, 0.55)'
+                : 'hsla(125, 85%, 50%, 0.45)';
+            for (let r = prevRow + 1; r <= headRow; r++) {
+                if (r < 0 || r >= this.rainRows) continue;
+                rctx.fillText(
+                    RAIN_GLYPHS[Math.floor(Math.random() * RAIN_GLYPHS.length)],
+                    x, (r + 0.55) * cellHDev);
+            }
+
+            // Bright head — restamped every frame, flashing with the beat.
+            if (headRow >= 0 && headRow < this.rainRows) {
+                rctx.fillStyle = s.accent
+                    ? `hsla(120, 95%, 88%, ${(0.55 + beat * 0.4).toFixed(3)})`
+                    : `hsla(122, 90%, 75%, ${(0.4 + beat * 0.4).toFixed(3)})`;
+                rctx.fillText(
+                    RAIN_GLYPHS[Math.floor(Math.random() * RAIN_GLYPHS.length)],
+                    x, (headRow + 0.55) * cellHDev);
+            }
+
+            if (s.remaining <= 0 || headRow > this.rainRows) {
+                this.rainStreams.splice(i, 1);
+            }
+        }
+    }
 
     private updateLissajous(_dt: number): void {
         // Phase shift bumps on each beat — gives the scope curve a fresh
@@ -1124,9 +1605,55 @@ export class FullscreenVisualizer {
             case FullscreenVizMode.Kaleidoscope:
                 this.renderKaleidoscope(ctx, width, height);
                 break;
+            case FullscreenVizMode.AsciiArt:
+                this.renderAsciiArt(ctx);
+                break;
+            case FullscreenVizMode.MatrixRain:
+                if (this.rainCanvas) ctx.drawImage(this.rainCanvas, 0, 0, width, height);
+                break;
         }
 
         this.drawVignette(ctx, width, height);
+    }
+
+    /**
+     * Compose the ASCII scope: the phosphor etch layer, then the live beam —
+     * the actual Lissajous curve, stroked faintly on top so you can see the
+     * "pen" that is doing the etching.
+     */
+    private renderAsciiArt(ctx: CanvasRenderingContext2D): void {
+        if (!this.artEtch) return;
+
+        const box = this.artBox;
+        ctx.drawImage(this.artEtch, box.x, box.y, box.w, box.h);
+
+        // Beam trace only while there's actually signal — a silent scope
+        // shows nothing at all.
+        if (!this.artBeamOn || !this.timeData) return;
+        const data = this.timeData;
+        const N = data.length;
+        const off = this.artOffset;
+        if (N < off + 8) return;
+
+        const beat = beatEnv(this.currentCycle * 4);
+        const cx = box.x + box.w / 2;
+        const cy = box.y + box.h / 2;
+        const amp = 0.49;
+        const norm = 1 / this.artPeak;
+        const usable = N - off;
+        const step = Math.max(2, Math.floor(usable / 300));
+
+        ctx.strokeStyle = `hsla(${this.theme.neonHue}, 90%, 72%, ${(0.05 + beat * 0.07).toFixed(3)})`;
+        ctx.lineWidth = 1;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        for (let i = 0; i < usable; i += step) {
+            const x = cx + Math.max(-1, Math.min(1, (data[i] - 128) * norm)) * amp * box.w;
+            const y = cy + Math.max(-1, Math.min(1, (data[i + off] - 128) * norm)) * amp * box.h;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
     }
 
     /**
@@ -1926,6 +2453,28 @@ function beatEnv(phase: number): number {
     const decay = 1 - t;
     const d2 = decay * decay;
     return d2 * d2;
+}
+
+/**
+ * Parse `#rgb` / `#rrggbb` into components. Falls back if parsing fails.
+ */
+function rgbOf(color: string, fallback: [number, number, number]): [number, number, number] {
+    const c = color.trim();
+    if (/^#[0-9a-f]{3}$/i.test(c)) {
+        return [
+            parseInt(c[1] + c[1], 16),
+            parseInt(c[2] + c[2], 16),
+            parseInt(c[3] + c[3], 16),
+        ];
+    }
+    if (/^#[0-9a-f]{6}$/i.test(c)) {
+        return [
+            parseInt(c.slice(1, 3), 16),
+            parseInt(c.slice(3, 5), 16),
+            parseInt(c.slice(5, 7), 16),
+        ];
+    }
+    return fallback;
 }
 
 /**
