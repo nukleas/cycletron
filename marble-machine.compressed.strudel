@@ -1,0 +1,111 @@
+setcpm(36)
+
+// recurring phrases, defined once
+let d0 = s("<[bd sd bd sd] [bd - sd bd - bd sd -]>");
+let d1 = s("<[- sd - sd]!2>");
+let d2 = s("<[bd sd bd sd] [bd - sd - - bd sd -]>");
+let d3 = s("<[- - bd - sd - - bd] [- sd bd - sd bd - -]>");
+let d4 = arrange([2, d2], [2, d0]);
+let d5 = arrange([4, d4], [2, d3]);
+let d6 = arrange([2, s("<[[bd,cr] sd bd sd] [bd - sd bd - bd sd -]>")], [6, d5], [2, d0]);
+let d7 = arrange([10, d6], [2, d2], [1, s("[bd sd bd sd]")]);
+let d8 = arrange([2, d1], [2, d1], [2, d1], [1, s("[- sd]")]);
+let b0 = note("<[C2 - C2 - C3 C2 - C2] [C3 C2 - C3 - G2 A2 D3] [- D3 D2 - D3 D2 - D4]>");
+let b1 = note("<[- G2 G1 - G2 G1 - D4] [- G3 - G2 F#2 G2 A2 D3] [B1 - B1 - B2 B1 - B1]>");
+let b2 = arrange([2, note("<[A1@4 A2 A1@3] [B1@3 B2@3 B1@2]>")], [3, b0]);
+let b3 = arrange([5, b2], [1, note("[- C4 - B3 D2 G2 A2 D3]")]);
+let b4 = arrange([2, note("<[E1 - E2 - E3 E1 - E4] [- E3 -@2 E2 G2 A2 D3]>")], [3, b1]);
+let b5 = arrange([2, note("<[E1 - E2 - E3 E2 - E4] [E2 E1 -@2 G2 A2 B2 D3]>")], [3, b1]);
+let m0 = note("<[- C5 E5 B5 B4 C5 D5 D6] [C6 B5 [F#5,D5] A5 - G5 [A5,F#5,D5] E6]>");
+let m1 = arrange([2, m0], [1, note("[-@2 [E5,B4] B5 -@2 [E5,B4] A5]")]);
+let m2 = note("<[- B4 C5 F#5 C5 E5 G5 D5] [F#5 A5 B4 B5 D5 G5 A5 E6]>");
+let m3 = note("<[-@2 [B4,D5] B5 -@2 [B4,D5] D6] [C6 B5 [B4,D5] A5 - G5 [D5,B4,A5] D6]>");
+let m4 = arrange([1, note("[C6 B5 [F#5,D5] A5 - G5 [F#5,D5,A5] E5]")], [3, m1]);
+let m5 = note("<[-@2 [B4,D5] B5 -@2 [B4,D5] A5] [G5 A5 [D5,B4] F#5 - G5 [A5,D5,B4] D6]>");
+let m6 = arrange([2, m5], [1, note("[-@2 [F#5,D5] B5 -@2 [F#5,D5] D6]")]);
+let m7 = arrange([2, m3], [4, note("<[-@2 [F#5,D5] B5 -@2 [F#5,A5,D5] E6] [- B5 [D5,B4] A5 - G5 [D5,F#5,B4] E5] -!2>")]);
+let m8 = arrange([2, m2], [1, note("[-@2 [E5,B4] B5 -@2 [E5,B4] A5]")]);
+let m9 = note("<[-@2 [E5,B4] B5 -@2 [B4,E5] A5] [G5 A5 [E5,B4] B5 - G5 [A5,B4,E5] D6]>");
+let m10 = note("<[-@2 [B4,D5] B5 -@2 [B4,D5] D6] [C6 B5 [D5,B4] A5 - G5 [D5,B4,A5] D6]>");
+
+// Track 1: Drum Kit
+$: arrange(
+  [8, s("<-!8>")],
+  [7, d8],
+  [1, s("[- sd - - sd - - -]")],
+  [10, d6],
+  [6, d5],
+  [10, d6],
+  [4, d4],
+  [27, s("<[- bd sd -] -!22 [- - - sd - - - sd]!2 [- - - - - sd - -] [- - - sd - - sd -]>")],
+  [2, d0],
+  [2, d0],
+  [2, d0],
+  [2, d3],
+  [8, s("<cr -!7>")],
+  [7, d8],
+  [1, s("-")],
+  [13, d7],
+  [1, s("[- bd sd bd - bd sd -]")],
+  [2, d3],
+  [13, d7],
+  [2, s("<[bd - sd - - - - [bd,cr]] ->")]
+).gain(0.38)
+
+// Track 2: Bass Guitar (Classic) (G:major)
+$: arrange(
+  [16, note("<-!16>")],
+  [5, b5],
+  [3, note("<[B2 B1 -@2 B2 B1 D2 E2] [C2 C3] [D2@2 - D3 -@2 E3@2]>")],
+  [5, b4],
+  [1, note("[B2 B1 - A2 - G2 F#2@2]")],
+  [5, b2],
+  [3, note("<[- D3 - B3 - G3 A3 D4] [E1 - E2 - E3 E2 - E1] [E3 E2 - E1 - E2 G2@2]>")],
+  [6, b3],
+  [29, note("<[E2 - E2 - E3 E2 - E2] [E3 E2 - E2 - E2 G2 -] [E2@3 E3@4 -] -!18 [E1@2 E2@2 E3 E1@2 E3] [E2 G1 - E3 E1 G1 E2 G2] [- G2 G1 - G3 - G2 A1] [- G2 A1 - G1 - E2 G1] [G2 B1 - B1 - A1 B1 -] [A1 A1 B1 - B1 - B1 -] [- C2@4 C3@3] [- D2@3 D3 - E1 E2]>")],
+  [5, b4],
+  [3, note("<[B2 B1 - B1 - B1 D2 E2] [E1@4 G2 G2@3] [-@4 G2 - E1 G2]>")],
+  [3, b0],
+  [13, note("<[- D3 - G2 F#2 G2 A2 D3] [E2 - E2 - E3 E2 - E2] [E3 E2 - E3 - E2 G2 -] [A2 A3] [B2@3 B3 - E1 E2 -] [C2 - C2 - C3 C2 - A3] [C3 E1 - B3 E1 G2 A2 D3] [- D3 D2 - D3 D2 - D3] [- C3 - B2 E1 G3 A3 D4] [E2 - E2 - E3 E2 - E2] [G1 E2 - E4 - E2 - E2] -!2>")],
+  [5, b5],
+  [9, note("<[B2 B1 - B2 -@2 B1 -] [C2 D3] [C3@3 B2@2 E2 G2@2] [E1@2 -@2 E2@2 E3 F#3@8 D3@2] [-@3 E3@2 G2@2 D2] [- D3 D2 - D3 D2 - D3] [-@2 D2 D3 - D2 - B1] [- B2 B1 - B2 B1 - B2] [- B1 G1 B2 - B1 B2 -]>")],
+  [6, b3],
+  [11, note("<[E2 - E1 - E3 E3 - E2] [G2 E2 - E2 E1 E2 G2 -] [A1@4 A2 A1@3] [B1@3 B2 - B1 B2 -] [C2 - C2 - C3 C2 - C2] [C3 C3 - C2 - G2 A2 D3] [- D3 D2 - D3 D2 - D3] [- C3 - G2 F#2 G2 A2 D3] [B1 - B1 - B2 B1 - B1] [B2 B1 -@2 B2 B1 D2 E2] ->")]
+).sound("sine").gain(0.63).release(0.12)
+
+// Track 3: Grand Piano (Classic) (G:major)
+$: arrange(
+  [5, note("<[E6 - [E5,B4] B5 -@2 [E5,B4] A5] [G5 A5 [E5,B4] B5 - G5 [A5,B4,E5] D6] [-@2 [B4,D5] B5 -@2 [B4,D5] A5] [G5 A5 [D5,B4] F#5 - G5 [B4,A5,D5] D6] [-@2 [F#5,D5] B5 -@2 [F#5,D5] D6]>")],
+  [4, m4],
+  [5, note("<[G5 A5 [E5,B4] B5 - G5 [A5,B4,E5] D6] [-@2 [B4,D5] B5 -@2 [B4,D5] D6] [C6 B5 [B4,D5] A5 - G5 [D5,A5,B4] D6] [-@2 [F#5,D5] B5 -@2 [F#5,A5,D5] E6] [- B5 [D5,B4] A5 - G5 [F#5,D5,B4] E5]>")],
+  [3, m8],
+  [4, note("<[G5 A5 [E5,B4] B5 - G5 [E5,B4,A5] D6] [-@2 [B4,D5] B5 -@2 [B4,D5] A5] [G5 A5 [B4,D5] F#5 - G5 [A5,D5,B4] D6] [-@2 [F#5,D5] B5 -@2 [D5,F#5] D6]>")],
+  [4, m4],
+  [1, note("[G5 A5 [B4,E5] B5 - G5 [A5,B4,E5] D6]")],
+  [2, m3],
+  [2, note("<[-@2 [F#5,D5] B5 -@2 [D5,A5,F#5] E6] [- B5 [D5,B4] A5 - G5 [F#5,D5,B4] E5]>")],
+  [2, m2],
+  [2, m9],
+  [2, m5],
+  [6, note("<[-@2 [F#5,D5] B5 -@2 [D5,F#5] D6] [C6 B5 [F#5,D5] A5 - G5 [F#5,A5,D5] E5] [- C5 E5 B5 B4 C5 D5 D6] [C6 B5 [F#5,D5] A5 - G5 [F#5,D5,A5] E6] [-@2 [E5,B4] B5 -@2 [E5,B4] A5] [G5 A5 [E5,B4] B5 - G5 [A5,B4,E5] D6]>")],
+  [6, m7],
+  [35, note("<[E6,G5] - [G5,D6] - [D6,F#5] - [C6,E5,G5] - [B5 [E6,E5]] B5 [[D6,D5] B5] [- [B4,D6]] B5 [A5 B5 C5 E5] [C5 E5@2 C6 E6@12] -!18 [E6 - [E5,B4] B5 -@2 [B4,E5] A5] [G5 A5 [E5,B4] B5 - G5 [A5,B4,E5] D6]>")],
+  [3, m6],
+  [1, note("[C6 B5 [F#5,D5] A5 - G5 [A5,F#5,D5] E5]")],
+  [2, m0],
+  [2, m9],
+  [6, m7],
+  [2, note("<[E6 - [E5,B4] B5 -@2 [E5,B4] A5] [G5 A5 [E5,B4] B5 - G5 [B4,E5,A5] D6]>")],
+  [3, m6],
+  [4, m4],
+  [1, note("[G5 A5 [E5,B4] B5 - G5 [E5,A5,B4] D6]")],
+  [2, m10],
+  [2, note("<[-@2 [F#5,D5] B5 -@2 [F#5,A5,D5] E6] [- B5 [D5,B4] A5 - G5 [B4,F#5,D5] E5]>")],
+  [3, m8],
+  [5, note("<[G5 A5 [E5,B4] B5 - G5 [A5,B4,E5] D6] [-@2 [B4,D5] B5 -@2 [D5,B4] A5] [G5 A5 [D5,B4] F#5 - G5 [A5,D5,B4] D6] [-@2 [D5,F#5] B5 -@2 [F#5,D5] D6] [C6 B5 [F#5,D5] A5 - G5 [F#5,A5,D5] E5]>")],
+  [3, m1],
+  [1, note("[G5 A5 [E5,B4] B5 - G5 [E5,B4,A5] D6]")],
+  [2, m10],
+  [3, note("<[-@2 [F#5,D5] B5 -@2 [A5,F#5,D5] E6] [- B5 [D5,B4] A5 - G5 [F#5,D5,B4] E5] ->")]
+).sound("supersquare").gain(0.63).release(0.06)
+

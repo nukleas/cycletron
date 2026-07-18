@@ -1,0 +1,72 @@
+// AGENCY OST — 01 · Legacy System
+// Boot-up. The old mainframe hums in a dark server room; badge-in at dawn.
+// Dark ambient waking into a Berlin-school sequence. This track states the
+// ALBUM MOTIF: scale degrees 0 2 4 6 · 7 4 2 0 (rise to the subtonic,
+// answer falling from the octave) — it returns in tracks 4, 5 and 8.
+//
+// FORM (56 BPM · 1 cycle = 1 bar ≈ 4.3s · 48 bars ≈ 3:26 · loops):
+//   boot   8  e1  sub drone + detuned octave beating
+//   hum    8  e1  + machine noise wash, electrical hum
+//   wake   8  e2  + evolving pad (i→VI), tritone unease underneath
+//   drift  12 e3  + the motif enters as a sequencer line
+//   surge  8  e3  pad opens, cello fifth, motif migrates up a fourth
+//   fade   4  e1  everything recedes; the drone never stops
+// hook: the Agency motif — first statement, high and patient.
+
+setbpm(56);
+
+"<boot@2 hum@2 wake@2 drift@3 surge@2 fade>".slow(4).pickRestart({
+  boot: stack(
+    note("c#1").s("sine").slow(4).attack(4).release(12).gain(0.55),
+    note("c#2").s("sine").slow(4).attack(6).release(12).detune(9).gain(0.26)
+  ).room(0.92),
+  hum: stack(
+    note("c#1").s("sine").slow(4).attack(4).release(12).gain(0.52),
+    note("c#2").s("sine").slow(4).attack(6).release(12).detune(9).gain(0.24),
+    s("brown").slow(2).attack(4).release(8).lpf(sine.range(180, 650).slow(12)).pan(0.4).gain(0.26),
+    note("c#1").s("square").slow(2).attack(2).release(8).lpf(200).vib(0.25).vibmod(0.4).crush(7).pan(0.6).gain(0.12)
+  ).room(0.85),
+  wake: stack(
+    note("c#1").s("sine").slow(4).attack(4).release(12).gain(0.5),
+    s("brown").slow(2).attack(4).release(8).lpf(sine.range(180, 650).slow(12)).pan(0.4).gain(0.22),
+    note("<[c#3, e3, g#3, b3] [a2, c#3, e3, g#3]>/2").s("wt_pad")
+      .attack(3).release(6)
+      .lpf(sine.range(300, 1100).slow(16)).resonance(4)
+      .pan(sine.range(0.35, 0.65).slow(24)).gain(0.3),
+    note("g2").s("sine").slow(4).attack(6).release(12)
+      .detune(sine.range(-14, 14).slow(20)).gain(0.16)
+  ).room(0.9),
+  drift: stack(
+    note("c#1").s("sine").slow(4).attack(4).release(12).gain(0.46),
+    note("<[c#3, e3, g#3, b3] [a2, c#3, e3, g#3]>/2").s("wt_pad")
+      .attack(3).release(6).lpf(sine.range(400, 1200).slow(16))
+      .pan(sine.range(0.35, 0.65).slow(24)).gain(0.28),
+    note("<[0 2 4 6 7 4 2 0] [0 2 4 6 7 9 7 6] [0 2 4 6 7 4 2 0] [7 6 4 2 0 ~ ~ ~]>")
+      .scale("C#5:minor").s("wt_pluck")
+      .every(8, x => x.transpose(5))
+      .lpf(sine.range(600, 2000).slow(8)).resonance(6)
+      .delay(0.5).delaytime(0.375).delayfeedback(0.55)
+      .pan(0.6).gain(0.3)
+  ).room(0.8),
+  surge: stack(
+    note("c#1").s("sine").slow(4).attack(4).release(12).gain(0.44),
+    note("g#1").s("wt_cello").slow(4).attack(6).release(12).lpf(420).pan(0.42).gain(0.22),
+    note("<[c#3, e3, g#3, b3] [a2, c#3, e3, g#3] [f#2, a2, c#3, e3] [g#2, b#2, d#3]>/2")
+      .s("wt_pad").attack(2.5).release(5)
+      .lpf(sine.range(600, 1600).slow(16))
+      .pan(sine.range(0.35, 0.65).slow(24)).gain(0.3),
+    note("<[0 2 4 6 7 4 2 0] [5 7 9 11 12 9 7 5] [0 2 4 6 7 4 2 0] [12 11 9 7 6 4 2 0]>")
+      .scale("C#5:minor").s("wt_pluck")
+      .lpf(sine.range(800, 2400).slow(8)).resonance(6)
+      .delay(0.5).delaytime(0.375).delayfeedback(0.55)
+      .pan(0.6).gain(0.32)
+  ).room(0.8),
+  fade: stack(
+    note("c#1").s("sine").slow(4).attack(4).release(14).gain(0.5),
+    note("c#2").s("sine").slow(4).attack(6).release(14).detune(9).gain(0.22),
+    note("<[0 ~ 2 ~ 4 ~ ~ ~] [7 ~ ~ ~ ~ ~ ~ ~] [4 ~ ~ 2 ~ ~ ~ ~] [0 ~ ~ ~ ~ ~ ~ ~]>")
+      .scale("C#5:minor").s("wt_pluck")
+      .lpf(1000).delay(0.6).delaytime(0.375).delayfeedback(0.6)
+      .pan(0.6).gain(0.24)
+  ).room(0.92)
+})

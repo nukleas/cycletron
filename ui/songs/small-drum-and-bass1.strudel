@@ -1,0 +1,100 @@
+---
+name: "Robostrudel Session"
+bpm: 174
+created: 2026-07-15
+tags: [robostrudel]
+---
+// Small drum & bass arrangement in F minor.
+// FORM (174 BPM · 1 cycle = 1 bar · 36 bars): intro 4 · build 4 · drop 8 · breakdown 4 · bridge 4 · final 8 · outro 4.
+setbpm(174);
+
+"<intro build drop@2 breakdown bridge final@2 outro>".slow(4).pickRestart({
+  intro: stack(
+    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").lpf(500).gain(0.72),
+    s("hh*8").hpf(5000).gain(0.14),
+    note("<f1 f1 d#1 c#1>")
+      .s("sine").attack(0.02).release(0.45).gain(0.52),
+    note("<[f3,g#3,c4] [d#3,g3,a#3] [c#3,f3,g#3] [c3,d#3,g3]>")
+      .s("wt_pad").attack(0.8).release(1.4).lpf(1000).room(0.6).gain(0.2)
+  ),
+  build: stack(
+    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").gain(0.86),
+    s("<[~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~] [~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~] [~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ sd sd] [sd*4 sd*4 sd*8 sd*8]>")
+      .gain(0.66),
+    s("hh*8").hpf(5000).gain(0.17),
+    note("<[f1 ~ f1 ~] [f1 ~ f1 ~] [d#1 ~ d#1 ~] [c#1 ~ c#1 c1]>")
+      .s("supersaw").lpf(sine.range(220, 900).slow(4)).resonance(9).gain(0.38),
+    note("<[f3,g#3,c4] [d#3,g3,a#3] [c#3,f3,g#3] [c3,d#3,g3]>")
+      .s("wt_pad").attack(0.5).release(1.0).lpf(1450).room(0.5).gain(0.2),
+    // hook tease — last 2 bars only, short fragments
+    note("<[~ ~ ~ ~] [~ ~ ~ ~] [f4 ~ ab4 ~] [c5 ~ bb4 ~]>")
+      .s("supersquare").release(0.18).lpf(2800).delay(0.18).delaytime(0.125).delayfeedback(0.35)
+      .room(0.3).gain(0.28)
+  ),
+  drop: stack(
+    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").gain(0.95),
+    s("~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~").gain(0.8),
+    s("hh*16").hpf(5500).gain(0.2),
+    note("<[f1 ~ f1 f1] [f1 ~ f1 c2] [d#1 ~ d#1 d#1] [c#1 ~ c#1 c1]>")
+      .s("supersaw").lpf(sine.range(180, 1200).slow(2)).resonance(10).gain(0.46),
+    note("<[f3,g#3,c4] [d#3,g3,a#3] [c#3,f3,g#3] [c3,d#3,g3]>")
+      .s("sawtooth").struct("~ 1 ~ ~").release(0.16).lpf(1800).room(0.25).gain(0.3),
+    // 8-bar developing lead hook (F minor)
+    note("<[f4 ~ ab4 c5] [bb4 ~ ab4 g4] [f4 ~ eb4 c4] [db4 ~ c4 ~] [f4 ab4 c5 eb5] [c5 ~ bb4 ab4] [g4 ab4 f4 ~] [eb4 ~ c4 ~]>")
+      .s("supersquare").release(0.14).lpf(3200).delay(0.22).delaytime(0.125).delayfeedback(0.4)
+      .room(0.28).pan(sine.range(0.4, 0.6)).gain(0.36)
+  ),
+  breakdown: stack(
+    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~").lpf(700).gain(0.68),
+    s("~ ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~").room(0.35).gain(0.58),
+    note("<f1 f1 d#1 c#1>")
+      .s("sine").attack(0.03).release(0.8).gain(0.55),
+    note("<[f3,g#3,c4] [d#3,g3,a#3] [c#3,f3,g#3] [c3,d#3,g3]>")
+      .s("wt_pad").attack(1.0).release(1.8).lpf(1200).room(0.7).gain(0.24),
+    // sparse echo of the hook
+    note("<[f4 ~ ~ ~] [~ ~ ab4 ~] [~ ~ ~ c5] [~ bb4 ~ ~]>")
+      .s("supersquare").attack(0.05).release(0.5).lpf(2000).delay(0.3).delayfeedback(0.5)
+      .room(0.5).gain(0.22)
+  ),
+  bridge: stack(
+    s("bd ~ ~ bd ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").gain(0.9),
+    s("~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~").gain(0.74),
+    s("hh*8").hpf(5200).gain(0.16),
+    note("<[f1 ~ f1 c2] [d#1 ~ d#1 a#1] [c#1 ~ c#1 g#1] [c1 ~ c1 d#1]>")
+      .s("supersaw").lpf(950).resonance(9).gain(0.42),
+    note("<[f4 c5 g#4 c5] [d#4 a#4 g4 a#4] [c#4 g#4 f4 g#4] [c4 g4 d#4 g4]>")
+      .s("wt_pluck").decay(0.1).sustain(0).delay(0.2).room(0.25)
+      .pan(sine.range(0.35, 0.65)).gain(0.25),
+    // mid-register counter-melody against the pluck arp
+    note("<[c5 ~ ~ ab4] [~ bb4 ~ g4] [ab4 ~ f4 ~] [~ g4 ~ eb4]>")
+      .s("supersquare").release(0.2).lpf(2600).delay(0.15).room(0.3).gain(0.24)
+  ),
+  final: stack(
+    s("bd ~ ~ ~ ~ ~ ~ bd ~ ~ bd ~ ~ ~ ~ ~").gain(0.96),
+    s("~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~").gain(0.82),
+    s("hh*16").hpf(5500).gain(0.22).pan(sine.range(0.38, 0.62)),
+    s("~ oh ~ oh").gain(0.16),
+    note("<[f1 ~ f1 f1] [f1 ~ f1 c2] [d#1 ~ d#1 g#1] [c#1 ~ c#1 c1]>")
+      .s("supersaw").lpf(sine.range(180, 1450).slow(2)).resonance(11).gain(0.48),
+    note("<[f3,g#3,c4] [d#3,g3,a#3] [c#3,f3,g#3] [c3,d#3,g3]>")
+      .s("sawtooth").struct("~ 1 ~ 1").release(0.14).lpf(2200).room(0.3).gain(0.32),
+    // full hook + octave lift on the second half
+    note("<[f4 ~ ab4 c5] [bb4 ~ ab4 g4] [f4 ~ eb4 c4] [db4 ~ c4 ~] [f5 ab5 c6 eb6] [c6 ~ bb5 ab5] [g5 ab5 f5 ~] [eb5 ~ c5 ~]>")
+      .s("supersquare").release(0.12).lpf(3600).delay(0.25).delaytime(0.125).delayfeedback(0.42)
+      .room(0.3).pan(sine.range(0.38, 0.62)).gain(0.32)
+  ),
+  outro: stack(
+    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~")
+      .lpf(isaw.range(180, 900).slow(4)).gain(0.72),
+    s("hh*8").lpf(isaw.range(2200, 7000).slow(4)).gain(0.13),
+    note("<f1 f1 d#1 c#1>")
+      .s("sine").attack(0.04).release(0.9).gain(0.46),
+    note("<[f3,g#3,c4] [d#3,g3,a#3] [c#3,f3,g#3] [c3,d#3,g3]>")
+      .s("wt_pad").attack(1.0).release(2.0)
+      .lpf(isaw.range(500, 1400).slow(4)).room(0.7).gain(0.22),
+    // fading hook fragment
+    note("<[f4 ~ ~ ~] [ab4 ~ ~ ~] [c5 ~ ~ ~] [~ ~ ~ ~]>")
+      .s("supersquare").attack(0.08).release(0.7).lpf(isaw.range(800, 2400).slow(4))
+      .delay(0.25).room(0.55).gain(0.18)
+  )
+})
