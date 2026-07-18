@@ -10,9 +10,6 @@ robostrudel-agent = { workspace = true }
 robostrudel-corpus = { workspace = true }
 robostrudel-gen = { workspace = true }
 robostrudel-analysis = { workspace = true }
-strudel-dsl = { workspace = true }
-strudel-core = { workspace = true }
-strudel-mini = { workspace = true, default-features = false }
 midi-to-strudel = { workspace = true }
 tauri = { version = "2.11", features = ["tray-icon"] }
 tauri-plugin-opener = "2.5"
@@ -43,7 +40,6 @@ mime_guess = "2"
 hyper = { version = "1", features = ["full"] }
 http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
-tower = { version = "0.4", features = ["util"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

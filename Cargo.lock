@@ -2661,7 +2661,6 @@ dependencies = [
  "serde_json",
  "strudel-core",
  "strudel-dsl",
- "strudel-mini",
  "walkdir",
 ]
 
@@ -3612,26 +3611,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pin-project"
-version = "1.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2466b2336ed02bcdca6b294417127b90ec92038d1d5c4fbeac971a922e0e0924"
-dependencies = [
- "pin-project-internal",
-]
-
-[[package]]
-name = "pin-project-internal"
-version = "1.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c96395f0a926bc13b1c17622aaddda1ecb55d49c8f1bf9777e4d877800a43f8b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4109,7 +4088,7 @@ dependencies = [
  "tokio",
  "tokio-native-tls",
  "tokio-util",
- "tower 0.5.3",
+ "tower",
  "tower-http",
  "tower-service",
  "url",
@@ -4148,7 +4127,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util",
- "tower 0.5.3",
+ "tower",
  "tower-http",
  "tower-service",
  "url",
@@ -4200,20 +4179,15 @@ dependencies = [
 name = "robostrudel-agent"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "eventsource-stream",
- "futures-core",
- "pin-project-lite",
  "reqwest 0.12.28",
- "robostrudel-core",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -4247,9 +4221,6 @@ dependencies = [
  "rust-embed",
  "serde",
  "serde_json",
- "strudel-core",
- "strudel-dsl",
- "strudel-mini",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -4261,7 +4232,6 @@ dependencies = [
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
  "tokio",
- "tower 0.4.13",
  "tracing",
  "tracing-subscriber",
 ]
@@ -4275,7 +4245,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "toml 0.8.2",
- "tracing",
  "uuid",
 ]
 
@@ -4287,7 +4256,6 @@ dependencies = [
  "robostrudel-core",
  "serde",
  "serde_json",
- "thiserror 2.0.18",
  "tracing",
  "walkdir",
 ]
@@ -6024,21 +5992,6 @@ checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 
 [[package]]
 name = "tower"
-version = "0.4.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8fa9be0de6cf49e536ce1851f987bd21a43b771b09473c3549a6c853db37c1c"
-dependencies = [
- "futures-core",
- "futures-util",
- "pin-project",
- "pin-project-lite",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "tower"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebe5ef63511595f1344e2d5cfa636d973292adc0eec1f0ad45fae9f0851ab1d4"
@@ -6065,7 +6018,7 @@ dependencies = [
  "http-body",
  "iri-string",
  "pin-project-lite",
- "tower 0.5.3",
+ "tower",
  "tower-layer",
  "tower-service",
 ]
@@ -6088,7 +6041,6 @@ version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
 dependencies = [
- "log",
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",

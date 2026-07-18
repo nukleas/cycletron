@@ -8,8 +8,8 @@ name = "dsl-eval"
 path = "main.rs"
 
 [dependencies]
-strudel-dsl = { path = "../../../../strudel-rs/crates/strudel-dsl" }
-strudel-mini = { path = "../../../../strudel-rs/crates/strudel-mini", default-features = false }
-strudel-core = { path = "../../../../strudel-rs/crates/strudel-core" }
-serde_json = "1"
-serde = { version = "1", features = ["derive"] }
+strudel-dsl = { workspace = true }
+strudel-mini = { workspace = true }
+strudel-core = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
