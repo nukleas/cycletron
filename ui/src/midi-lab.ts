@@ -243,6 +243,8 @@ export class MidiLab {
             notesPerBar: num('midiLabNotesPerBar'),
             barLimit: num('midiLabBarLimit'),
             compact: chk('midiLabCompact'),
+            compose: chk('midiLabCompose'),
+            sectionNaming: (sel('midiLabSectionNaming') as ImportMidiOptions['sectionNaming']) ?? undefined,
             detectDrumNames: chk('midiLabDetectDrums'),
         };
         // Build included channels from the meta + excluded set.

@@ -154,6 +154,8 @@ export interface ImportMidiOptions {
     autoResolution?: boolean;
     barLimit?: number;
     compact?: boolean;
+    compose?: boolean;
+    sectionNaming?: 'heuristic' | 'generic';
     detectDrumNames?: boolean;
     instrumentMode?: 'hybrid' | 'waveforms' | 'gm' | 'auto';
     drumBank?: 'simple' | '808' | '909' | '707' | 'linn' | 'dmx' | 'auto';

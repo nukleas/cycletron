@@ -607,6 +607,17 @@
                         <span>Compact repeats (!)</span>
                     </label>
                     <label class="midi-lab-field midi-lab-check">
+                        <input type="checkbox" id="midiLabCompose">
+                        <span>Split into sections (pickRestart)</span>
+                    </label>
+                    <label class="midi-lab-field">
+                        <span>Section naming</span>
+                        <select id="midiLabSectionNaming">
+                            <option value="heuristic" selected>Heuristic</option>
+                            <option value="generic">Generic</option>
+                        </select>
+                    </label>
+                    <label class="midi-lab-field midi-lab-check">
                         <input type="checkbox" id="midiLabDetectDrums" checked>
                         <span>Detect drum names</span>
                     </label>
