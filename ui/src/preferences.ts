@@ -3,7 +3,7 @@
  * `set_user_settings` commands. Persists to `{app_data_dir}/settings.json`.
  *
  * Triggered by:
- *   - "Robostrudel → Preferences…" menu (Cmd+,)
+ *   - "Cycletron → Preferences…" menu (Cmd+,)
  *   - The "Change…" buttons from other modals (e.g. Library root in here)
  */
 
@@ -443,7 +443,7 @@ export class PreferencesModal {
             this.close();
         } catch (e: any) {
             const {message} = await import('@tauri-apps/plugin-dialog');
-            await message(`Could not save preferences:\n${e}`, {title: 'Robostrudel', kind: 'error'});
+            await message(`Could not save preferences:\n${e}`, {title: 'Cycletron', kind: 'error'});
         }
     }
 

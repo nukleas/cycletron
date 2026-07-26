@@ -108,7 +108,7 @@ async function initAiBridge() {
             const elapsedMs = performance.now() - startedAt;
             if (elapsedMs > 6000 && !document.hasFocus()) {
                 const preview = (response || '').replace(/\s+/g, ' ').slice(0, 120);
-                void notify('AI response ready', preview || 'Open Robostrudel to see the result.');
+                void notify('AI response ready', preview || 'Open Cycletron to see the result.');
             }
         } catch (err: any) {
             removeTask('ai-response');
@@ -261,7 +261,7 @@ async function initAiBridge() {
         suppressWelcome = true;
         // Also scrub any welcome that slipped in before this event fired.
         const first = messagesEl.firstElementChild;
-        if (first && first.textContent?.startsWith('Welcome to Robostrudel')) {
+        if (first && first.textContent?.startsWith('Welcome to Cycletron')) {
             first.remove();
         }
     });
@@ -270,7 +270,7 @@ async function initAiBridge() {
     setTimeout(() => {
         if (suppressWelcome || messagesEl.children.length > 0) return;
         addMessage('assistant',
-            '**Welcome to Robostrudel!**\n\n' +
+            '**Welcome to Cycletron!**\n\n' +
             'Describe the music you want, or use the quick buttons below.\n\n' +
             'Press **Play** first to arm audio, then I can update patterns live.'
         );

@@ -385,7 +385,7 @@ export class FileExplorer {
         const {ask} = await import('@tauri-apps/plugin-dialog');
         const ok = await ask(
             `Delete ${entry.is_dir ? 'folder' : 'file'} "${entry.name}"? This cannot be undone.`,
-            {title: 'Robostrudel', kind: 'warning'},
+            {title: 'Cycletron', kind: 'warning'},
         );
         if (!ok) return;
         try {
@@ -682,7 +682,7 @@ async function showError(msg: string): Promise<void> {
         return;
     }
     const {message} = await import('@tauri-apps/plugin-dialog');
-    await message(msg, {title: 'Robostrudel', kind: 'error'});
+    await message(msg, {title: 'Cycletron', kind: 'error'});
 }
 
 function basename(path: string): string {

@@ -15,7 +15,7 @@ pub struct TrayState<R: Runtime> {
 pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<TrayState<R>> {
     let play_pause_item = MenuItemBuilder::with_id("tray.play_pause", "Play").build(app)?;
     let stop_item = MenuItemBuilder::with_id("tray.stop", "Stop").build(app)?;
-    let show_item = MenuItemBuilder::with_id("tray.show", "Show Robostrudel").build(app)?;
+    let show_item = MenuItemBuilder::with_id("tray.show", "Show Cycletron").build(app)?;
     let quit_item = MenuItemBuilder::with_id("tray.quit", "Quit").build(app)?;
 
     let menu: Menu<R> = MenuBuilder::new(app)
@@ -30,7 +30,7 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<TrayState<R>>
     let handle = app.clone();
     let _tray = TrayIconBuilder::with_id("robostrudel-tray")
         .icon(app.default_window_icon().unwrap().clone())
-        .tooltip("Robostrudel — stopped")
+        .tooltip("Cycletron — stopped")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(move |_tray, event| {
@@ -98,9 +98,9 @@ pub fn tray_set_playback(
         _ => "Play",
     };
     let tooltip = match state.as_str() {
-        "playing" => "Robostrudel — playing",
-        "paused" => "Robostrudel — paused",
-        _ => "Robostrudel — stopped",
+        "playing" => "Cycletron — playing",
+        "paused" => "Cycletron — paused",
+        _ => "Cycletron — stopped",
     };
 
     if let Some(item) = tray_state.play_pause.lock().unwrap().as_ref() {

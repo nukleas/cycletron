@@ -1,7 +1,7 @@
 {
-  "productName": "Robostrudel",
+  "productName": "Cycletron",
   "version": "0.1.0",
-  "identifier": "com.nukleas.robostrudel",
+  "identifier": "com.nukleas.cycletron",
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Robostrudel",
+        "title": "Cycletron",
         "width": 1400,
         "height": 900,
         "minWidth": 900,
@@ -38,8 +38,8 @@
     "active": true,
     "createUpdaterArtifacts": true,
     "category": "Music",
-    "shortDescription": "AI-first Strudel music engine",
-    "longDescription": "Robostrudel pairs a Strudel WASM REPL with an AI operator that generates and edits live-coded patterns.",
+    "shortDescription": "AI-native live coding for music",
+    "longDescription": "Cycletron is a desktop live-coding instrument with an AI operator. Patterns run on strudel-rs (Rust) using a Strudel-compatible mini-notation dialect. A NaderLabs project.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -51,7 +51,7 @@
       {
         "ext": ["strudel"],
         "name": "Strudel Pattern",
-        "description": "Robostrudel pattern file",
+        "description": "Cycletron pattern file",
         "role": "Editor",
         "mimeType": "text/plain"
       },
@@ -82,7 +82,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/nukleas/robostrudel/releases/latest/download/latest.json"
+        "https://github.com/nukleas/cycletron/releases/latest/download/latest.json"
       ],
       "pubkey": "",
       "dialog": false

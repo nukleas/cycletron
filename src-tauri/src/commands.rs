@@ -834,7 +834,7 @@ pub fn diagnostic_dump(app_handle: tauri::AppHandle) -> String {
     let package = app_handle.package_info();
     let identifier = app_handle.config().identifier.clone();
     let mut out = String::new();
-    out.push_str("=== Robostrudel diagnostic dump ===\n");
+    out.push_str("=== Cycletron diagnostic dump ===\n");
     out.push_str(&format!("App      : {} {}\n", package.name, package.version));
     out.push_str(&format!("Bundle   : {}\n", identifier));
     out.push_str(&format!("Tauri    : {}\n", tauri::VERSION));

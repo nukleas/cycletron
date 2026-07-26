@@ -229,7 +229,7 @@ pub fn run() {
                             .unwrap(),
                     ),
                 )
-                .title("Robostrudel")
+                .title("Cycletron")
                 .inner_size(1400.0, 900.0)
                 .min_inner_size(900.0, 600.0)
                 .resizable(true)
@@ -244,7 +244,7 @@ pub fn run() {
                 tracing::info!("Production frontend served at {}", url);
 
                 WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse().unwrap()))
-                    .title("Robostrudel")
+                    .title("Cycletron")
                     .inner_size(1400.0, 900.0)
                     .min_inner_size(900.0, 600.0)
                     .resizable(true)

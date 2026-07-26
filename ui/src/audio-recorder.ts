@@ -195,7 +195,7 @@ class AudioRecorder {
         if (!isTauri) { console.warn(message); return; }
         try {
             const {message: dialog} = await import('@tauri-apps/plugin-dialog');
-            await dialog(message, {title: 'Robostrudel', kind: 'warning'});
+            await dialog(message, {title: 'Cycletron', kind: 'warning'});
         } catch { /* ignore */ }
     }
 }
@@ -276,7 +276,7 @@ function defaultFileName(): string {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    return `robostrudel-${stamp}.wav`;
+    return `cycletron-${stamp}.wav`;
 }
 
 function basename(path: string): string {

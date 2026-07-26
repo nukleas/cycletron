@@ -21,7 +21,7 @@ resolver = "2"
 [workspace.package]
 edition = "2024"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/nukleas/robostrudel"
+repository = "https://github.com/nukleas/cycletron"
 
 [workspace.dependencies]
 # Internal crates

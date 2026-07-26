@@ -52,7 +52,7 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
         }
         const {ask} = await import('@tauri-apps/plugin-dialog');
         const accept = await ask(
-            `Robostrudel ${update.version} is available.\n\nDownload and install now?`,
+            `Cycletron ${update.version} is available.\n\nDownload and install now?`,
             {title: 'Update available', kind: 'info'},
         );
         if (!accept) return;
@@ -80,5 +80,5 @@ async function note(message: string): Promise<void> {
         return;
     }
     const {message: dialog} = await import('@tauri-apps/plugin-dialog');
-    await dialog(message, {title: 'Robostrudel'});
+    await dialog(message, {title: 'Cycletron'});
 }

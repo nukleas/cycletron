@@ -10,8 +10,8 @@ pub fn build_app_menu<R: Runtime>(
     recents: &[std::path::PathBuf],
 ) -> tauri::Result<Menu<R>> {
     // App-level (macOS conventions: Preferences with Cmd+,)
-    let app_menu = SubmenuBuilder::new(app, "Robostrudel")
-        .item(&MenuItemBuilder::with_id("app.about", "About Robostrudel").build(app)?)
+    let app_menu = SubmenuBuilder::new(app, "Cycletron")
+        .item(&MenuItemBuilder::with_id("app.about", "About Cycletron").build(app)?)
         .separator()
         .item(
             &MenuItemBuilder::with_id("app.preferences", "Preferences…")
@@ -152,7 +152,7 @@ pub fn build_app_menu<R: Runtime>(
 
     // Help
     let help = SubmenuBuilder::new(app, "Help")
-        .item(&MenuItemBuilder::with_id("help.about", "About Robostrudel").build(app)?)
+        .item(&MenuItemBuilder::with_id("help.about", "About Cycletron").build(app)?)
         .item(&MenuItemBuilder::with_id("help.docs", "Open Strudel Docs").build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("help.show_logs", "Show Logs…").build(app)?)

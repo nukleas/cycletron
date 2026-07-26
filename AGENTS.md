@@ -1,4 +1,5 @@
-# Robostrudel
+# Cycletron (legacy codename: Robostrudel)
+
 
 AI-first strudel music engine — Tauri v2 desktop app.
 

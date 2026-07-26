@@ -1,14 +1,17 @@
 //! API-key storage in the OS keychain.
 //!
 //! Keys are stored per provider so a Claude key and a Grok key can coexist.
-//! Service = `"robostrudel"`, account = the provider id (`"anthropic"`,
+//! Service = `"cycletron"`, account = the provider id (`"anthropic"`,
 //! `"grok"`, `"openai"`, …). Reads fall back to a provider-specific environment
 //! variable when the keychain has no entry, preserving the old
 //! `ANTHROPIC_API_KEY` workflow.
+//!
+//! Pre-rename builds used service `"robostrudel"` — re-enter keys once after upgrade
+//! (or set the env var) if the keychain entry is missing.
 
 use keyring::Entry;
 
-const SERVICE: &str = "robostrudel";
+const SERVICE: &str = "cycletron";
 
 /// Resolve a provider's API key.
 ///

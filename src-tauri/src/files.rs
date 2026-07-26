@@ -63,7 +63,7 @@ fn tmp_path(path: &Path) -> PathBuf {
 fn format_with_frontmatter(code: &str, bpm: Option<f64>) -> String {
     let bpm_line = bpm.map(|v| format!("bpm: {v}\n")).unwrap_or_default();
     format!(
-        "---\nname: \"Robostrudel Session\"\n{bpm_line}created: {}\ntags: [robostrudel]\n---\n{code}",
+        "---\nname: \"Cycletron Session\"\n{bpm_line}created: {}\ntags: [cycletron]\n---\n{code}",
         Utc::now().format("%Y-%m-%d"),
     )
 }

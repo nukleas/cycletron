@@ -137,7 +137,7 @@ class HistoryModal {
         if (!isTauri) { console.warn(message); return; }
         try {
             const {message: dialog} = await import('@tauri-apps/plugin-dialog');
-            await dialog(message, {title: 'Robostrudel'});
+            await dialog(message, {title: 'Cycletron'});
         } catch { /* ignore */ }
     }
 }

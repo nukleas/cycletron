@@ -1,7 +1,7 @@
 /**
  * Corpus browser panel.
  * Only strudel-rs compatible entries are ever shown (the Rust loader in
- * robostrudel-corpus drops "js-song", "tidal", etc. at load time because this
+ * cycletron-corpus drops "js-song", "tidal", etc. at load time because this
  * app is built on the strudel-rs WASM engine, not the full web-strudel JS runtime).
  * Backed by `search_corpus` / `get_corpus_source`.
  */
@@ -111,7 +111,7 @@ export class CorpusBrowser {
             const {ask} = await import('@tauri-apps/plugin-dialog');
             const ok = await ask(
                 `Load "${entry.title ?? entry.filename}"? Unsaved changes will be lost.`,
-                {title: 'Robostrudel', kind: 'warning'},
+                {title: 'Cycletron', kind: 'warning'},
             );
             if (!ok) return;
         }

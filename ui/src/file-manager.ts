@@ -237,7 +237,7 @@ export class FileManager {
         const dialog = await this.getDialog();
         return dialog.ask(
             `"${this.currentName}" has unsaved changes. Discard them?`,
-            {title: 'Robostrudel', kind: 'warning'},
+            {title: 'Cycletron', kind: 'warning'},
         );
     }
 
@@ -247,7 +247,7 @@ export class FileManager {
             return;
         }
         const dialog = await this.getDialog();
-        await dialog.message(message, {title: 'Robostrudel', kind: 'error'});
+        await dialog.message(message, {title: 'Cycletron', kind: 'error'});
     }
 
     private async getDialog(): Promise<Dialog> {

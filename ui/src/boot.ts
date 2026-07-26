@@ -72,7 +72,7 @@ function setupTitleBar(): void {
 
     const update = (detail: {name: string; dirty: boolean}) => {
         const marker = detail.dirty ? ' •' : '';
-        document.title = `Robostrudel — ${detail.name}${marker}`;
+        document.title = `Cycletron — ${detail.name}${marker}`;
         if (fileNameEl) {
             fileNameEl.textContent = `${detail.name}${marker}`;
             fileNameEl.classList.toggle('status-file--dirty', detail.dirty);
@@ -253,7 +253,7 @@ function setupExternalChangeListener(): void {
         const {ask} = await import('@tauri-apps/plugin-dialog');
         const reload = await ask(
             `"${basename(path)}" changed on disk. Discard your unsaved changes and reload?`,
-            {title: 'Robostrudel', kind: 'warning'},
+            {title: 'Cycletron', kind: 'warning'},
         );
         if (reload) await fileManager.openPath(path);
     });

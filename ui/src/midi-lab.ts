@@ -299,7 +299,7 @@ export class MidiLab {
             this.close();
         } catch (e: any) {
             const {message} = await import('@tauri-apps/plugin-dialog');
-            await message(`Could not save:\n${e}`, {title: 'Robostrudel', kind: 'error'});
+            await message(`Could not save:\n${e}`, {title: 'Cycletron', kind: 'error'});
         }
     }
 
