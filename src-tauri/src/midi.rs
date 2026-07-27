@@ -91,7 +91,7 @@ pub fn convert_bytes(data: &[u8], opts: &ImportOptions) -> anyhow::Result<Import
     let bpm = midi.bpm;
 
     let notes_per_bar = if opts.auto_resolution {
-        suggest_notes_per_bar(&midi.track_info, midi.cycle_ticks, midi.cycle_len)
+        suggest_notes_per_bar(&midi.track_info, midi.cycle_ticks)
             .unwrap_or(opts.notes_per_bar)
     } else {
         opts.notes_per_bar

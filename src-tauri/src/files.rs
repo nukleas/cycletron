@@ -233,20 +233,20 @@ mod tests {
 
     #[test]
     fn roundtrip_with_frontmatter() {
-        let tmp = std::env::temp_dir().join("robostrudel_test.strudel");
+        let tmp = std::env::temp_dir().join("cycletron_test.strudel");
         let code = "note(\"c4 e4 g4\").s(\"sine\")\n";
         write_file(&tmp, code, Some(120.0)).unwrap();
         let doc = read_file(&tmp).unwrap();
         assert_eq!(doc.code.trim(), code.trim());
         let fm = doc.frontmatter.unwrap();
         assert_eq!(fm.bpm, Some(120.0));
-        assert!(fm.tags.contains(&"robostrudel".to_string()));
+        assert!(fm.tags.contains(&"cycletron".to_string()));
         let _ = fs::remove_file(&tmp);
     }
 
     #[test]
     fn read_plain_js_file() {
-        let tmp = std::env::temp_dir().join("robostrudel_plain.js");
+        let tmp = std::env::temp_dir().join("cycletron_plain.js");
         let code = "stack(note(\"c4\"), s(\"bd\"))\n";
         fs::write(&tmp, code).unwrap();
         let doc = read_file(&tmp).unwrap();

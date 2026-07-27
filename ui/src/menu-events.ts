@@ -12,7 +12,9 @@ import {preferencesModal} from './preferences.js';
 import {checkForUpdates} from './updater.js';
 import {logsModal} from './logs-modal.js';
 import {welcomeModal} from './welcome-modal.js';
+import {helpModal} from './help-modal.js';
 import {diag} from './diagnostics.js';
+import {openExternal} from './external-link.js';
 
 const isTauri = !!(window as any).__TAURI__;
 
@@ -53,11 +55,10 @@ export async function initMenuEvents(): Promise<void> {
             const code = await invoke<string | null>('session_redo');
             if (code != null) void window.strudelApp?.replaceCodeAndPlay?.(code);
         },
-        'menu:docs': () => {
-            void (window as any).__TAURI__.core.invoke('plugin:opener|open_url', {
-                url: 'https://strudel.cc/learn/',
-            });
-        },
+        'menu:docs': () => { void openExternal('https://strudel.cc/learn/'); },
+        'menu:user_guide': () => { helpModal.open('guide'); },
+        'menu:shortcuts': () => { helpModal.open('shortcuts'); },
+        'menu:dialect': () => { helpModal.open('dialect'); },
         'menu:about': () => { void aboutModal.open(); },
         'menu:preferences': () => { void preferencesModal.open(); },
         'menu:check_updates': () => { void checkForUpdates(true); },

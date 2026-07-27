@@ -1,4 +1,4 @@
-//! Pull a MIDI dataset into the robostrudel knowledge base.
+//! Pull a MIDI dataset into the Cycletron knowledge base.
 //!
 //! Walks a folder of `.mid`/`.midi` files, converts each to strudel-rs via the
 //! `midi-to-strudel` pipeline, validates the result through the same gate as
@@ -199,7 +199,7 @@ fn convert(data: &[u8], bar_limit: usize) -> anyhow::Result<(String, f64)> {
     let midi = MidiData::from_bytes(data)?;
     let bpm = midi.bpm;
     let notes_per_bar =
-        suggest_notes_per_bar(&midi.track_info, midi.cycle_ticks, midi.cycle_len).unwrap_or(16);
+        suggest_notes_per_bar(&midi.track_info, midi.cycle_ticks).unwrap_or(16);
     let builder = TrackBuilder::new(
         midi.cycle_len,
         midi.cycle_ticks,
@@ -238,7 +238,7 @@ fn validate(code: &str, window: usize) -> Result<(), String> {
                 .and_then(|f| require_haps(&f.pattern, window));
         }
     }
-    match strudel_dsl::execute(code) {
+    match strudel_dsl::eval_dsl_with_tempo(code) {
         Ok(out) => require_haps(&out.pattern, window),
         Err(e) => Err(e.to_string()),
     }

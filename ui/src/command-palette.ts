@@ -15,6 +15,7 @@ import {invoke} from './tauri.js';
 import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
 import {aboutModal} from './about-modal.js';
+import {helpModal} from './help-modal.js';
 import {preferencesModal} from './preferences.js';
 import {midiLab} from './midi-lab.js';
 import {audioRecorder} from './audio-recorder.js';
@@ -189,7 +190,11 @@ const COMMANDS: Item[] = [
     {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => { void midiLab.openEmpty(); }},
     {id: 'cmd.load_samples',title: 'Load Sample Folder…',   section: 'Commands',                 run: () => { void window.strudelApp?.loadSampleFolder?.(); }},
     {id: 'cmd.preferences', title: 'Preferences…',          section: 'Commands', hint: '⌘,',     run: () => { void preferencesModal.open(); }},
-    {id: 'cmd.about',       title: 'About Cycletron',     section: 'Commands',                 run: () => { void aboutModal.open(); }},
+    {id: 'cmd.examples',    title: 'Browse Examples…',      section: 'Commands',                 run: () => { document.getElementById('browseExamples')?.click(); }},
+    {id: 'cmd.help_guide',  title: 'User Guide…',           section: 'Commands',                 run: () => { helpModal.open('guide'); }},
+    {id: 'cmd.help_keys',   title: 'Keyboard Shortcuts…',   section: 'Commands',                 run: () => { helpModal.open('shortcuts'); }},
+    {id: 'cmd.help_dialect',title: 'Cycletron Dialect…',    section: 'Commands',                 run: () => { helpModal.open('dialect'); }},
+    {id: 'cmd.about',       title: 'About Cycletron',       section: 'Commands',                 run: () => { void aboutModal.open(); }},
     {id: 'cmd.updates',     title: 'Check for Updates',     section: 'Commands',                 run: () => { void checkForUpdates(true); }},
     {id: 'cmd.logs',        title: 'Show Logs…',            section: 'Commands',                 run: () => { void logsModal.open(); }},
     {id: 'cmd.toggle_ai',   title: 'Toggle AI Panel',       section: 'Commands',                 run: () => document.getElementById('aiPanel')?.classList.toggle('collapsed')},

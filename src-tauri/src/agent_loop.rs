@@ -1,9 +1,9 @@
 use crate::state::AppState;
 use crate::strudel;
-use robostrudel_agent::LlmProvider;
-use robostrudel_agent::types::*;
-use robostrudel_core::traits::CorpusIndex;
-use robostrudel_core::types::{ChatMessage, ChatRole, CorpusQuery, MusicalRole, PlaybackState};
+use cycletron_agent::LlmProvider;
+use cycletron_agent::types::*;
+use cycletron_core::traits::CorpusIndex;
+use cycletron_core::types::{ChatMessage, ChatRole, CorpusQuery, MusicalRole, PlaybackState};
 use std::sync::LazyLock;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
@@ -33,7 +33,7 @@ pub async fn run_agent_loop(
     event_tx: mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
     let mut api_messages = session_to_api_messages(session_messages);
-    let tool_defs = robostrudel_agent::tools::music_tool_definitions();
+    let tool_defs = cycletron_agent::tools::music_tool_definitions();
 
     // Build the system prompt with current editor code injected
     let current_code = {
@@ -255,7 +255,7 @@ fn tool_list_sounds(state: &AppState) -> Result<String, String> {
 }
 
 /// Generate ready-to-play strudel code from an algorithmic-composition
-/// primitive (`robostrudel_gen`). Returns complete `.strudel` source the agent
+/// primitive (`cycletron_gen`). Returns complete `.strudel` source the agent
 /// can then validate / play / edit. Missing params fall back to the same
 /// defaults as the `gen-pattern` CLI.
 fn tool_generate_pattern(input: &serde_json::Value) -> Result<String, String> {
@@ -267,15 +267,15 @@ fn tool_generate_pattern(input: &serde_json::Value) -> Result<String, String> {
         "genre" => {
             let genre = input["genre"].as_str().unwrap_or("house");
             let seed = input["seed"].as_u64().unwrap_or(7);
-            robostrudel_gen::compose::by_name(genre, seed).map(|piece| {
+            cycletron_gen::compose::by_name(genre, seed).map(|piece| {
                 let code = piece.to_strudel();
                 // Family names and aliases route to one flagship — say so, and
                 // name the siblings, so "trance" → uplifting-trance is a
                 // visible choice rather than a silent collapse.
                 let requested = genre.trim().to_ascii_lowercase().replace([' ', '_'], "-");
-                match robostrudel_gen::spec::find(genre) {
+                match cycletron_gen::spec::find(genre) {
                     Some(spec) if spec.name != requested => {
-                        let siblings: Vec<String> = robostrudel_gen::map::families()
+                        let siblings: Vec<String> = cycletron_gen::map::families()
                             .iter()
                             .find(|f| f.genres.iter().any(|g| g.name == spec.name))
                             .map(|f| {
@@ -300,26 +300,26 @@ fn tool_generate_pattern(input: &serde_json::Value) -> Result<String, String> {
         "infinity" => {
             let count = input["count"].as_u64().unwrap_or(16) as usize;
             let root = input["root"].as_i64().unwrap_or(60) as i32;
-            Ok(robostrudel_gen::infinity(count, root))
+            Ok(cycletron_gen::infinity(count, root))
         }
         "hexbeat" => {
             let hex = input["hex"].as_str().unwrap_or("a4f2");
-            robostrudel_gen::hexbeat(hex)
+            cycletron_gen::hexbeat(hex)
         }
         "numerals" => {
             let key = input["key"].as_str().unwrap_or("C");
             let numerals = input["numerals"].as_str().unwrap_or("ii V I vi");
-            robostrudel_gen::numerals(key, numerals)
+            cycletron_gen::numerals(key, numerals)
         }
         "palindrome" => {
             let motif = input["motif"].as_str().unwrap_or("c4 e4 g4 b4");
-            Ok(robostrudel_gen::palindrome(motif))
+            Ok(cycletron_gen::palindrome(motif))
         }
         "automaton" => {
             let rule = input["rule"].as_u64().unwrap_or(90).min(255) as u8;
             let width = input["width"].as_u64().unwrap_or(8) as usize;
             let gens = input["gens"].as_u64().unwrap_or(4) as usize;
-            robostrudel_gen::automaton(rule, width, gens)
+            cycletron_gen::automaton(rule, width, gens)
         }
         other => Err(format!(
             "unknown generator '{other}'; supported: genre, infinity, hexbeat, numerals, palindrome, automaton"
@@ -556,7 +556,7 @@ fn tool_genre_recipe(input: &serde_json::Value, state: &AppState) -> Result<Stri
 
 /// Render a recipe as agent-readable markdown-ish text: constraints header,
 /// then each section's prose + playable fragments, then sources.
-fn format_recipe(r: &robostrudel_corpus::Recipe) -> String {
+fn format_recipe(r: &cycletron_corpus::Recipe) -> String {
     use std::fmt::Write;
     let mut s = String::new();
 

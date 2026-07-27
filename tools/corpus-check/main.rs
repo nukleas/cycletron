@@ -1,4 +1,4 @@
-//! Strict validator for the robostrudel curated corpus.
+//! Strict validator for the Cycletron curated corpus.
 //!
 //! Walks `corpus/` and runs every `.strudel` file — and every ```strudel
 //! fragment inside `corpus/genres/*.md` recipes — through the same pipeline
@@ -61,7 +61,7 @@ fn main() -> ExitCode {
     for path in collect_recipe_files(&root) {
         match std::fs::read_to_string(&path) {
             Ok(text) => {
-                for frag in robostrudel_corpus::recipes::extract_strudel_blocks(&text) {
+                for frag in cycletron_corpus::recipes::extract_strudel_blocks(&text) {
                     units.push(Unit {
                         label: format!("{} [{}]", short(&path), frag.label),
                         code: frag.code,
@@ -302,20 +302,17 @@ fn validate(code: &str) -> Result<(), String> {
         }
     }
 
-    if let Ok(out) = strudel_dsl::execute(code) {
-        return require_haps(&out.pattern);
+    match strudel_dsl::eval_dsl_with_tempo(code) {
+        Ok(out) => return require_haps(&out.pattern),
+        Err(dsl_err) => {
+            if let Ok(ast) = strudel_mini::parse(code)
+                && let Ok(pat) = strudel_mini::evaluate(&ast)
+            {
+                return require_haps(&pat);
+            }
+            return Err(dsl_err.to_string());
+        }
     }
-
-    if let Ok(ast) = strudel_mini::parse(code)
-        && let Ok(pat) = strudel_mini::evaluate(&ast)
-    {
-        return require_haps(&pat);
-    }
-
-    Err(match strudel_dsl::execute(code) {
-        Err(e) => e.to_string(),
-        Ok(_) => "pattern did not evaluate".to_string(),
-    })
 }
 
 fn require_haps(pattern: &strudel_core::Pattern) -> Result<(), String> {

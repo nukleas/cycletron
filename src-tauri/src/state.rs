@@ -1,10 +1,10 @@
 use crate::files::Recents;
 use crate::library::{self, LibrarySettings};
 use crate::settings::UserSettings;
-use robostrudel_agent::{ClaudeClient, LlmProvider, OpenAiClient};
-use robostrudel_core::config::AppConfig;
-use robostrudel_core::session::Session;
-use robostrudel_corpus::{InMemoryCorpusIndex, Recipe};
+use cycletron_agent::{ClaudeClient, LlmProvider, OpenAiClient};
+use cycletron_core::config::AppConfig;
+use cycletron_core::session::Session;
+use cycletron_corpus::{InMemoryCorpusIndex, Recipe};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -63,23 +63,22 @@ impl AppState {
     /// `data_dir` is the Tauri-resolved per-app data directory.
     pub fn initialize(&self, data_dir: PathBuf) -> anyhow::Result<()> {
         *self.app_data_dir.lock().unwrap() = Some(data_dir.clone());
+        // Debug: keys go to `{data_dir}/provider-keys.json` (no keychain prompts).
+        // Release: OS keychain. Must run before any get_key/set_key.
+        crate::secrets::init(&data_dir);
 
         // User settings overlay first so the rest of init sees the merged config.
         let mut user = UserSettings::load(&data_dir);
 
-        // Migrate a pre-multiprovider plaintext API key out of settings.json and
-        // into the OS keychain, then persist the blanked settings so the key
-        // never sits in plaintext again.
+        // Migrate a pre-multiprovider plaintext API key out of settings.json.
         if let Some(key) = user.migrate_legacy_anthropic() {
             match crate::secrets::set_key("anthropic", &key) {
                 Ok(()) => {
-                    tracing::info!("migrated plaintext API key into the OS keychain");
+                    tracing::info!("migrated plaintext API key into secrets store");
                     let _ = user.save(&data_dir);
                 }
                 Err(e) => {
-                    // Keep the key in memory (put it back) so AI still works this
-                    // session; don't persist plaintext beyond what already exists.
-                    tracing::warn!("could not migrate API key to keychain: {e}");
+                    tracing::warn!("could not migrate API key into secrets store: {e}");
                     user.anthropic.api_key = Some(key);
                 }
             }
@@ -115,7 +114,7 @@ impl AppState {
             .clone()
             .unwrap_or_else(|| corpus_path.clone())
             .join("genres");
-        let recipes = robostrudel_corpus::recipes::load_recipes(&genres_dir);
+        let recipes = cycletron_corpus::recipes::load_recipes(&genres_dir);
         tracing::info!("loaded {} genre recipe(s) from {}", recipes.len(), genres_dir.display());
         *self.recipes.lock().unwrap() = recipes;
 

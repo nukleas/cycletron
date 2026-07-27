@@ -6,7 +6,7 @@ and everything else the AI era throws at a terminal. The album follows one
 full crisis cycle — badge-in to ship day.
 
 Every track is a single validated `.strudel` file (gated by `corpus-check` +
-`song-check`), loopable by construction, playable in the robostrudel app.
+`song-check`), loopable by construction, playable in the Cycletron app.
 
 ## Tracklist
 

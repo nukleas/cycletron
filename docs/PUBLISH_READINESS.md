@@ -2,7 +2,7 @@
 
 Living notes from the 2026-07 product audit. Update as gates close.
 
-**Status snapshot:** ~55–65% ready for private/alpha release; not yet ready for a broad public “download and use it” launch.
+**Status snapshot:** ~70–75% ready for **private alpha** (docs + CI + license + CSP in place). Still blocked on updater keys, Apple signing, and a green CI run against a real `strudel-rs` token if the engine repo is private.
 
 Related: [PLAN.md](../PLAN.md), [AGENT_FRICTION.md](./AGENT_FRICTION.md), [STRUDEL_RS_SUPPORTED.md](./STRUDEL_RS_SUPPORTED.md).
 
@@ -15,13 +15,13 @@ Related: [PLAN.md](../PLAN.md), [AGENT_FRICTION.md](./AGENT_FRICTION.md), [STRUD
 | Core product / features | **8/10** | Full Tauri app: editor, AI chat, MIDI Lab, export WIP, examples, corpus, viz |
 | Ease of use (power users) | **7/10** | Palette, menus, shortcuts, empty state, quick prompts |
 | Ease of use (new musicians) | **4/10** | Onboarding is setup, not teaching music or the AI workflow |
-| Help / tutorials / docs | **2/10** | Almost no end-user docs; Help → external Strudel docs only |
-| Quality / tests / CI | **5/10** | ~134 Rust unit tests + corpus-check; no CI, no UI tests |
-| Security / privacy | **5/10** | Keychain good; CSP off; no privacy policy; agent telemetry local-only |
-| Distribution / packaging | **3/10** | Bundle config exists; signing/updater/keys incomplete; hard local deps |
-| Legal / licensing | **3/10** | AGPL in Cargo.toml; no LICENSE file, no in-app notice |
+| Help / tutorials / docs | **6/10** | USER_GUIDE + DIALECT + in-app Help; progressive Examples; no video/tour yet |
+| Quality / tests / CI | **6/10** | Unit tests + corpus-check + GitHub Actions; needs live strudel-rs access; no UI e2e |
+| Security / privacy | **7/10** | Keychain; production CSP set; DevTools off; privacy blurb in About |
+| Distribution / packaging | **4/10** | Bundle + licenseFile; updater pubkey empty; signing not done |
+| Legal / licensing | **7/10** | AGPL LICENSE file + About notice; sample-bank audit still open |
 | Cross-platform | **4/10** | macOS-first; Windows/Linux keyring not enabled |
-| Branding / marketing surface | **4/10** | Icons, about modal; no README, site, or release notes |
+| Branding / marketing surface | **6/10** | Cycletron About/README; site/download page still open |
 
 ---
 
@@ -46,12 +46,12 @@ Related: [PLAN.md](../PLAN.md), [AGENT_FRICTION.md](./AGENT_FRICTION.md), [STRUD
 
 ## 3. P0 — must fix before public download
 
-1. **No public product docs** — no root README, user guide, FAQ, keyboard reference, install page. `learning/` empty. Help is setup/logs + external docs only.
-2. **Cannot build from a clean public clone** — hard path deps on sibling `../strudel-rs`; UI WASM needs nightly + that tree.
-3. **Release pipeline incomplete** — version `0.1.0`, updater `pubkey: ""`, `devtools: true`, `csp: null`, no signing/notarization pipeline documented.
-4. **Legal surface missing** — AGPL in Cargo.toml only; no LICENSE file, About attribution, sample-bank notices, privacy blurb (LLM traffic, local telemetry).
-5. **No CI** — no automated `cargo test` / corpus-check / UI build / release artifacts.
-6. **Working tree not release-clean** — large WIP (export/rewrite/optimize), scratch files; ship only from a clean tag.
+1. ~~LICENSE / user docs / privacy blurb / CSP / DevTools off / CI workflow~~ — **Stream D done.**
+2. **Cannot build from a clean public clone** — hard path deps on sibling `../strudel-rs`; UI WASM needs nightly + that tree (document or vendor).
+3. **Release pipeline incomplete** — updater `pubkey: ""`, no Apple signing/notarization yet (see `docs/RELEASE.md`).
+4. **Sample-bank license audit** — bundled Dirt-Samples / soundfonts before wide redistribution.
+5. **Green CI on GitHub** — confirm `STRUDEL_RS_TOKEN` if engine is private; first green run.
+6. **Ship only from a clean tag** — exclude scratch / WIP from release notes.
 
 Cross-platform note: `keyring` is `apple-native` only until Windows/Linux features are enabled.
 
@@ -62,11 +62,11 @@ Cross-platform note: `keyring` is `apple-native` only until Windows/Linux featur
 ### Onboarding
 | Present | Missing |
 |---------|---------|
-| Welcome setup wizard | Guided first song (Play → prompt → edit → save) |
-| Empty editor: Open / New / Examples | In-app tutorial / “what is this language?” |
-| AI quick chips | Clear AI-panel empty state (key required / local model) |
-| Shortcut list in welcome | Persistent Help → Keyboard Shortcuts |
-| Examples list | Progressive lessons on supported DSL only |
+| Welcome setup wizard | Guided first-song wizard (Play → Lesson 1 → AI → save) |
+| Empty editor: Open / New / Examples | — |
+| Help → User Guide / Shortcuts / Dialect | Video / interactive tour |
+| Progressive Examples (lessons → patterns → showcase) | Wire Agency full tracks into library “Demos” folder at install |
+| AI welcome copy (Play first) | Clearer empty state when no API key |
 
 ### Help system (target)
 1. Product user guide (AI operator, eval/play, library, MIDI, export).
@@ -95,13 +95,13 @@ Cross-platform note: `keyring` is `apple-native` only until Windows/Linux featur
 ## 5. Ship gates
 
 ### Gate A — Private alpha
-1. Root README (what / screenshots / API key or Ollama / first 60s).
-2. LICENSE + About attribution.
-3. User quickstart (`docs/USER_GUIDE.md` or in-app Help).
-4. Signed macOS build (updater optional).
-5. Tag `v0.1.0-alpha` from clean tree.
-6. CI: test + corpus-check + UI typecheck/build.
-7. Privacy one-liner: patterns/prompts go to chosen AI provider; keys in keychain.
+1. ~~Root README~~  
+2. ~~LICENSE + About attribution + privacy~~  
+3. ~~User quickstart (`docs/USER_GUIDE.md` / in-app Help)~~  
+4. Signed macOS build (updater optional) — **owner**  
+5. Tag `v0.1.0-alpha` from clean tree — **owner**  
+6. ~~CI workflow (test + corpus-check + UI typecheck)~~ — confirm green  
+7. ~~Privacy one-liner~~
 
 ### Gate B — Public beta
 1. In-app 3–5 step tutorial that makes sound.
@@ -142,7 +142,7 @@ Cross-platform note: `keyring` is `apple-native` only until Windows/Linux featur
 | GitHub / handle (cross-project) | **nukleas** (and related) | Org/username — not the consumer app name |
 | Pattern engine (About/docs) | **strudel-rs** | Technical credit only |
 | Pattern dialect (docs) | Strudel-compatible mini-notation | Interop label, not product brand |
-| Legacy codename | Robostrudel | Internal / old repo strings until rename lands |
+| Legacy codename | Robostrudel | Retired — crates renamed to `cycletron-*` |
 
 **Working taglines**
 
@@ -175,7 +175,7 @@ Cross-platform note: `keyring` is `apple-native` only until Windows/Linux featur
 | Studio | NaderLabs | Parent site, “a NaderLabs project” |
 | Bundle id (target) | `com.nukleas.cycletron` or `io.naderlabs.cycletron` | Freeze before first signed public build |
 | File extension | keep `.strudel` for interop | Optional later dual ext |
-| Keychain service (target) | `cycletron` | Migrate with settings if changing from `robostrudel` |
+| Keychain service | `cycletron` | Old builds used `robostrudel` — re-enter keys once |
 
 ### Availability snapshot (2026-07-26)
 
@@ -189,15 +189,11 @@ Cross-platform note: `keyring` is `apple-native` only until Windows/Linux featur
 | npm / pypi `cycletron` | Free | Claim if publishing packages |
 | cyclotron.* | Avoid | Conflicting AI consultancy brand |
 
-### Rename surface (when implementing)
+### Rename surface
 
-**User-visible:** `productName`, window title, About, welcome, menus, updater, notifications, tray, AI welcome copy.
+**Done (Streams A + E):** user-visible Cycletron everywhere; crates `cycletron-{core,agent,corpus,gen,analysis}` + `cycletron-app`; log targets `cycletron::*`; keychain `cycletron`; bundle id `com.nukleas.cycletron`.
 
-**Technical (harder later):** crate names (`robostrudel-*` → optional later), bundle `identifier`, keychain service, app data dir, updater GitHub URL, repo name (redirects OK).
-
-**Low urgency:** prompts, corpus READMEs, AGENTS.md.
-
-Prefer freezing **display name + bundle id + keychain** before Gate A signed alpha. Internal crate paths can lag.
+**Historical only:** `_references/` research notes may mention the old codename; keychain migration from service `robostrudel`.
 
 ### Messaging cheat-sheet
 
@@ -213,18 +209,21 @@ Prefer freezing **display name + bundle id + keychain** before Gate A signed alp
 | 2026-07-26 | Product rename under consideration | Avoid Strudel* consumer brand; keep strudel-rs |
 | 2026-07-26 | **Working product name: Cycletron** | Not Cyclotron (consultancy collision). Parent: **NaderLabs** / naderlabs.io music side-quest. Nukleas stays handle/org, not app name. |
 | 2026-07-26 | Domains | Prefer naderlabs.io/music/cycletron as canonical; optional cycletron.* vanity → redirect. Grab alternates if cheap. |
-| 2026-07-26 | **GitHub home: `nukleas/cycletron`** | Product branding + README; private repo under @nukleas. Legacy `nukleas/robostrudel` may remain as archive. Bundle id `com.nukleas.cycletron`. |
+| 2026-07-26 | **GitHub home: `nukleas/cycletron`** | Product branding + README; private repo under @nukleas. Bundle id `com.nukleas.cycletron`. |
+| 2026-07-26 | **Stream E: crate rename** | `robostrudel-*` → `cycletron-*` (dirs, packages, Rust crate ids, docs). |
 
 ---
 
 ## 7. Immediate next work (suggested order)
 
-1. **Brand freeze follow-through:** claim free Cycletron handles/domains if desired; sketch naderlabs.io/music/cycletron page.  
-2. Gate A docs under Cycletron name: README, LICENSE, USER_GUIDE, privacy one-liner.  
-3. Build story: document or vendor strudel-rs; CI green.  
-4. Signed private alpha as **Cycletron** (display name at minimum).  
-5. Gate B tutorial + help + updater.  
-6. Code rename pass (UI strings → bundle id) when ready — not blocking private alpha if display name is Cycletron.
+1. ~~Stream A~~ brand freeze  
+2. ~~Stream B~~ materials / Help  
+3. ~~Stream D / Gate A plumbing~~ LICENSE, privacy, CSP, DevTools off, Cargo.lock, CI, RELEASE.md, strudel-rs API fix  
+4. Generate updater keypair + paste pubkey; Apple sign alpha DMG  
+5. Confirm CI green (strudel-rs token if private)  
+6. Vendor/document strudel-rs for clean clones  
+7. Gate B+: guided tour, working auto-updater, sample license audit  
+8. ~~Stream E~~ crate rename `robostrudel-*` → `cycletron-*`
 
 ---
 
@@ -234,3 +233,7 @@ Prefer freezing **display name + bundle id + keychain** before Gate A signed alp
 |------|--------|
 | 2026-07-26 | Initial audit notes + branding/naming section from publish-readiness review |
 | 2026-07-26 | Locked working product name **Cycletron** under **NaderLabs**; availability + site placement notes |
+| 2026-07-26 | **Stream A:** fixed `build:wasm` out-dir → `cycletron/ui/pkg`; tray/MIDI/log branding; CLAUDE/AGENTS aligned; PLAN.md archived banner; frontmatter test tag match |
+| 2026-07-26 | **Stream B:** `docs/USER_GUIDE.md` + `DIALECT.md`; in-app Help modal; progressive Examples (lessons/patterns/showcase); .js songs → .strudel; DnB dedupe; About → CYCLETRON |
+| 2026-07-26 | **Stream D:** AGPL `LICENSE`; About privacy; CSP + `devtools: false`; track `Cargo.lock`; CI workflow; `docs/RELEASE.md`; restore `execute` cascade for current strudel-rs |
+| 2026-07-26 | **Stream E:** full crate/path rename `robostrudel-*` → `cycletron-*` |

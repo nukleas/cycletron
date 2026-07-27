@@ -130,7 +130,7 @@ export class PreferencesModal {
             ]);
             this.loaded = settings;
             // AI: seed the in-memory provider map, select the active provider,
-            // and paint its fields. Keys are write-only (kept in the keychain),
+            // and paint its fields. Keys are write-only (secrets store),
             // so the key input starts empty and a status line reports whether one
             // exists.
             this.llm = normalizeLlm(settings.llm);
@@ -246,7 +246,7 @@ export class PreferencesModal {
         this.llm.active = this.currentProviderId;
         return {
             llm: this.llm,
-            // Legacy block, now always empty — keys live in the keychain.
+            // Legacy block, now always empty — keys live in the secrets store.
             anthropic: {api_key: null, model: null, max_tokens: null},
             audio: {
                 default_tempo: numOrNull(this.defaultTempo),
@@ -421,7 +421,7 @@ export class PreferencesModal {
         if (!isTauri) return;
         try {
             const next = this.collect();
-            // Persist a newly-typed key into the keychain first, so the client
+            // Persist a newly-typed key into the secrets store first, so the client
             // rebuild inside set_user_settings picks it up. Empty = leave as-is.
             const typedKey = (this.apiKey?.value ?? '').trim();
             if (typedKey.length > 0) {

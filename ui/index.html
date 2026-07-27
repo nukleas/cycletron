@@ -337,7 +337,7 @@
                         <span>API key</span>
                         <input type="password" id="welcomeApiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
                     </label>
-                    <p class="prefs-note" id="welcomeProviderNote">Stored securely in your OS keychain. Leave blank to read the provider's key from the environment instead.</p>
+                    <p class="prefs-note" id="welcomeProviderNote">Stored locally by Cycletron (not in chat). Leave blank to use the provider env var instead.</p>
                 </div>
                 <div class="welcome-step" data-step="2" hidden>
                     <h3>Library location</h3>
@@ -349,8 +349,8 @@
                 </div>
                 <div class="welcome-step" data-step="3" hidden>
                     <h3>You're all set</h3>
-                    <p>The cyan panel on the left is the AI Operator; the next one is your file system. The toolbar above the editor has Record, MIDI Lab, and History.</p>
-                    <p>If anything breaks, Help → Show Logs gives you a copy-and-paste diagnostic dump for bug reports.</p>
+                    <p>Press <strong>Play</strong>, open <strong>Examples</strong>, and load <strong>Lesson 1</strong>. The left panel is the AI Operator; Files is your library.</p>
+                    <p>Help → User Guide, Keyboard Shortcuts, and Dialect cover the rest. If anything breaks, Help → Show Logs for a diagnostic dump.</p>
                 </div>
             </div>
             <div class="app-modal-actions welcome-actions">
@@ -409,6 +409,27 @@
         </div>
     </div>
 
+    <!-- Help modal (User Guide / Shortcuts / Dialect) -->
+    <div id="helpModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window app-modal-window--wide" role="document">
+            <div class="app-modal-header">
+                <span id="helpTitle">Help</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div id="helpTabs" class="help-tabs" role="tablist">
+                <button type="button" class="help-tab help-tab--active" data-help-section="guide">User Guide</button>
+                <button type="button" class="help-tab" data-help-section="shortcuts">Shortcuts</button>
+                <button type="button" class="help-tab" data-help-section="dialect">Dialect</button>
+            </div>
+            <div id="helpBody" class="help-body"></div>
+            <div class="app-modal-actions">
+                <span class="app-modal-spacer"></span>
+                <button data-dismiss class="app-modal-primary">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- About modal -->
     <div id="aboutModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
         <div class="app-modal-backdrop" data-dismiss></div>
@@ -418,15 +439,20 @@
                 <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
             </div>
             <div class="about-modal-body">
-                <div class="about-logo">ROBO<span class="about-logo-accent">STRUDEL</span></div>
-                <div class="about-tagline">AI-first strudel music engine</div>
+                <div class="about-logo">CYCLE<span class="about-logo-accent">TRON</span></div>
+                <div class="about-tagline">AI-native live coding for music</div>
+                <p class="about-credit">A NaderLabs project · engine: strudel-rs</p>
+                <p class="about-license">Licensed under AGPL-3.0-or-later</p>
+                <p class="about-privacy">Privacy: prompts and pattern text go to the AI provider you choose. API keys stay on this machine. Local logs and agent stats are not uploaded.</p>
                 <dl class="about-grid">
                     <dt>Version</dt><dd id="aboutVersion">—</dd>
                     <dt>Identifier</dt><dd id="aboutIdentifier">—</dd>
                     <dt>Tauri</dt><dd id="aboutTauri">—</dd>
                 </dl>
                 <div class="about-links">
-                    <button id="aboutDocsBtn" class="app-modal-link">Strudel Docs</button>
+                    <button id="aboutGuideBtn" class="app-modal-link">User Guide</button>
+                    <button id="aboutDialectBtn" class="app-modal-link">Dialect</button>
+                    <button id="aboutDocsBtn" class="app-modal-link">Strudel Docs (web)</button>
                     <button id="aboutCheckUpdates" class="app-modal-link">Check for Updates</button>
                 </div>
             </div>

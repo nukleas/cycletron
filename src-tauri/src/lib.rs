@@ -25,7 +25,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use rust_embed::RustEmbed;
+use rust_embed::Embed;
 use state::AppState;
 use tauri::Manager;
 use tauri::async_runtime;
@@ -38,7 +38,7 @@ use tracing_subscriber::util::SubscriberInitExt as _;
 /// Embeds the production frontend (`ui/dist`) at compile time.
 /// This lets us serve it from a real `http://127.0.0.1` origin in production,
 /// which is required for WebKit to expose SharedArrayBuffer + Atomics.
-#[derive(RustEmbed)]
+#[derive(Embed)]
 #[folder = "$CARGO_MANIFEST_DIR/../ui/dist"]
 struct FrontendAssets;
 
@@ -128,7 +128,7 @@ pub fn run() {
     // so the in-app Logs modal can show recent activity without reaching
     // out to the OS log facility.
     let filter = EnvFilter::from_default_env()
-        .add_directive("robostrudel=debug".parse().unwrap());
+        .add_directive("cycletron=debug".parse().unwrap());
     let fmt_layer = tracing_subscriber::fmt::layer().with_writer(std::io::stderr);
     tracing_subscriber::registry()
         .with(filter)
@@ -156,12 +156,12 @@ pub fn run() {
         .manage(tray::TrayStateHolder::new())
         .manage(midi_input::MidiInputState::new())
         .setup(|app| {
-            // Resolve the app data dir (e.g. ~/Library/Application Support/com.nukleas.robostrudel)
+            // Resolve the app data dir (e.g. ~/Library/Application Support/com.nukleas.cycletron)
             // and hand it to AppState so recents + session snapshots can persist.
             let data_dir = app
                 .path()
                 .app_data_dir()
-                .unwrap_or_else(|_| std::env::temp_dir().join("robostrudel"));
+                .unwrap_or_else(|_| std::env::temp_dir().join("cycletron"));
             if let Err(e) = std::fs::create_dir_all(&data_dir) {
                 tracing::warn!("could not create app data dir {}: {e}", data_dir.display());
             }

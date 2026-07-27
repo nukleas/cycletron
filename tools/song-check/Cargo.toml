@@ -8,4 +8,4 @@ name = "song-check"
 path = "main.rs"
 
 [dependencies]
-robostrudel-analysis = { workspace = true }
+cycletron-analysis = { workspace = true }

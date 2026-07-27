@@ -53,7 +53,7 @@ class WelcomeModal {
         if (this.providerNote) {
             const extra = preset?.note ? ` ${preset.note}` : '';
             this.providerNote.textContent =
-                `Stored securely in your OS keychain. Leave blank to read the provider's key from the environment instead.${extra}`;
+                `Stored locally by Cycletron (not in chat). Leave blank to use the provider env var instead.${extra}`;
         }
     }
 
@@ -112,7 +112,7 @@ class WelcomeModal {
         const apiKey = this.apiKeyInput?.value.trim() || '';
         if (this.settings && isTauri) {
             try {
-                // Key goes to the OS keychain, not settings.json.
+                // Key goes to secrets store (dev file / release keychain), not settings.json.
                 if (apiKey.length > 0) {
                     await invoke<void>('set_provider_key', {provider, key: apiKey});
                 }

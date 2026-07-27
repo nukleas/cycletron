@@ -1,4 +1,4 @@
-# Recommendations for Robostrudel — prioritized
+# Recommendations for Cycletron — prioritized
 
 Synthesized from docs 01–04. Ordered by leverage-to-effort. Each item notes the touchpoint in
 the existing codebase so it stays grounded.
@@ -22,7 +22,7 @@ small) into a Rust generation module and (a) expose select ones to the agent loo
 Tag each curated `.strudel` by *technique* (euclidean, markov, serial-transform,
 numeral-progression, microtonal, cellular…), not just category, so the agent can retrieve by
 method. Sharpens few-shot grounding cheaply.
-- **Touchpoints:** `crates/robostrudel-corpus/` (index/search), corpus file frontmatter.
+- **Touchpoints:** `crates/cycletron-corpus/` (index/search), corpus file frontmatter.
 
 ### 3. Align `s("…")` vocabulary with Dirt-Samples names
 Make the agent speak the names users expect (`bd sd hh cp arpy jvbass …`). Audit current
@@ -58,7 +58,7 @@ prompt and corpus-acceptance criteria (Mercury's 30-line visible-performance eth
 - **Pull from:** doc 03. **Touchpoints:** `prompts/`, corpus-curation guidelines.
 
 ### 8. Visualizer cross-pollination (Hydra / Punctual)
-Robostrudel already has visualizers (`ui/visualizer.ts`, fullscreen modes). Hydra and Punctual
+Cycletron already has visualizers (`ui/visualizer.ts`, fullscreen modes). Hydra and Punctual
 are the reference audiovisual languages — mine for reactive-visual ideas and possibly a
 pattern→visual binding.
 - **Pull from:** doc 01. **Touchpoints:** `ui/visualizer.ts`.

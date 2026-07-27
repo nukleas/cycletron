@@ -79,7 +79,7 @@ impl Default for MidiInputState {
 /// Enumerate the currently available MIDI input devices.
 #[tauri::command]
 pub async fn list_midi_input_devices() -> Result<Vec<MidiDeviceInfo>, String> {
-    let midi_in = MidiInput::new("robostrudel-input-list")
+    let midi_in = MidiInput::new("cycletron-input-list")
         .map_err(|e| format!("Failed to create MIDI input: {e}"))?;
 
     let ports = midi_in.ports();
@@ -112,7 +112,7 @@ pub async fn start_midi_input_listening(
     }
 
     // Probe for ports up front so we can report "nothing connected" cleanly.
-    let probe = MidiInput::new("robostrudel-input")
+    let probe = MidiInput::new("cycletron-input")
         .map_err(|e| format!("Failed to create MIDI input: {e}"))?;
     let ports = probe.ports();
     if ports.is_empty() {
@@ -148,7 +148,7 @@ pub async fn start_midi_input_listening(
 
     for (idx, device_name) in ports_to_connect {
         // `connect` consumes the `MidiInput`, so each port needs a fresh one.
-        let midi_in = MidiInput::new(&format!("robostrudel-input-{idx}"))
+        let midi_in = MidiInput::new(&format!("cycletron-input-{idx}"))
             .map_err(|e| format!("Failed to create MIDI input: {e}"))?;
         let ports = midi_in.ports();
         let port = ports
@@ -161,7 +161,7 @@ pub async fn start_midi_input_listening(
         let conn = midi_in
             .connect(
                 port,
-                &format!("robostrudel-midi-in-{idx}"),
+                &format!("cycletron-midi-in-{idx}"),
                 move |_timestamp, message, _| {
                     if let Some(evt) = parse_midi_message(message, &device_name_clone) {
                         let _ = app_handle_clone.emit("midi-input", evt);

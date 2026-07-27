@@ -2,7 +2,7 @@
 
 Source: <https://github.com/toplap/awesome-livecoding> (captured 2026-06-05).
 This is an archive of the list, lightly reorganized. Inactive projects are marked.
-Robostrudel-relevant entries are flagged with **⭐**.
+Cycletron-relevant entries are flagged with **⭐**.
 
 ## Audio-focused languages
 
@@ -53,7 +53,7 @@ Robostrudel-relevant entries are flagged with **⭐**.
 - **Overtone** — audio env via SuperCollider/Clojure. http://overtone.github.io/
 - **Pure Data** — visual sound/graphics programming. https://puredata.info/
 
-## Libraries & tools (selected, Robostrudel-relevant)
+## Libraries & tools (selected, Cycletron-relevant)
 
 - **total-serialism** ⭐ — algorithmic-composition toolkit (JS). https://tmhglnd.github.io/total-serialism/
 - **isobar** ⭐ — Python composition/pattern library. https://github.com/ideoforms/isobar

@@ -1440,8 +1440,8 @@ button.danger:hover:not(:disabled) {
 }
 
 .ex-modal {
-    width: min(480px, 90vw);
-    max-height: min(420px, 70vh);
+    width: min(520px, 92vw);
+    max-height: min(520px, 80vh);
     background: var(--bg-light);
     border: 1px solid var(--neon-subtle);
     border-radius: 0;
@@ -1449,6 +1449,47 @@ button.danger:hover:not(:disabled) {
     flex-direction: column;
     overflow: hidden;
     box-shadow: 0 0 40px rgba(125, 249, 255, 0.08), 0 0 80px rgba(0, 0, 0, 0.5);
+}
+
+.ex-tip {
+    margin: 0;
+    padding: 6px 12px 4px;
+    font-size: 10px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--neon-subtle);
+}
+
+.ex-tip kbd {
+    font-size: 9px;
+    padding: 1px 4px;
+    border: 1px solid var(--neon-subtle);
+    color: var(--neon);
+}
+
+.ex-section {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 8px;
+}
+
+.ex-section-label {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--magenta, #ff6ec7);
+    padding: 6px 10px 2px;
+}
+
+.ex-lesson {
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--neon);
+    padding: 1px 5px;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
 }
 
 .ex-header {
@@ -1535,7 +1576,7 @@ button.danger:hover:not(:disabled) {
     font-size: 11px;
     font-weight: 600;
     color: var(--text);
-    text-transform: capitalize;
+    text-transform: none;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -3671,6 +3712,131 @@ body.is-drop-target::after {
     text-align: center;
     color: var(--text-secondary);
 }
+/* ── Help modal ─────────────────────────────────────────── */
+.help-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--neon-subtle);
+    padding: 0 12px;
+}
+.help-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 10px 12px;
+    cursor: pointer;
+}
+.help-tab:hover { color: var(--neon); }
+.help-tab--active {
+    color: var(--neon);
+    border-bottom-color: var(--neon);
+}
+.help-body {
+    padding: 14px 16px 8px;
+    max-height: min(420px, 60vh);
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text);
+}
+.help-lead {
+    margin: 0 0 12px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+.help-h {
+    margin: 14px 0 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--neon);
+}
+.help-list {
+    margin: 0 0 8px 1.1em;
+    padding: 0;
+}
+.help-list li { margin-bottom: 4px; }
+.help-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+}
+.help-table td {
+    padding: 4px 8px 4px 0;
+    vertical-align: top;
+    border-bottom: 1px solid rgba(125, 249, 255, 0.06);
+}
+.help-keys { width: 7em; white-space: nowrap; }
+.help-keys kbd {
+    font-size: 11px;
+    color: var(--neon);
+    border: 1px solid var(--neon-subtle);
+    padding: 1px 6px;
+}
+.help-rule {
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(125, 249, 255, 0.06);
+}
+.help-code-label {
+    margin: 6px 0 2px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--neon);
+}
+.help-code-label--bad { color: var(--magenta, #ff6ec7); }
+.help-code {
+    margin: 0;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--neon-subtle);
+    font-size: 11px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    color: var(--text);
+}
+.help-code--bad { border-color: rgba(255, 110, 199, 0.35); }
+.help-foot {
+    margin: 16px 0 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.help-foot code {
+    font-size: 10px;
+    color: var(--neon);
+}
+
+.about-credit {
+    margin: 0 0 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+}
+.about-license {
+    margin: 0 0 8px;
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.about-privacy {
+    margin: 0 auto 12px;
+    max-width: 320px;
+    font-size: 10px;
+    line-height: 1.45;
+    color: var(--text-muted);
+    text-align: center;
+}
+
 .about-logo {
     font-size: 18px;
     font-weight: 800;
@@ -3700,8 +3866,9 @@ body.is-drop-target::after {
 .about-grid dd { color: var(--neon); font-weight: 700; word-break: break-all; }
 .about-links {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
-    gap: 10px;
+    gap: 8px;
     margin-top: 8px;
 }
 .app-modal-link {

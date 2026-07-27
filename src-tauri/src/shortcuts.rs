@@ -1,4 +1,4 @@
-//! System-wide global shortcuts. These fire even when Robostrudel is not
+//! System-wide global shortcuts. These fire even when Cycletron is not
 //! the focused app — useful for live-performance transport control.
 //!
 //! The Rust side translates accelerator presses into `shortcut:*` events

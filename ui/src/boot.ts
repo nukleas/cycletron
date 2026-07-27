@@ -18,6 +18,7 @@ import {soundsBrowser} from './sounds-browser.js';
 import {fileExplorer} from './file-explorer.js';
 import {midiLab} from './midi-lab.js';
 import {aboutModal} from './about-modal.js';
+import {helpModal} from './help-modal.js';
 import {preferencesModal} from './preferences.js';
 import {audioRecorder} from './audio-recorder.js';
 import {commandPalette} from './command-palette.js';
@@ -147,6 +148,7 @@ async function boot(): Promise<void> {
     // parallel init below completes.
     midiLab.init();
     aboutModal.init();
+    helpModal.init();
     preferencesModal.init();
     audioRecorder.init();
     commandPalette.init();

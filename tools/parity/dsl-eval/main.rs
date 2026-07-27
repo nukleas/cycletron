@@ -77,7 +77,7 @@ fn eval_code(code: &str) -> strudel_core::Pattern {
 
     if looks_like_dsl {
         // Try DSL eval (handles method chains, function calls)
-        if let Ok(output) = strudel_dsl::execute(code) {
+        if let Ok(output) = strudel_dsl::eval_dsl_with_tempo(code) {
             return output.pattern;
         }
         // Try strudel file parse (multi-track with directives)
@@ -101,7 +101,7 @@ fn eval_code(code: &str) -> strudel_core::Pattern {
 
     // Fall back to DSL if we haven't tried it yet
     if !looks_like_dsl {
-        if let Ok(output) = strudel_dsl::execute(code) {
+        if let Ok(output) = strudel_dsl::eval_dsl_with_tempo(code) {
             return output.pattern;
         }
         if let Ok(file) = strudel_dsl::parse_strudel_file(code) {
@@ -111,7 +111,7 @@ fn eval_code(code: &str) -> strudel_core::Pattern {
         }
     }
 
-    let err = match strudel_dsl::execute(code) {
+    let err = match strudel_dsl::eval_dsl_with_tempo(code) {
         Err(e) => e.to_string(),
         Ok(_) => "unknown evaluation error".to_string(),
     };

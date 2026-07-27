@@ -1,7 +1,8 @@
 # Rust / Cargo
 **/target/
 **/*.rs.bk
-Cargo.lock
+# Track the root Cargo.lock for reproducible app builds (Gate A).
+# Nested lockfiles under tools/ remain untracked if created.
 
 # Node / Frontend
 **/node_modules/

@@ -8,4 +8,4 @@ name = "gen-pattern"
 path = "main.rs"
 
 [dependencies]
-robostrudel-gen = { workspace = true }
+cycletron-gen = { workspace = true }

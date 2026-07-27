@@ -1,5 +1,5 @@
 /**
- * Fullscreen Immersive Visualizations for Robostrudel
+ * Fullscreen Immersive Visualizations for Cycletron
  *
  * Music-reactive canvas modes intended for large-screen / live-performance use.
  * Two flavors:

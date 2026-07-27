@@ -8,8 +8,8 @@ use crate::snapshots::{self, Snapshot};
 use crate::state::AppState;
 use crate::strudel;
 use midi_to_strudel::{InstrumentMode, SectionNamingStrategy, drums::DrumBank};
-use robostrudel_core::traits::CorpusIndex;
-use robostrudel_core::types::*;
+use cycletron_core::traits::CorpusIndex;
+use cycletron_core::types::*;
 use serde::Deserialize;
 use std::path::PathBuf;
 use tauri::{Emitter, Manager, State};
@@ -127,7 +127,7 @@ pub fn critique_form(code: String, cycles: Option<usize>) -> Result<strudel::Cri
 pub fn genre_recipe(
     genre: Option<String>,
     state: State<'_, AppState>,
-) -> Result<Vec<robostrudel_corpus::Recipe>, String> {
+) -> Result<Vec<cycletron_corpus::Recipe>, String> {
     let recipes = state.recipes.lock().unwrap();
     match genre {
         Some(q) if !q.trim().is_empty() => {
@@ -164,14 +164,14 @@ pub fn get_corpus_source(id: String, state: State<'_, AppState>) -> Result<Strin
 #[tauri::command]
 pub fn get_pattern_history(
     state: State<'_, AppState>,
-) -> Vec<robostrudel_core::session::PatternEntry> {
+) -> Vec<cycletron_core::session::PatternEntry> {
     let session = state.session.lock().unwrap();
     session.pattern_history.clone()
 }
 
 /// Get current config.
 #[tauri::command]
-pub fn get_config(state: State<'_, AppState>) -> robostrudel_core::config::AppConfig {
+pub fn get_config(state: State<'_, AppState>) -> cycletron_core::config::AppConfig {
     state.config.lock().unwrap().clone()
 }
 
@@ -182,7 +182,7 @@ pub fn clear_session(state: State<'_, AppState>) -> Result<(), String> {
     let tempo = config.audio.default_tempo;
     drop(config);
     let mut session = state.session.lock().unwrap();
-    *session = robostrudel_core::session::Session::new(tempo);
+    *session = cycletron_core::session::Session::new(tempo);
     Ok(())
 }
 
@@ -722,8 +722,9 @@ pub fn set_user_settings(
     Ok(())
 }
 
-/// Store (or clear, when `key` is empty) a provider's API key in the OS
-/// keychain, then rebuild the client so the change takes effect immediately.
+/// Store (or clear, when `key` is empty) a provider's API key, then rebuild
+/// the client so the change takes effect immediately.
+/// Debug: app-data file. Release: OS keychain.
 /// `provider` is the provider id: `"anthropic"`, `"grok"`, `"openai"`, etc.
 #[tauri::command]
 pub fn set_provider_key(
@@ -736,8 +737,8 @@ pub fn set_provider_key(
     Ok(())
 }
 
-/// Whether a usable key exists for `provider` (keychain or env fallback). The
-/// key value itself is never returned to the frontend.
+/// Whether a usable key exists for `provider` (stored secret or env fallback).
+/// The key value itself is never returned to the frontend.
 #[tauri::command]
 pub fn has_provider_key(provider: String) -> bool {
     crate::secrets::has_key(&provider)
@@ -818,12 +819,12 @@ pub fn clear_logs() {
 /// console isn't visible.
 #[tauri::command]
 pub fn log_diagnostic(level: String, target: String, message: String) {
-    let tgt = if target.is_empty() { "robostrudel::frontend".to_string() } else { target };
+    let tgt = if target.is_empty() { "cycletron::frontend".to_string() } else { target };
     match level.as_str() {
-        "error" => tracing::error!(target: "robostrudel::frontend", source = %tgt, "{}", message),
-        "warn" => tracing::warn!(target: "robostrudel::frontend", source = %tgt, "{}", message),
-        "debug" => tracing::debug!(target: "robostrudel::frontend", source = %tgt, "{}", message),
-        _ => tracing::info!(target: "robostrudel::frontend", source = %tgt, "{}", message),
+        "error" => tracing::error!(target: "cycletron::frontend", source = %tgt, "{}", message),
+        "warn" => tracing::warn!(target: "cycletron::frontend", source = %tgt, "{}", message),
+        "debug" => tracing::debug!(target: "cycletron::frontend", source = %tgt, "{}", message),
+        _ => tracing::info!(target: "cycletron::frontend", source = %tgt, "{}", message),
     }
 }
 

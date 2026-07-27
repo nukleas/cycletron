@@ -1,5 +1,5 @@
 /**
- * File lifecycle for robostrudel: New / Open / Save / Save As / Recents.
+ * File lifecycle for Cycletron: New / Open / Save / Save As / Recents.
  *
  * Sits between the native dialog plugin and the Tauri file commands.
  * The editor is the authoritative buffer — we pull code from it on save

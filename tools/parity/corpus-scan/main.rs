@@ -1,7 +1,7 @@
 //! Scan the strudel corpus against strudel-rs's DSL/mini evaluators.
 //!
 //! Walks a corpus directory, runs each pattern through the same
-//! validation pipeline `robostrudel_app::strudel::validate_code` uses,
+//! validation pipeline `cycletron_app::strudel::validate_code` uses,
 //! classifies failures, and emits:
 //!   - parity-report.jsonl  — one row per file
 //!   - parity-summary.md    — top error categories
@@ -149,8 +149,8 @@ fn try_evaluate(code: &str) -> Result<&'static str, (&'static str, String)> {
         }
     }
 
-    // 2. execute — DSL with optional tempo prefix (was eval_dsl_with_tempo).
-    if strudel_dsl::execute(code).is_ok() {
+    // 2. DSL with optional tempo (setbpm/setcpm).
+    if strudel_dsl::eval_dsl_with_tempo(code).is_ok() {
         return Ok("dsl-with-tempo");
     }
 
@@ -161,8 +161,8 @@ fn try_evaluate(code: &str) -> Result<&'static str, (&'static str, String)> {
         return Ok("mini");
     }
 
-    // 4. Bare execute — most likely source of the useful error message.
-    let err = match strudel_dsl::execute(code) {
+    // 4. Surface the DSL error as the most useful diagnostic.
+    let err = match strudel_dsl::eval_dsl_with_tempo(code) {
         Err(e) => e.to_string(),
         Ok(_) => "pattern did not evaluate (all paths exhausted)".to_string(),
     };

@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn within_blocks_traversal() {
-        let tmp = std::env::temp_dir().join("robostrudel_lib_test_root");
+        let tmp = std::env::temp_dir().join("cycletron_lib_test_root");
         let _ = fs::create_dir_all(&tmp);
         assert!(within(&tmp, &tmp.join("foo.strudel")));
         assert!(within(&tmp, &tmp.join("sub").join("bar.strudel")));
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn list_excludes_hidden_and_unknown_extensions() {
-        let dir = std::env::temp_dir().join("robostrudel_lib_test_list");
+        let dir = std::env::temp_dir().join("cycletron_lib_test_list");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join(".hidden.strudel"), "").unwrap();

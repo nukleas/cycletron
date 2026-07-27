@@ -1,16 +1,16 @@
 # Sounds & samples — current state + desktop opportunities
 
-Research into how Strudel proper handles instruments/samples vs. how robostrudel does today,
+Research into how Strudel proper handles instruments/samples vs. how cycletron does today,
 and where **desktop power** (Tauri = local filesystem, native decoding, bundling, no CORS)
 changes what's possible. Captured 2026-06-05.
 
 Sources: strudel.cc [Samples](https://strudel.cc/learn/samples/),
-[Sounds](https://strudel.cc/learn/sounds/); engine source in `../strudel-rs`; robostrudel
+[Sounds](https://strudel.cc/learn/sounds/); engine source in `../strudel-rs`; cycletron
 `ui/` + `docs/STRUDEL_RS_SUPPORTED.md` §5–6.
 
 ---
 
-## 1. What robostrudel has today
+## 1. What cycletron has today
 
 ### Synths (15, pure-Rust DSP) — solid
 Defined in `../strudel-rs/crates/strudel-dsp/src/lib.rs` (`SynthKind`, ~L266–319), rendered in
@@ -24,7 +24,7 @@ The gap is **melodic/acoustic instruments** — there are no piano/strings/guita
 
 ### Samples — minimal, HTTP-sourced
 - Engine bundles only **bd/sd/hh/cp** `.wav` (`strudel-audio/assets/samples/`, `include_bytes!`).
-- robostrudel loads **12 drum names on startup** (`bd sd sn hh cp oh ht mt lt cr cb rs`) over
+- cycletron loads **12 drum names on startup** (`bd sd sn hh cp oh ht mt lt cr cb rs`) over
   HTTP from `raw.githubusercontent.com/tidalcycles/Dirt-Samples` — `ui/sample-loader.ts`
   (`loadEssentialDrums`, also `loadTR808`/`loadTR909`), called from `ui/src/app.ts` startup.
 - Sample name → sound: `SoundId::classify()` treats any non-synth name as a sample bank;
@@ -39,7 +39,7 @@ audio into the DSP engine with pitch/loop/zone metadata — is **done**.
 
 ### Soundfonts — engine support exists, UI not wired
 `../strudel-rs/crates/strudel-soundfont` + `patternhandle.queryMissingBanks()` support SF2/WAF,
-but **robostrudel never loads the SF2/WAF data** (per DSL doc §6). This is the single biggest
+but **cycletron never loads the SF2/WAF data** (per DSL doc §6). This is the single biggest
 latent capability.
 
 ---
@@ -64,7 +64,7 @@ latent capability.
   instruments** into the `s()` namespace, generated from `GeneralUserGS.sf2` / `FluidR3.sf2`.
   This is how web-strudel gets piano, strings, brass, etc.
 
-robostrudel's loader already mirrors the `strudel.json` → decode → register flow, so it can
+cycletron's loader already mirrors the `strudel.json` → decode → register flow, so it can
 consume the same maps **today** with minimal work.
 
 ---

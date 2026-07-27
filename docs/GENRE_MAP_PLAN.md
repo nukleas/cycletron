@@ -79,19 +79,19 @@ Rough params (bpm · drum archetype · mood) to seed the specs. ✓ = already co
 ## Phases
 
 - **Phase 0 — Foundation. ✅ DONE (2026-07-12).** `GenreSpec` + `compose_from_spec(spec, seed)`
-  in `crates/robostrudel-gen/src/spec.rs` / `compose.rs`; the archetype library
+  in `crates/cycletron-gen/src/spec.rs` / `compose.rs`; the archetype library
   (19 drum archetypes incl. ratcheted trap hats, 9 bass styles, swing via
   `.late()` splits); the 5 original genres re-derived as specs with a
   byte-identical regression test against the legacy composers; agent tool +
   `regen_corpus` read the spec registry.
 - **Phase 1 — The map. ✅ DONE (2026-07-12).** Skeleton encoded as a spec tree in
-  `crates/robostrudel-gen/src/map.rs` (22 families / 64 genres, every entry's
+  `crates/cycletron-gen/src/map.rs` (22 families / 64 genres, every entry's
   drum stack round-trip verified); `GenreSpec::derive` is the subgenre
   inherit+override mechanism; `gen_map` example renders
   `corpus/genres/_map.{md,json}` with *computed* coverage (spec / recipe /
   sketch); browsable artifact published from `_map.json`.
 - **Phase 2 — Populate specs. ✅ DONE (2026-07-12, first pass).** All 64 map
-  entries have full specs (`crates/robostrudel-gen/src/genres.rs`, ~10 lines of
+  entries have full specs (`crates/cycletron-gen/src/genres.rs`, ~10 lines of
   data each via helpers): genre-appropriate scale + progression, real palette
   (synths/wavetables/gm_*), swing where styles shuffle, `dist`/`crush` where
   they bite. `MelodySpec::Arpeggio` added for trance/italo/Berlin-school.

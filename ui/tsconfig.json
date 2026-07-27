@@ -18,15 +18,24 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "types": [
-      "vite/client"
-    ]
+    "noFallthroughCasesInSwitch": true
   },
   "include": [
     "src",
-    "*.ts",
+    "audio-manager.ts",
+    "scheduler.ts",
+    "sample-loader.ts",
+    "polyfills.ts",
+    "query-profiler.ts",
+    "soundfont-tables.ts",
+    "worklet.ts",
+    "worklet-types.d.ts",
     "pkg/*.d.ts",
     "global.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "vite.config.ts"
   ]
 }

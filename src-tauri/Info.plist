@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Robostrudel uses the microphone for the live audio recording feature in the Pattern Console.</string>
+  <string>Cycletron uses the microphone for the live audio recording feature in the Pattern Console.</string>
   <key>NSAppleEventsUsageDescription</key>
-  <string>Robostrudel uses Apple Events to reveal files in Finder.</string>
+  <string>Cycletron uses Apple Events to reveal files in Finder.</string>
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.music</string>
 </dict>

@@ -18,7 +18,7 @@
  *     chord `[c4,e4,g4]`.
  */
 
-/** Strudel pitch-class spelling — matches `PC_LOWER` in `robostrudel-gen`. */
+/** Strudel pitch-class spelling — matches `PC_LOWER` in the gen crate. */
 const NOTE_NAMES = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
 
 /** Notes whose onsets fall within this many ms are treated as one chord. */

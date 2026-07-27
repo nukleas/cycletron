@@ -1,0 +1,16 @@
+// Techno Loop — simple driving groove · 130 BPM
+setbpm(130);
+
+stack(
+  s("bd*4").gain(0.9),
+  s("~ cp ~ cp").gain(0.6),
+  s("[hh hh hh oh]*4").gain(0.35),
+  note("c2 c2 c3 c2 eb2 c2 g2 c2")
+    .s("sawtooth")
+    .cutoff(400)
+    .resonance(15)
+    .gain(0.5),
+  note("c1*4")
+    .s("sine")
+    .gain(0.4)
+)

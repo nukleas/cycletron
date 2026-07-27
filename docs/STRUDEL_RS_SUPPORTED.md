@@ -45,7 +45,7 @@ stack(s("bd*4"), s("~ sd ~ sd"))
 ```
 
 BPM is also published via `getCurrentBpmPtr()` so the host can read it after each
-`parsePattern` (see `robostrudel/ui/src/app.ts` for the JS side).
+`parsePattern` (see `ui/src/app.ts` for the JS side).
 
 ## 2. Mini-notation operators
 
@@ -330,15 +330,15 @@ From `crates/strudel-sounds/src/synths.rs`. Pass to `s(...)` / `.sound(...)`.
 
 ## 6. Samples
 
-`s("bd")` / `s("sd")` etc. resolve to sample banks. The robostrudel UI ships
+`s("bd")` / `s("sd")` etc. resolve to sample banks. The Cycletron UI ships
 the Dirt-Samples drum kit (`bd sd sn hh cp oh ht mt lt cr cb rs` — see
 `ui/sample-loader.ts`). Additional banks load on demand from the configured
 URL. Sample indices select variants: `bd:3` picks the 4th sample in the bd
 bank. Names are case-insensitive.
 
 Soundfont / WebAudioFont support exists in `crates/strudel-soundfont` and is
-wired through `patternhandle.queryMissingBanks()`. **This is now wired up in
-robostrudel**: the scheduler scans a lookahead window for missing banks
+wired through `patternhandle.queryMissingBanks()`. **This is wired up in
+Cycletron**: the scheduler scans a lookahead window for missing banks
 (`ui/scheduler.ts` `onMissingBanks`), and General MIDI instruments referenced
 as `s("gm_piano")`, `s("gm_violin")`, etc. stream in on demand from the
 WebAudioFont CDN (`ui/sample-loader.ts` `loadWebAudioFont`, driven by
@@ -399,7 +399,7 @@ inspection — re-check when upgrading):
 
 ## 10. Validation contract
 
-Robostrudel ships two validators driven by the same logic:
+Cycletron ships two validators driven by the same logic:
 
 - `validate_pattern` IPC tool (used by the agent and the editor) →
   `src-tauri/src/strudel.rs::validate_code`.

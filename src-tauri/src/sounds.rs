@@ -202,7 +202,7 @@ pub fn register_sound_banks(names: Vec<String>, state: State<'_, AppState>) -> R
 
 // Built-in sound catalog lives in the shared analysis crate so CLI tools use
 // the same known-sound set; user-loaded banks are layered on here.
-pub use robostrudel_analysis::sounds::{
+pub use cycletron_analysis::sounds::{
     builtin_sound_set, DEFAULT_DRUMS, GM_INSTRUMENTS, MACHINE_KITS, SYNTHS, WAVETABLES,
 };
 

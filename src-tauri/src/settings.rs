@@ -305,7 +305,7 @@ impl UserSettings {
     }
 
     /// Apply user overrides on top of an [`AppConfig`]. Mutates in place.
-    pub fn apply_to(&self, config: &mut robostrudel_core::config::AppConfig) {
+    pub fn apply_to(&self, config: &mut cycletron_core::config::AppConfig) {
         if let Some(key) = &self.anthropic.api_key {
             if !key.is_empty() {
                 config.anthropic.api_key = Some(key.clone());

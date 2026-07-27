@@ -7,6 +7,7 @@ import {invoke} from './tauri.js';
 import type {AppInfo} from './types/tauri-commands.js';
 import {dismissibleModal} from './modal-utils.js';
 import {openExternal} from './external-link.js';
+import {helpModal} from './help-modal.js';
 
 const isTauri = !!(window as any).__TAURI__;
 
@@ -26,6 +27,14 @@ export class AboutModal {
         this.identifierEl = document.getElementById('aboutIdentifier');
         this.tauriEl = document.getElementById('aboutTauri');
 
+        document.getElementById('aboutGuideBtn')?.addEventListener('click', () => {
+            this.close();
+            helpModal.open('guide');
+        });
+        document.getElementById('aboutDialectBtn')?.addEventListener('click', () => {
+            this.close();
+            helpModal.open('dialect');
+        });
         document.getElementById('aboutDocsBtn')?.addEventListener('click', () => {
             void openExternal('https://strudel.cc/learn/');
         });

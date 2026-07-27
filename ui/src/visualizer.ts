@@ -538,9 +538,10 @@ export class PatternVisualizer {
             const trackId = data[i++];
             let trackName = this.trackNameCache[trackId];
             if (trackName === undefined) {
-                trackName = pattern.getTrackName(trackId) ?? `track${trackId}`;
+                trackName = String(pattern.getTrackName(trackId) ?? `track${trackId}`);
                 this.trackNameCache[trackId] = trackName;
             }
+            const trackLabel: string = trackName ?? `track${trackId}`;
 
             // Read events for this track
             const eventCount = data[i++];
@@ -564,7 +565,9 @@ export class PatternVisualizer {
                 if (w > 30) {
                     ctx.fillStyle = '#05060a';
                     ctx.font = labelFont;
-                    const label = Number.isFinite(note) ? this.midiNoteTable[note & 127] : trackName;
+                    const label = Number.isFinite(note)
+                        ? (this.midiNoteTable[note & 127] ?? String(note))
+                        : trackLabel;
                     ctx.fillText(label, x + 6, y + 19);
                     // Restore event color for next iteration.
                     ctx.fillStyle = color;
@@ -575,7 +578,7 @@ export class PatternVisualizer {
             // Track label below events.
             ctx.fillStyle = colorText;
             ctx.font = trackFont;
-            ctx.fillText(trackName, 4, y + eventHeight + 14);
+            ctx.fillText(trackLabel, 4, y + eventHeight + 14);
         }
     }
 

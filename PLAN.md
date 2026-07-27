@@ -1,12 +1,30 @@
-# Robostrudel — Planning Document
+# PLAN.md — Historical planning notes (archived)
+
+> **Status:** Archived. Product name is **Cycletron** (NaderLabs).  
+> For current architecture and release gates, use `README.md`, `AGENTS.md` /
+> `CLAUDE.md`, and `docs/PUBLISH_READINESS.md`.  
+> Do **not** treat this file as the live system design.
+
+**What changed since this was written**
+
+- Audio is **WASM-only** (AudioWorklet + SharedArrayBuffer). There is no cpal /
+  native audio path in the Tauri backend.
+- Multi-provider LLM (Anthropic, xAI/Grok, OpenAI, local OpenAI-compatible),
+  not a single Claude-only client.
+- Internal crates may still be named `cycletron-*`; user-facing brand is Cycletron.
+
+---
+
+# Original: Cycletron — Planning Document
 
 > AI-first strudel music engine with self-improving ecosystem
 
 ## Vision
 
-Robostrudel is an AI-native music creation environment built on top of
-[strudel-rs](../strudel-rs) (Rust pattern engine) and
-[strudel-corpus](../strudel-corpus) (curated composition knowledge base).
+Cycletron (working title at the time: *Cycletron*) is an AI-native music
+creation environment built on top of [strudel-rs](../strudel-rs) (Rust pattern
+engine) and [strudel-corpus](../strudel-corpus) (curated composition knowledge
+base).
 
 It provides a REPL where an AI agent collaborates with the musician in real time —
 composing, extending, remixing, and iterating on strudel patterns — while
@@ -37,7 +55,7 @@ continuously improving its own musical knowledge and tooling.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                     Robostrudel Desktop App                      │
+│                     Cycletron Desktop App                        │
 │                         (Tauri v2 shell)                         │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
@@ -50,25 +68,26 @@ continuously improving its own musical knowledge and tooling.
 │  │  │ Session     │  │  Corpus    │  │  Arrangement        │ │  │
 │  │  │ History     │  │  Browser   │  │  Timeline           │ │  │
 │  │  └─────────────┘  └────────────┘  └─────────────────────┘ │  │
+│  │  + AudioWorklet + strudel-rs WASM (audio lives here)      │  │
 │  └──────────────────────────┬─────────────────────────────────┘  │
 │                             │ Tauri IPC (commands + events)      │
 │  ┌──────────────────────────▼─────────────────────────────────┐  │
-│  │                   Rust Backend (core)                       │  │
-│  │                                                             │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐  │  │
-│  │  │ AI Agent │  │ Pattern  │  │ Corpus   │  │ Audio     │  │  │
-│  │  │ (Claude  │  │ Buffer   │  │ Indexer  │  │ Engine    │  │  │
-│  │  │  API via │  │ (live    │  │ (search, │  │ (cpal +   │  │  │
-│  │  │  reqwest)│  │  state)  │  │  ingest) │  │  strudel  │  │  │
-│  │  └──────────┘  └──────────┘  └──────────┘  │  DSP)     │  │  │
-│  │                                             └───────────┘  │  │
+│  │           Rust Backend (AI + corpus + files; no audio)      │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐                 │  │
+│  │  │ AI Agent │  │ Pattern  │  │ Corpus   │                 │  │
+│  │  │ (multi-  │  │ tools /  │  │ Indexer  │                 │  │
+│  │  │ provider)│  │ validate │  │ (search) │                 │  │
+│  │  └──────────┘  └──────────┘  └──────────┘                 │  │
 │  └────────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+> **Note:** Early drafts put audio in Rust/cpal. **Current product:** all audio
+> is WASM in the webview. See `AGENTS.md`.
+
 ### Why Tauri v2
 
-- **Rust-native backend** — all audio, AI, corpus, and pattern logic in Rust
+- **Rust backend** — AI, corpus, files, MIDI import; pattern validation via strudel-rs path deps
 - **Lightweight** — no Electron/Chromium bundle, uses system webview
 - **IPC** — typed Tauri commands bridge frontend UI to Rust backend
 - **Desktop features** — native menus, file dialogs, system tray, notifications,
@@ -483,7 +502,7 @@ Embeddings add complexity for no measurable gain at this scale.
 |----------|----------|-----------|
 | Agent runtime | Pure Rust (reqwest + serde) | No runtime deps, single binary, direct API access to strudel crates |
 | UI | Tauri v2 desktop app | Native feel, Rust backend, lightweight, cross-platform |
-| Corpus location | Configurable path, default `../strudel-corpus/` | Stays the source of truth, robostrudel reads/writes directly |
+| Corpus location | Configurable path, default `../strudel-corpus/` | Stays the source of truth, cycletron reads/writes directly |
 | strudel-rs integration | Cargo path deps | Direct Rust calls, no FFI overhead, easy co-development |
 | Corpus tooling | Rewrite in Rust | Eliminate Node.js dependency, faster, integrated |
 | Frontend framework | Solid.js or vanilla TS | Minimal overhead, fast reactivity |
@@ -510,23 +529,23 @@ Embeddings add complexity for no measurable gain at this scale.
 ## File Structure (Proposed)
 
 ```
-robostrudel/
+cycletron/
 ├── Cargo.toml                  # workspace root
 ├── PLAN.md                     # this document
 ├── CLAUDE.md                   # agent instructions
 ├── tauri.conf.json             # Tauri v2 configuration
 │
 ├── crates/
-│   ├── robostrudel-core/       # pattern buffer, session state, config, types
-│   ├── robostrudel-agent/      # Claude API client, tool-use loop, streaming
-│   ├── robostrudel-corpus/     # corpus indexing, search, ingestion, metadata extraction
-│   ├── robostrudel-audio/      # audio engine wrapper around strudel-audio/dsp
-│   └── robostrudel-app/        # Tauri commands, IPC bridge, app state
+│   ├── cycletron-core/       # pattern buffer, session state, config, types
+│   ├── cycletron-agent/      # Claude API client, tool-use loop, streaming
+│   ├── cycletron-corpus/     # corpus indexing, search, ingestion, metadata extraction
+│   ├── cycletron-audio/      # audio engine wrapper around strudel-audio/dsp
+│   └── cycletron-app/        # Tauri commands, IPC bridge, app state
 │
 ├── src-tauri/
 │   ├── src/
 │   │   └── main.rs             # Tauri entry point, registers commands
-│   ├── Cargo.toml              # Tauri app crate (depends on robostrudel-*)
+│   ├── Cargo.toml              # Tauri app crate (depends on cycletron-*)
 │   ├── tauri.conf.json         # Tauri window/menu/permission config
 │   └── icons/                  # app icons
 │
@@ -553,11 +572,11 @@ robostrudel/
 
 | Crate | Purpose | Key Dependencies |
 |-------|---------|-----------------|
-| `robostrudel-core` | Shared types, config, pattern buffer, session state | `serde`, `toml` |
-| `robostrudel-agent` | Claude API client, tool definitions, agent loop | `reqwest`, `serde_json`, `tokio`, `robostrudel-core` |
-| `robostrudel-corpus` | Load/search/write corpus, metadata extraction | `serde`, `robostrudel-core` |
-| `robostrudel-audio` | Thin wrapper: init audio, play/stop, tempo, waveform data | `strudel-audio`, `strudel-dsp`, `strudel-mini`, `strudel-dsl` |
-| `robostrudel-app` | Tauri command handlers, glues everything together | `tauri`, all robostrudel-* crates |
+| `cycletron-core` | Shared types, config, pattern buffer, session state | `serde`, `toml` |
+| `cycletron-agent` | Claude API client, tool definitions, agent loop | `reqwest`, `serde_json`, `tokio`, `cycletron-core` |
+| `cycletron-corpus` | Load/search/write corpus, metadata extraction | `serde`, `cycletron-core` |
+| `cycletron-audio` | Thin wrapper: init audio, play/stop, tempo, waveform data | `strudel-audio`, `strudel-dsp`, `strudel-mini`, `strudel-dsl` |
+| `cycletron-app` | Tauri command handlers, glues everything together | `tauri`, all cycletron-* crates |
 
 ---
 

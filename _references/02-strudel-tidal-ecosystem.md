@@ -1,12 +1,12 @@
 # Strudel / Tidal ecosystem — what's directly mineable
 
-Robostrudel's frontend *is* a Strudel-rs REPL, so the Tidal/Strudel sub-ecosystem is the
+Cycletron's frontend *is* a Strudel-rs REPL, so the Tidal/Strudel sub-ecosystem is the
 most directly relevant slice of awesome-livecoding. Sources: awesome-tidalcycles, the main
 list, and the Strudel project.
 
 ## Tidal "ports" / cousins — cross-reference DSL coverage
 
-Robostrudel already tracks DSL surface in `docs/STRUDEL_RS_SUPPORTED.md`. These ports are
+Cycletron already tracks DSL surface in `docs/STRUDEL_RS_SUPPORTED.md`. These ports are
 worth diffing against for function-coverage ideas and notation alternatives:
 
 | Project | Lang | Why look |
@@ -22,7 +22,7 @@ worth diffing against for function-coverage ideas and notation alternatives:
 - **Strudel Flow** (xyflow.com/strudel-flow) — node-graph UI over Strudel. Idea for a visual
   pattern builder alongside the text editor.
 - **strudel.nvim** (github.com/gruvw/strudel.nvim) — controls Strudel from Neovim. Confirms
-  the "editor drives a headless Strudel engine" pattern Robostrudel already uses.
+  the "editor drives a headless Strudel engine" pattern Cycletron already uses.
 - **Topos** (topos.live) — Teletype-inspired, very terse cellular sequencing. Good source of
   compact-notation ideas.
 - **Flok** (munshkr.github.io/flok) — P2P collaborative editing. If multiplayer/shared
@@ -55,7 +55,7 @@ drum-bank aliases, and (where licensing allows) actual sample assets:
 - **Live Coding: A User's Manual** (livecodingbook.toplap.org) — open-access MIT Press book;
   conceptual grounding for system prompts and docs.
 
-## Concrete pulls for Robostrudel
+## Concrete pulls for Cycletron
 
 1. Diff `STRUDEL_RS_SUPPORTED.md` function list against Strudel + Vortex; log gaps as corpus
    constraints or roadmap items.

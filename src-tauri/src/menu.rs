@@ -153,7 +153,10 @@ pub fn build_app_menu<R: Runtime>(
     // Help
     let help = SubmenuBuilder::new(app, "Help")
         .item(&MenuItemBuilder::with_id("help.about", "About Cycletron").build(app)?)
-        .item(&MenuItemBuilder::with_id("help.docs", "Open Strudel Docs").build(app)?)
+        .item(&MenuItemBuilder::with_id("help.user_guide", "User Guide…").build(app)?)
+        .item(&MenuItemBuilder::with_id("help.shortcuts", "Keyboard Shortcuts…").build(app)?)
+        .item(&MenuItemBuilder::with_id("help.dialect", "Cycletron Dialect…").build(app)?)
+        .item(&MenuItemBuilder::with_id("help.docs", "Open Strudel Docs (web)").build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("help.show_logs", "Show Logs…").build(app)?)
         .item(&MenuItemBuilder::with_id("help.welcome", "Show Welcome…").build(app)?)
@@ -177,7 +180,7 @@ pub fn build_app_menu<R: Runtime>(
 /// tell the frontend to do the work.
 pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     let id = event.id().as_ref();
-    tracing::info!(target: "robostrudel::menu", menu_id = id, "menu event received");
+    tracing::info!(target: "cycletron::menu", menu_id = id, "menu event received");
 
     // Dynamic recents submenu: each item id is `file.recent.{idx}`. We look
     // the path up in current state (so a stale menu still resolves correctly
@@ -233,6 +236,9 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "playback.stop" => "menu:stop",
         "playback.tempo_up" => "menu:tempo_up",
         "playback.tempo_down" => "menu:tempo_down",
+        "help.user_guide" => "menu:user_guide",
+        "help.shortcuts" => "menu:shortcuts",
+        "help.dialect" => "menu:dialect",
         "help.docs" => "menu:docs",
         "help.show_logs" => "menu:show_logs",
         "help.welcome" => "menu:welcome",
@@ -240,8 +246,8 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         _ => return,
     };
     match app.emit(topic, ()) {
-        Ok(_) => tracing::info!(target: "robostrudel::menu", topic, "emitted menu topic"),
-        Err(e) => tracing::error!(target: "robostrudel::menu", topic, error = ?e, "failed to emit menu topic"),
+        Ok(_) => tracing::info!(target: "cycletron::menu", topic, "emitted menu topic"),
+        Err(e) => tracing::error!(target: "cycletron::menu", topic, error = ?e, "failed to emit menu topic"),
     }
 }
 

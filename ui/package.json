@@ -9,7 +9,7 @@
     "prebuild": "npm run build:wasm",
     "build": "vite build",
     "preview": "vite preview --port 5173",
-    "build:wasm": "cd ../../strudel-rs/crates/strudel-audio-wasm && env RUSTUP_TOOLCHAIN=nightly wasm-pack build . --target web --out-dir ../../../robostrudel/ui/pkg -- -Z build-std=std,panic_abort"
+    "build:wasm": "cd ../../strudel-rs/crates/strudel-audio-wasm && env RUSTUP_TOOLCHAIN=nightly wasm-pack build . --target web --out-dir ../../../cycletron/ui/pkg -- -Z build-std=std,panic_abort"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.1",

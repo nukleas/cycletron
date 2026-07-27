@@ -2,7 +2,7 @@
  * Ambient/immersive visualization wiring: owns the FullscreenVisualizer
  * instance, the auto-hiding HUD, and the keyboard shortcuts.
  *
- * Ported from the Robostrudel desktop app-side wiring. The visualizer starts
+ * Desktop app-side ambient visualizer wiring. The visualizer starts
  * with the first audio init (that's when an AnalyserNode exists) and can be
  * toggled with Ctrl/Cmd+Shift+V, the HUD's HIDE button, or the header's
  * Visuals menu; [ / ] cycle modes. attach() is safe to call again after an
@@ -121,7 +121,7 @@ export class AmbientViz {
 
     /**
      * Cycle to the next ambient mode. Public wrapper around the private
-     * switchMode() for callers outside this file — e.g. robostrudel's native
+     * switchMode() for callers outside this file — e.g. Cycletron's native
      * View menu ("Next Visualization"), which strudio (web, no OS menu)
      * doesn't need.
      */

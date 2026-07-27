@@ -1,4 +1,4 @@
-From: Robostrudel <fix>
+From: Cycletron <fix>
 Subject: fix(strudel-mini): @N followed by *M no longer collapses element
 
 `parse_slice_with_ops` handled `@N` and `_` by mutating `element.weight`
@@ -23,7 +23,7 @@ the op-producing match so they `continue` the loop and any following
 operator is still parsed by `parse_slice_with_ops`.
 
 Apply from the strudel-rs repo root:
-    git apply ../robostrudel/patches/strudel-mini-elongation-followed-by-stretch.patch
+    git apply ../cycletron/patches/strudel-mini-elongation-followed-by-stretch.patch
 
 ---
  crates/strudel-mini/src/parser.rs | 88 ++++++++++++++++++++++++++-----

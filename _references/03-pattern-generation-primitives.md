@@ -2,7 +2,7 @@
 
 The single biggest extractable asset from the live-coding world for an *AI-first* engine is
 a vetted catalog of **algorithmic-composition functions**. Two libraries (both well-documented)
-are near-complete inventories. Below they're mapped onto Robostrudel's six corpus categories
+are near-complete inventories. Below they're mapped onto Cycletron's six corpus categories
 (`rhythm, melody, harmony, form, timbre, motion`) so they can become: (a) AI tools, (b) corpus
 generators, and/or (c) DSL methods.
 
@@ -20,7 +20,7 @@ A compact, gettable function set. Categories below; **[cat]** = best-fit corpus 
 - `space()` — onset patterns from spacing. **[rhythm]**
 
 ### Algorithmic
-- `euclid()` — Euclidean rhythms (Robostrudel likely has this already — confirm parity). **[rhythm]**
+- `euclid()` — Euclidean rhythms (Cycletron likely has this already — confirm parity). **[rhythm]**
 - `hexBeat()` — rhythm from a hex string (e.g. `"a4"` → beats). Terse + powerful. **[rhythm]**
 - `fibonacci()`, `pisano()` — Fibonacci & Pisano-period sequences. **[melody/form]**
 - `collatz()` — Collatz sequence as a melodic/rhythmic contour. **[melody]**
@@ -76,7 +76,7 @@ interesting as the individual classes.
 Mercury is the *style* guide for AI-generated, audience-legible code:
 
 - **Semantic clarity over symbolic density** — clear descriptive names, lowercase commands,
-  no bracket/semicolon overhead. Robostrudel's AI output should read like prose.
+  no bracket/semicolon overhead. Cycletron's AI output should read like prose.
 - **30-line visible-performance limit** — a strong prior for keeping generated patterns short
   and comprehensible (good corpus-curation heuristic).
 - **Declarative `set` / `new` / `list` core** — global state, sound declarations, and named
@@ -88,7 +88,7 @@ Mercury is the *style* guide for AI-generated, audience-legible code:
 
 ---
 
-## How this maps to Robostrudel
+## How this maps to Cycletron
 
 Three ways to land these:
 
@@ -99,7 +99,7 @@ Three ways to land these:
    produce value arrays → trivially lowered to strudel mini-notation `note("…")`.
 
 2. **As DSL methods (higher effort).** Only if strudel-rs upstream wants them; otherwise keep
-   them in Robostrudel's generation layer so `validate_code` stays the contract.
+   them in Cycletron's generation layer so `validate_code` stays the contract.
 
 3. **As corpus tags.** Tag curated `.strudel` files by the technique used (euclidean,
    markov, serial-transform, numeral-progression…) so `search_corpus` can retrieve by

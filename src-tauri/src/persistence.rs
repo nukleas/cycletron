@@ -5,7 +5,7 @@
 //! Autosave is throttled to at most once every `AUTOSAVE_MIN_INTERVAL`.
 
 use crate::state::AppState;
-use robostrudel_core::types::ChatMessage;
+use cycletron_core::types::ChatMessage;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn snapshot_roundtrips() {
-        let dir = std::env::temp_dir().join("robostrudel_persist_test");
+        let dir = std::env::temp_dir().join("cycletron_persist_test");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 

@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn snapshots_roundtrip() {
-        let tmp = std::env::temp_dir().join("robostrudel_snap_test");
+        let tmp = std::env::temp_dir().join("cycletron_snap_test");
         let _ = fs::remove_dir_all(&tmp);
         let file = PathBuf::from("/virtual/song.strudel");
 
@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn snapshots_prune_to_keep() {
-        let tmp = std::env::temp_dir().join("robostrudel_snap_prune_test");
+        let tmp = std::env::temp_dir().join("cycletron_snap_prune_test");
         let _ = fs::remove_dir_all(&tmp);
         let file = PathBuf::from("/virtual/song-prune.strudel");
         let dir = dir_for(&tmp, &file);

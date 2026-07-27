@@ -3,7 +3,7 @@
  *
  * Each preset maps a user-facing choice (Claude, Grok, OpenAI, local, custom)
  * to a wire codec plus default base URL / model / token budget. API keys are
- * never stored here — they live in the OS keychain, set via `set_provider_key`.
+ * never stored here — they go through `set_provider_key` (dev: app-data file; release: keychain).
  * Mirrors the built-in presets in `src-tauri/src/settings.rs`.
  */
 

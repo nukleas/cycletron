@@ -17,15 +17,16 @@ Cycletron is a Tauri v2 desktop app: a WASM live-coding REPL, file library, MIDI
 - **MIDI** — import, lab conversion, keyboard input, pads
 - **Library** — save patterns, recents, snapshots, export (evolving)
 
-Legacy codename: *Robostrudel* (internal crates may still use that name).
-
 ---
 
 ## Status
 
 Early private development (`0.1.0`). Not a public 1.0 yet.
 
-Product readiness notes: [`docs/PUBLISH_READINESS.md`](docs/PUBLISH_READINESS.md)
+- **User guide:** [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) (also Help → User Guide in-app)
+- **Dialect footguns:** [`docs/DIALECT.md`](docs/DIALECT.md) (Help → Cycletron Dialect)
+- **Supported DSL:** [`docs/STRUDEL_RS_SUPPORTED.md`](docs/STRUDEL_RS_SUPPORTED.md)
+- **Release readiness:** [`docs/PUBLISH_READINESS.md`](docs/PUBLISH_READINESS.md)
 
 ---
 
@@ -35,7 +36,7 @@ Product readiness notes: [`docs/PUBLISH_READINESS.md`](docs/PUBLISH_READINESS.md
 - Node.js + npm (UI)
 - Sibling **strudel-rs** checkout at `../strudel-rs` (path deps + WASM package)
 - Nightly + `wasm-pack` for `ui` WASM rebuilds
-- Optional: API key for your AI provider (`ANTHROPIC_API_KEY`, `XAI_API_KEY`, or `OPENAI_API_KEY`, or keychain via Preferences)
+- Optional: API key for your AI provider (`ANTHROPIC_API_KEY` / `XAI_API_KEY` / `OPENAI_API_KEY`, or Preferences)
 
 ```bash
 # from this repo
@@ -50,7 +51,16 @@ cd ui && npm run build:wasm   # rebuild strudel-audio-wasm (needs nightly)
 
 ## License
 
-AGPL-3.0-or-later (see workspace `Cargo.toml`). A root `LICENSE` file will land before public binary distribution.
+**AGPL-3.0-or-later** — see [`LICENSE`](LICENSE) and workspace `Cargo.toml`.
+
+## Privacy
+
+Prompts and pattern text go to the AI provider you choose. API keys stay in the
+local secrets store (keychain in release builds). Logs and agent stats remain on this machine.
+
+## Releasing
+
+See [`docs/RELEASE.md`](docs/RELEASE.md) (updater keys, signing, CI, tags).
 
 ---
 

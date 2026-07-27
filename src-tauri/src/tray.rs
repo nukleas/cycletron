@@ -28,7 +28,7 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<TrayState<R>>
         .build()?;
 
     let handle = app.clone();
-    let _tray = TrayIconBuilder::with_id("robostrudel-tray")
+    let _tray = TrayIconBuilder::with_id("cycletron-tray")
         .icon(app.default_window_icon().unwrap().clone())
         .tooltip("Cycletron — stopped")
         .menu(&menu)
@@ -106,7 +106,7 @@ pub fn tray_set_playback(
     if let Some(item) = tray_state.play_pause.lock().unwrap().as_ref() {
         let _ = item.set_text(label);
     }
-    if let Some(tray) = app.tray_by_id("robostrudel-tray") {
+    if let Some(tray) = app.tray_by_id("cycletron-tray") {
         let _ = tray.set_tooltip(Some(tooltip));
     }
     Ok(())

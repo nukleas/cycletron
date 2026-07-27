@@ -1,6 +1,6 @@
 /**
  * Receives system-wide global shortcut events from the backend.
- * These fire whether or not Robostrudel is the focused app.
+ * These fire whether or not Cycletron is the focused app.
  */
 
 const isTauri = !!(window as any).__TAURI__;

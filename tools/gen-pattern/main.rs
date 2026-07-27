@@ -1,6 +1,6 @@
-//! `gen-pattern` — thin CLI over the `robostrudel-gen` corpus generators.
+//! `gen-pattern` — thin CLI over the pattern generators (crate: `cycletron-gen`).
 //!
-//! The generative logic lives in the `robostrudel-gen` library so the agent's
+//! The generative logic lives in the gen library so the agent's
 //! `generate_pattern` tool and this CLI share one implementation. This binary
 //! just parses flags, calls a generator, and writes/prints the `.strudel`
 //! document. Gate output with `cargo run -p corpus-check`.
@@ -32,26 +32,26 @@ fn main() -> ExitCode {
         "infinity" => {
             let count = flag("--count").and_then(|s| s.parse().ok()).unwrap_or(16);
             let root = flag("--root").and_then(|s| s.parse().ok()).unwrap_or(60);
-            Ok(robostrudel_gen::infinity(count, root))
+            Ok(cycletron_gen::infinity(count, root))
         }
         "hexbeat" => {
             let hex = flag("--hex").unwrap_or_else(|| "a4f2".to_string());
-            robostrudel_gen::hexbeat(&hex)
+            cycletron_gen::hexbeat(&hex)
         }
         "numerals" => {
             let key = flag("--key").unwrap_or_else(|| "C".to_string());
             let numerals = flag("--numerals").unwrap_or_else(|| "ii V I vi".to_string());
-            robostrudel_gen::numerals(&key, &numerals)
+            cycletron_gen::numerals(&key, &numerals)
         }
         "palindrome" => {
             let motif = flag("--motif").unwrap_or_else(|| "c4 e4 g4 b4".to_string());
-            Ok(robostrudel_gen::palindrome(&motif))
+            Ok(cycletron_gen::palindrome(&motif))
         }
         "automaton" => {
             let rule = flag("--rule").and_then(|s| s.parse().ok()).unwrap_or(90u8);
             let width = flag("--width").and_then(|s| s.parse().ok()).unwrap_or(8usize);
             let gens = flag("--gens").and_then(|s| s.parse().ok()).unwrap_or(4usize);
-            robostrudel_gen::automaton(rule, width, gens)
+            cycletron_gen::automaton(rule, width, gens)
         }
         other => Err(format!(
             "unknown generator {other:?}; supported: infinity hexbeat numerals palindrome automaton"

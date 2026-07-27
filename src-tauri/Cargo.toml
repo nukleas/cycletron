@@ -1,15 +1,15 @@
 [package]
-name = "robostrudel-app"
+name = "cycletron-app"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-robostrudel-core = { workspace = true }
-robostrudel-agent = { workspace = true }
-robostrudel-corpus = { workspace = true }
-robostrudel-gen = { workspace = true }
-robostrudel-analysis = { workspace = true }
+cycletron-core = { workspace = true }
+cycletron-agent = { workspace = true }
+cycletron-corpus = { workspace = true }
+cycletron-gen = { workspace = true }
+cycletron-analysis = { workspace = true }
 midi-to-strudel = { workspace = true }
 tauri = { version = "2.11", features = ["tray-icon"] }
 tauri-plugin-opener = "2.5"
@@ -21,9 +21,9 @@ tauri-plugin-updater = "2.10"
 tauri-plugin-notification = "2.3"
 tauri-plugin-store = "2.4"
 midir = "0.10"
-# OS keychain for API-key storage. `apple-native` is the macOS backend; add
-# `windows-native` / `sync-secret-service` when building for those platforms.
-keyring = { version = "3", features = ["apple-native"] }
+# OS keychain for API-key storage (release builds only; debug uses a local file).
+# Platform backends: macOS keychain, Linux Secret Service, Windows Credential Manager.
+keyring = { version = "3", features = ["apple-native", "sync-secret-service", "windows-native"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
@@ -45,5 +45,5 @@ hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
 tauri-build = { version = "2", features = [] }
 
 [lib]
-name = "robostrudel_app"
+name = "cycletron_app"
 crate-type = ["lib", "staticlib", "cdylib"]

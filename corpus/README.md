@@ -1,4 +1,4 @@
-# Robostrudel curated corpus
+# Cycletron curated corpus
 
 Hand-written `.strudel` examples that exercise the strudel-rs DSL from first
 principles. Every file is gated by `tools/corpus-check`, which runs the same

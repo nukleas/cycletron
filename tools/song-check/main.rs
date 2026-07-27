@@ -18,7 +18,7 @@
 //! using user-loaded sample banks may get spurious `unknown-sound` warns.
 //! Those stay severity "warn", never errors.
 
-use robostrudel_analysis as analysis;
+use cycletron_analysis as analysis;
 use std::path::PathBuf;
 use std::process::ExitCode;
 

@@ -1,6 +1,6 @@
 # Rust-native live-coding engines — inspiration
 
-Robostrudel is Rust-first (Tauri v2, no Node/Python). Two Rust live-coding engines in the
+Cycletron is Rust-first (Tauri v2, no Node/Python). Two Rust live-coding engines in the
 list are worth studying for architecture and generative ideas.
 
 ## Mégra.rs — Markov-chain sequencing in pure Rust
@@ -21,7 +21,7 @@ editor and synthesis. Its tagline is literally *"make music with Markov chains."
 - Deliberately **not Turing-complete** and **without heavy music-theory abstractions**
   (no built-in scales/chords/tunings) — scope is kept tight on purpose.
 
-**Why it matters for Robostrudel:**
+**Why it matters for Cycletron:**
 - Validates a **generative, probabilistic** direction for the agent: instead of emitting a
   fixed pattern, the agent could emit (or evolve) a small transition graph that *keeps
   producing* idiomatic variation. Pairs naturally with `total-serialism`'s `MarkovChain` /
@@ -37,14 +37,14 @@ editor and synthesis. Its tagline is literally *"make music with Markov chains."
 Source: glicol.org , github.com/chaosprint/glicol
 
 **What it is:** a graph-oriented audio language, written in Rust, compiled to **WASM** and
-run in the browser via AudioWorklet — architecturally *very* close to Robostrudel's
+run in the browser via AudioWorklet — architecturally *very* close to Cycletron's
 WASM-REPL + AudioWorklet stack (per CLAUDE.md).
 
 **Why it matters:**
 - Reference for **Rust→WASM→AudioWorklet** DSP packaging and SharedArrayBuffer/worklet
   plumbing — directly comparable to `ui/worklet.ts` + `pkg/` and `npm run build:wasm`.
 - Its syntax (`~chain: node >> node >> node`) is a clean model for **node-chain notation**,
-  should Robostrudel ever want a synth-graph layer beneath strudel patterns (cf. Mercury's
+  should Cycletron ever want a synth-graph layer beneath strudel patterns (cf. Mercury's
   left-to-right `fx()` chains, doc 03).
 - Good comparison point for WASM build ergonomics (nightly toolchain, wasm-bindgen, audio
   buffer marshaling).

@@ -271,8 +271,10 @@ async function initAiBridge() {
         if (suppressWelcome || messagesEl.children.length > 0) return;
         addMessage('assistant',
             '**Welcome to Cycletron!**\n\n' +
-            'Describe the music you want, or use the quick buttons below.\n\n' +
-            'Press **Play** first to arm audio, then I can update patterns live.'
+            '1. Press **Play** to arm audio\n' +
+            '2. Open **Examples → Lesson 1** (or describe a groove here)\n' +
+            '3. Edit the code, Play again — I can rewrite the editor from chat\n\n' +
+            'Help → **User Guide** / **Dialect** covers shortcuts and strudel-rs footguns.'
         );
     }, 150);
 }
