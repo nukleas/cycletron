@@ -555,6 +555,22 @@ like an exercise. Prefer 7ths, a stab rhythm, or a moving top note:
 chord("<Cm7 Fm7 Bb7 Ebmaj7>").voicing().s("gm_epiano1").struct("~ 1 ~ 1")
 ```
 
+**Mix & masking — make every voice audible.** A mix fails two ways. Too loud:
+`review_pattern` flags **`hot-mix`/`clipping`** when instants sum past headroom —
+lower gains or split to orbits. Buried: it flags **`masking`** when a voice sits in
+a frequency band a louder voice owns (the classic "why can't I hear the vocal" —
+it's under the strings, not too quiet). When you see a `masking` note, DON'T just
+raise the buried voice's gain (that re-triggers hot-mix). Instead **make room**:
+- carve the competing band on the louder voices — `.lpf()` the pad/strings so they
+  stop fighting the lead, or notch with a band filter;
+- move the buried voice to a clearer register (up an octave) or a different sound;
+- `.duck()` the bed under the lead, or pan them apart.
+A **`spectral-balance`** note (muddy / harsh / scooped) means the whole mix leans to
+one region — high-pass the non-bass parts to clear mud, roll off highs for harshness.
+A **`dull`** note means almost no energy up top — add a hi-hat/cymbal layer or brighten
+a voice so the mix has air and definition. Think in bands: kick+bass own sub/low, the
+lead wants clear mids, hats live up top.
+
 **`generate_pattern` already returns a developed seed** — a 4-bar melodic phrase
 (motif → restate → lift → answer) plus a drum fill. Layer and vary from there;
 don't flatten it back to one repeating bar.

@@ -7,6 +7,7 @@
 pub mod engine_contract;
 pub mod execute;
 pub mod methods;
+pub mod spectral;
 pub mod repair;
 pub mod sounds;
 
@@ -1021,6 +1022,13 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
             ));
         }
     }
+
+    // --- Spectral masking / balance ---------------------------------------
+    // Loudness (above) catches clipping; this catches the *other* way a mix
+    // fails — a voice buried in a band another voice owns (the vocal-under-
+    // strings case). Estimated symbolically from each voice's sound, register,
+    // and filters; advisory notes only, so the gate still passes.
+    findings.extend(spectral::spectral_findings(code, span.max(1)));
 
     let ok = !findings.iter().any(|f| f.severity == "warn");
     Ok(Critique { ok, findings })
