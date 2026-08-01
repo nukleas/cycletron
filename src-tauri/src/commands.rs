@@ -32,19 +32,11 @@ pub async fn send_message(
         session.add_user_message(message.clone());
     }
 
-    // Refresh subscription OAuth before building the client so the bearer is not stale.
+    // Refresh subscription OAuth before building the client so the bearer is not
+    // stale. `crate::oauth` owns which providers this applies to.
     {
         let active = state.user_settings.lock().unwrap().llm.active.clone();
-        if active == "grok" && crate::xai_oauth::has_session() {
-            if let Err(e) = crate::xai_oauth::ensure_fresh().await {
-                tracing::warn!(target: "cycletron::xai_oauth", "token refresh failed: {e}");
-            }
-            state.rebuild_agent_client();
-        }
-        if active == "codex" && crate::codex_oauth::has_session() {
-            if let Err(e) = crate::codex_oauth::ensure_fresh().await {
-                tracing::warn!(target: "cycletron::codex_oauth", "token refresh failed: {e}");
-            }
+        if crate::oauth::refresh_if_stale(&active).await {
             state.rebuild_agent_client();
         }
     }

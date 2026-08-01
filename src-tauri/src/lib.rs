@@ -7,6 +7,7 @@ mod logs;
 mod menu;
 mod midi;
 mod midi_input;
+mod oauth;
 mod persistence;
 mod secrets;
 mod settings;

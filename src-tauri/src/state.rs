@@ -266,21 +266,14 @@ impl AppState {
     }
 }
 
-/// Resolve a bearer/API credential for `provider_id`.
-/// For Grok: valid xAI OAuth access token first, then secrets/env API key.
-/// For Codex: ChatGPT OAuth is handled separately via `CodexClient` (needs
-/// account id too), so this returns None for pure API-key resolution.
+/// Resolve a bearer/API credential for `provider_id`: an OAuth access token if
+/// the provider uses subscription OAuth and is signed in (see [`crate::oauth`]),
+/// otherwise the stored/env API key. Codex additionally needs an account id, so
+/// `build_agent_client` reads its full credential directly — this returns only
+/// the bearer, used for generic key resolution.
 pub(crate) fn resolve_provider_credential(provider_id: &str) -> Option<String> {
-    if provider_id == "grok" {
-        if let Some(tok) = crate::xai_oauth::peek_access_token() {
-            return Some(tok);
-        }
-    }
-    if provider_id == "codex" {
-        // Not a single bearer string — `build_agent_client` uses peek_credential.
-        return crate::codex_oauth::peek_credential().map(|(tok, _)| tok);
-    }
-    crate::secrets::get_key(provider_id)
+    crate::oauth::peek_access_token(provider_id)
+        .or_else(|| crate::secrets::get_key(provider_id))
 }
 
 /// Turn a relative corpus path into an absolute one, anchored at the
