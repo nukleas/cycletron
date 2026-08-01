@@ -10,5 +10,4 @@ pub use client::{AgentError, ClaudeClient};
 pub use codex::CodexClient;
 pub use openai::OpenAiClient;
 pub use provider::LlmProvider;
-pub use tools::ToolRegistry;
 pub use types::*;

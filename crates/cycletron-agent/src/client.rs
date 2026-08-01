@@ -140,10 +140,4 @@ pub enum AgentError {
 
     #[error("API error (status {status}): {body}")]
     Api { status: u16, body: String },
-
-    #[error("stream error: {0}")]
-    Stream(String),
-
-    #[error("tool error: {0}")]
-    Tool(String),
 }

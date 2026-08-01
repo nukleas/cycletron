@@ -1,51 +1,5 @@
 use crate::types::ToolDefinition;
 use serde_json::json;
-use std::collections::HashMap;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-
-/// A tool handler function: takes JSON input, returns string result.
-pub type ToolHandler = Arc<
-    dyn Fn(serde_json::Value) -> Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
-        + Send
-        + Sync,
->;
-
-/// Registry of tools available to the agent.
-pub struct ToolRegistry {
-    definitions: Vec<ToolDefinition>,
-    handlers: HashMap<String, ToolHandler>,
-}
-
-impl ToolRegistry {
-    pub fn new() -> Self {
-        Self {
-            definitions: Vec::new(),
-            handlers: HashMap::new(),
-        }
-    }
-
-    /// Register a tool with its definition and handler.
-    pub fn register(&mut self, definition: ToolDefinition, handler: ToolHandler) {
-        self.handlers.insert(definition.name.clone(), handler);
-        self.definitions.push(definition);
-    }
-
-    /// Get all tool definitions (for sending to Claude API).
-    pub fn definitions(&self) -> &[ToolDefinition] {
-        &self.definitions
-    }
-
-    /// Execute a tool by name with the given input.
-    pub async fn execute(&self, name: &str, input: serde_json::Value) -> Result<String, String> {
-        let handler = self
-            .handlers
-            .get(name)
-            .ok_or_else(|| format!("unknown tool: {name}"))?;
-        handler(input).await
-    }
-}
 
 /// Create the standard tool definitions for the music composition agent.
 pub fn music_tool_definitions() -> Vec<ToolDefinition> {
