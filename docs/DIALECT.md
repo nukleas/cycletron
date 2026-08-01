@@ -67,17 +67,7 @@ Without `.slow()`, each section lasts **one cycle** (~1–2s at dance tempos).
 
 Rough guide at 140 BPM: `.slow(4)` ≈ 7s, `.slow(8)` ≈ 14s, `.slow(16)` ≈ 27s.
 
-### 5. Arrow functions: no parentheses on the param
-
-```strudel
-// good
-.every(2, x => x.fast(2))
-
-// bad — parse error
-.every(2, (x) => x.fast(2))
-```
-
-### 6. Commas inside `< >` are illegal
+### 5. Commas inside `< >` are illegal
 
 Spaces separate items in slowcat. Commas stack **only** inside `[ ]` / `{ }` or
 at the top level of a mini-notation string.
@@ -93,7 +83,7 @@ note("<c2, g2, a2, f2>")
 note("<[c3,e3,g3], [f3,a3,c4]>")
 ```
 
-### 7. Random choice `|` only inside `[ ]` or `{ }`
+### 6. Random choice `|` only inside `[ ]` or `{ }`
 
 ```strudel
 // good
@@ -103,11 +93,12 @@ s("[bd | sd]")
 s("<bd | sd>")
 ```
 
-### 8. Tempo and syntax hygiene
+### 7. Tempo and syntax hygiene
 
 - Prefer `setbpm(120);` with parentheses and a semicolon.
-- Mini-notation strings use **double quotes** only (no `'…'` / `` `…` `` in the DSL).
-- No `.bank("RolandTR808")` — use sample names (`bd`, `sd`, …) or `Machine_voice` forms the sound catalog lists.
+- Prefer **double quotes** for mini-notation, though `'…'` and `` `…` `` also parse.
+- `.bank("RolandTR808")` works for the built-in machine kits (RolandTR808/909/707,
+  LinnDrum, BossDR55); only arbitrary *custom* sample banks are unsupported.
 - Euclid rotation must be a **literal** number: `bd(3,8,1)` not a nested pattern.
 
 ---

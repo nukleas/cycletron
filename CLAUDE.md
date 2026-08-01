@@ -53,13 +53,14 @@ endpoints (Ollama, LM Studio). Keys live in the OS keychain (service `cycletron`
 ## Build & Run
 
 ```bash
-cargo tauri dev                       # run desktop app in dev mode
-cd ui && npm run build:wasm           # rebuild WASM package (needs nightly)
+cargo tauri dev                       # run desktop app in dev mode (prebuilt WASM in ui/pkg)
+cd ui && npm run build:wasm           # OPTIONAL: rebuild WASM (needs a strudel-rs checkout + nightly)
 ```
 
 ## Key Dependencies
 
-- **strudel-rs** at `../strudel-rs/` — WASM audio package + Cargo path deps for validation
+- **strudel-rs** — pinned Codeberg git dependency (`rev` in the workspace `Cargo.toml`);
+  the prebuilt audio WASM is committed under `ui/pkg`, so no sibling checkout is needed.
 - **strudel-corpus** at `../strudel-corpus/` — bulk corpus on disk (optional sibling)
 - No cpal, no native audio — WASM handles everything
 
@@ -79,16 +80,11 @@ asserts each pattern emits at least one event in cycle 0. Curated entries
 load ahead of the bulk corpus in `InMemoryCorpusIndex`, so `search_corpus`
 surfaces them first.
 
-## AI Music Tooling (Grok / Claude environment)
+## AI Music Tooling
 
-When working in this repo with Grok (or Claude), the following are available for superior music/MIDI/Strudel understanding:
+- **Project skill:** `/research-genre` (`.claude/skills/research-genre/`) — researches a
+  genre and produces a validated `corpus/genres/<genre>.md` recipe, gated by corpus-check.
+- **DSL ground truth:** `docs/STRUDEL_RS_SUPPORTED.md` — the exact surface strudel-rs accepts
+  (web-strudel docs diverge); `docs/DIALECT.md` covers the common footguns.
 
-- **Project skills** (auto-loaded, highest priority):
-  - `/strudel-dsl` — exact ground-truth DSL surface from `docs/STRUDEL_RS_SUPPORTED.md`
-  - `/midi-strudel` — MIDI Lab conversion pipeline (`src-tauri/src/midi.rs`)
-
-- **MCP servers** (configured in `.grok/config.toml`):
-  - `midi-theory`, `music-theory`, `strudel-live`
-
-See also: `.grok/skills/`, `.grok/config.toml`, `docs/STRUDEL_RS_SUPPORTED.md`,
-`docs/PUBLISH_READINESS.md`. Historical vision notes: `PLAN.md` (archived).
+See also: `docs/PUBLISH_READINESS.md`. Historical vision notes: `PLAN.md` (archived).

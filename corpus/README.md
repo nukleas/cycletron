@@ -25,7 +25,7 @@ at the top.
 - One musical idea per file. The first comment line is a short label.
 - Use only DSL surface from `docs/STRUDEL_RS_SUPPORTED.md`.
 - Prefer named pitches (`c4 e4 g4`) over numeric MIDI for readability.
-- Set tempo explicitly at the top of a piece — `setbpm 120` etc.
+- Set tempo explicitly at the top of a piece — `setbpm(120);` etc.
 - Keep pieces short (4–16 bars of cycle content) so the validator stays fast.
 
 ## Adding a new example

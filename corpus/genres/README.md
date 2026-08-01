@@ -56,7 +56,7 @@ arrays (`-` items). Quote any value containing a comma.
 
 ## Growing this
 
-Recipes are meant to be **continuously researched**. The planned
+Recipes are meant to be **continuously researched**. The
 `/research-genre <genre>` skill drafts a recipe from web + music-theory sources,
 translates conventions into strudel-rs fragments, validates them through the
 gate, and writes a candidate file here for review. Cite sources in frontmatter

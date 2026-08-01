@@ -5,8 +5,11 @@ Steps for private alpha and public builds. Product readiness scorecard:
 
 ## Prerequisites
 
-- Sibling checkout of **strudel-rs** at `../strudel-rs` (path deps + WASM).
-- Rust (workspace edition 2024), Node 22+, `wasm-pack`, nightly for WASM rebuilds.
+- The **strudel-rs** engine is a pinned git dependency (Codeberg) and the prebuilt
+  audio WASM is committed under `ui/pkg` — a fresh clone builds with no sibling
+  checkout and no nightly toolchain.
+- Rust (workspace edition 2024), Node 22+. `wasm-pack` + nightly are needed only to
+  rebuild the audio WASM (see README).
 - macOS for signed desktop alpha (recommended first target).
 
 ## Gate A checklist (private alpha)
@@ -28,8 +31,7 @@ Steps for private alpha and public builds. Product readiness scorecard:
 ## Build (unsigned local)
 
 ```bash
-# from cycletron/
-cd ui && npm ci && npm run build:wasm && cd ..
+# from cycletron/ — cargo tauri build runs npm install + vite build for you.
 cargo tauri build
 ```
 
@@ -62,20 +64,13 @@ that is expected for pre-alpha.
 
 ## CI secrets / vars
 
+The engine is a **public** Codeberg git dependency and the audio WASM is committed,
+so CI needs no engine token and no sibling checkout — it builds from a single clone.
+
 | Name | Purpose |
 |------|---------|
-| `STRUDEL_RS_TOKEN` | Optional PAT if `nukleas/strudel-rs` is private |
-| `vars.STRUDEL_RS_REPO` | Override default `nukleas/strudel-rs` |
 | `TAURI_SIGNING_PRIVATE_KEY` | Updater signing (release job, later) |
 | `APPLE_*` | Notarization (later) |
-
-CI expects this layout after checkouts:
-
-```text
-runner/
-  cycletron/     # this repo
-  strudel-rs/    # sibling engine
-```
 
 ## Tagging a private alpha
 

@@ -1,4 +1,4 @@
-# _references — external research for improving Cycletron (legacy: Cycletron)
+# _references — external research for improving Cycletron
 
 Notes mined from the live-coding ecosystem, kept here so the corpus/DSL/agent work
 has a grounded source of ideas to pull from. Primary seed:

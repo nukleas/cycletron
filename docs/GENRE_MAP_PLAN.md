@@ -1,5 +1,9 @@
 # Genre Map — Plan
 
+> **Status (2026-08):** largely shipped. Genres are data (`crates/cycletron-gen/src/spec.rs`),
+> `compose_from_spec` is the single generator, and 60+ genre recipes live in `corpus/genres/`.
+> Kept as design rationale; the phase checklist below is historical.
+
 Goal: a **true map across the electronic-music taxonomy**
 ([Wikipedia: List of electronic music genres](https://en.wikipedia.org/wiki/List_of_electronic_music_genres)),
 where every genre has a **spec** the verified constructive generator turns into
