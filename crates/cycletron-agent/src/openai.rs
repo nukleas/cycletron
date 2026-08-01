@@ -13,13 +13,14 @@
 
 use crate::client::AgentError;
 use crate::provider::LlmProvider;
+use crate::sse::{StreamDecoder, ToolBuf, drive_stream, finish_tool_calls};
 use crate::types::*;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use tokio::sync::mpsc;
-use tracing::{debug, error, warn};
+use tracing::debug;
 
 /// HTTP client for any OpenAI-compatible chat/completions API.
 #[derive(Clone)]
@@ -84,54 +85,12 @@ impl LlmProvider for OpenAiClient {
 
         debug!("sending streaming request to {}", self.endpoint());
 
-        let response = self
-            .http
-            .post(self.endpoint())
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| AgentError::Http(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(AgentError::Api {
-                status: status.as_u16(),
-                body,
-            });
-        }
-
-        let mut acc = Accumulator::default();
-        let bytes_stream = response.bytes_stream();
-
-        use std::pin::pin;
-        use tokio_stream::StreamExt;
-
-        use eventsource_stream::Eventsource as _;
-        let sse_stream = bytes_stream.eventsource();
-        let mut sse_stream = pin!(sse_stream);
-
-        while let Some(event_result) = sse_stream.next().await {
-            let event = match event_result {
-                Ok(ev) => ev,
-                Err(e) => {
-                    error!("SSE stream error: {e}");
-                    continue;
-                }
-            };
-
-            // OpenAI-compatible streams terminate with a literal `[DONE]`.
-            if event.data.is_empty() || event.data == "[DONE]" {
-                continue;
-            }
-
-            match serde_json::from_str::<ChatChunk>(&event.data) {
-                Ok(chunk) => acc.process(&chunk, event_tx),
-                Err(e) => debug!("failed to parse OpenAI chunk: {e}, data: {}", event.data),
-            }
-        }
-
-        Ok(acc.finalize(event_tx))
+        drive_stream(
+            self.http.post(self.endpoint()).json(&body),
+            Accumulator::default(),
+            event_tx,
+        )
+        .await
     }
 
     fn max_tokens(&self) -> u32 {
@@ -288,13 +247,6 @@ struct Accumulator {
     finish_reason: Option<String>,
 }
 
-#[derive(Default)]
-struct ToolBuf {
-    id: String,
-    name: String,
-    args: String,
-}
-
 impl Accumulator {
     fn process(&mut self, chunk: &ChatChunk, event_tx: &mpsc::UnboundedSender<AgentEvent>) {
         let Some(choice) = chunk.choices.first() else {
@@ -336,53 +288,24 @@ impl Accumulator {
         }
     }
 
+}
+
+impl StreamDecoder for Accumulator {
+    fn on_event(&mut self, data: &str, event_tx: &mpsc::UnboundedSender<AgentEvent>) {
+        match serde_json::from_str::<ChatChunk>(data) {
+            Ok(chunk) => self.process(&chunk, event_tx),
+            Err(e) => debug!("failed to parse OpenAI chunk: {e}, data: {data}"),
+        }
+    }
+
     fn finalize(self, event_tx: &mpsc::UnboundedSender<AgentEvent>) -> MessagesResponse {
         let mut content = Vec::new();
-        let mut incomplete_tool_input = false;
-
         if !self.text.is_empty() {
             content.push(ContentBlock::Text { text: self.text });
         }
-
-        for (_index, buf) in self.tools {
-            let input: Value = if buf.args.trim().is_empty() {
-                json!({})
-            } else {
-                match serde_json::from_str(&buf.args) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        // Almost always a max_tokens cutoff mid-arguments. Flag
-                        // it so the loop gives the model honest feedback rather
-                        // than a misleading "missing parameter" error.
-                        warn!(
-                            "tool '{}' input JSON truncated/unparseable ({e}); {} bytes buffered",
-                            buf.name,
-                            buf.args.len()
-                        );
-                        incomplete_tool_input = true;
-                        json!({})
-                    }
-                }
-            };
-
-            let _ = event_tx.send(AgentEvent::ToolCall {
-                name: buf.name.clone(),
-                input: input.clone(),
-            });
-
-            // Some servers omit the id for a single tool-call stream; synthesize
-            // a stable one so the tool_result round-trip still matches.
-            let id = if buf.id.is_empty() {
-                format!("call_{}", buf.name)
-            } else {
-                buf.id
-            };
-            content.push(ContentBlock::ToolUse {
-                id,
-                name: buf.name,
-                input,
-            });
-        }
+        let (tool_blocks, incomplete_tool_input) =
+            finish_tool_calls(self.tools.into_values(), event_tx);
+        content.extend(tool_blocks);
 
         // Map OpenAI finish reasons onto the Anthropic vocabulary the agent
         // loop already understands (notably `max_tokens` for truncation).

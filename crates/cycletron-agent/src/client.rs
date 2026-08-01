@@ -1,8 +1,9 @@
+use crate::sse::drive_stream;
 use crate::stream::StreamAccumulator;
 use crate::types::*;
 use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
 use tokio::sync::mpsc;
-use tracing::{debug, error};
+use tracing::debug;
 
 const API_URL: &str = "https://api.anthropic.com/v1/messages";
 const API_VERSION: &str = "2023-06-01";
@@ -34,15 +35,13 @@ impl ClaudeClient {
         }
     }
 
-    /// The configured per-response output token limit. Used to phrase
-    /// truncation feedback to the model.
-    pub fn max_tokens(&self) -> u32 {
-        self.max_tokens
-    }
+}
 
+#[async_trait::async_trait]
+impl crate::provider::LlmProvider for ClaudeClient {
     /// Send a streaming request and emit AgentEvents via the channel.
     /// Returns the accumulated response (content blocks + stop reason).
-    pub async fn stream_message(
+    async fn stream_message(
         &self,
         system: &str,
         messages: &[ApiMessage],
@@ -60,71 +59,12 @@ impl ClaudeClient {
 
         debug!("sending streaming request to Claude API");
 
-        let response = self
-            .http
-            .post(API_URL)
-            .json(&request)
-            .send()
-            .await
-            .map_err(|e| AgentError::Http(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(AgentError::Api {
-                status: status.as_u16(),
-                body,
-            });
-        }
-
-        let mut accumulator = StreamAccumulator::new();
-        let bytes_stream = response.bytes_stream();
-
-        use std::pin::pin;
-        use tokio_stream::StreamExt;
-
-        use eventsource_stream::Eventsource as _;
-        let sse_stream = bytes_stream.eventsource();
-        let mut sse_stream = pin!(sse_stream);
-
-        while let Some(event_result) = sse_stream.next().await {
-            let event = match event_result {
-                Ok(ev) => ev,
-                Err(e) => {
-                    error!("SSE stream error: {e}");
-                    continue;
-                }
-            };
-
-            // Skip empty data or [DONE]
-            if event.data.is_empty() || event.data == "[DONE]" {
-                continue;
-            }
-
-            match serde_json::from_str::<StreamEvent>(&event.data) {
-                Ok(stream_event) => {
-                    accumulator.process_event(&stream_event, event_tx);
-                }
-                Err(e) => {
-                    debug!("failed to parse SSE event: {e}, data: {}", event.data);
-                }
-            }
-        }
-
-        accumulator.into_response()
-    }
-}
-
-#[async_trait::async_trait]
-impl crate::provider::LlmProvider for ClaudeClient {
-    async fn stream_message(
-        &self,
-        system: &str,
-        messages: &[ApiMessage],
-        tools: &[ToolDefinition],
-        event_tx: &mpsc::UnboundedSender<AgentEvent>,
-    ) -> Result<MessagesResponse, AgentError> {
-        ClaudeClient::stream_message(self, system, messages, tools, event_tx).await
+        drive_stream(
+            self.http.post(API_URL).json(&request),
+            StreamAccumulator::new(),
+            event_tx,
+        )
+        .await
     }
 
     fn max_tokens(&self) -> u32 {

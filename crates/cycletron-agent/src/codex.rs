@@ -6,12 +6,13 @@
 
 use crate::client::AgentError;
 use crate::provider::LlmProvider;
+use crate::sse::{StreamDecoder, ToolBuf, drive_stream, finish_tool_calls};
 use crate::types::*;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use tokio::sync::mpsc;
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 /// HTTP client for the Codex ChatGPT Responses backend.
 #[derive(Clone)]
@@ -91,51 +92,12 @@ impl LlmProvider for CodexClient {
 
         debug!("sending Codex Responses stream to {}", self.endpoint);
 
-        let response = self
-            .http
-            .post(&self.endpoint)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| AgentError::Http(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(AgentError::Api {
-                status: status.as_u16(),
-                body,
-            });
-        }
-
-        let mut acc = ResponsesAccumulator::default();
-        let bytes_stream = response.bytes_stream();
-
-        use std::pin::pin;
-        use tokio_stream::StreamExt;
-
-        use eventsource_stream::Eventsource as _;
-        let sse_stream = bytes_stream.eventsource();
-        let mut sse_stream = pin!(sse_stream);
-
-        while let Some(event_result) = sse_stream.next().await {
-            let event = match event_result {
-                Ok(ev) => ev,
-                Err(e) => {
-                    error!("Codex SSE stream error: {e}");
-                    continue;
-                }
-            };
-            if event.data.is_empty() || event.data == "[DONE]" {
-                continue;
-            }
-            match serde_json::from_str::<Value>(&event.data) {
-                Ok(v) => acc.process(&v, event_tx),
-                Err(e) => debug!("failed to parse Codex event: {e}"),
-            }
-        }
-
-        Ok(acc.finalize(event_tx))
+        drive_stream(
+            self.http.post(&self.endpoint).json(&body),
+            ResponsesAccumulator::default(),
+            event_tx,
+        )
+        .await
     }
 
     fn max_tokens(&self) -> u32 {
@@ -228,13 +190,6 @@ struct ResponsesAccumulator {
     /// Map stream item_id → call_id key.
     item_keys: BTreeMap<String, String>,
     stop_reason: Option<String>,
-}
-
-#[derive(Default)]
-struct ToolBuf {
-    id: String,
-    name: String,
-    args: String,
 }
 
 impl ResponsesAccumulator {
@@ -353,53 +308,40 @@ impl ResponsesAccumulator {
         }
     }
 
+}
+
+impl StreamDecoder for ResponsesAccumulator {
+    fn on_event(&mut self, data: &str, event_tx: &mpsc::UnboundedSender<AgentEvent>) {
+        match serde_json::from_str::<Value>(data) {
+            Ok(v) => self.process(&v, event_tx),
+            Err(e) => debug!("failed to parse Codex event: {e}"),
+        }
+    }
+
     fn finalize(self, event_tx: &mpsc::UnboundedSender<AgentEvent>) -> MessagesResponse {
         let mut content = Vec::new();
-        let mut incomplete_tool_input = false;
-
         if !self.text.is_empty() {
             content.push(ContentBlock::Text { text: self.text });
         }
+        // Capture the explicit stop before moving `self.tools`; if the stream
+        // never sent `response.completed`/`incomplete`, infer it from whether
+        // any tool call landed.
+        let explicit_stop = self.stop_reason;
+        let (tool_blocks, incomplete_tool_input) =
+            finish_tool_calls(self.tools.into_values(), event_tx);
+        content.extend(tool_blocks);
 
-        for (_k, buf) in self.tools {
-            let input: Value = if buf.args.trim().is_empty() {
-                json!({})
-            } else {
-                match serde_json::from_str(&buf.args) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        warn!(
-                            "Codex tool '{}' input JSON unparseable ({e}); {} bytes",
-                            buf.name,
-                            buf.args.len()
-                        );
-                        incomplete_tool_input = true;
-                        json!({})
-                    }
-                }
-            };
-            let _ = event_tx.send(AgentEvent::ToolCall {
-                name: buf.name.clone(),
-                input: input.clone(),
-            });
-            let id = if buf.id.is_empty() {
-                format!("call_{}", buf.name)
-            } else {
-                buf.id
-            };
-            content.push(ContentBlock::ToolUse {
-                id,
-                name: buf.name,
-                input,
-            });
-        }
-
-        let stop_reason = self.stop_reason.or_else(|| {
-            Some(if content.iter().any(|c| matches!(c, ContentBlock::ToolUse { .. })) {
-                "tool_use".into()
-            } else {
-                "end_turn".into()
-            })
+        let stop_reason = explicit_stop.or_else(|| {
+            Some(
+                if content
+                    .iter()
+                    .any(|c| matches!(c, ContentBlock::ToolUse { .. }))
+                {
+                    "tool_use".into()
+                } else {
+                    "end_turn".into()
+                },
+            )
         });
 
         MessagesResponse {

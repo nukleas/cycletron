@@ -1,4 +1,4 @@
-use crate::client::AgentError;
+use crate::sse::StreamDecoder;
 use crate::types::*;
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
@@ -122,8 +122,8 @@ impl StreamAccumulator {
         }
     }
 
-    pub fn into_response(self) -> Result<MessagesResponse, AgentError> {
-        Ok(MessagesResponse {
+    pub fn into_response(self) -> MessagesResponse {
+        MessagesResponse {
             id: self.message_id.unwrap_or_default(),
             content: self.content_blocks,
             stop_reason: self.stop_reason,
@@ -132,6 +132,19 @@ impl StreamAccumulator {
                 input_tokens: self.input_tokens,
                 output_tokens: self.output_tokens,
             },
-        })
+        }
+    }
+}
+
+impl StreamDecoder for StreamAccumulator {
+    fn on_event(&mut self, data: &str, event_tx: &mpsc::UnboundedSender<AgentEvent>) {
+        match serde_json::from_str::<StreamEvent>(data) {
+            Ok(stream_event) => self.process_event(&stream_event, event_tx),
+            Err(e) => debug!("failed to parse SSE event: {e}, data: {data}"),
+        }
+    }
+
+    fn finalize(self, _event_tx: &mpsc::UnboundedSender<AgentEvent>) -> MessagesResponse {
+        self.into_response()
     }
 }
