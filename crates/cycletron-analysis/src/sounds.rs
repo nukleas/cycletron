@@ -23,10 +23,32 @@ pub const DEFAULT_DRUMS: &[&str] = &[
     "bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs",
 ];
 
+/// Percussion & texture "color" banks — a curated Dirt-Samples slice bundled in
+/// `ui/public/samples/` and loaded in the background at startup (see
+/// `PERCUSSION_COLORS` in `ui/sample-loader.ts`, which must stay in sync). These
+/// exist so the agent has real percussion/texture voices beyond the 12 default
+/// drums instead of reaching for `rs(3,16).hpf()` as its only dry/metallic hit.
+/// One representative sample per bank (index 0); `s("perc:2")` selects variants.
+pub const PERCUSSION: &[&str] = &[
+    "perc", "click", "metal", "east", "hand", "industrial",
+    "space", "arpy", "tabla", "jvbass", "amencutup", "breaks165",
+];
+
+/// Single source of truth for how `.bank()` behaves, surfaced to the agent via
+/// `list_sounds` (see `src-tauri/src/sounds.rs`) so the claim lives in exactly
+/// one place. The `.bank()` half of this is verified against the real engine by
+/// [`crate::engine_contract`]; keep them consistent.
+pub const DRUM_MACHINE_NOTE: &str =
+    "Two equivalent forms: s(\"RolandTR808_bd\") or s(\"bd\").bank(\"RolandTR808\"). \
+     .bank() IS supported and rewrites every sample name in the pattern to {Bank}_{sound}, \
+     so a voice the kit lacks goes silent — e.g. LinnDrum has no cr, so \
+     s(\"bd cr\").bank(\"LinnDrum\") drops the crash. .bank() only affects samples; \
+     it no-ops on synths/GM.";
+
 /// Bundled drum machine kits and their voices.
 /// Bank names are `{MachineName}_{voice}`, e.g. `s("RolandTR808_bd")`.
-/// (Equivalent to web-strudel's `s("bd").bank("RolandTR808")` once strudel-rs
-/// implements `.bank()` prefix lookup in `apply_control_to_event`.)
+/// `.bank()` prefix lookup IS implemented in the engine, so `s("bd").bank("RolandTR808")`
+/// resolves to the same sample — the two forms are interchangeable.
 pub const MACHINE_KITS: &[(&str, &str, &[&str])] = &[
     ("RolandTR808", "TR-808",   &["bd","sd","hh","oh","cp","rim","lt","mt","ht","cb"]),
     ("RolandTR909", "TR-909",   &["bd","sd","hh","oh","cp","rd","rim"]),
@@ -54,6 +76,7 @@ pub fn builtin_sound_set() -> std::collections::HashSet<String> {
         .iter()
         .chain(WAVETABLES.iter())
         .chain(DEFAULT_DRUMS.iter())
+        .chain(PERCUSSION.iter())
         .chain(GM_INSTRUMENTS.iter())
         .map(|s| s.to_string())
         .collect();

@@ -14,6 +14,7 @@ import {logsModal} from './logs-modal.js';
 import {welcomeModal} from './welcome-modal.js';
 import {helpModal} from './help-modal.js';
 import {diag} from './diagnostics.js';
+import {notify} from './notifications.js';
 import {openExternal} from './external-link.js';
 
 const isTauri = !!(window as any).__TAURI__;
@@ -43,6 +44,14 @@ export async function initMenuEvents(): Promise<void> {
         },
         'menu:browse_examples': () => {
             document.getElementById('browseExamples')?.click();
+        },
+        'menu:reload_corpus': async () => {
+            try {
+                const n = await invoke<number>('reload_corpus');
+                void notify('Corpus reloaded', `${n} genre recipe${n === 1 ? '' : 's'} now loaded.`);
+            } catch (e) {
+                void notify('Corpus reload failed', String(e));
+            }
         },
         'menu:play_pause': () => {
             void window.strudelApp?.togglePlayPause?.();

@@ -343,9 +343,20 @@ From `crates/strudel-sounds/src/synths.rs`. Pass to `s(...)` / `.sound(...)`.
 
 `s("bd")` / `s("sd")` etc. resolve to sample banks. The Cycletron UI ships
 the Dirt-Samples drum kit (`bd sd sn hh cp oh ht mt lt cr cb rs` — see
-`ui/sample-loader.ts`). Additional banks load on demand from the configured
+`ui/sample-loader.ts`), a curated percussion/texture pack (`perc click metal
+east hand industrial space arpy tabla jvbass amencutup breaks165`), and the
+five drum machine kits. Additional banks load on demand from the configured
 URL. Sample indices select variants: `bd:3` picks the 4th sample in the bd
 bank. Names are case-insensitive.
+
+`.bank(name)` **is supported** and rewrites every sample name in the pattern to
+`{Bank}_{sound}`: `s("bd sd").bank("RolandTR808")` == `s("RolandTR808_bd
+RolandTR808_sd")` — the two forms are interchangeable, and `name` may itself be a
+pattern (`.bank("<RolandTR808 RolandTR909>")` alternates per cycle). It only
+affects samples (no-ops on synths / GM). **Caveat:** a voice the chosen kit lacks
+resolves to nothing and plays silent — e.g. LinnDrum has no `cr`, so
+`s("bd cr").bank("LinnDrum")` drops the crash. Keep such accents on the default
+kit, or pick a machine that has the voice.
 
 Soundfont / WebAudioFont support exists in `crates/strudel-soundfont` and is
 wired through `patternhandle.queryMissingBanks()`. **This is wired up in
@@ -392,8 +403,10 @@ Common JS-strudel idioms that **don't** survive the strudel-rs parser:
 - `bd(3,8,<0 1 2>)` — the Euclidean rotation argument must be a static number;
   a pattern there is rejected. Slowcat pre-rotated variants instead:
   `<bd(3,8) bd(3,8,1) bd(3,8,2)>`.
-- Arrow functions with parens (`(x) => x.fast(2)`) — the DSL parser accepts
-  the bare form `x => x.fast(2)` but not the parenthesised one.
+
+(Both arrow forms — bare `x => x.fast(2)` and parenthesised `(x) => x.fast(2)` —
+now parse and behave identically; the parens are no longer rejected. Verified by
+`engine_contract`.)
 
 (Single-quoted `'...'` and backtick `` `...` `` strings **do** parse on the
 current engine — double quotes are still the convention, but the other two are
@@ -409,10 +422,10 @@ inspection — re-check when upgrading):
 - No MIDI input (MIDI **file** parsing exists via `midi-to-strudel`).
 - Sample registry is host-driven; the engine doesn't fetch samples itself.
 
-(`$:` multi-track / labelled-section syntax **is** supported — see §1. Named
-custom sample banks via `.bank(...)` and a `strudel.json` manifest are supported
-by the engine; the Cycletron UI currently wires only GM soundfonts + the bundled
-drum machines, so custom-manifest banks may not resolve in-app yet.)
+(`$:` multi-track / labelled-section syntax **is** supported — see §1. `.bank(...)`
+**is** supported and resolves in-app for the bundled drum-machine kits
+(RolandTR808/909/707, LinnDrum, BossDR55) — see §6. Only arbitrary *custom*
+`strudel.json` manifest banks aren't auto-wired yet; the bundled kits are.)
 
 ## 10. Validation contract
 

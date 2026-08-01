@@ -46,9 +46,10 @@ const LOCAL_MACHINES_BASE = '/machines/';
 
 /**
  * All bundled drum machine voices.
- * Naming: `{MachineName}_{voice}` — these are the canonical web-strudel names
- * (what `.bank("RolandTR808")` + `s("bd")` resolves to once the strudel-rs engine
- * supports `.bank()` prefix lookup). Until then, use the full name directly in `s("…")`.
+ * Naming: `{MachineName}_{voice}` — these are the canonical web-strudel names.
+ * The engine supports `.bank()` prefix lookup, so `s("bd").bank("RolandTR808")`
+ * resolves to `RolandTR808_bd`; the full underscore name works too. A voice the
+ * kit lacks (e.g. LinnDrum has no `cr`) resolves to nothing and plays silent.
  *
  * Grouped as [machineName, displayName, voices[]].
  */
@@ -58,6 +59,30 @@ export const BUNDLED_MACHINE_KITS: Array<[string, string, string[]]> = [
     ['RolandTR707', 'TR-707',   ['bd','sd','hh','oh','cp','lt','ht']],
     ['LinnDrum',    'LinnDrum', ['bd','sd','hh','cp']],
     ['BossDR55',    'DR-55',    ['bd','sd','hh','rim']],
+];
+
+/**
+ * Percussion & texture "color" banks — a curated slice of Dirt-Samples bundled
+ * in `ui/public/samples/` (offline-first, Dirt CDN fallback). These break the
+ * agent out of the 12-drum default kit: instead of reaching for `rs(3,16).hpf()`
+ * as the only dry/metallic percussion, it gets real perc, industrial, hand, and
+ * ethnic voices plus a bass, a pluck, an atmosphere, and a breakbeat. One
+ * representative sample per bank (index 0); use `s("perc:2")` for variety once
+ * more indices are bundled. Each entry is [bankName, relativePath].
+ */
+export const PERCUSSION_COLORS: Array<[string, string]> = [
+    ['perc',       'perc/000_perc0.wav'],
+    ['click',      'click/000_click0.wav'],
+    ['metal',      'metal/000_0.wav'],
+    ['east',       'east/000_nipon_wood_block.wav'],
+    ['hand',       'hand/hand1-mono.wav'],
+    ['industrial', 'industrial/000_01.wav'],
+    ['space',      'space/000_0.wav'],
+    ['arpy',       'arpy/arpy01.wav'],
+    ['tabla',      'tabla/000_bass_flick1.wav'],
+    ['jvbass',     'jvbass/000_01.wav'],
+    ['amencutup',  'amencutup/000_AMENCUT_001.wav'],
+    ['breaks165',  'breaks165/000_RAWCLN.WAV'],
 ];
 
 /**
@@ -79,6 +104,8 @@ async function fetchFirstOk(urls: string[]): Promise<Response | null> {
 interface LoadKitResult {
     loaded: number;
     kit: string;
+    /** Bank names that decoded and registered successfully. */
+    names: string[];
 }
 
 interface WafZone {
@@ -243,10 +270,27 @@ export class SampleLoader {
     }
 
     /**
+     * Load the bundled percussion & texture color pack ([`PERCUSSION_COLORS`])
+     * from `ui/public/samples/` (offline-first, Dirt CDN fallback). Returns the
+     * bank names that loaded, so the caller can register them with the backend
+     * (`register_sound_banks`) — that's how the agent's `list_sounds` learns they
+     * exist and stops defaulting to a lone rimshot for every percussion part.
+     */
+    async loadPercussionColors(): Promise<string[]> {
+        const samples = PERCUSSION_COLORS.map(([name, sub]) => ({
+            name,
+            url: LOCAL_SAMPLES_BASE + sub,
+            fallback: DIRT_SAMPLES_BASE + sub,
+        }));
+        const {names} = await this._loadKitBatch(samples, 'Percussion Colors');
+        return names;
+    }
+
+    /**
      * Load all bundled drum machine kits from `ui/public/machines/` (offline-first).
      * Each voice is registered under `{MachineName}_{voice}`, e.g. `RolandTR808_bd`.
-     * These are the canonical web-strudel `.bank()` equivalents — use them directly
-     * in patterns as `s("RolandTR808_bd")` until strudel-rs adds `.bank()` prefixing.
+     * Use either the full name `s("RolandTR808_bd")` or the `.bank()` form
+     * `s("bd").bank("RolandTR808")` — the engine resolves both to the same sample.
      * Returns the total number of voices loaded.
      */
     async loadMachineKits(): Promise<number> {
@@ -495,6 +539,6 @@ export class SampleLoader {
 
         this.audioManager.sendSampleBatch(valid);
         const loaded = valid.length;
-        return {loaded, kit};
+        return {loaded, kit, names: valid.map(v => v.name)};
     }
 }

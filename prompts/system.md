@@ -318,7 +318,20 @@ Drum machines (bundled offline — use full name in s("…")):
   LinnDrum: LinnDrum_bd     LinnDrum_sd     LinnDrum_hh     LinnDrum_cp
   DR-55:    BossDR55_bd     BossDR55_sd     BossDR55_hh     BossDR55_rim
 Note: .bank() IS supported — `s("bd sd").bank("RolandTR808")` resolves to the machine's kit.
-The full underscore name, e.g. s("RolandTR808_bd"), also works.
+The full underscore name, e.g. s("RolandTR808_bd"), also works. .bank() rewrites EVERY
+sound in the pattern to {Bank}_{sound}, so a voice the kit lacks goes silent — LinnDrum
+has no cr, so `s("bd cr").bank("LinnDrum")` drops the crash. Keep such accents on the
+default kit (put them in a separate part without .bank()). .bank() only affects samples.
+Percussion & texture colors (bundled offline — real voices beyond the default kit):
+  perc, click, metal, east, hand, industrial  — dry / clicky / metallic hits
+  space, arpy                                  — atmosphere pad, plucked tone
+  tabla, jvbass                                — hand drum, sampled bass
+  amencutup, breaks165                         — breakbeat chops (jungle/DnB/breakcore)
+  Use s("perc:2") to pick a variant. IMPORTANT for percussion variety: do NOT
+  default to a high-passed rimshot (`rs(3,16).hpf(...)`) for every "metallic" or
+  "industrial" part — it reads as a typewriter tapping. Reach for `industrial`,
+  `metal`, `perc`, `east`, or `hand` (optionally layered) instead; save `rs` for
+  an actual rimshot accent.
 Synths: sine, sawtooth, triangle, square, pulse, fm, supersaw, supersquare, superpwm, superzow, sbd, white, pink, brown, crackle
 Wavetable synths (richer timbres, use with note()): wt_flute, wt_clarinet, wt_oboe, wt_violin, wt_cello, wt_trumpet, wt_bassoon, wt_organ, wt_piano, wt_bell, wt_pluck, wt_bass, wt_lead, wt_pad, wt_choir, wt_strings, wt_sine, wt_tri, wt_square, wt_saw
 New effects: .chorus(depth) .chorusspeed(hz) .vowel(0-4: A/E/I/O/U) .grainsize(ms) .scatter(0-1) .ir(0-2: room/hall/plate)

@@ -94,33 +94,8 @@ impl AppState {
         }
         *self.user_settings.lock().unwrap() = user;
 
-        let config = self.config.lock().unwrap();
-
-        // Corpus. The config path may be relative — anchor it against the
-        // workspace root (one level up from this crate's manifest dir) so
-        // `cargo tauri dev` works regardless of the process cwd.
-        let corpus_path = resolve_corpus_path(&config.corpus.path);
-        let curated_path = config
-            .corpus
-            .curated_path
-            .as_ref()
-            .map(|p| resolve_corpus_path(p));
-        match InMemoryCorpusIndex::load_with_curated(&corpus_path, curated_path.as_deref()) {
-            Ok(corpus) => *self.corpus.lock().unwrap() = Some(corpus),
-            Err(e) => tracing::warn!("corpus failed to load: {e}"),
-        }
-
-        // Genre recipes live under `<corpus>/genres/` — prefer the curated dir
-        // (the repo's hand-gated corpus), falling back to the bulk corpus path.
-        let genres_dir = curated_path
-            .clone()
-            .unwrap_or_else(|| corpus_path.clone())
-            .join("genres");
-        let recipes = cycletron_corpus::recipes::load_recipes(&genres_dir);
-        tracing::info!("loaded {} genre recipe(s) from {}", recipes.len(), genres_dir.display());
-        *self.recipes.lock().unwrap() = recipes;
-
-        drop(config);
+        // Corpus + genre recipes — the agent's knowledge base.
+        self.load_knowledge();
 
         // AI backend, built from the active provider profile + its keychain key.
         let client = self.build_agent_client();
@@ -146,6 +121,41 @@ impl AppState {
         *self.library.lock().unwrap() = settings;
 
         Ok(())
+    }
+
+    /// (Re)load the corpus index and genre recipes from disk into state. Safe to
+    /// call again at runtime — the `reload_corpus` command uses it so regenerated
+    /// recipes / edited corpus entries are picked up without restarting the app
+    /// (recipes are otherwise read exactly once at startup). Returns the recipe
+    /// count for the caller to report.
+    pub fn load_knowledge(&self) -> usize {
+        let config = self.config.lock().unwrap();
+        // The config path may be relative — anchor it against the workspace root
+        // (one level up from this crate's manifest dir) so `cargo tauri dev` works
+        // regardless of the process cwd.
+        let corpus_path = resolve_corpus_path(&config.corpus.path);
+        let curated_path = config
+            .corpus
+            .curated_path
+            .as_ref()
+            .map(|p| resolve_corpus_path(p));
+        drop(config);
+
+        match InMemoryCorpusIndex::load_with_curated(&corpus_path, curated_path.as_deref()) {
+            Ok(corpus) => *self.corpus.lock().unwrap() = Some(corpus),
+            Err(e) => tracing::warn!("corpus failed to load: {e}"),
+        }
+
+        // Genre recipes live under `<corpus>/genres/` — prefer the curated dir
+        // (the repo's hand-gated corpus), falling back to the bulk corpus path.
+        let genres_dir = curated_path
+            .unwrap_or_else(|| corpus_path.clone())
+            .join("genres");
+        let recipes = cycletron_corpus::recipes::load_recipes(&genres_dir);
+        let n = recipes.len();
+        tracing::info!("loaded {n} genre recipe(s) from {}", genres_dir.display());
+        *self.recipes.lock().unwrap() = recipes;
+        n
     }
 
     pub fn library_root(&self) -> PathBuf {

@@ -274,6 +274,7 @@ pub fn run() {
             commands::critique_form,
             commands::genre_recipe,
             commands::search_corpus,
+            commands::reload_corpus,
             commands::get_corpus_source,
             commands::get_pattern_history,
             commands::get_config,

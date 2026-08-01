@@ -21,6 +21,7 @@ interface SoundCatalog {
     synths: string[];
     wavetables: string[];
     drums: string[];
+    percussion?: string[];
     drum_machines: DrumMachine[];
     gm_instruments: string[];
     gm_note?: string;
@@ -67,7 +68,7 @@ export class SoundsBrowser {
     private render(cat: SoundCatalog): void {
         if (!this.listEl) return;
         const total =
-            cat.synths.length + cat.drums.length +
+            cat.synths.length + cat.drums.length + (cat.percussion?.length ?? 0) +
             cat.gm_instruments.length + cat.user_sample_banks.length;
         if (this.countEl) this.countEl.textContent = String(total);
 
@@ -80,6 +81,7 @@ export class SoundsBrowser {
             this.group('Synths', cat.synths, 'synth'),
             this.group('Wavetables', cat.wavetables ?? [], 'synth', 'use with note(…).s("wt_…")'),
             this.group('Drums', cat.drums, 'drum'),
+            this.group('Percussion & Textures', cat.percussion ?? [], 'sample', 'perc/metal/east/hand/industrial · space/arpy · tabla/jvbass · breaks'),
             ...machineGroups,
             this.group('GM Instruments', cat.gm_instruments, 'gm', '+ any gm_* name'),
             this.group(

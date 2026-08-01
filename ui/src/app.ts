@@ -771,12 +771,24 @@ export class StrudelApp {
             const drums = await this.sampleLoader!.loadEssentialDrums();
             if (!this.isInitialized) return;
 
-            // Load bundled drum machine kits in the background after essentials are ready.
-            void this.sampleLoader!.loadMachineKits().then(machineCount => {
+            // Load bundled drum machine kits + the percussion/texture color pack in
+            // the background after essentials are ready.
+            void Promise.all([
+                this.sampleLoader!.loadMachineKits(),
+                this.sampleLoader!.loadPercussionColors(),
+            ]).then(([machineCount, colorNames]) => {
                 if (!this.isInitialized) return;
-                const total = drums + machineCount;
+                const total = drums + machineCount + colorNames.length;
                 this.elements.sampleCount.textContent = `${total}`;
-                // Refresh Sounds panel with newly available machine banks.
+                // Tell the backend which color banks are live so the agent's
+                // `list_sounds` reports them and stops defaulting to a lone rimshot.
+                const invoke = (window as any).__TAURI__?.core?.invoke as
+                    | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
+                    | undefined;
+                if (colorNames.length && invoke) {
+                    void invoke('register_sound_banks', {names: colorNames}).catch(() => {});
+                }
+                // Refresh Sounds panel with newly available banks.
                 document.dispatchEvent(new CustomEvent('sounds:changed'));
             });
 

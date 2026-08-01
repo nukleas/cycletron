@@ -250,12 +250,21 @@ pub fn list_tracks(code: &str) -> Vec<TrackInfo> {
 }
 
 /// Resolve a caller-supplied handle (an `@id` or a 1-based index string) to a
-/// track. Case-insensitive on ids.
+/// track. Ids are compared through [`clean_id`] on BOTH sides so a handle and a
+/// stored marker match regardless of separator style: `@bass_line`, `@bass-line`
+/// and `@bass line` all resolve to the same track. (Ids are always *written* via
+/// `clean_id`, so matching on the raw handle would miss any id containing `_`,
+/// spaces, or punctuation — appending a duplicate track instead of replacing it.)
 fn find<'a>(tracks: &'a [Track], handle: &str) -> Option<&'a Track> {
     let h = handle.trim().trim_start_matches('@');
-    let hl = h.to_ascii_lowercase();
-    if let Some(t) = tracks.iter().find(|t| t.id.as_deref() == Some(hl.as_str())) {
-        return Some(t);
+    let key = clean_id(handle);
+    if !key.is_empty() {
+        if let Some(t) = tracks
+            .iter()
+            .find(|t| t.id.as_deref().map(clean_id).as_deref() == Some(key.as_str()))
+        {
+            return Some(t);
+        }
     }
     if let Ok(n) = h.parse::<usize>() {
         return tracks.iter().find(|t| t.index == n);
@@ -474,6 +483,22 @@ mod tests {
     #[test]
     fn upsert_new_requires_id() {
         assert!(upsert_track(MULTI, "99", "s(\"cp\")").is_err());
+    }
+
+    #[test]
+    fn upsert_underscore_handle_replaces_not_duplicates() {
+        // Handle with a `_` is written as `@bass-line` (clean_id maps `_`→`-`);
+        // re-upserting the same handle must REPLACE that track, not append a
+        // second one. Regression: `find` used to match the raw handle and miss.
+        let (once, id) = upsert_track(MULTI, "bass_line", "note(\"c2\")").unwrap();
+        assert_eq!(id, "bass-line");
+        let (twice, id2) = upsert_track(&once, "bass_line", "note(\"e2\")").unwrap();
+        assert_eq!(id2, "bass-line");
+        assert_eq!(twice.matches("@bass-line").count(), 1, "should be one track:\n{twice}");
+        assert!(twice.contains("note(\"e2\")") && !twice.contains("note(\"c2\")"));
+        // The hyphen spelling of the same handle also resolves to it.
+        let (thrice, _) = upsert_track(&twice, "bass-line", "note(\"g2\")").unwrap();
+        assert_eq!(thrice.matches("@bass-line").count(), 1, "hyphen alias must match:\n{thrice}");
     }
 
     #[test]
