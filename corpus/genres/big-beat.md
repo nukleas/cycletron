@@ -18,8 +18,8 @@ Big beat — driven break, octave bass riff, blaring stabs. Tempo 128–132 BPM 
 setbpm(130);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").gain(0.95).dist(0.15).every(4, x => x.fast(2)),
-  note("e2 ~ e3 ~ e2 ~ e3 ~").s("sawtooth").lpf(900).resonance(8).gain(0.5),
-  note("<[e3, g#3, b3, d4] [d4, f#4, a4, c#5]>").s("sawtooth").struct("1 ~ ~ 1").release(0.15).lpf(2000).gain(0.36).room(0.3).pan(0.42)
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").gain(0.59).dist(0.15).every(4, x => x.fast(2)),
+  note("e2 ~ e3 ~ e2 ~ e3 ~").s("sawtooth").lpf(900).resonance(8).gain(0.31),
+  note("<[e3, g#3, b3, d4] [d4, f#4, a4, c#5]>").s("sawtooth").struct("1 ~ ~ 1").release(0.15).lpf(2000).gain(0.22).room(0.3).pan(0.42)
 )
 ```

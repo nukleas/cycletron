@@ -19,10 +19,10 @@ signature: shuffled 2-step, warm sub, clipped chord skips
 setbpm(130);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~").gain(0.9).every(4, x => x.fast(2)),
-  s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").late(0.0172).gain(0.9),
-  note("g1 ~ ~ ~ ~ ~ ~ ~ ~ ~ g1 ~ ~ ~ ~ ~").s("sine").attack(0.02).release(0.4).gain(0.58),
-  note("<[g3, a#3, d4, f4] [c4, d#4, g4, a#4] [d4, f4, a4, c5] [c4, d#4, g4, a#4]>").s("gm_epiano1").struct("~ 1 ~ 1").release(0.18).gain(0.4).room(0.3).pan(0.42),
-  note("<[g5 ~ ~ ~ d6 ~ ~ ~] [g5 ~ ~ ~ d6 ~ ~ ~] [a#5 ~ ~ ~ f6 ~ ~ ~] [c6 ~ ~ ~ d6 ~ ~ ~]>").s("wt_pluck").delay(0.25).room(0.3).gain(0.3).pan(0.62)
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~").gain(0.79).every(4, x => x.fast(2)),
+  s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").late(0.0172).gain(0.79),
+  note("g1 ~ ~ ~ ~ ~ ~ ~ ~ ~ g1 ~ ~ ~ ~ ~").s("sine").attack(0.02).release(0.4).gain(0.51),
+  note("<[g3, a#3, d4, f4] [c4, d#4, g4, a#4] [d4, f4, a4, c5] [c4, d#4, g4, a#4]>").s("gm_epiano1").struct("~ 1 ~ 1").release(0.18).gain(0.35).room(0.3).pan(0.42),
+  note("<[g5 ~ ~ ~ d6 ~ ~ ~] [g5 ~ ~ ~ d6 ~ ~ ~] [a#5 ~ ~ ~ f6 ~ ~ ~] [c6 ~ ~ ~ d6 ~ ~ ~]>").s("wt_pluck").delay(0.25).room(0.3).gain(0.26).pan(0.62)
 )
 ```

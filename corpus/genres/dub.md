@@ -18,9 +18,9 @@ Dub — one-drop skank, walking bass, chords lost in echo. Tempo 70–80 BPM in 
 setbpm(75);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ rs ~ ~ ~ ~ ~ ~ ~ rs ~ ~ ~").gain(0.88).room(0.4).every(4, x => x.fast(2)),
-  s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").late(0.0078).gain(0.88).room(0.4),
-  note("a1 ~ e2 ~ a1 ~ g2 ~").s("gm_acoustic_bass").gain(0.6),
-  note("<[a3, c4, e4, g4] [d4, f#4, a4, c5]>").s("gm_epiano1").struct("~ 1 ~ 1").release(0.25).gain(0.38).room(0.7).delay(0.55).pan(0.42)
+  s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ rs ~ ~ ~ ~ ~ ~ ~ rs ~ ~ ~").gain(0.62).room(0.4).every(4, x => x.fast(2)),
+  s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").late(0.0078).gain(0.62).room(0.4),
+  note("a1 ~ e2 ~ a1 ~ g2 ~").s("gm_acoustic_bass").gain(0.42),
+  note("<[a3, c4, e4, g4] [d4, f#4, a4, c5]>").s("gm_epiano1").struct("~ 1 ~ 1").release(0.25).gain(0.27).room(0.7).delay(0.55).pan(0.42)
 )
 ```

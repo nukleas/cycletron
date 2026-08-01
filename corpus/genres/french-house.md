@@ -18,8 +18,8 @@ French house — four-on-floor, filtered stab loop, pumping offbeat bass. Tempo 
 setbpm(123);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~, hh*16").gain(0.9).every(4, x => x.fast(2)),
-  note("~ f2 ~ f2 ~ f2 ~ f3").s("sawtooth").lpf(600).resonance(6).gain(0.5),
-  note("<[f3, g#3, c4, d#4] [a#3, d4, f4, g#4] [c4, d#4, g4, a#4] [a#3, d4, f4, g#4]>").s("sawtooth").struct("1 ~ 1 ~").release(0.18).lpf(1200).gain(0.38).room(0.3).pan(0.42)
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~, hh*16").gain(0.67).every(4, x => x.fast(2)),
+  note("~ f2 ~ f2 ~ f2 ~ f3").s("sawtooth").lpf(600).resonance(6).gain(0.37),
+  note("<[f3, g#3, c4, d#4] [a#3, d4, f4, g#4] [c4, d#4, g4, a#4] [a#3, d4, f4, g#4]>").s("sawtooth").struct("1 ~ 1 ~").release(0.18).lpf(1200).gain(0.28).room(0.3).pan(0.42)
 )
 ```

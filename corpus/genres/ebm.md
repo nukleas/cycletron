@@ -18,8 +18,8 @@ EBM — four-on-floor with snare, sequenced 16th bass, cold stabs. Tempo 126–1
 setbpm(128);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.92).dist(0.15).every(4, x => x.fast(2)),
-  note("a2 ~ a2 ~ a2 ~ a2 ~ a2 ~ a2 b2 a2 ~ a2 ~").s("sawtooth").lpf(800).resonance(10).gain(0.5),
-  note("<[a3, c4, e4, g4] [f4, a4, c5, e5]>").s("sawtooth").struct("~ 1 ~ 1").release(0.12).lpf(1600).gain(0.32).pan(0.42)
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.61).dist(0.15).every(4, x => x.fast(2)),
+  note("a2 ~ a2 ~ a2 ~ a2 ~ a2 ~ a2 b2 a2 ~ a2 ~").s("sawtooth").lpf(800).resonance(10).gain(0.33),
+  note("<[a3, c4, e4, g4] [f4, a4, c5, e5]>").s("sawtooth").struct("~ 1 ~ 1").release(0.12).lpf(1600).gain(0.21).pan(0.42)
 )
 ```

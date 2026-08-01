@@ -18,8 +18,8 @@ Drill 'n' bass — amen shrapnel at speed, growling reese, needle stabs. Tempo 1
 setbpm(170);
 
 stack(
-  s("bd ~ bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ sd ~, hh*16").gain(0.92).every(4, x => x.fast(2)),
-  note("e1 ~ ~ d2 ~ ~ e2 ~").s("supersaw").lpf(700).resonance(11).gain(0.5),
-  note("<[e3, g3, b3, d4] [f3, a3, c4, e4]>").s("sawtooth").struct("~ ~ 1 ~").release(0.1).lpf(1700).gain(0.28).pan(0.42)
+  s("bd ~ bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ sd ~, hh*16").gain(0.81).every(4, x => x.fast(2)),
+  note("e1 ~ ~ d2 ~ ~ e2 ~").s("supersaw").lpf(700).resonance(11).gain(0.44),
+  note("<[e3, g3, b3, d4] [f3, a3, c4, e4]>").s("sawtooth").struct("~ ~ 1 ~").release(0.1).lpf(1700).gain(0.25).pan(0.42)
 )
 ```

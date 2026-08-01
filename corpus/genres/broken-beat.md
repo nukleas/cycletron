@@ -18,10 +18,10 @@ Broken beat â€” swung broken drums, walking bass, Rhodes extensions. Tempo 118â€
 setbpm(120);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ ~ ~").gain(0.9).every(4, x => x.fast(2)),
-  s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").late(0.0094).gain(0.9),
-  note("d2 ~ a2 ~ d2 ~ c3 ~").s("gm_acoustic_bass").gain(0.58),
-  note("<[d3, f3, a3, c4] [g3, b3, d4, f4] [a3, c4, e4, g4] [e3, g3, b3, d4]>").s("gm_epiano1").release(0.4).gain(0.4).room(0.35).pan(0.42),
-  note("<[a4 ~ d5 ~ g5 ~ f5 ~] [a4 ~ d5 ~ g5 ~ f5 ~] [c5 ~ f5 ~ b5 ~ a5 ~] [f5 ~ f5 ~ f5 ~ c5 ~]>").s("wt_flute").room(0.35).delay(0.2).gain(0.3).pan(0.62)
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ ~ ~").gain(0.76).every(4, x => x.fast(2)),
+  s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").late(0.0094).gain(0.76),
+  note("d2 ~ a2 ~ d2 ~ c3 ~").s("gm_acoustic_bass").gain(0.49),
+  note("<[d3, f3, a3, c4] [g3, b3, d4, f4] [a3, c4, e4, g4] [e3, g3, b3, d4]>").s("gm_epiano1").release(0.4).gain(0.34).room(0.35).pan(0.42),
+  note("<[a4 ~ d5 ~ g5 ~ f5 ~] [a4 ~ d5 ~ g5 ~ f5 ~] [c5 ~ f5 ~ b5 ~ a5 ~] [f5 ~ f5 ~ f5 ~ c5 ~]>").s("wt_flute").room(0.35).delay(0.2).gain(0.25).pan(0.62)
 )
 ```

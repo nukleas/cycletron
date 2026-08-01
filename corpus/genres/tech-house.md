@@ -18,9 +18,9 @@ Tech house — four-on-floor, offbeat hats, clipped dorian stabs. Tempo 124–12
 setbpm(126);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.9).every(4, x => x.fast(2)),
-  note("~ a2 ~ a2 ~ a2 ~ a3").s("sawtooth").lpf(750).resonance(7).gain(0.5),
-  note("<[a3, c4, e4, g4] [d4, f#4, a4, c5] [e4, g4, b4, d5] [d4, f#4, a4, c5]>").s("sawtooth").struct("~ 1 ~ 1").release(0.12).lpf(2100).gain(0.4).room(0.25).pan(0.42),
-  note("<[a5 ~ ~ ~ e6 ~ ~ ~] [a5 ~ ~ ~ e6 ~ ~ ~] [c6 ~ ~ ~ g6 ~ ~ ~] [d6 ~ ~ ~ e6 ~ ~ ~]>").s("wt_pluck").delay(0.3).room(0.25).gain(0.32).pan(0.62)
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.65).every(4, x => x.fast(2)),
+  note("~ a2 ~ a2 ~ a2 ~ a3").s("sawtooth").lpf(750).resonance(7).gain(0.36),
+  note("<[a3, c4, e4, g4] [d4, f#4, a4, c5] [e4, g4, b4, d5] [d4, f#4, a4, c5]>").s("sawtooth").struct("~ 1 ~ 1").release(0.12).lpf(2100).gain(0.29).room(0.25).pan(0.42),
+  note("<[a5 ~ ~ ~ e6 ~ ~ ~] [a5 ~ ~ ~ e6 ~ ~ ~] [c6 ~ ~ ~ g6 ~ ~ ~] [d6 ~ ~ ~ e6 ~ ~ ~]>").s("wt_pluck").delay(0.3).room(0.25).gain(0.23).pan(0.62)
 )
 ```

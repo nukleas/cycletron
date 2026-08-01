@@ -18,9 +18,9 @@ Detroit techno — four-on-floor, warm dorian chords over a rolling machine bass
 setbpm(128);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.9).every(4, x => x.fast(2)),
-  note("c2 ~ c2 ~ c2 ~ c2 ~ c2 ~ c2 d2 c2 ~ c2 ~").s("sawtooth").lpf(850).resonance(6).gain(0.48),
-  note("<[c3, d#3, g3, a#3] [f3, a3, c4, d#4] [g3, a#3, d4, f4] [f3, a3, c4, d#4]>").s("gm_epiano1").struct("~ 1 ~ ~").release(0.3).gain(0.4).room(0.35).pan(0.42),
-  note("<[c5 ~ ~ ~ a5 ~ ~ ~] [c5 ~ ~ ~ a5 ~ ~ ~] [d#5 ~ ~ ~ c6 ~ ~ ~] [g5 ~ ~ ~ a5 ~ ~ ~]>").s("wt_bell").delay(0.3).room(0.4).gain(0.3).pan(0.62)
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.54).every(4, x => x.fast(2)),
+  note("c2 ~ c2 ~ c2 ~ c2 ~ c2 ~ c2 d2 c2 ~ c2 ~").s("sawtooth").lpf(850).resonance(6).gain(0.29),
+  note("<[c3, d#3, g3, a#3] [f3, a3, c4, d#4] [g3, a#3, d4, f4] [f3, a3, c4, d#4]>").s("gm_epiano1").struct("~ 1 ~ ~").release(0.3).gain(0.24).room(0.35).pan(0.42),
+  note("<[c5 ~ ~ ~ a5 ~ ~ ~] [c5 ~ ~ ~ a5 ~ ~ ~] [d#5 ~ ~ ~ c6 ~ ~ ~] [g5 ~ ~ ~ a5 ~ ~ ~]>").s("wt_bell").delay(0.3).room(0.4).gain(0.18).pan(0.62)
 )
 ```

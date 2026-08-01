@@ -18,9 +18,9 @@ Uplifting trance — four-on-floor, rolling 16th bass, supersaw lift, gated arp.
 setbpm(138);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~, hh*16").gain(0.9).every(4, x => x.fast(2)),
-  note("a2 ~ a2 ~ a2 ~ a2 ~ a2 ~ a2 b2 a2 ~ a2 ~").s("sawtooth").lpf(700).resonance(5).gain(0.48),
-  note("<[a3, c4, e4, g4] [f4, a4, c5, e5] [d4, f4, a4, c5] [g4, b4, d5, f5]>").s("supersaw").struct("~ 1 ~ 1").release(0.2).lpf(2400).gain(0.36).room(0.4).pan(0.42),
-  note("a4 c5 e5 a5").s("wt_lead").delay(0.35).room(0.4).gain(0.33).pan(0.62)
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~, hh*16").gain(0.45).every(4, x => x.fast(2)),
+  note("a2 ~ a2 ~ a2 ~ a2 ~ a2 ~ a2 b2 a2 ~ a2 ~").s("sawtooth").lpf(700).resonance(5).gain(0.24),
+  note("<[a3, c4, e4, g4] [f4, a4, c5, e5] [d4, f4, a4, c5] [g4, b4, d5, f5]>").s("supersaw").struct("~ 1 ~ 1").release(0.2).lpf(2400).gain(0.18).room(0.4).pan(0.42),
+  note("a4 c5 e5 a5").s("wt_lead").delay(0.35).room(0.4).gain(0.17).pan(0.62)
 )
 ```

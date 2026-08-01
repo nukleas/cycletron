@@ -18,8 +18,8 @@ Grime — half-time menace, square sub jabs, cold stabs. Tempo 138–142 BPM in 
 setbpm(140);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").gain(0.9).every(4, x => x.fast(2)),
-  note("c1 ~ ~ ~ ~ ~ ~ ~ ~ ~ c1 ~ ~ ~ ~ ~").s("square").lpf(500).gain(0.55),
-  note("<[c3, d#3, g3, a#3] [d3, f3, g#3, c4]>").s("sawtooth").struct("1 ~ ~ 1").release(0.12).lpf(1400).gain(0.3).room(0.25).pan(0.42)
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").gain(0.61).every(4, x => x.fast(2)),
+  note("c1 ~ ~ ~ ~ ~ ~ ~ ~ ~ c1 ~ ~ ~ ~ ~").s("square").lpf(500).gain(0.37),
+  note("<[c3, d#3, g3, a#3] [d3, f3, g#3, c4]>").s("sawtooth").struct("1 ~ ~ 1").release(0.12).lpf(1400).gain(0.2).room(0.25).pan(0.42)
 )
 ```

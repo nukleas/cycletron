@@ -69,10 +69,142 @@ fn chord_prog(scale: &Scale, roots: &[i32], octave: i32, voicing: Voicing) -> Mi
     )
 }
 
-/// Assemble + verify a piece: every melodic part is round-trip checked and the
-/// whole document is validated before it can be returned.
+fn value_f64(v: &strudel_core::Value) -> Option<f64> {
+    match v {
+        strudel_core::Value::Number(n) => Some(*n),
+        strudel_core::Value::String(s) => s.parse().ok(),
+        _ => None,
+    }
+}
+
+fn value_sound(v: &strudel_core::Value) -> Option<String> {
+    match v {
+        strudel_core::Value::String(s) => Some(s.to_string()),
+        _ => None,
+    }
+}
+
+/// Percussion voice? (matches the mix critique's list.)
+fn is_percussive(sound: &str) -> bool {
+    const DRUMS: [&str; 12] = [
+        "bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs",
+    ];
+    DRUMS.contains(&sound.rsplit('_').next().unwrap_or(sound))
+}
+
+/// The loudest simultaneous instant of a rendered doc, using the SAME loudness
+/// model as `cycletron_analysis`'s mix critique: at each onset instant, group by
+/// (sound, gain); a chord (n notes from one source) sums in power `g·√n`; drum
+/// transients weight ×0.5. Scans 4 cycles so the bar-4 fill is counted. This is
+/// the real peak (from events), not a per-part estimate. 0 if it can't evaluate.
+fn stack_peak(doc: &str) -> f64 {
+    use std::collections::HashMap;
+    use strudel_core::ContextKey;
+    let Ok(out) = strudel_dsl::execute(doc) else {
+        return 0.0;
+    };
+    let mut peak = 0.0f64;
+    for cyc in 0..4i32 {
+        let mut haps: Vec<_> = out
+            .pattern
+            .query_arc(cyc, cyc + 1)
+            .into_iter()
+            .filter(|h| h.has_onset())
+            .collect();
+        haps.sort_by(|a, b| {
+            a.whole_or_part()
+                .begin
+                .to_f64()
+                .partial_cmp(&b.whole_or_part().begin.to_f64())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let mut i = 0;
+        while i < haps.len() {
+            let bi = haps[i].whole_or_part().begin.to_f64();
+            let mut j = i + 1;
+            while j < haps.len() && (haps[j].whole_or_part().begin.to_f64() - bi).abs() < 1e-6 {
+                j += 1;
+            }
+            // group this instant by (sound, gain)
+            let mut sources: HashMap<(String, u64), usize> = HashMap::new();
+            for h in &haps[i..j] {
+                let sound = h
+                    .context
+                    .get(&ContextKey::Sound)
+                    .and_then(value_sound)
+                    .or_else(|| value_sound(&h.value))
+                    .unwrap_or_default();
+                let gain = h
+                    .context
+                    .get(&ContextKey::Gain)
+                    .and_then(value_f64)
+                    .unwrap_or(1.0);
+                *sources.entry((sound, gain.to_bits())).or_insert(0) += 1;
+            }
+            let gsum: f64 = sources
+                .iter()
+                .map(|((sound, gbits), n)| {
+                    let weight = if is_percussive(sound) { 0.5 } else { 1.0 };
+                    f64::from_bits(*gbits) * (*n as f64).sqrt() * weight
+                })
+                .sum();
+            peak = peak.max(gsum);
+            i = j;
+        }
+    }
+    peak
+}
+
+/// Multiply the `.gain(x)` value in a chain by `m` (2dp). A master `.gain()` on
+/// the stack does NOT reliably compose through per-part control chains in
+/// strudel-rs, so we scale each part's own gain at the source — which always
+/// changes the emitted event gain. Chains with no `.gain(...)` get one appended.
+fn scale_gain(chain: &str, m: f64) -> String {
+    let scaled = |g: f64| (g * m * 100.0).round() / 100.0;
+    if let Some(i) = chain.find(".gain(") {
+        let start = i + ".gain(".len();
+        if let Some(len) = chain[start..].find(')') {
+            if let Ok(g) = chain[start..start + len].trim().parse::<f64>() {
+                return format!(
+                    "{}.gain({}){}",
+                    &chain[..i],
+                    scaled(g),
+                    &chain[start + len + 1..]
+                );
+            }
+        }
+    }
+    format!("{chain}.gain({})", scaled(1.0))
+}
+
+/// Assemble + verify a piece: every melodic part is round-trip checked; the
+/// rendered mix's real peak is measured and, if it exceeds headroom, every
+/// part's gain is scaled to bring the loudest instant under the critique's
+/// hot-mix line; then the whole document is validated.
 fn assemble(title: &str, bpm: u32, grid: &Grid, parts: Vec<Part>) -> Result<Piece, String> {
+    const TARGET: f64 = 1.8;
     verify_grid(grid).map_err(|e| format!("{title}: {e}"))?;
+
+    let piece0 = Piece {
+        title: title.to_string(),
+        bpm,
+        parts,
+    };
+    let peak = stack_peak(&piece0.to_strudel());
+    let parts = if peak > TARGET {
+        let m = TARGET / peak;
+        piece0
+            .parts
+            .into_iter()
+            .map(|p| Part {
+                chain: scale_gain(&p.chain, m),
+                src: p.src,
+            })
+            .collect()
+    } else {
+        piece0.parts
+    };
+
     let piece = Piece {
         title: title.to_string(),
         bpm,
@@ -522,6 +654,19 @@ mod tests {
                 oracle(seed).unwrap_or_else(|e| panic!("{name} legacy failed: {e}"));
             }
         }
+    }
+
+    #[test]
+    fn dense_genre_is_gain_budgeted_within_headroom() {
+        // A dense genre (amapiano's raw mix peaked ~4.0) must be scaled so the
+        // loudest instant lands under the critique's hot-mix line (~1.8 target;
+        // critique-clean confirmed by the corpus-check/song-check sweep).
+        let s = spec::find("amapiano").unwrap();
+        let doc = compose_from_spec(&s, 1).unwrap().to_strudel();
+        let peak = stack_peak(&doc);
+        assert!(peak <= 1.85, "amapiano peak {peak:.2} exceeds headroom:\n{doc}");
+        // gains are reduced but the mix is not crushed to silence.
+        assert!(peak > 1.0, "amapiano over-attenuated to {peak:.2}");
     }
 
     #[test]
