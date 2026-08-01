@@ -4,7 +4,7 @@ aliases: [downtempo, drone, dark ambient, new age, ambient techno]
 bpm: [50, 68]
 swing: 0.0
 scales: [major, lydian, minor, dorian]
-key_sounds: [sine, sawtooth, gm_pad_warm, gm_kalimba, piano, wt_pad]
+key_sounds: [sine, sawtooth, gm_pad_warm, gm_kalimba, wt_piano, wt_pad]
 signature: Slow, spacious, and evolving — long-attack pad chords over a sustained drone, sparse bell or piano notes, everything drenched in reverb. Little or no percussion. (Brian Eno, Stars of the Lid, Biosphere.)
 artists: [Brian Eno, Stars of the Lid, Biosphere, Aphex Twin, Tim Hecker]
 sources:

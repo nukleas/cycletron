@@ -3,6 +3,7 @@
 setbpm(90);
 
 chord("<C F G C>")
+  .voicing()
   .s("sawtooth")
   .cutoff(1200)
   .attack(0.05)

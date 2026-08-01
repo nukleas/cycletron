@@ -896,6 +896,7 @@ dependencies = [
 name = "corpus-check"
 version = "0.1.0"
 dependencies = [
+ "cycletron-analysis",
  "cycletron-corpus",
  "serde_json",
  "strudel-core",

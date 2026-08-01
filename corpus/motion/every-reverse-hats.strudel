@@ -1,0 +1,9 @@
+// Self-varying rhythm: every 4th cycle the hats reverse, so the groove
+// reorganises itself without changing a single note. `every(n, fn)` motion.
+setbpm(128);
+
+stack(
+  s("bd*4"),
+  s("~ cp ~ cp").gain(0.6),
+  s("hh*8").every(4, x => x.rev).gain(0.4)
+)

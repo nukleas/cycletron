@@ -229,7 +229,12 @@ export class StrudelApp {
         const ranges: { from: number; to: number }[] = [];
         const seen = new Set<string>();
 
-        for (let i = 0; i < count; i += 2) {
+        // The engine packs each active location as a 3-tuple: (startByte,
+        // endByte, colorRGB). We highlight the source span and ignore the
+        // colour for now. (Reading this as 2-tuples — the pre-migration format —
+        // misaligns every entry and, since colour is usually 0, produces spurious
+        // spans that start at byte 0, boxing the whole top of the file.)
+        for (let i = 0; i + 2 < count; i += 3) {
             const fromByte = locsBuf[i];
             const toByte = locsBuf[i + 1];
             const from = fromByte < b2c.length ? b2c[fromByte] : fromByte;

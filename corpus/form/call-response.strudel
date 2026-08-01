@@ -1,0 +1,7 @@
+// Two-bar call-and-response: a phrase answered by its variation via
+// `every(2, ...)` — the simplest way to make a 1-bar idea feel like 2 bars.
+setbpm(110);
+
+note("0 2 4 7 ~ ~ ~ ~").scale("c4:dorian").s("wt_lead")
+  .every(2, x => x.rev.add(7))
+  .room(0.3).gain(0.5)

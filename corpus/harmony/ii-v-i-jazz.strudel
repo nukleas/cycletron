@@ -3,6 +3,7 @@
 setbpm(110);
 
 chord("<Gm7 C7 FM7 FM7>")
+  .voicing()
   .s("triangle")
   .attack(0.05)
   .release(0.7)

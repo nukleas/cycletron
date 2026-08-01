@@ -2,8 +2,8 @@ setcpm(36)
 
 // Track 1: PERCUSSION (Drums)
 $: s(`<
-    [tb - tb tb tb - tb tb [tb,perc:G1] - [tb,perc:G1] - - - - -] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb]
-    [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb] [[tb,cb] - tb tb tb - tb tb [tb,cb] - tb tb tb - tb tb]>`).gain(0.60)
+    [hh - hh hh hh - hh hh [hh,cp] - [hh,cp] - - - - -] [[hh,cb] - hh hh hh - hh hh [hh,cb] - hh hh hh - hh hh] [[hh,cb] - hh hh hh - hh hh [hh,cb] - hh hh hh - hh hh] [[hh,cb] - hh hh hh - hh hh [hh,cb] - hh hh hh - hh hh]
+    [[hh,cb] - hh hh hh - hh hh [hh,cb] - hh hh hh - hh hh] [[hh,cb] - hh hh hh - hh hh [hh,cb] - hh hh hh - hh hh] [[hh,cb] - hh hh hh - hh hh [hh,cb] - hh hh hh - hh hh] [[hh,cb] - hh hh hh - hh hh [hh,cb] - hh hh hh - hh hh]>`).gain(0.60)
 
 // Track 2: ELECTRIC GRAND (C:major)
 $: note(`<

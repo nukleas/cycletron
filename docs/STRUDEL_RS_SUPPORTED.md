@@ -105,6 +105,7 @@ receiver.
 | `slowcat(...)` | `cat` (in some contexts) | One pattern per cycle. |
 | `stack(...)` | `polyrhythm` | Play patterns simultaneously. |
 | `polymeter(...)` | `pm` | Stack with LCM step alignment. |
+| `arrange(...)` | — | Section combinator: `arrange([bars, pat], …)` plays each pattern for `bars` cycles at its native rate, then loops. |
 
 > Note: the alias `cat` overlaps between `fastcat` and `slowcat` in the source.
 > Prefer the explicit `fastcat` / `slowcat` to avoid ambiguity.
@@ -135,28 +136,28 @@ Aliases inside `()`.
 ### Time / sequencing
 
 `fast(n)`, `slow(n)`, `early(t)`, `late(t)`, `zoom(s, e)`, `rev`, `palindrome`,
-`linger(t)`, `repeat_cycles(n)`, `replicate(n)`, `ply(n)`, `inside(n, fn)`,
+`linger(t)`, `repeatCycles(n)`, `replicate(n)`, `ply(n)`, `inside(n, fn)`,
 `outside(n, fn)`, `within(start, end, fn)`, `chop(n)`, `segment(rate)` (`seg`).
 
 ### Conditionals
 
-`every(n, fn)` (`firstOf`), `last_of(n, fn)`, `when(cond, fn)`, `always(fn)`,
-`never`, `sometimes(fn)`, `sometimes_by(prob, fn)`, `often(fn)`, `rarely(fn)`,
-`almost_always(fn)`, `almost_never(fn)`.
+`every(n, fn)` (`firstOf`), `lastOf(n, fn)`, `when(cond, fn)`, `always(fn)`,
+`never`, `sometimes(fn)`, `sometimesBy(prob, fn)`, `often(fn)`, `rarely(fn)`,
+`almostAlways(fn)`, `almostNever(fn)`.
 
 ### Degradation
 
-`degrade`, `degrade_by(prob)`, `mask(pat)`.
+`degrade`, `degradeBy(prob)`, `mask(pat)`.
 
 ### Stereo & layering
 
-`jux(fn)`, `jux_by(amount, fn)`, `off(time, fn)`, `superimpose(fn, ...)` (`sup`),
-`layer(fn, ...)`, `tail(other)`.
+`jux(fn)`, `juxBy(amount, fn)`, `off(time, fn)`, `superimpose(fn, ...)` (`sup`),
+`layer(fn, ...)`.
 
 ### Structure
 
-`with_structure(pat)` (mini-notation name: `struct`), `euclid(p, s, [rot])`
-(`euclidRot`, `bjork`), `euclid_legato(p, s)`, `euclid_legato_rot(p, s, r)`.
+`struct(pat)` (method + mini-notation name), `euclid(p, s, [rot])`
+(`euclidRot`, `bjork`), `euclidLegato(p, s)`, `euclidLegatoRot(p, s, r)`.
 
 ### Selection / picking
 
@@ -171,8 +172,8 @@ chains.
 ### Notes / pitch / scale
 
 `note(pat)` (`n`), `sound(pat)` (`s`), `transpose(n)` (`trans`),
-`scale_transpose(n)` (`scaleTrans`, `strans`), `scale("name")`,
-`root_notes(octave)`, `voicing()`, `voicings(dict)`, `chord(pat)`,
+`scaleTranspose(n)` (`scaleTrans`, `strans`), `scale("name")`,
+`rootNotes(octave)`, `voicing()`, `voicings(dict)`, `chord(pat)`,
 `dictionary(name)` (`dict`), `unit(name)`.
 
 ### Math on values
@@ -182,13 +183,13 @@ chains.
 
 ### Stutter / echo
 
-`stut(times, feedback, time)`, `stut_with(times, time, fn)` (`echoWith`),
+`stut(times, feedback, time)`, `stutWith(times, time, fn)` (`echoWith`),
 `echo(times, time, feedback)`.
 
 ### ADSR envelope (note)
 
 `attack(t)` (`att`), `decay(t)` (`dec`), `sustain(level)` (`sus`),
-`release(t)` (`rel`), `duration(t)` (`dur`).
+`release(t)` (`rel`), `duration(t)` (`dur`), `adsr(a, d, s, r)`.
 
 ### Amplitude / panning
 
@@ -196,7 +197,7 @@ chains.
 
 ### Low-pass filter
 
-`cutoff(hz)` (`lpf`, `lp`), `resonance(q)` (`lpq`, `q`),
+`cutoff(hz)` (`lpf`, `lp`, `ctf`), `resonance(q)` (`lpq`, `q`),
 `lpenv(amount)` (`lpe`), `lpattack(t)` (`lpatt`), `lpdecay(t)` (`lpdec`),
 `lpsustain(level)` (`lpsus`), `lprelease(t)` (`lprel`).
 
@@ -224,7 +225,7 @@ chains.
 
 ### Reverb / room
 
-`room(amount)`, `roomsize(size)` (`size`).
+`room(amount)`, `roomsize(size)` (`size`), `roomdamp(amount)` (`verbdamp`).
 
 ### Distortion & shaping
 
@@ -234,6 +235,8 @@ chains.
 ### Pitch modulation / FM
 
 `fmindex(v)` (`fmi`, `fm`), `fmratio(v)` (`fmh`),
+`fmattack(t)` (`fma`), `fmdecay(t)` (`fmd`), `fmsustain(level)` (`fms`),
+`fmrelease(t)` (`fmr`), `fmenv(amount)` (`fme`),
 `vib(rate)` (`vibrato`), `vibmod(depth)` (`vmod`),
 `tremolo(rate)` (`trem`), `tremolodepth(depth)` (`tremdepth`),
 `tremoloshape(s)` (`tremshape`), `detune(cents)` (`det`).
@@ -266,10 +269,15 @@ response. `v` selects the character: 0=small room, 1=hall, 2=plate.
 Applied as an **insert** (per-voice), not a send. Use alongside or instead of
 `room()`. The IRs are 512-sample synthetic responses baked at build time.
 
+### Effect quick-list (chainable)
+
+Compact index of the timbre/space effects above (see subsections for detail):
+`vowel(v)`, `grainsize(ms)` (`grain`), `scatter(v)`, `ir(v)`, `adsr(a, d, s, r)`,
+`roomdamp(amount)` (`verbdamp`), `ctf(hz)`, `chorus(depth)` (`choruspeed`).
+
 ### Sample playback
 
-`speed(v)`, `begin(0..1)`, `end(0..1)` (canonical name is `end`,
-also reachable as `sample_end`), `cut(group)`, `bank(name)`, `loop_at(v)`,
+`speed(v)`, `begin(0..1)`, `end(0..1)`, `cut(group)`, `bank(name)`, `loop(v)`,
 `orbit(v)`, `duration(v)` (`dur`).
 
 ### Ducking / sidechain
@@ -279,10 +287,11 @@ also reachable as `sample_end`), `cut(group)`, `bank(name)`, `loop_at(v)`,
 
 ### Metadata (no audio effect)
 
-`color(hex)`, `anchor(pos)`, `unit(name)`, `add_control(...)`,
-`add_context(...)`, `set_context(...)`, `strip_context()`,
-`filter_haps(fn)`, `filter_values(fn)`, `onsets_only()`,
-`discrete_only()`.
+`color(hex)`, `anchor(pos)`, `unit(name)`.
+
+(Note: add_context, add_control, set_context, strip_context, filter_haps,
+filter_values, onsets_only, discrete_only are Rust-only Pattern API — they are
+**not** registered as DSL methods and cannot be called from a .strudel chain.)
 
 ### Per-pattern tempo
 
@@ -302,6 +311,8 @@ From `crates/strudel-sounds/src/synths.rs`. Pass to `s(...)` / `.sound(...)`.
 | `fm` | 2-op FM (`fmindex`, `fmratio`) |
 | `supersaw` | Detuned saw stack |
 | `supersquare` | Detuned square stack |
+| `superpwm` | Detuned pulse-width-modulation stack |
+| `superzow` | Detuned "zow" saw/square hybrid stack |
 | `white`, `noise` | White noise |
 | `pink` | Pink noise |
 | `brown`, `red` | Brown noise |
@@ -381,10 +392,12 @@ Common JS-strudel idioms that **don't** survive the strudel-rs parser:
 - `bd(3,8,<0 1 2>)` — the Euclidean rotation argument must be a static number;
   a pattern there is rejected. Slowcat pre-rotated variants instead:
   `<bd(3,8) bd(3,8,1) bd(3,8,2)>`.
-- Single-quoted strings (`'...'`) and template literals (`` `...` ``) — only
-  double quotes work for mini-notation strings.
 - Arrow functions with parens (`(x) => x.fast(2)`) — the DSL parser accepts
   the bare form `x => x.fast(2)` but not the parenthesised one.
+
+(Single-quoted `'...'` and backtick `` `...` `` strings **do** parse on the
+current engine — double quotes are still the convention, but the other two are
+not rejected.)
 
 ## 9. Known gaps vs. web-strudel
 
@@ -392,10 +405,14 @@ Things that exist in JS-strudel but **don't** in strudel-rs (per source
 inspection — re-check when upgrading):
 
 - No inline JavaScript / arbitrary expressions inside patterns.
-- No `$:` track / labelled section syntax.
 - Spectral effects not implemented.
 - No MIDI input (MIDI **file** parsing exists via `midi-to-strudel`).
 - Sample registry is host-driven; the engine doesn't fetch samples itself.
+
+(`$:` multi-track / labelled-section syntax **is** supported — see §1. Named
+custom sample banks via `.bank(...)` and a `strudel.json` manifest are supported
+by the engine; the Cycletron UI currently wires only GM soundfonts + the bundled
+drum machines, so custom-manifest banks may not resolve in-app yet.)
 
 ## 10. Validation contract
 

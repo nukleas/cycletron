@@ -22,26 +22,20 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "add_context",
-        "detail": "add_context(...)",
-        "info": "Metadata (no audio effect)",
+        "label": "adsr",
+        "detail": "adsr(a, d, s, r)",
+        "info": "ADSR envelope (note)",
         "kind": "method"
     },
     {
-        "label": "add_control",
-        "detail": "add_control(...)",
-        "info": "Metadata (no audio effect)",
-        "kind": "method"
-    },
-    {
-        "label": "almost_always",
-        "detail": "almost_always(fn)",
+        "label": "almostAlways",
+        "detail": "almostAlways(fn)",
         "info": "Conditionals",
         "kind": "method"
     },
     {
-        "label": "almost_never",
-        "detail": "almost_never(fn)",
+        "label": "almostNever",
+        "detail": "almostNever(fn)",
         "info": "Conditionals",
         "kind": "method"
     },
@@ -62,6 +56,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "detail": "anchor(pos)",
         "info": "Metadata (no audio effect)",
         "kind": "method"
+    },
+    {
+        "label": "arrange",
+        "detail": "arrange(...)",
+        "info": "Section combinator: arrange([bars, pat], …) plays each pattern for bars cycles at its native rate, then loops.",
+        "kind": "function"
     },
     {
         "label": "att",
@@ -202,6 +202,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "choruspeed",
+        "detail": "choruspeed",
+        "info": "Effect quick-list (chainable)",
+        "kind": "method"
+    },
+    {
         "label": "clip",
         "detail": "clip(threshold)",
         "info": "Distortion & shaping",
@@ -238,6 +244,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "ctf",
+        "detail": "ctf(hz)",
+        "info": "Low-pass filter",
+        "kind": "method"
+    },
+    {
         "label": "cut",
         "detail": "cut(group)",
         "info": "Sample playback",
@@ -268,8 +280,8 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "degrade_by",
-        "detail": "degrade_by(prob)",
+        "label": "degradeBy",
+        "detail": "degradeBy(prob)",
         "info": "Degradation",
         "kind": "method"
     },
@@ -325,12 +337,6 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "dictionary",
         "detail": "dictionary(name)",
         "info": "Notes / pitch / scale",
-        "kind": "method"
-    },
-    {
-        "label": "discrete_only",
-        "detail": "discrete_only()",
-        "info": "Metadata (no audio effect)",
         "kind": "method"
     },
     {
@@ -454,14 +460,14 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "euclid_legato",
-        "detail": "euclid_legato(p, s)",
+        "label": "euclidLegato",
+        "detail": "euclidLegato(p, s)",
         "info": "Structure",
         "kind": "method"
     },
     {
-        "label": "euclid_legato_rot",
-        "detail": "euclid_legato_rot(p, s, r)",
+        "label": "euclidLegatoRot",
+        "detail": "euclidLegatoRot(p, s, r)",
         "info": "Structure",
         "kind": "method"
     },
@@ -490,18 +496,6 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "function"
     },
     {
-        "label": "filter_haps",
-        "detail": "filter_haps(fn)",
-        "info": "Metadata (no audio effect)",
-        "kind": "method"
-    },
-    {
-        "label": "filter_values",
-        "detail": "filter_values(fn)",
-        "info": "Metadata (no audio effect)",
-        "kind": "method"
-    },
-    {
         "label": "firstOf",
         "detail": "firstOf",
         "info": "Conditionals",
@@ -511,6 +505,42 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "fm",
         "detail": "fm",
         "info": "2-op FM (fmindex, fmratio)",
+        "kind": "method"
+    },
+    {
+        "label": "fma",
+        "detail": "fma",
+        "info": "Pitch modulation / FM",
+        "kind": "method"
+    },
+    {
+        "label": "fmattack",
+        "detail": "fmattack(t)",
+        "info": "Pitch modulation / FM",
+        "kind": "method"
+    },
+    {
+        "label": "fmd",
+        "detail": "fmd",
+        "info": "Pitch modulation / FM",
+        "kind": "method"
+    },
+    {
+        "label": "fmdecay",
+        "detail": "fmdecay(t)",
+        "info": "Pitch modulation / FM",
+        "kind": "method"
+    },
+    {
+        "label": "fme",
+        "detail": "fme",
+        "info": "Pitch modulation / FM",
+        "kind": "method"
+    },
+    {
+        "label": "fmenv",
+        "detail": "fmenv(amount)",
+        "info": "Pitch modulation / FM",
         "kind": "method"
     },
     {
@@ -532,8 +562,32 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "fmr",
+        "detail": "fmr",
+        "info": "Pitch modulation / FM",
+        "kind": "method"
+    },
+    {
         "label": "fmratio",
         "detail": "fmratio(v)",
+        "info": "Pitch modulation / FM",
+        "kind": "method"
+    },
+    {
+        "label": "fmrelease",
+        "detail": "fmrelease(t)",
+        "info": "Pitch modulation / FM",
+        "kind": "method"
+    },
+    {
+        "label": "fms",
+        "detail": "fms",
+        "info": "Pitch modulation / FM",
+        "kind": "method"
+    },
+    {
+        "label": "fmsustain",
+        "detail": "fmsustain(level)",
         "info": "Pitch modulation / FM",
         "kind": "method"
     },
@@ -541,6 +595,18 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "gain",
         "detail": "gain(v)",
         "info": "Amplitude / panning",
+        "kind": "method"
+    },
+    {
+        "label": "grain",
+        "detail": "grain",
+        "info": "Effect quick-list (chainable)",
+        "kind": "method"
+    },
+    {
+        "label": "grainsize",
+        "detail": "grainsize(ms)",
+        "info": "Effect quick-list (chainable)",
         "kind": "method"
     },
     {
@@ -652,6 +718,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "ir",
+        "detail": "ir(v)",
+        "info": "Effect quick-list (chainable)",
+        "kind": "method"
+    },
+    {
         "label": "irand",
         "detail": "irand(n)",
         "info": "Integer random in [0, n).",
@@ -670,14 +742,14 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "jux_by",
-        "detail": "jux_by(amount, fn)",
+        "label": "juxBy",
+        "detail": "juxBy(amount, fn)",
         "info": "Stereo & layering",
         "kind": "method"
     },
     {
-        "label": "last_of",
-        "detail": "last_of(n, fn)",
+        "label": "lastOf",
+        "detail": "lastOf(n, fn)",
         "info": "Conditionals",
         "kind": "method"
     },
@@ -700,8 +772,8 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "loop_at",
-        "detail": "loop_at(v)",
+        "label": "loop",
+        "detail": "loop(v)",
         "info": "Sample playback",
         "kind": "method"
     },
@@ -835,12 +907,6 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "often",
         "detail": "often(fn)",
         "info": "Conditionals",
-        "kind": "method"
-    },
-    {
-        "label": "onsets_only",
-        "detail": "onsets_only()",
-        "info": "Metadata (no audio effect)",
         "kind": "method"
     },
     {
@@ -1078,8 +1144,8 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "repeat_cycles",
-        "detail": "repeat_cycles(n)",
+        "label": "repeatCycles",
+        "detail": "repeatCycles(n)",
         "info": "Time / sequencing",
         "kind": "method"
     },
@@ -1108,14 +1174,20 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "roomdamp",
+        "detail": "roomdamp(amount)",
+        "info": "Reverb / room",
+        "kind": "method"
+    },
+    {
         "label": "roomsize",
         "detail": "roomsize(size)",
         "info": "Reverb / room",
         "kind": "method"
     },
     {
-        "label": "root_notes",
-        "detail": "root_notes(octave)",
+        "label": "rootNotes",
+        "detail": "rootNotes(octave)",
         "info": "Notes / pitch / scale",
         "kind": "method"
     },
@@ -1129,12 +1201,6 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "s",
         "detail": "s",
         "info": "Notes / pitch / scale",
-        "kind": "method"
-    },
-    {
-        "label": "sample_end",
-        "detail": "sample_end",
-        "info": "Sample playback",
         "kind": "method"
     },
     {
@@ -1168,15 +1234,21 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "scale_transpose",
-        "detail": "scale_transpose(n)",
+        "label": "scaleTrans",
+        "detail": "scaleTrans",
         "info": "Notes / pitch / scale",
         "kind": "method"
     },
     {
-        "label": "scaleTrans",
-        "detail": "scaleTrans",
+        "label": "scaleTranspose",
+        "detail": "scaleTranspose(n)",
         "info": "Notes / pitch / scale",
+        "kind": "method"
+    },
+    {
+        "label": "scatter",
+        "detail": "scatter(v)",
+        "info": "Effect quick-list (chainable)",
         "kind": "method"
     },
     {
@@ -1189,12 +1261,6 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "segment",
         "detail": "segment(rate)",
         "info": "Time / sequencing",
-        "kind": "method"
-    },
-    {
-        "label": "set_context",
-        "detail": "set_context(...)",
-        "info": "Metadata (no audio effect)",
         "kind": "method"
     },
     {
@@ -1270,8 +1336,8 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "sometimes_by",
-        "detail": "sometimes_by(prob, fn)",
+        "label": "sometimesBy",
+        "detail": "sometimesBy(prob, fn)",
         "info": "Conditionals",
         "kind": "method"
     },
@@ -1318,14 +1384,8 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "strip_context",
-        "detail": "strip_context()",
-        "info": "Metadata (no audio effect)",
-        "kind": "method"
-    },
-    {
         "label": "struct",
-        "detail": "struct",
+        "detail": "struct(pat)",
         "info": "Structure",
         "kind": "method"
     },
@@ -1336,8 +1396,8 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "stut_with",
-        "detail": "stut_with(times, time, fn)",
+        "label": "stutWith",
+        "detail": "stutWith(times, time, fn)",
         "info": "Stutter / echo",
         "kind": "method"
     },
@@ -1360,6 +1420,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "superpwm",
+        "detail": "superpwm",
+        "info": "Detuned pulse-width-modulation stack",
+        "kind": "sound"
+    },
+    {
         "label": "supersaw",
         "detail": "supersaw",
         "info": "Detuned saw stack",
@@ -1372,6 +1438,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "sound"
     },
     {
+        "label": "superzow",
+        "detail": "superzow",
+        "info": "Detuned \"zow\" saw/square hybrid stack",
+        "kind": "sound"
+    },
+    {
         "label": "sus",
         "detail": "sus",
         "info": "ADSR envelope (note)",
@@ -1381,12 +1453,6 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "sustain",
         "detail": "sustain(level)",
         "info": "ADSR envelope (note)",
-        "kind": "method"
-    },
-    {
-        "label": "tail",
-        "detail": "tail(other)",
-        "info": "Stereo & layering",
         "kind": "method"
     },
     {
@@ -1474,6 +1540,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "verbdamp",
+        "detail": "verbdamp",
+        "info": "Reverb / room",
+        "kind": "method"
+    },
+    {
         "label": "vib",
         "detail": "vib(rate)",
         "info": "Pitch modulation / FM",
@@ -1510,6 +1582,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "vowel",
+        "detail": "vowel(v)",
+        "info": "Effect quick-list (chainable)",
+        "kind": "method"
+    },
+    {
         "label": "when",
         "detail": "when(cond, fn)",
         "info": "Conditionals",
@@ -1520,12 +1598,6 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "detail": "white",
         "info": "White noise",
         "kind": "sound"
-    },
-    {
-        "label": "with_structure",
-        "detail": "with_structure(pat)",
-        "info": "Structure",
-        "kind": "method"
     },
     {
         "label": "within",

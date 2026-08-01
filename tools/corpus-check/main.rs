@@ -57,6 +57,20 @@ fn main() -> ExitCode {
         }
     }
 
+    // 1b. On a default full run, also gate the historically-ungated song files
+    //     (cover songs + agency arrangements + the root marble-machine demo).
+    if args.get(1).is_none() {
+        for path in extra_ungated_files() {
+            match std::fs::read_to_string(&path) {
+                Ok(code) => units.push(Unit {
+                    label: short(&path),
+                    code,
+                }),
+                Err(e) => failures.push((short(&path), format!("io: {e}"))),
+            }
+        }
+    }
+
     // 2. ```strudel fragments inside `*.md` genre recipes.
     for path in collect_recipe_files(&root) {
         match std::fs::read_to_string(&path) {
@@ -140,6 +154,21 @@ fn default_corpus_dir() -> PathBuf {
         .and_then(|p| p.parent())
         .map(|p| p.join("corpus"))
         .unwrap_or_else(|| PathBuf::from("corpus"))
+}
+
+/// Song files outside `corpus/` that were historically ungated:
+/// `ui/songs/**/*.strudel` + the root `marble-machine.compressed.strudel`.
+fn extra_ungated_files() -> Vec<PathBuf> {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let Some(repo) = manifest.parent().and_then(|p| p.parent()) else {
+        return Vec::new();
+    };
+    let mut out = collect_strudel_files(&repo.join("ui").join("songs"));
+    let marble = repo.join("marble-machine.compressed.strudel");
+    if marble.is_file() {
+        out.push(marble);
+    }
+    out
 }
 
 fn collect_strudel_files(root: &Path) -> Vec<PathBuf> {
@@ -291,12 +320,41 @@ fn validate(code: &str) -> Result<(), String> {
     }
     // Structural file → standalone DSL → mini-notation (strudel-rs cascade).
     let out = strudel_dsl::execute(code).map_err(|e| e.to_string())?;
-    require_haps(&out.pattern)
+    require_haps(&out.pattern)?;
+    // Silence lint: a pattern can parse + emit haps yet still ship a DEAD layer —
+    // an unvoiced `chord(...)` (never expands to pitches) or an invented sound
+    // name (falls back to sine). Gate on those two silent-bug classes (same
+    // checks song-check runs); clipping/mono/etc. stay advisory-only.
+    let mut dead: Vec<String> = Vec::new();
+    for f in cycletron_analysis::lint_source(code) {
+        if f.code == "unvoiced-chord" {
+            dead.push(format!("{}: {}", f.code, f.message));
+        }
+    }
+    if let Ok(digest) = cycletron_analysis::inspect_code(code, 4) {
+        let known = cycletron_analysis::sounds::builtin_sound_set();
+        for f in cycletron_analysis::lint_digest(&digest, &known) {
+            if f.code == "unknown-sound" {
+                dead.push(format!("{}: {}", f.code, f.message));
+            }
+        }
+    }
+    if dead.is_empty() {
+        Ok(())
+    } else {
+        Err(dead.join("\n"))
+    }
 }
 
 fn require_haps(pattern: &strudel_core::Pattern) -> Result<(), String> {
-    if pattern.query_arc(0i32, 1i32).is_empty() {
-        Err("pattern emits no events in cycle 0 — silent pattern".to_string())
+    // Scan a small window, not just cycle 0 — full songs legitimately open with
+    // a rest/pickup, so a strict cycle-0 check false-fails them. A pattern silent
+    // across the whole window is a real curation bug (dead layer / typo).
+    const WINDOW: i32 = 8;
+    if pattern.query_arc(0i32, WINDOW).is_empty() {
+        Err(format!(
+            "pattern emits no events in {WINDOW} cycles — silent pattern"
+        ))
     } else {
         Ok(())
     }

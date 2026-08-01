@@ -389,7 +389,29 @@ fn error_context(code: &str, err: &str) -> String {
     let line_no = code[..line_start].matches('\n').count() + 1;
     let col = code[line_start..pos].chars().count();
     let line = &code[line_start..line_end];
-    format!("\n  line {line_no}: {line}\n  {}^ here", " ".repeat(col + "line : ".len() + line_no.to_string().len()))
+    let caret = format!(
+        "\n  line {line_no}: {line}\n  {}^ here",
+        " ".repeat(col + "line : ".len() + line_no.to_string().len())
+    );
+    // Common typo: a method chained on a string literal INSIDE a call, e.g.
+    // `s("bd*4".fast(2))` — the quote closed too early; it should be
+    // `s("bd*4").fast(2)` (chain on the pattern, not the string in the call).
+    let hint = if quote_then_method(line) {
+        "\n  hint: a method looks chained on a string INSIDE a call — did the quote close too \
+         early? `s(\"bd*4\".fast(2))` should be `s(\"bd*4\").fast(2)`."
+    } else {
+        ""
+    };
+    format!("{caret}{hint}")
+}
+
+/// True when a line contains a closing `"` immediately followed by `.method` —
+/// the tell-tale of `s("bd*4".fast(2))` (method chained on the string literal).
+fn quote_then_method(line: &str) -> bool {
+    let b = line.as_bytes();
+    b.windows(2)
+        .enumerate()
+        .any(|(i, w)| w[0] == b'"' && w[1] == b'.' && b.get(i + 2).is_some_and(u8::is_ascii_alphabetic))
 }
 
 /// The combined quality gate: validate + silence lint + mix critique + (for

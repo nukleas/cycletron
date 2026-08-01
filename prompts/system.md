@@ -153,26 +153,26 @@ run                           — running counter
 .linger(n)         — extend duration
 .chop(n)           — chop into n pieces
 .segment(n) / .seg(n)  — segment at rate
-.repeat_cycles(n)  — repeat entire pattern
+.repeatCycles(n)   — repeat entire pattern
 .replicate(n)      — replicate events
 .within(start, end, fn) — transform within time range
-.loop_at(n)        — loop at position
+.loop(n)           — loop the sample over n cycles
 ```
 
 ## Pattern methods — Conditionals
 
 ```
 .every(n, fn)  / .firstOf(n, fn)  — apply every N cycles
-.last_of(n, fn)                    — apply on last of N
+.lastOf(n, fn)                     — apply on last of N
 .always(fn)                        — always apply
 .sometimes(fn)                     — 50% chance (random)
-.sometimes_by(prob, fn)            — probability 0-1
+.sometimesBy(prob, fn)             — probability 0-1
 .often(fn) / .rarely(fn)           — high/low probability
-.almost_always(fn) / .almost_never(fn)
+.almostAlways(fn) / .almostNever(fn)
 .when(pat, fn)                     — conditional on pattern
 .off(t, fn)                        — offset copy with transform
 .jux(fn)                           — juxtapose L/R
-.jux_by(amount, fn)                — juxtapose by amount
+.juxBy(amount, fn)                 — juxtapose by amount
 ```
 
 ## Pattern methods — Selection/Picking
@@ -194,7 +194,7 @@ NOTE: pickRestart uses camelCase, not lowercase. All pick variants are camelCase
 .note(pat) / .n(pat)           — set note
 .sound(pat) / .s(pat)          — set sound/synth name
 .transpose(n) / .trans(n)      — transpose semitones
-.scale_transpose(n) / .strans(n) — transpose in scale
+.scaleTranspose(n) / .scaleTrans(n) / .strans(n) — transpose in scale
 .scale("root:mode")            — quantize numeric degrees to scale. Format: "C4:minor", "F3:dorian".
                                  ONLY affects numeric values (0, 1, 2…), NOT absolute note names.
 .voicing()                     — expand chord symbols to voiced notes (required after chord())
@@ -266,7 +266,7 @@ Band-pass:
 
 ```
 .begin(n)                      — sample start 0-1
-.end(n) / .sample_end(n)       — sample end 0-1
+.end(n)                        — sample end 0-1
 .speed(n)                      — playback speed
 .cut(n)                        — cut group (monophonic)
 ```
@@ -279,7 +279,7 @@ Band-pass:
 .stut(n, feedback, time)       — stutter
 .echo(n, time, feedback)       — echo
 .degrade                       — randomly drop events
-.degrade_by(amount)            — drop by probability
+.degradeBy(amount)             — drop by probability
 .mask(pat)                     — mask with pattern
 .struct(pat)                   — restructure
 .euclid(pulses, steps)         — Euclidean rhythm
@@ -317,7 +317,8 @@ Drum machines (bundled offline — use full name in s("…")):
   TR-707:   RolandTR707_bd  RolandTR707_sd  RolandTR707_hh  RolandTR707_oh  RolandTR707_cp  RolandTR707_lt  RolandTR707_ht
   LinnDrum: LinnDrum_bd     LinnDrum_sd     LinnDrum_hh     LinnDrum_cp
   DR-55:    BossDR55_bd     BossDR55_sd     BossDR55_hh     BossDR55_rim
-Note: .bank() is not yet supported in strudel-rs. Use the full name, e.g. s("RolandTR808_bd").
+Note: .bank() IS supported — `s("bd sd").bank("RolandTR808")` resolves to the machine's kit.
+The full underscore name, e.g. s("RolandTR808_bd"), also works.
 Synths: sine, sawtooth, triangle, square, pulse, fm, supersaw, supersquare, superpwm, superzow, sbd, white, pink, brown, crackle
 Wavetable synths (richer timbres, use with note()): wt_flute, wt_clarinet, wt_oboe, wt_violin, wt_cello, wt_trumpet, wt_bassoon, wt_organ, wt_piano, wt_bell, wt_pluck, wt_bass, wt_lead, wt_pad, wt_choir, wt_strings, wt_sine, wt_tri, wt_square, wt_saw
 New effects: .chorus(depth) .chorusspeed(hz) .vowel(0-4: A/E/I/O/U) .grainsize(ms) .scatter(0-1) .ir(0-2: room/hall/plate)

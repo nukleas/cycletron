@@ -967,7 +967,10 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
     }
 
     // --- Mono image -------------------------------------------------------
-    if !d.uses_pan && d.max_voices >= 3 {
+    // Centre-pan is the DEFAULT, so don't nag every sketch: only nudge on a
+    // dense (5+ simultaneous voices), pitched mix where stereo width genuinely
+    // helps — not a 3-voice drum-and-bass seed.
+    if !d.uses_pan && d.max_voices >= 5 && d.note_low.is_some() {
         findings.push(note(
             "mono",
             format!(
@@ -1034,6 +1037,18 @@ fn looks_like_chord_symbol(s: &str) -> bool {
         || tail.chars().all(|c| c.is_ascii_digit())
 }
 
+/// Strip `//`-to-end-of-line comments (blanking them, keeping line structure)
+/// so source-level token counting ignores prose and `// @track` markers.
+fn strip_line_comments(code: &str) -> String {
+    code.lines()
+        .map(|line| match line.find("//") {
+            Some(i) => &line[..i],
+            None => line,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Source-level lints for silent failures the digest can't see. Today: a
 /// `chord(...)` with no matching `.voicing()` — the chord symbol never
 /// expands to pitches, so the layer is silent even though the sound name on
@@ -1041,8 +1056,12 @@ fn looks_like_chord_symbol(s: &str) -> bool {
 /// symbol-used-AS-sound case).
 pub fn lint_source(code: &str) -> Vec<Finding> {
     let mut findings = Vec::new();
-    let chords = code.matches("chord(").count();
-    let voicings = code.matches(".voicing(").count();
+    // Count only in executable code — a `chord(...)` mentioned in a `//` comment
+    // (or a `// @track` marker) must not trip the lint. Mini-notation strings
+    // never contain `//`, so a plain line-comment strip is safe here.
+    let stripped = strip_line_comments(code);
+    let chords = stripped.matches("chord(").count();
+    let voicings = stripped.matches(".voicing(").count();
     if chords > voicings {
         findings.push(Finding {
             severity: "warn".to_string(),
@@ -1052,6 +1071,24 @@ pub fn lint_source(code: &str) -> Vec<Finding> {
                  symbol never expands to pitches, so that layer is SILENT. Write \
                  chord(\"<Cm7 FM7>\").voicing().s(…)."
             ),
+        });
+    }
+    // Informational: a melodic pattern with no instrument assigned plays a bare
+    // sine (the default). Audible, but usually not intended — nudge to pick a
+    // sound. Coarse whole-document check (a `.s(...)` anywhere suppresses it), so
+    // it never false-warns a piece that does assign sounds.
+    let melodic = stripped.contains("note(") || stripped.contains(".n(");
+    let has_instrument = stripped.contains(".s(")
+        || stripped.contains(".sound(")
+        || stripped.contains("s(\"")
+        || stripped.contains("sound(");
+    if melodic && !has_instrument {
+        findings.push(Finding {
+            severity: "note".to_string(),
+            code: "default-synth".to_string(),
+            message: "a note(…) layer has no .s()/.sound() — it plays a bare sine (the default). \
+                      Add .s(\"…\") to pick an instrument."
+                .to_string(),
         });
     }
     findings
@@ -1795,6 +1832,48 @@ mod tests {
         );
         // Voiced chord: clean.
         assert!(lint_source(r#"chord("<Cm7 FM7>").voicing().s("supersaw")"#).is_empty());
+    }
+
+    #[test]
+    fn lint_source_ignores_chord_mentioned_in_a_comment() {
+        // A `chord(...)` in a `//` comment must not count toward the balance.
+        let code = "// chord(...) expands to notes\nchord(\"<C F>\").voicing().s(\"sine\")";
+        assert!(
+            !lint_source(code).iter().any(|f| f.code == "unvoiced-chord"),
+            "comment chord() falsely tripped the lint: {:?}",
+            lint_source(code)
+        );
+    }
+
+    #[test]
+    fn lint_source_notes_a_melodic_layer_with_no_instrument() {
+        let f = lint_source(r#"note("c4 e4 g4")"#);
+        assert!(
+            f.iter().any(|f| f.code == "default-synth" && f.severity == "note"),
+            "got: {f:?}"
+        );
+        // With an instrument assigned: no nudge.
+        assert!(
+            !lint_source(r#"note("c4 e4 g4").s("wt_lead")"#)
+                .iter()
+                .any(|f| f.code == "default-synth")
+        );
+    }
+
+    #[test]
+    fn critique_does_not_nag_mono_on_a_sparse_centre_mix() {
+        // A 3-voice centred sketch must NOT trip the mono note (centre is the
+        // default; the nudge is reserved for dense 5+ voice pitched mixes).
+        let c = critique_code(
+            r#"stack(s("bd*4"), note("c2 e2 g2 c3").s("sawtooth"), note("<c4 e4>").s("sine"))"#,
+            4,
+        )
+        .unwrap();
+        assert!(
+            !c.findings.iter().any(|f| f.code == "mono"),
+            "unexpected mono nag: {:?}",
+            c.findings
+        );
     }
 
     /// The tool-test song shape: 8 labeled tokens × .slow(8). Labels are
