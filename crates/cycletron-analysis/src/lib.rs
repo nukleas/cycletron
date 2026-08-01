@@ -4,6 +4,7 @@
 //! review pipeline the in-app agent uses can run from CLI tools like
 //! `tools/song-check`. Plain Rust: code strings in, serializable digests out.
 
+pub mod engine_contract;
 pub mod execute;
 pub mod methods;
 pub mod repair;

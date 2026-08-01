@@ -105,8 +105,23 @@ fn main() -> ExitCode {
     let passing = total.saturating_sub(failing);
     println!("corpus-check: {passing}/{total} ok");
 
-    if failing > 0 {
-        println!();
+    // Engine-behavior contract: every documented claim about strudel-rs is
+    // re-verified against the pinned engine here, so a rev bump that changes
+    // behavior fails the gate instead of silently stale-ing the docs/prompt.
+    let contract = cycletron_analysis::engine_contract::check();
+    if !contract.is_empty() {
+        println!("\nengine-contract: {} documented claim(s) drifted from the engine", contract.len());
+        for msg in &contract {
+            println!("  DRIFT {msg}");
+        }
+    } else {
+        println!("engine-contract: ok (documented behaviors match the pinned engine)");
+    }
+
+    if failing > 0 || !contract.is_empty() {
+        if failing > 0 {
+            println!();
+        }
         for (label, err) in &failures {
             println!("FAIL {label}");
             for line in err.lines() {
