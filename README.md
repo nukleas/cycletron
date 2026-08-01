@@ -34,17 +34,33 @@ Early private development (`0.1.0`). Not a public 1.0 yet.
 
 - Rust (edition 2024 toolchain as in workspace)
 - Node.js + npm (UI)
-- Sibling **strudel-rs** checkout at `../strudel-rs` (path deps + WASM package)
-- Nightly + `wasm-pack` for `ui` WASM rebuilds
-- Optional: API key for your AI provider (`ANTHROPIC_API_KEY` / `XAI_API_KEY` / `OPENAI_API_KEY`, or Preferences)
+- Optional: AI provider — Preferences → AI (SuperGrok OAuth, Codex/ChatGPT OAuth, or API keys / env: `ANTHROPIC_API_KEY` / `XAI_API_KEY` / `OPENAI_API_KEY`)
+
+The **strudel-rs** engine is a pinned git dependency (Codeberg), and the prebuilt
+audio WASM is committed under `ui/pkg`, so a fresh clone builds with no sibling
+checkout and no nightly toolchain:
 
 ```bash
-# from this repo
-cargo tauri dev          # desktop app (runs Vite UI)
+# from this repo root — installs UI deps, starts Vite + app
+cargo tauri dev
 ```
 
+`beforeDevCommand` runs `npm install` then the Vite dev server under `ui/`.
+You should not need a separate `cd ui && npm install` for a fresh clone.
+
 ```bash
-cd ui && npm run build:wasm   # rebuild strudel-audio-wasm (needs nightly)
+cargo tauri build             # production bundle (npm install + vite build first)
+```
+
+### Bumping the engine
+
+Only needed when moving to a newer strudel-rs. Update the pinned `rev` for the
+`strudel-*` / `midi-to-strudel` git deps in the workspace `Cargo.toml`, then
+rebuild and re-commit the audio WASM (needs a strudel-rs checkout at that rev +
+nightly + `wasm-pack`):
+
+```bash
+cd ui && npm run build:wasm   # rebuild strudel-audio-wasm → ui/pkg, then commit ui/pkg
 ```
 
 ---
@@ -56,7 +72,9 @@ cd ui && npm run build:wasm   # rebuild strudel-audio-wasm (needs nightly)
 ## Privacy
 
 Prompts and pattern text go to the AI provider you choose. API keys stay in the
-local secrets store (keychain in release builds). Logs and agent stats remain on this machine.
+local secrets store (keychain in release builds). SuperGrok / Codex OAuth tokens
+live in app data (`xai-oauth.json`, `codex-oauth.json`, owner-only). Logs and
+agent stats remain on this machine.
 
 ## Releasing
 
@@ -70,4 +88,4 @@ See [`docs/RELEASE.md`](docs/RELEASE.md) (updater keys, signing, CI, tags).
 |--|--|
 | Studio | [naderlabs.io](https://www.naderlabs.io/) |
 | GitHub | [github.com/nukleas/cycletron](https://github.com/nukleas/cycletron) |
-| Engine | strudel-rs (path dependency today) |
+| Engine | [strudel-rs](https://codeberg.org/nukleas/strudel-rs) (pinned git dependency) |

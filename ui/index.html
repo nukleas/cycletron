@@ -31,8 +31,10 @@
                 <div id="visualsMenu" class="dropdown-menu" role="menu" aria-labelledby="visualsMenuBtn" hidden></div>
             </div>
             <div class="transport-group">
+                <button id="skipBackBtn" class="skip-btn" disabled title="Back 5 cycles" aria-label="Skip back 5 cycles">⏮ 5</button>
                 <button id="transportBtn" class="primary" disabled>▶ Play</button>
                 <button id="stopBtn" class="danger" disabled>■ Stop</button>
+                <button id="skipFwdBtn" class="skip-btn" disabled title="Forward 5 cycles" aria-label="Skip forward 5 cycles">5 ⏭</button>
                 <button id="metronomeBtn" class="metronome-btn" title="Metronome off" aria-label="Metronome">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 22h14"/>
@@ -479,7 +481,8 @@
                         <select id="prefsProvider">
                             <option value="anthropic">Claude (Anthropic)</option>
                             <option value="grok">Grok (xAI)</option>
-                            <option value="openai">OpenAI</option>
+                            <option value="codex">Codex (ChatGPT)</option>
+                            <option value="openai">OpenAI (API key)</option>
                             <option value="local">Local (Ollama / LM Studio)</option>
                             <option value="custom">Custom (OpenAI-compatible)</option>
                         </select>
@@ -489,6 +492,22 @@
                         <input type="password" id="prefsApiKey" placeholder="sk-…" autocomplete="off" spellcheck="false">
                     </label>
                     <div class="prefs-field-hint" id="prefsKeyStatus">No key set</div>
+                    <div id="prefsGrokOauth" class="prefs-oauth" hidden>
+                        <div class="prefs-row prefs-oauth-row">
+                            <button type="button" id="prefsGrokSignIn" class="prefs-inline-btn">Sign in with SuperGrok</button>
+                            <button type="button" id="prefsGrokImport" class="prefs-inline-btn">Import Grok Build session</button>
+                            <button type="button" id="prefsGrokSignOut" class="prefs-inline-btn" hidden>Sign out OAuth</button>
+                        </div>
+                        <div class="prefs-field-hint" id="prefsGrokOauthStatus">Use your SuperGrok / SuperHeavy subscription via OAuth — no API key required.</div>
+                    </div>
+                    <div id="prefsCodexOauth" class="prefs-oauth" hidden>
+                        <div class="prefs-row prefs-oauth-row">
+                            <button type="button" id="prefsCodexSignIn" class="prefs-inline-btn">Sign in with ChatGPT</button>
+                            <button type="button" id="prefsCodexImport" class="prefs-inline-btn">Import Codex CLI session</button>
+                            <button type="button" id="prefsCodexSignOut" class="prefs-inline-btn" hidden>Sign out OAuth</button>
+                        </div>
+                        <div class="prefs-field-hint" id="prefsCodexOauthStatus">Use your ChatGPT / Codex plan via OAuth — same as `codex login`.</div>
+                    </div>
                     <label class="prefs-field" id="prefsBaseUrlField" hidden>
                         <span>Base URL</span>
                         <input type="text" id="prefsBaseUrl" placeholder="https://api.example.com/v1" autocomplete="off" spellcheck="false">
@@ -571,6 +590,14 @@
                             <button id="prefsChangeLibrary" class="prefs-inline-btn">Change…</button>
                         </div>
                     </div>
+                </section>
+                <section class="prefs-section">
+                    <h4>Editor</h4>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsEditorAssist">
+                        <span>Autocomplete &amp; hover docs</span>
+                    </label>
+                    <p class="prefs-note">Suggestions and hover help sourced from the strudel-rs DSL surface. Toggle live from the command palette too.</p>
                 </section>
                 <section class="prefs-section">
                     <h4>Notifications</h4>

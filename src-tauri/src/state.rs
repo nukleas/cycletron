@@ -1,7 +1,7 @@
 use crate::files::Recents;
 use crate::library::{self, LibrarySettings};
 use crate::settings::UserSettings;
-use cycletron_agent::{ClaudeClient, LlmProvider, OpenAiClient};
+use cycletron_agent::{ClaudeClient, CodexClient, LlmProvider, OpenAiClient};
 use cycletron_core::config::AppConfig;
 use cycletron_core::session::Session;
 use cycletron_corpus::{InMemoryCorpusIndex, Recipe};
@@ -66,6 +66,8 @@ impl AppState {
         // Debug: keys go to `{data_dir}/provider-keys.json` (no keychain prompts).
         // Release: OS keychain. Must run before any get_key/set_key.
         crate::secrets::init(&data_dir);
+        crate::xai_oauth::init(&data_dir);
+        crate::codex_oauth::init(&data_dir);
 
         // User settings overlay first so the rest of init sees the merged config.
         let mut user = UserSettings::load(&data_dir);
@@ -133,11 +135,11 @@ impl AppState {
         *self.recents.lock().unwrap() = recents;
 
         // Library: load settings or fall back to {app_data_dir}/library,
-        // ensure the directory exists so the explorer always has a home.
+        // then prepare (mkdir + seed Demos/). Same path as set_library_root.
         let settings = LibrarySettings::load_or_default(&data_dir);
-        if let Err(e) = library::ensure_root_exists(&settings.root) {
+        if let Err(e) = library::prepare_root(&settings.root) {
             tracing::warn!(
-                "could not create library root {}: {e}",
+                "could not initialize library at {}: {e}",
                 settings.root.display()
             );
         }
@@ -158,14 +160,18 @@ impl AppState {
     }
 
     /// Construct the client for the active provider, pulling its key from the
-    /// keychain (env fallback). Returns `None` when the provider can't run —
-    /// Anthropic with no key, or an OpenAI-compatible provider with no base URL.
+    /// keychain (env fallback) or xAI OAuth for Grok. Returns `None` when the
+    /// provider can't run — Anthropic with no key, or an OpenAI-compatible
+    /// provider with no base URL.
     fn build_agent_client(&self) -> Option<Arc<dyn LlmProvider>> {
         let (active, profile) = {
             let us = self.user_settings.lock().unwrap();
             (us.llm.active.clone(), us.llm.active_profile())
         };
-        let key = crate::secrets::get_key(&active);
+        // Prefer a still-valid SuperGrok OAuth access token for Grok; fall
+        // back to API key / env. Callers that need a guaranteed-fresh token
+        // should run `xai_oauth::ensure_fresh` first (see send_message).
+        let key = resolve_provider_credential(&active);
 
         match profile.codec.as_str() {
             "anthropic" => {
@@ -175,6 +181,18 @@ impl AppState {
                     &key,
                     &profile.model,
                     profile.max_tokens,
+                )))
+            }
+            "codex" => {
+                // ChatGPT subscription OAuth → Codex Responses backend.
+                let (access, account_id) = crate::codex_oauth::peek_credential()?;
+                let base = profile.base_url.as_deref();
+                Some(Arc::new(CodexClient::new(
+                    &access,
+                    &account_id,
+                    &profile.model,
+                    profile.max_tokens,
+                    base,
                 )))
             }
             "openai" => {
@@ -201,6 +219,23 @@ impl AppState {
     pub fn app_data_dir(&self) -> Option<PathBuf> {
         self.app_data_dir.lock().unwrap().clone()
     }
+}
+
+/// Resolve a bearer/API credential for `provider_id`.
+/// For Grok: valid xAI OAuth access token first, then secrets/env API key.
+/// For Codex: ChatGPT OAuth is handled separately via `CodexClient` (needs
+/// account id too), so this returns None for pure API-key resolution.
+pub(crate) fn resolve_provider_credential(provider_id: &str) -> Option<String> {
+    if provider_id == "grok" {
+        if let Some(tok) = crate::xai_oauth::peek_access_token() {
+            return Some(tok);
+        }
+    }
+    if provider_id == "codex" {
+        // Not a single bearer string — `build_agent_client` uses peek_credential.
+        return crate::codex_oauth::peek_credential().map(|(tok, _)| tok);
+    }
+    crate::secrets::get_key(provider_id)
 }
 
 /// Turn a relative corpus path into an absolute one, anchored at the

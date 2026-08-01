@@ -1,7 +1,23 @@
 // Progressive examples + showcase — validated against strudel-rs surface.
 // Only uses features confirmed working (see docs/STRUDEL_RS_SUPPORTED.md).
+//
+// Hand-authored lessons/patterns/showcase live here. Full songs, curated
+// techniques, and genre sketches are merged from on-disk `.strudel` files
+// via `examples-from-files.ts` so the browser stays in sync with the library.
 
-export type ExampleSection = 'lessons' | 'patterns' | 'showcase';
+import {
+    loadGenreExamples,
+    loadSongExamples,
+    loadTechniqueExamples,
+} from './examples-from-files.js';
+
+export type ExampleSection =
+    | 'lessons'
+    | 'patterns'
+    | 'showcase'
+    | 'techniques'
+    | 'songs'
+    | 'genres';
 
 export interface Example {
     title: string;
@@ -15,7 +31,7 @@ export interface Example {
     blurb?: string;
 }
 
-export const EXAMPLES: Example[] = [
+const HAND_AUTHORED: Example[] = [
     // ── Lessons (play first, then load in order) ──────────────────────────
     {
         title: 'First Steps',
@@ -498,10 +514,28 @@ stack(
     },
 ];
 
+/** Full catalog: progressive hand-authored set + every bundled song/technique/genre. */
+export const EXAMPLES: Example[] = [
+    ...HAND_AUTHORED,
+    ...loadTechniqueExamples(),
+    ...loadSongExamples(),
+    ...loadGenreExamples(),
+];
+
 export const SECTION_LABELS: Record<ExampleSection, string> = {
     lessons: 'Lessons',
     patterns: 'Patterns',
     showcase: 'Showcase',
+    techniques: 'Techniques',
+    songs: 'Songs & albums',
+    genres: 'Genres',
 };
 
-export const SECTION_ORDER: ExampleSection[] = ['lessons', 'patterns', 'showcase'];
+export const SECTION_ORDER: ExampleSection[] = [
+    'lessons',
+    'patterns',
+    'showcase',
+    'techniques',
+    'songs',
+    'genres',
+];

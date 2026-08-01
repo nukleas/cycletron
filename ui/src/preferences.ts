@@ -50,6 +50,7 @@ export class PreferencesModal {
     private libraryRoot: HTMLElement | null = null;
     private autoCheck: HTMLInputElement | null = null;
     private notifications: HTMLInputElement | null = null;
+    private editorAssist: HTMLInputElement | null = null;
     private metronomeVolume: HTMLInputElement | null = null;
     private audioOutput: HTMLSelectElement | null = null;
     private midiInputSelect: HTMLSelectElement | null = null;
@@ -81,6 +82,7 @@ export class PreferencesModal {
         this.libraryRoot = document.getElementById('prefsLibraryRoot');
         this.autoCheck = document.getElementById('prefsAutoCheck') as HTMLInputElement;
         this.notifications = document.getElementById('prefsNotifications') as HTMLInputElement;
+        this.editorAssist = document.getElementById('prefsEditorAssist') as HTMLInputElement;
         this.metronomeVolume = document.getElementById('prefsMetronomeVolume') as HTMLInputElement;
         this.audioOutput = document.getElementById('prefsAudioOutput') as HTMLSelectElement;
         this.midiInputSelect = document.getElementById('prefsMidiInput') as HTMLSelectElement;
@@ -100,6 +102,12 @@ export class PreferencesModal {
 
         document.getElementById('prefsSave')?.addEventListener('click', () => void this.save());
         document.getElementById('prefsChangeLibrary')?.addEventListener('click', () => void this.changeLibrary());
+        document.getElementById('prefsGrokSignIn')?.addEventListener('click', () => void this.grokOAuthSignIn());
+        document.getElementById('prefsGrokImport')?.addEventListener('click', () => void this.grokOAuthImport());
+        document.getElementById('prefsGrokSignOut')?.addEventListener('click', () => void this.grokOAuthSignOut());
+        document.getElementById('prefsCodexSignIn')?.addEventListener('click', () => void this.codexOAuthSignIn());
+        document.getElementById('prefsCodexImport')?.addEventListener('click', () => void this.codexOAuthImport());
+        document.getElementById('prefsCodexSignOut')?.addEventListener('click', () => void this.codexOAuthSignOut());
 
         this.inited = true;
     }
@@ -138,6 +146,8 @@ export class PreferencesModal {
             if (this.provider) this.provider.value = this.currentProviderId;
             this.applyProviderToForm(this.currentProviderId);
             await this.refreshKeyStatus(this.currentProviderId);
+            await this.refreshGrokOauthUi();
+            await this.refreshCodexOauthUi();
             if (this.defaultTempo) {
                 this.defaultTempo.value = settings.audio.default_tempo != null
                     ? String(settings.audio.default_tempo) : '';
@@ -145,6 +155,7 @@ export class PreferencesModal {
             if (this.libraryRoot) this.libraryRoot.textContent = libRoot || '—';
             if (this.autoCheck) this.autoCheck.checked = settings.updater.auto_check;
             if (this.notifications) this.notifications.checked = settings.notifications.enabled;
+            if (this.editorAssist) this.editorAssist.checked = settings.editor?.assist_enabled ?? true;
             if (this.metronomeVolume) {
                 this.metronomeVolume.value = String(Math.round((settings.metronome?.volume ?? 0.4) * 100));
             }
@@ -175,6 +186,8 @@ export class PreferencesModal {
         this.applyProviderToForm(next);
         if (this.apiKey) this.apiKey.value = '';
         await this.refreshKeyStatus(next);
+        await this.refreshGrokOauthUi();
+        await this.refreshCodexOauthUi();
     }
 
     /** Paint the model / base-URL / max-tokens fields for a provider, plus its
@@ -192,6 +205,213 @@ export class PreferencesModal {
             const note = preset?.note ?? '';
             this.providerNote.textContent = note;
             this.providerNote.hidden = note.length === 0;
+        }
+        const grokPanel = document.getElementById('prefsGrokOauth');
+        if (grokPanel) grokPanel.hidden = id !== 'grok';
+        const codexPanel = document.getElementById('prefsCodexOauth');
+        if (codexPanel) codexPanel.hidden = id !== 'codex';
+        // Codex is subscription-only — hide the API key field noise a bit.
+        if (this.apiKey) {
+            const keyLabel = this.apiKey.closest('label');
+            if (keyLabel) (keyLabel as HTMLElement).hidden = id === 'codex';
+        }
+    }
+
+    private async refreshGrokOauthUi(): Promise<void> {
+        const panel = document.getElementById('prefsGrokOauth');
+        const statusEl = document.getElementById('prefsGrokOauthStatus');
+        const signOut = document.getElementById('prefsGrokSignOut') as HTMLButtonElement | null;
+        const importBtn = document.getElementById('prefsGrokImport') as HTMLButtonElement | null;
+        if (!panel || this.currentProviderId !== 'grok') {
+            if (panel) panel.hidden = true;
+            return;
+        }
+        panel.hidden = false;
+        try {
+            const st = await invoke<{
+                signed_in: boolean;
+                email: string | null;
+                expires_at: number | null;
+                source: string | null;
+                grok_build_available: boolean;
+            }>('xai_oauth_status');
+            if (statusEl) {
+                if (st.signed_in) {
+                    const who = st.email ? ` as ${st.email}` : '';
+                    const src = st.source ? ` (${st.source})` : '';
+                    statusEl.textContent = `Signed in with SuperGrok OAuth${who}${src}. Usage bills to your xAI subscription.`;
+                    statusEl.classList.add('is-ok');
+                } else if (st.grok_build_available) {
+                    statusEl.textContent = 'Grok Build session found on this Mac — click “Import Grok Build session”, or sign in fresh.';
+                    statusEl.classList.remove('is-ok');
+                } else {
+                    statusEl.textContent = 'Use your SuperGrok / SuperHeavy subscription via OAuth — no API key required. Or paste a console.x.ai API key above.';
+                    statusEl.classList.remove('is-ok');
+                }
+            }
+            if (signOut) signOut.hidden = !st.signed_in;
+            if (importBtn) importBtn.hidden = !st.grok_build_available && st.signed_in;
+        } catch (e) {
+            if (statusEl) statusEl.textContent = `OAuth status unavailable: ${e}`;
+        }
+    }
+
+    private async grokOAuthSignIn(): Promise<void> {
+        const statusEl = document.getElementById('prefsGrokOauthStatus');
+        try {
+            if (statusEl) {
+                statusEl.textContent = 'Starting xAI sign-in…';
+                statusEl.classList.remove('is-ok');
+            }
+            const start = await invoke<{
+                user_code: string;
+                verification_uri: string;
+                verification_uri_complete: string | null;
+                expires_in: number;
+                interval: number;
+                device_code: string;
+            }>('xai_oauth_start_login');
+            if (statusEl) {
+                statusEl.textContent = `Approve in browser (code ${start.user_code}). Waiting for xAI…`;
+            }
+            await invoke('xai_oauth_poll_login', {
+                deviceCode: start.device_code,
+                interval: start.interval,
+                expiresIn: start.expires_in,
+            });
+            // Prefer Grok as active after successful OAuth.
+            this.currentProviderId = 'grok';
+            this.llm.active = 'grok';
+            if (this.provider) this.provider.value = 'grok';
+            this.applyProviderToForm('grok');
+            await this.refreshKeyStatus('grok');
+            await this.refreshGrokOauthUi();
+            this.flash('Signed in with SuperGrok');
+        } catch (e: any) {
+            if (statusEl) statusEl.textContent = String(e);
+            const {message} = await import('@tauri-apps/plugin-dialog');
+            await message(`SuperGrok sign-in failed:\n${e}`, {title: 'Cycletron', kind: 'error'});
+        }
+    }
+
+    private async grokOAuthImport(): Promise<void> {
+        const statusEl = document.getElementById('prefsGrokOauthStatus');
+        try {
+            await invoke('xai_oauth_import_grok_build');
+            this.currentProviderId = 'grok';
+            this.llm.active = 'grok';
+            if (this.provider) this.provider.value = 'grok';
+            this.applyProviderToForm('grok');
+            await this.refreshKeyStatus('grok');
+            await this.refreshGrokOauthUi();
+            this.flash('Imported Grok Build session');
+        } catch (e: any) {
+            if (statusEl) statusEl.textContent = String(e);
+            const {message} = await import('@tauri-apps/plugin-dialog');
+            await message(`Import failed:\n${e}`, {title: 'Cycletron', kind: 'error'});
+        }
+    }
+
+    private async grokOAuthSignOut(): Promise<void> {
+        try {
+            await invoke('xai_oauth_logout');
+            await this.refreshKeyStatus('grok');
+            await this.refreshGrokOauthUi();
+            this.flash('Signed out of SuperGrok OAuth');
+        } catch (e: any) {
+            const {message} = await import('@tauri-apps/plugin-dialog');
+            await message(`Sign out failed:\n${e}`, {title: 'Cycletron', kind: 'error'});
+        }
+    }
+
+    private async refreshCodexOauthUi(): Promise<void> {
+        const panel = document.getElementById('prefsCodexOauth');
+        const statusEl = document.getElementById('prefsCodexOauthStatus');
+        const signOut = document.getElementById('prefsCodexSignOut') as HTMLButtonElement | null;
+        const importBtn = document.getElementById('prefsCodexImport') as HTMLButtonElement | null;
+        if (!panel || this.currentProviderId !== 'codex') {
+            if (panel) panel.hidden = true;
+            return;
+        }
+        panel.hidden = false;
+        try {
+            const st = await invoke<{
+                signed_in: boolean;
+                email: string | null;
+                account_id: string | null;
+                source: string | null;
+                codex_cli_available: boolean;
+            }>('codex_oauth_status');
+            if (statusEl) {
+                if (st.signed_in) {
+                    const who = st.email ? ` as ${st.email}` : '';
+                    const src = st.source ? ` (${st.source})` : '';
+                    statusEl.textContent = `Signed in with ChatGPT / Codex OAuth${who}${src}. Usage bills to your ChatGPT plan.`;
+                    statusEl.classList.add('is-ok');
+                } else if (st.codex_cli_available) {
+                    statusEl.textContent = 'Codex CLI session found — click “Import Codex CLI session”, or sign in fresh.';
+                    statusEl.classList.remove('is-ok');
+                } else {
+                    statusEl.textContent = 'Use your ChatGPT Plus/Pro/Codex plan via OAuth — same as `codex login`. No API key.';
+                    statusEl.classList.remove('is-ok');
+                }
+            }
+            if (signOut) signOut.hidden = !st.signed_in;
+            if (importBtn) importBtn.hidden = !st.codex_cli_available && st.signed_in;
+        } catch (e) {
+            if (statusEl) statusEl.textContent = `OAuth status unavailable: ${e}`;
+        }
+    }
+
+    private async codexOAuthSignIn(): Promise<void> {
+        const statusEl = document.getElementById('prefsCodexOauthStatus');
+        try {
+            if (statusEl) {
+                statusEl.textContent = 'Opening ChatGPT sign-in in your browser… (localhost:1455 callback)';
+                statusEl.classList.remove('is-ok');
+            }
+            await invoke('codex_oauth_login');
+            this.currentProviderId = 'codex';
+            this.llm.active = 'codex';
+            if (this.provider) this.provider.value = 'codex';
+            this.applyProviderToForm('codex');
+            await this.refreshKeyStatus('codex');
+            await this.refreshCodexOauthUi();
+            this.flash('Signed in with ChatGPT / Codex');
+        } catch (e: any) {
+            if (statusEl) statusEl.textContent = String(e);
+            const {message} = await import('@tauri-apps/plugin-dialog');
+            await message(`Codex sign-in failed:\n${e}`, {title: 'Cycletron', kind: 'error'});
+        }
+    }
+
+    private async codexOAuthImport(): Promise<void> {
+        const statusEl = document.getElementById('prefsCodexOauthStatus');
+        try {
+            await invoke('codex_oauth_import_cli');
+            this.currentProviderId = 'codex';
+            this.llm.active = 'codex';
+            if (this.provider) this.provider.value = 'codex';
+            this.applyProviderToForm('codex');
+            await this.refreshKeyStatus('codex');
+            await this.refreshCodexOauthUi();
+            this.flash('Imported Codex CLI session');
+        } catch (e: any) {
+            if (statusEl) statusEl.textContent = String(e);
+            const {message} = await import('@tauri-apps/plugin-dialog');
+            await message(`Import failed:\n${e}`, {title: 'Cycletron', kind: 'error'});
+        }
+    }
+
+    private async codexOAuthSignOut(): Promise<void> {
+        try {
+            await invoke('codex_oauth_logout');
+            await this.refreshKeyStatus('codex');
+            await this.refreshCodexOauthUi();
+            this.flash('Signed out of Codex OAuth');
+        } catch (e: any) {
+            const {message} = await import('@tauri-apps/plugin-dialog');
+            await message(`Sign out failed:\n${e}`, {title: 'Cycletron', kind: 'error'});
         }
     }
 
@@ -212,7 +432,7 @@ export class PreferencesModal {
         };
     }
 
-    /** Reflect whether a key is stored for this provider (never shows the key). */
+    /** Reflect whether a key/OAuth session is stored for this provider (never shows secrets). */
     private async refreshKeyStatus(id: string): Promise<void> {
         if (!this.keyStatus) return;
         let has = false;
@@ -220,9 +440,30 @@ export class PreferencesModal {
             has = await invoke<boolean>('has_provider_key', {provider: id});
         } catch { /* ignore */ }
         const required = presetById(id)?.keyRequired ?? true;
-        this.keyStatus.textContent = has
+        let label = has
             ? 'Key saved ✓'
             : (required ? 'No key set' : 'No key (optional)');
+        if (id === 'grok' && has) {
+            try {
+                const st = await invoke<{signed_in: boolean; email: string | null}>('xai_oauth_status');
+                if (st.signed_in) {
+                    label = st.email
+                        ? `SuperGrok OAuth ✓ (${st.email})`
+                        : 'SuperGrok OAuth ✓';
+                }
+            } catch { /* keep key label */ }
+        }
+        if (id === 'codex' && has) {
+            try {
+                const st = await invoke<{signed_in: boolean; email: string | null}>('codex_oauth_status');
+                if (st.signed_in) {
+                    label = st.email
+                        ? `Codex OAuth ✓ (${st.email})`
+                        : 'Codex OAuth ✓';
+                }
+            } catch { /* keep key label */ }
+        }
+        this.keyStatus.textContent = label;
         this.keyStatus.classList.toggle('is-ok', has);
     }
 
@@ -260,6 +501,9 @@ export class PreferencesModal {
             metronome: {
                 enabled: baseMetronome.enabled,
                 volume: volPct != null ? Math.max(0, Math.min(1, volPct / 100)) : baseMetronome.volume,
+            },
+            editor: {
+                assist_enabled: this.editorAssist ? !!this.editorAssist.checked : (this.loaded?.editor?.assist_enabled ?? true),
             },
             midi_input: {
                 device_id: midiDevice && midiDevice.length > 0 ? midiDevice : null,
@@ -437,6 +681,7 @@ export class PreferencesModal {
                 window.strudelApp?.applyBpm?.(tempo);
             }
             setNotificationsEnabled(next.notifications.enabled);
+            window.strudelApp?.editor?.setAssistEnabled(next.editor.assist_enabled);
             metronome.setVolume(next.metronome.volume);
             midiInput.applyFromSettings(next.midi_input);
             await applyAudioSinkId(this.audioOutput?.value ?? '');
@@ -494,3 +739,19 @@ async function applyAudioSinkId(deviceId: string): Promise<void> {
 
 export const preferencesModal = new PreferencesModal();
 (window as any).preferencesModal = preferencesModal;
+
+/**
+ * Persist just the editor-assist flag to the Rust settings via a read-modify-
+ * write, leaving every other preference untouched. Lets the command-palette /
+ * menu toggle survive a restart without opening the modal. No-op outside Tauri.
+ */
+export async function persistEditorAssist(enabled: boolean): Promise<void> {
+    if (!isTauri) return;
+    try {
+        const settings = await invoke<UserSettings>('get_user_settings');
+        settings.editor = {assist_enabled: enabled};
+        await invoke<void>('set_user_settings', {settings});
+    } catch (e) {
+        console.warn('[prefs] persist editor assist failed:', e);
+    }
+}

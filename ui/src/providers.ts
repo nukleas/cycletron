@@ -12,8 +12,8 @@ import type {LlmSettings, ProviderProfile} from './types/tauri-commands.js';
 export interface ProviderPreset {
     id: string;
     label: string;
-    /** "anthropic" (Messages API) or "openai" (OpenAI-compatible chat). */
-    codec: 'anthropic' | 'openai';
+    /** "anthropic" | "openai" | "codex" (ChatGPT Responses backend). */
+    codec: 'anthropic' | 'openai' | 'codex';
     /** Default base URL for the OpenAI codec; null for the Anthropic codec. */
     baseUrl: string | null;
     model: string;
@@ -35,7 +35,14 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     {
         id: 'grok', label: 'Grok (xAI)', codec: 'openai',
         baseUrl: 'https://api.x.ai/v1', model: 'grok-4.5', maxTokens: 32000,
-        keyPlaceholder: 'xai-…', keyRequired: true, showBaseUrl: true,
+        keyPlaceholder: 'xai-… (optional if SuperGrok OAuth)', keyRequired: false, showBaseUrl: true,
+        note: 'Prefer SuperGrok / SuperHeavy OAuth (subscription) over a metered API key. Import your Grok Build session or sign in below.',
+    },
+    {
+        id: 'codex', label: 'Codex (ChatGPT)', codec: 'codex',
+        baseUrl: 'https://chatgpt.com/backend-api/codex', model: 'gpt-5.6-sol', maxTokens: 32000,
+        keyPlaceholder: '(subscription OAuth — no API key)', keyRequired: false, showBaseUrl: true,
+        note: 'Uses your ChatGPT Plus/Pro/Codex plan via OAuth (same as `codex login`). Bills to the subscription, not API credits.',
     },
     {
         id: 'openai', label: 'OpenAI', codec: 'openai',

@@ -186,6 +186,7 @@ async fn execute_tool(
         "search_corpus" => tool_search_corpus(input, state),
         "get_example" => tool_get_example(input, state),
         "list_sounds" => tool_list_sounds(state),
+        "list_methods" => tool_list_methods(input),
         "generate_pattern" => tool_generate_pattern(input),
         "validate_pattern" => tool_validate_pattern(input, state),
         "review_pattern" => tool_review_pattern(input, state),
@@ -195,6 +196,10 @@ async fn execute_tool(
         "critique_form" => tool_critique_form(input),
         "genre_recipe" => tool_genre_recipe(input, state),
         "play_pattern" => tool_play_pattern(input, state, event_tx),
+        "list_parts" => tool_list_parts(state),
+        "upsert_track" => tool_upsert_track(input, state, event_tx),
+        "mute_track" => tool_mute_track(input, state, event_tx),
+        "unmute_track" => tool_unmute_track(input, state, event_tx),
         "stop" => tool_stop(state, event_tx),
         "set_tempo" => tool_set_tempo(input, state, event_tx),
         _ => Err(format!("unknown tool: {name}")),
@@ -252,6 +257,15 @@ fn tool_get_example(input: &serde_json::Value, state: &AppState) -> Result<Strin
 /// any user-loaded sample banks) so the agent picks names that actually exist.
 fn tool_list_sounds(state: &AppState) -> Result<String, String> {
     serde_json::to_string_pretty(&crate::sounds::sound_catalog(state)).map_err(|e| e.to_string())
+}
+
+/// Report the DSL method/function/keyword surface the validator accepts, so the
+/// agent uses real names instead of guessing. Backed by the generated
+/// `dsl-surface.json` (ground truth = `docs/STRUDEL_RS_SUPPORTED.md`).
+fn tool_list_methods(input: &serde_json::Value) -> Result<String, String> {
+    let kind = input["kind"].as_str();
+    let category = input["category"].as_str();
+    Ok(strudel::methods_listing(kind, category))
 }
 
 /// Generate ready-to-play strudel code from an algorithmic-composition
@@ -605,28 +619,177 @@ fn format_recipe(r: &cycletron_corpus::Recipe) -> String {
     s
 }
 
-/// Instead of playing directly, emit a "set_code" event to the frontend.
-/// The WASM REPL handles actual audio playback.
+/// Repair-and-revalidate gate before playback. Playback injects code straight
+/// into the editor, and the agent is only *expected* to validate first — nothing
+/// forced it, so raw model output could reach the WASM REPL and play (or, worse,
+/// silently fail to). This gate closes that loop in three steps:
+///
+///   1. deterministically repair the mechanical mistakes with one correct fix
+///      (fences, `(x) =>` params, negative literal pan — see `sanitize_source`);
+///   2. re-validate the result through the *real* evaluator and fail closed —
+///      un-evaluable code is never injected, it goes back to the agent to fix;
+///   3. run the advisory silence lint — syntactically valid but audibly-dead
+///      layers are surfaced (not blocked; the audible layers still play).
+///
+/// The repaired code — not the raw input — is what reaches the editor and the
+/// session, so `current_pattern` always reflects what actually plays.
 fn tool_play_pattern(
     input: &serde_json::Value,
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let raw = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    apply_document(state, event_tx, raw, "Pattern sent to editor for playback.")
+}
 
-    {
-        let mut session = state.session.lock().unwrap();
-        session.set_pattern(code.to_string());
-        session.playback = PlaybackState::Playing;
+/// The shared commit path for anything that changes the playing document:
+/// deterministic repair → re-validate (fail closed) → silence lint (advisory) →
+/// store in session → emit `__set_code_and_play` (a phase-preserving hot-swap on
+/// the frontend). `lead` is the first sentence of the summary returned to the
+/// agent. On a validation failure NOTHING is committed or emitted — the caller's
+/// edit is a no-op and the agent is told why.
+fn apply_document(
+    state: &AppState,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    raw: &str,
+    lead: &str,
+) -> Result<String, String> {
+    // The resolvable sound set drives both the alias remap and the silence lint.
+    let known = crate::sounds::known_sound_set(state);
+
+    // 1. Deterministic repair: mechanical fixes + catalog-backed sound aliases.
+    let strudel::Sanitized { code, notes } = strudel::sanitize_source_with_catalog(raw, &known);
+    let repair_summary = if notes.is_empty() {
+        String::new()
+    } else {
+        let mut s = String::from("\nAuto-repaired:");
+        for n in &notes {
+            s.push_str(&format!("\n  • {n}"));
+        }
+        s
+    };
+
+    // 2. Re-validate through the REAL evaluator. Fail closed: never inject code
+    //    the engine can't parse — that is silence with no feedback loop.
+    if let Err(e) = strudel::validate_code(&code) {
+        return Ok(format!(
+            "NOT APPLIED — the resulting pattern does not evaluate, so nothing changed.\n\
+             INVALID: {e}{}{repair_summary}\n\nFix the error and try again.",
+            error_context(&code, &e.to_string()),
+        ));
     }
 
-    // Emit a custom event that the frontend will use to inject code into the WASM REPL
+    // 3. Silence lint (advisory): valid syntax, but audibly-dead layers —
+    //    invented sounds, unvoiced chords, out-of-range pan. Surface, don't block.
+    let mut lint = strudel::lint_source(&code);
+    lint.extend(
+        strudel::inspect_code(&code, 4)
+            .map(|d| strudel::lint_digest(&d, &known))
+            .unwrap_or_default(),
+    );
+    let warns: Vec<_> = lint.iter().filter(|f| f.severity == "warn").collect();
+
+    // 4. Commit the repaired code: store it and inject into the WASM REPL.
+    {
+        let mut session = state.session.lock().unwrap();
+        session.set_pattern(code.clone());
+        session.playback = PlaybackState::Playing;
+    }
     let _ = event_tx.send(AgentEvent::ToolResult {
         name: "__set_code_and_play".to_string(),
-        result: code.to_string(),
+        result: code.clone(),
     });
 
-    Ok(format!("Pattern sent to editor for playback."))
+    // 5. Report back what was repaired and any silent-layer warnings.
+    let mut msg = String::from(lead);
+    msg.push_str(&repair_summary);
+    if !warns.is_empty() {
+        msg.push_str("\nPlaying, but these layers may be SILENT — fix, then play again:");
+        for f in &warns {
+            msg.push_str(&format!("\n  [{}] {}: {}", f.severity, f.code, f.message));
+        }
+    }
+    Ok(msg)
+}
+
+/// The document currently in the editor/session, or a friendly error when there
+/// is nothing to edit yet.
+fn current_document(state: &AppState) -> Result<String, String> {
+    state
+        .session
+        .lock()
+        .unwrap()
+        .current_pattern
+        .clone()
+        .ok_or_else(|| {
+            "There's no song in the editor yet. Use play_pattern to start one, then edit its \
+             tracks with upsert_track / mute_track."
+                .to_string()
+        })
+}
+
+/// List the addressable tracks of the current song (read-only; no playback).
+fn tool_list_parts(state: &AppState) -> Result<String, String> {
+    let code = current_document(state)?;
+    let parts = crate::tracks::list_tracks(&code);
+    if parts.is_empty() {
+        return Ok("The current document has no tracks yet.".to_string());
+    }
+    let mut out = format!("{} track(s) in the current song:\n", parts.len());
+    for p in &parts {
+        let handle = match &p.id {
+            Some(id) => format!("@{id}"),
+            None => format!("#{} (no id — address by index)", p.index),
+        };
+        let muted = if p.muted { " [MUTED]" } else { "" };
+        out.push_str(&format!("  {}. {}{}  —  {}\n", p.index, handle, muted, p.preview));
+    }
+    out.push_str(
+        "\nEdit one with upsert_track {id, code}; silence one with mute_track {id}.",
+    );
+    Ok(out)
+}
+
+/// Add or replace one track, then hot-swap. Only the target track's text changes.
+fn tool_upsert_track(
+    input: &serde_json::Value,
+    state: &AppState,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+) -> Result<String, String> {
+    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
+    let expr = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let code = current_document(state)?;
+    let (new_code, wrote) = crate::tracks::upsert_track(&code, id, expr)?;
+    apply_document(
+        state,
+        event_tx,
+        &new_code,
+        &format!("Track @{wrote} updated (other tracks unchanged)."),
+    )
+}
+
+/// Mute one track (comment it out), then hot-swap.
+fn tool_mute_track(
+    input: &serde_json::Value,
+    state: &AppState,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+) -> Result<String, String> {
+    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
+    let code = current_document(state)?;
+    let new_code = crate::tracks::mute_track(&code, id)?;
+    apply_document(state, event_tx, &new_code, &format!("Track '{id}' muted."))
+}
+
+/// Restore a muted track, then hot-swap.
+fn tool_unmute_track(
+    input: &serde_json::Value,
+    state: &AppState,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+) -> Result<String, String> {
+    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
+    let code = current_document(state)?;
+    let new_code = crate::tracks::unmute_track(&code, id)?;
+    apply_document(state, event_tx, &new_code, &format!("Track '{id}' unmuted."))
 }
 
 fn tool_stop(

@@ -16,7 +16,7 @@ import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
 import {aboutModal} from './about-modal.js';
 import {helpModal} from './help-modal.js';
-import {preferencesModal} from './preferences.js';
+import {preferencesModal, persistEditorAssist} from './preferences.js';
 import {midiLab} from './midi-lab.js';
 import {audioRecorder} from './audio-recorder.js';
 import {checkForUpdates} from './updater.js';
@@ -187,6 +187,8 @@ const COMMANDS: Item[] = [
     {id: 'cmd.play_pause',  title: 'Play / Pause',          section: 'Commands', hint: '⌘↩',     run: () => { void window.strudelApp?.togglePlayPause?.(); }},
     {id: 'cmd.stop',        title: 'Stop Playback',         section: 'Commands', hint: 'Esc',    run: () => window.strudelApp?.stop?.()},
     {id: 'cmd.record',      title: 'Toggle Recording',      section: 'Commands',                 run: () => { void audioRecorder.toggle(); }},
+    {id: 'cmd.export_audio',title: 'Export Audio…',         section: 'Commands', hint: '⌘⇧E',    run: () => { void fileManager.exportAudio(); }},
+    {id: 'cmd.export_midi', title: 'Export MIDI…',          section: 'Commands',                 run: () => { void fileManager.exportMidi(); }},
     {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => { void midiLab.openEmpty(); }},
     {id: 'cmd.load_samples',title: 'Load Sample Folder…',   section: 'Commands',                 run: () => { void window.strudelApp?.loadSampleFolder?.(); }},
     {id: 'cmd.preferences', title: 'Preferences…',          section: 'Commands', hint: '⌘,',     run: () => { void preferencesModal.open(); }},
@@ -199,6 +201,7 @@ const COMMANDS: Item[] = [
     {id: 'cmd.logs',        title: 'Show Logs…',            section: 'Commands',                 run: () => { void logsModal.open(); }},
     {id: 'cmd.toggle_ai',   title: 'Toggle AI Panel',       section: 'Commands',                 run: () => document.getElementById('aiPanel')?.classList.toggle('collapsed')},
     {id: 'cmd.toggle_files',title: 'Toggle Files Panel',    section: 'Commands',                 run: () => document.getElementById('filesPanel')?.classList.toggle('collapsed')},
+    {id: 'cmd.toggle_assist',title: 'Toggle Editor Autocomplete', section: 'Commands',            run: async () => { const e = window.strudelApp?.editor; if (!e) return; const on = !e.isAssistEnabled(); e.setAssistEnabled(on); await persistEditorAssist(on); }},
     {id: 'cmd.tempo_up',    title: 'Tempo +1 BPM',          section: 'Commands',                 run: () => adjustBpm(1)},
     {id: 'cmd.tempo_down',  title: 'Tempo −1 BPM',          section: 'Commands',                 run: () => adjustBpm(-1)},
     {id: 'cmd.clear_session', title: 'Clear AI Session',    section: 'Commands',                 run: async () => {

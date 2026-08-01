@@ -16,11 +16,11 @@ Related: [PLAN.md](../PLAN.md), [AGENT_FRICTION.md](./AGENT_FRICTION.md), [STRUD
 | Ease of use (power users) | **7/10** | Palette, menus, shortcuts, empty state, quick prompts |
 | Ease of use (new musicians) | **4/10** | Onboarding is setup, not teaching music or the AI workflow |
 | Help / tutorials / docs | **6/10** | USER_GUIDE + DIALECT + in-app Help; progressive Examples; no video/tour yet |
-| Quality / tests / CI | **6/10** | Unit tests + corpus-check + GitHub Actions; needs live strudel-rs access; no UI e2e |
+| Quality / tests / CI | **7/10** | Unit tests + corpus-check + GitHub Actions; engine is a public git dep (no token/sibling); typecheck vs committed `ui/pkg`; no UI e2e |
 | Security / privacy | **7/10** | Keychain; production CSP set; DevTools off; privacy blurb in About |
-| Distribution / packaging | **4/10** | Bundle + licenseFile; updater pubkey empty; signing not done |
+| Distribution / packaging | **5/10** | Bundle + licenseFile; **clean-clone build works** (git-dep engine + committed WASM); updater pubkey empty; signing not done |
 | Legal / licensing | **7/10** | AGPL LICENSE file + About notice; sample-bank audit still open |
-| Cross-platform | **4/10** | macOS-first; Windows/Linux keyring not enabled |
+| Cross-platform | **5/10** | macOS-first; keyring now apple + secret-service + windows-native; Win/Linux installer smoke pending |
 | Branding / marketing surface | **6/10** | Cycletron About/README; site/download page still open |
 
 ---
@@ -47,13 +47,19 @@ Related: [PLAN.md](../PLAN.md), [AGENT_FRICTION.md](./AGENT_FRICTION.md), [STRUD
 ## 3. P0 — must fix before public download
 
 1. ~~LICENSE / user docs / privacy blurb / CSP / DevTools off / CI workflow~~ — **Stream D done.**
-2. **Cannot build from a clean public clone** — hard path deps on sibling `../strudel-rs`; UI WASM needs nightly + that tree (document or vendor).
+2. ~~**Cannot build from a clean public clone**~~ — **DONE.** `strudel-rs` is now a pinned
+   git dependency (public Codeberg, `rev` in workspace `Cargo.toml`) and the prebuilt audio
+   WASM is committed under `ui/pkg`, so a fresh clone builds with no sibling checkout and no
+   nightly. `beforeDevCommand`/`prebuild` no longer rebuild the WASM.
 3. **Release pipeline incomplete** — updater `pubkey: ""`, no Apple signing/notarization yet (see `docs/RELEASE.md`).
 4. **Sample-bank license audit** — bundled Dirt-Samples / soundfonts before wide redistribution.
-5. **Green CI on GitHub** — confirm `STRUDEL_RS_TOKEN` if engine is private; first green run.
+5. ~~**Green CI (STRUDEL_RS_TOKEN)**~~ — engine is a public git dep now, so CI needs no token /
+   sibling checkout; the WASM-type stub is gone (typecheck runs against the committed `ui/pkg`).
+   Still: confirm the first green run on GitHub.
 6. **Ship only from a clean tag** — exclude scratch / WIP from release notes.
 
-Cross-platform note: `keyring` is `apple-native` only until Windows/Linux features are enabled.
+Cross-platform note: `keyring` now enables `apple-native` + `sync-secret-service` (Linux) +
+`windows-native`. Installer/keyring smoke tests on Windows/Linux still pending.
 
 ---
 
@@ -65,7 +71,7 @@ Cross-platform note: `keyring` is `apple-native` only until Windows/Linux featur
 | Welcome setup wizard | Guided first-song wizard (Play → Lesson 1 → AI → save) |
 | Empty editor: Open / New / Examples | — |
 | Help → User Guide / Shortcuts / Dialect | Video / interactive tour |
-| Progressive Examples (lessons → patterns → showcase) | Wire Agency full tracks into library “Demos” folder at install |
+| Progressive Examples (lessons → patterns → showcase + techniques/songs/genres) | ~~Wire Agency + songs + curated corpus into library `Demos/` at install~~ done |
 | AI welcome copy (Play first) | Clearer empty state when no API key |
 
 ### Help system (target)
@@ -237,3 +243,5 @@ Cross-platform note: `keyring` is `apple-native` only until Windows/Linux featur
 | 2026-07-26 | **Stream B:** `docs/USER_GUIDE.md` + `DIALECT.md`; in-app Help modal; progressive Examples (lessons/patterns/showcase); .js songs → .strudel; DnB dedupe; About → CYCLETRON |
 | 2026-07-26 | **Stream D:** AGPL `LICENSE`; About privacy; CSP + `devtools: false`; track `Cargo.lock`; CI workflow; `docs/RELEASE.md`; restore `execute` cascade for current strudel-rs |
 | 2026-07-26 | **Stream E:** full crate/path rename `robostrudel-*` → `cycletron-*` |
+| 2026-07-31 | **AI co-editor arc:** `list_methods` tool; track-aware surgical editing (`list_parts`/`upsert_track`/`mute_track`); genre-recipe coverage 12 → 65; transport skip ±5 cycles; auto full-loop export length (+ pickRestart-length fix). |
+| 2026-07-31 | **Engine migration (P0 #2 resolved):** `strudel-rs` path deps → pinned public Codeberg git dep; audio WASM rebuilt from main + committed to `ui/pkg`; clean clone builds with no sibling/nightly. README + CI updated (no `STRUDEL_RS_TOKEN`, no WASM stub); keyring cross-platform. |

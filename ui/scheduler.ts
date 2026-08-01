@@ -24,6 +24,40 @@ const INV_240 = 1 / 240;
  */
 const SOUNDFONT_LOOKAHEAD_CYCLES = 4;
 
+/** Main-thread schedule cadence. Worker-driven so WKWebView doesn't throttle it. */
+const SCHEDULE_MS = 100;
+/** Extra cycle lookahead while the window is hidden (safety if a tick is delayed). */
+const BACKGROUND_LOOKAHEAD_CYCLES = 0.75;
+
+/**
+ * Dedicated Worker whose `setInterval` keeps firing when the main document is
+ * backgrounded. Chromium/WebKit throttle main-thread timers heavily on blur;
+ * that starves our ~300ms audio lookahead and causes glitches / catch-up spikes.
+ */
+function createScheduleTimerWorker(): Worker | null {
+    if (typeof Worker === 'undefined') return null;
+    try {
+        const src = `
+            let id = null;
+            self.onmessage = (e) => {
+                const msg = e.data || {};
+                if (msg.type === 'start') {
+                    if (id != null) clearInterval(id);
+                    const ms = typeof msg.ms === 'number' && msg.ms > 0 ? msg.ms : ${SCHEDULE_MS};
+                    id = setInterval(() => self.postMessage({ type: 'tick' }), ms);
+                } else if (msg.type === 'stop') {
+                    if (id != null) clearInterval(id);
+                    id = null;
+                }
+            };
+        `;
+        return new Worker(URL.createObjectURL(new Blob([src], {type: 'application/javascript'})));
+    } catch (e) {
+        console.warn('[scheduler] timer worker unavailable, falling back to setTimeout:', e);
+        return null;
+    }
+}
+
 export class PatternScheduler {
     private processor: MainThreadProcessor | null;
     private readonly audioContext: AudioContext;
@@ -42,6 +76,9 @@ export class PatternScheduler {
     /** Cycle position saved when pause() is called, so the UI can display it while frozen. */
     private pausedCycle: number = 0;
 
+    /** When true, skip rAF UI updates (window hidden) but keep audio scheduling. */
+    private uiPaused: boolean = false;
+
     onCycleUpdate: ((cycle: number) => void) | null = null;
 
     /**
@@ -53,6 +90,8 @@ export class PatternScheduler {
 
     private _animationId: number | null = null;
     private _scheduleTimer: ReturnType<typeof setTimeout> | null = null;
+    private _timerWorker: Worker | null = null;
+    private _usingWorkerTimer = false;
 
     /**
      * @param processor
@@ -61,6 +100,22 @@ export class PatternScheduler {
     constructor(processor: MainThreadProcessor, audioContext: AudioContext) {
         this.processor = processor;
         this.audioContext = audioContext;
+        this._timerWorker = createScheduleTimerWorker();
+        if (this._timerWorker) {
+            this._timerWorker.onmessage = (e: MessageEvent) => {
+                if (e.data?.type === 'tick' && this.running) {
+                    this.scheduleTick();
+                }
+            };
+            this._timerWorker.onerror = (err) => {
+                console.warn('[scheduler] timer worker error, falling back to setTimeout:', err);
+                this._stopTimerDriver();
+                this._timerWorker?.terminate();
+                this._timerWorker = null;
+                this._usingWorkerTimer = false;
+                if (this.running) this._armTimeoutTick();
+            };
+        }
     }
 
     /**
@@ -130,6 +185,38 @@ export class PatternScheduler {
     }
 
     /**
+     * Jump the transport by `delta` cycles (negative = backward), clamped at 0.
+     *
+     * Re-anchors `startTime` exactly like `setBpm`/`resume` so playback continues
+     * in phase from the target cycle, rewinds `scheduledTo` so the target span is
+     * re-queried (a backward jump would otherwise be skipped by the
+     * `queryEnd > scheduledTo` guard), and hushes stale queued events on the
+     * worklet (active voices ring out; only pending events are dropped).
+     *
+     * No-op when nothing is loaded. While paused, it moves the saved position so
+     * a later `resume()` starts from the new cycle.
+     */
+    seekBy(delta: number): void {
+        this.seekTo((this.running ? this._liveCurrentCycle() : this.pausedCycle) + delta);
+    }
+
+    /** Seek to an absolute cycle (clamped at 0). See {@link seekBy}. */
+    seekTo(cycle: number): void {
+        if (!this.pattern) return;
+        const target = Math.max(0, cycle);
+        if (this.running) {
+            this.startTime = this.audioContext.currentTime - target / this.cps;
+            this.processor?.setStartTime(this.startTime);
+            this.scheduledTo = target;
+            this.audioManager?.sendHush(); // drop pending events; we jumped
+            this.kickSchedule(); // re-query from the target immediately
+        } else {
+            this.pausedCycle = target;
+        }
+        if (this.onCycleUpdate) this.onCycleUpdate(target);
+    }
+
+    /**
      * Start playback from cycle 0.
      */
     start(): void {
@@ -143,8 +230,10 @@ export class PatternScheduler {
 
         this.processor!.setStartTime(this.startTime);
 
-        this.updateUI();
+        this._startTimerDriver();
+        // Immediate tick so the first events land before the first interval.
         this.scheduleTick();
+        if (!this.uiPaused) this.updateUI();
     }
 
     /**
@@ -159,16 +248,8 @@ export class PatternScheduler {
         if (!this.running) return;
 
         this.running = false;
-
-        if (this._animationId !== null) {
-            cancelAnimationFrame(this._animationId);
-            this._animationId = null;
-        }
-
-        if (this._scheduleTimer !== null) {
-            clearTimeout(this._scheduleTimer);
-            this._scheduleTimer = null;
-        }
+        this._stopUiLoop();
+        this._stopTimerDriver();
 
         // currentTime keeps advancing while paused (context stays running),
         // so we capture the cycle position now for startTime reconstruction.
@@ -196,8 +277,9 @@ export class PatternScheduler {
         this.scheduledTo = this.pausedCycle;
         this.running = true;
 
-        this.updateUI();
+        this._startTimerDriver();
         this.scheduleTick();
+        if (!this.uiPaused) this.updateUI();
     }
 
     /**
@@ -206,16 +288,8 @@ export class PatternScheduler {
     stop(): void {
         this.running = false;
         this.pausedCycle = 0;
-
-        if (this._animationId !== null) {
-            cancelAnimationFrame(this._animationId);
-            this._animationId = null;
-        }
-
-        if (this._scheduleTimer !== null) {
-            clearTimeout(this._scheduleTimer);
-            this._scheduleTimer = null;
-        }
+        this._stopUiLoop();
+        this._stopTimerDriver();
 
         // hush() works correctly regardless of AudioContext state - no
         // resume() call needed, so there is no async race on stop.
@@ -235,10 +309,14 @@ export class PatternScheduler {
      *
      * Queries packed events from the Rust pattern engine and stores them in
      * CHANNEL.event_input so the audio thread picks them up on its next render block.
+     *
+     * Driven by a Worker timer when available so background tabs keep filling
+     * the lookahead buffer. Falls back to main-thread setTimeout otherwise.
      */
     scheduleTick = (): void => {
         if (!this.running || !this.pattern || !this.processor) {
             this.running = false;
+            this._stopTimerDriver();
             return;
         }
 
@@ -246,10 +324,15 @@ export class PatternScheduler {
         // No-op in steady state (two Atomics.load + equality check).
         this.audioManager?.flushAllocLog();
 
+        // Prefer a longer buffer while hidden — main-thread catch-up is costly.
+        const lookahead = this.uiPaused
+            ? Math.max(this.lookahead, BACKGROUND_LOOKAHEAD_CYCLES)
+            : this.lookahead;
+
         const cps = this.cps;
         const elapsed = this.audioContext.currentTime - this.startTime;
         const currentCycle = elapsed * cps;
-        const queryEnd = currentCycle + this.lookahead;
+        const queryEnd = currentCycle + lookahead;
 
         if (queryEnd > this.scheduledTo) {
             const from = this.scheduledTo;
@@ -266,7 +349,10 @@ export class PatternScheduler {
             this.onMissingBanks();
         }
 
-        this._scheduleTimer = setTimeout(this.scheduleTick, 100);
+        // Worker interval re-arms itself; only setTimeout needs a follow-up.
+        if (!this._usingWorkerTimer) {
+            this._armTimeoutTick();
+        }
     };
 
     /**
@@ -284,10 +370,31 @@ export class PatternScheduler {
     }
 
     /**
-     * High-frequency UI loop (~60fps).
+     * Pause/resume the visual rAF loop when the window is hidden/shown.
+     * Audio scheduling keeps running (Worker timer). Call with `true` on
+     * `visibilitychange` when `document.hidden`.
+     */
+    setUiPaused(paused: boolean): void {
+        if (this.uiPaused === paused) return;
+        this.uiPaused = paused;
+        if (paused) {
+            this._stopUiLoop();
+        } else if (this.running) {
+            // Refill the event buffer immediately after a focus return, then
+            // restart the visual loop.
+            this.kickSchedule();
+            this.updateUI();
+        }
+    }
+
+    /**
+     * High-frequency UI loop (~60fps). Skipped while the window is hidden.
      */
     updateUI = (): void => {
-        if (!this.running) return;
+        if (!this.running || this.uiPaused) {
+            this._animationId = null;
+            return;
+        }
 
         const visualElapsed = Math.max(
             0,
@@ -299,10 +406,47 @@ export class PatternScheduler {
         }
 
         // Continue loop
-        if (this.running) {
+        if (this.running && !this.uiPaused) {
             this._animationId = requestAnimationFrame(this.updateUI);
         }
     };
+
+    private _startTimerDriver(): void {
+        if (this._timerWorker) {
+            this._usingWorkerTimer = true;
+            this._timerWorker.postMessage({type: 'start', ms: SCHEDULE_MS});
+            return;
+        }
+        this._usingWorkerTimer = false;
+        this._armTimeoutTick();
+    }
+
+    private _stopTimerDriver(): void {
+        if (this._timerWorker && this._usingWorkerTimer) {
+            try {
+                this._timerWorker.postMessage({type: 'stop'});
+            } catch { /* ignore */ }
+        }
+        this._usingWorkerTimer = false;
+        if (this._scheduleTimer !== null) {
+            clearTimeout(this._scheduleTimer);
+            this._scheduleTimer = null;
+        }
+    }
+
+    private _armTimeoutTick(): void {
+        if (this._scheduleTimer !== null) {
+            clearTimeout(this._scheduleTimer);
+        }
+        this._scheduleTimer = setTimeout(this.scheduleTick, SCHEDULE_MS);
+    }
+
+    private _stopUiLoop(): void {
+        if (this._animationId !== null) {
+            cancelAnimationFrame(this._animationId);
+            this._animationId = null;
+        }
+    }
 
     /**
      * Live cycle position directly from the audio clock.
@@ -318,6 +462,12 @@ export class PatternScheduler {
 
     dispose(): void {
         this.stop();
+        if (this._timerWorker) {
+            try {
+                this._timerWorker.terminate();
+            } catch { /* ignore */ }
+            this._timerWorker = null;
+        }
         this.onCycleUpdate = null;
         this.onMissingBanks = null;
         this.processor = null;

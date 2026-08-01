@@ -80,6 +80,28 @@ export interface AppInfo {
     tauri_version: string;
 }
 
+/** Result of offline `export_audio` (WAV/MP3/stems via OfflineRenderer). */
+export interface ExportAudioResult {
+    paths: string[];
+    stem_paths: string[];
+    duration_secs: number;
+    bpm: number;
+    sample_rate: number;
+    clipped_samples: number;
+    notes: string[];
+}
+
+/** @deprecated alias — prefer ExportAudioResult */
+export type ExportWavResult = ExportAudioResult;
+
+/** Result of `export_midi` (strudio to-midi path). */
+export interface ExportMidiResult {
+    path: string;
+    cycles: number;
+    bpm: number;
+    note_count: number;
+}
+
 export interface Snapshot {
     id: string;
     created_at_ms: number;
@@ -125,6 +147,10 @@ export interface MetronomeSettings {
     volume: number;
 }
 
+export interface EditorSettings {
+    assist_enabled: boolean;
+}
+
 export interface MidiDeviceInfo {
     id: string;
     name: string;
@@ -161,6 +187,7 @@ export interface UserSettings {
     updater: UpdaterSettings;
     notifications: NotificationSettings;
     metronome: MetronomeSettings;
+    editor: EditorSettings;
     midi_input: MidiInputSettings;
     first_run_done: boolean;
 }

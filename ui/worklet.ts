@@ -49,14 +49,14 @@ class StrudelProcessor extends AudioWorkletProcessor<'strudel-processor'> {
         super();
 
         try {
-            const {wasmModule, sampleRate, sharedMemory} = options.processorOptions;
+            const {wasmModule, sampleRate, sharedMemory, rngSeed} = options.processorOptions;
 
             // Use the SAME memory object as the main thread.
             // Both instances compile the same binary, so CHANNEL is at the same
             // byte offset in both - they access the same physical bytes.
             initSync({module: wasmModule, memory: sharedMemory});
 
-            this.processor = new WorkletProcessor(sampleRate);
+            this.processor = new WorkletProcessor(sampleRate, rngSeed >>> 0);
 
             // Capture pointer offsets once - they are stable for the lifetime of
             // this instance (the values live in the audio heap 4-12MB range).

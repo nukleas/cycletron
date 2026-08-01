@@ -96,6 +96,10 @@ export default defineConfig({
     server: {
         port: 5173,
         strictPort: true,
+        // Allow importing curated corpus demos from the monorepo root.
+        fs: {
+            allow: ['.', '..', '../corpus'],
+        },
         headers: {
             'Cross-Origin-Opener-Policy': 'same-origin',
             'Cross-Origin-Embedder-Policy': 'require-corp',

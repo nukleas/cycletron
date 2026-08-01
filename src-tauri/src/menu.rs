@@ -76,6 +76,12 @@ pub fn build_app_menu<R: Runtime>(
         )
         .separator()
         .item(&MenuItemBuilder::with_id("file.import_midi", "Import MIDI…").build(app)?)
+        .item(
+            &MenuItemBuilder::with_id("file.export_audio", "Export Audio…")
+                .accelerator("CmdOrCtrl+Shift+E")
+                .build(app)?,
+        )
+        .item(&MenuItemBuilder::with_id("file.export_midi", "Export MIDI…").build(app)?)
         .separator()
         .item(&PredefinedMenuItem::quit(app, Some("Quit"))?)
         .build()?;
@@ -224,6 +230,8 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "file.save" => "menu:save",
         "file.save_as" => "menu:save_as",
         "file.import_midi" => "menu:import_midi",
+        "file.export_audio" | "file.export_wav" => "menu:export_audio",
+        "file.export_midi" => "menu:export_midi",
         "edit.undo" => "menu:undo",
         "edit.redo" => "menu:redo",
         "edit.clear_session" => "menu:clear_session",

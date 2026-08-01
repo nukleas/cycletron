@@ -54,22 +54,38 @@ Preferences so transport works when another app is focused.
 - Optional frontmatter at the top of a file can record `bpm` and tags.
 - **⌘↩** evaluates the whole buffer and starts (or updates) playback.
 - Edits while playing hot-swap on the next eval — there is no separate “compile” step.
+- **File → Export Audio…** (`⌘⇧E`) offline-bakes WAV/MP3 (and optional stems) via the Rust DSP engine — faster than realtime, no need to press Record.
+- **File → Export MIDI…** writes a Standard MIDI File from the current pattern.
+- The transport **Record** button still captures the live mix (realtime) when you want that.
 
 ### Examples (in-app)
 
-Examples are grouped:
+Open **View → Browse Examples** (or the empty-state Examples button). Sections:
 
 1. **Lessons** — progressive ramp (start here).
-2. **Patterns** — techniques and textures.
-3. **Showcase** — fuller grooves and concept-album excerpts.
+2. **Patterns** — hand-picked techniques and textures.
+3. **Showcase** — fuller groove sketches.
+4. **Techniques** — curated corpus (rhythm, melody, harmony, form, timbre, motion).
+5. **Songs & albums** — full tracks, covers, and the Agency OST.
+6. **Genres** — one playable sketch per genre recipe.
 
-Always **Play first**, then load an example so audio is already armed.
+Use the filter box to search by title or tag. Always **Play first**, then load
+an example so audio is already armed.
 
-### Library & songs
+### Library & demos
 
-Demo songs live under `ui/songs/` in the source tree (Agency OST, covers,
-grooves). Save your own work into the **library root** chosen in the welcome
-wizard or Preferences.
+Whenever your library folder is set up (first launch default, or when you choose a
+root in the welcome wizard / Preferences), Cycletron seeds a **Demos/** folder:
+
+| Folder | Contents |
+|--------|----------|
+| `Demos/Songs/` | Full tracks + `Agency/` album |
+| `Demos/Techniques/` | Curated short patterns by category |
+| `Demos/Genres/` | One sketch per genre |
+
+Browse them in the File Explorer, open any `.strudel`, and remix. Existing
+files are never overwritten on upgrade — only missing demos are filled in.
+Save your own work alongside them in the library root (Preferences → Library).
 
 ---
 

@@ -5,9 +5,13 @@
 //! `tools/song-check`. Plain Rust: code strings in, serializable digests out.
 
 pub mod execute;
+pub mod methods;
+pub mod repair;
 pub mod sounds;
 
 pub use execute::execute;
+pub use methods::{dsl_symbols, methods_listing, DslSymbol};
+pub use repair::{remap_sounds, sanitize_source, sanitize_source_with_catalog, Sanitized};
 
 use serde::Serialize;
 use strudel_core::{ContextKey, Hap, Value, ValueTypeTag};
@@ -650,6 +654,13 @@ pub fn analyze_code(code: &str, max_cycles: usize) -> Result<ArrangementAnalysis
     let labeled = parse_pickrestart_labels(code)
         .map(|labels| (labels, parse_pickrestart_slow(code).unwrap_or(1) as usize));
 
+    // A pickRestart selector defines the song's loop explicitly: total length =
+    // (expanded token count) × the per-token `.slow(n)` factor. This is the
+    // authoritative length for section-based / cover songs, where the onset
+    // fingerprint (`smallest_period`) often won't find a clean repeat inside the
+    // scan window. It wins over fingerprint detection below.
+    let pick_total = labeled.as_ref().map(|(labels, n)| labels.len() * n);
+
     if let Some((labels, n)) = labeled {
         let mut start = 0usize;
         let mut i = 0usize;
@@ -719,14 +730,17 @@ pub fn analyze_code(code: &str, max_cycles: usize) -> Result<ArrangementAnalysis
         .map(|s| s.label.clone())
         .collect::<Vec<_>>()
         .join(" ");
-    let total_seconds = period.and_then(|p| spc.map(|s| s * p as f64));
+    // pickRestart total is the authoritative loop length; fall back to the
+    // onset-fingerprint period when there's no selector.
+    let period_cycles = pick_total.or(period);
+    let total_seconds = period_cycles.and_then(|p| spc.map(|s| s * p as f64));
 
     Ok(ArrangementAnalysis {
         bpm,
         seconds_per_cycle: spc,
         window_cycles: window,
-        period_cycles: period,
-        repeats: period.is_some(),
+        period_cycles,
+        repeats: period_cycles.is_some(),
         total_seconds,
         form,
         sections,
@@ -1886,6 +1900,33 @@ $: "<intro drop drop outro>".slow(8).pickRestart({
         assert_eq!(outro.cycles, 8, "outro shredded: {:?}", a.sections);
         // drop drop merges into one 16-cycle section.
         assert_eq!(a.sections[1].cycles, 16);
+    }
+
+    #[test]
+    fn arrangement_length_from_pickrestart_selector() {
+        // 4 selector tokens (intro drop drop outro) × .slow(8) = 32-cycle loop.
+        // The onset fingerprint finds no clean repeat here, but the selector is
+        // authoritative — this is the length export auto-detect relies on.
+        let code = r#"setbpm(120);
+$: "<intro drop drop outro>".slow(8).pickRestart({
+    intro: s("hh ~ ~ ~"),
+    drop: s("bd*4, hh*8"),
+    outro: s("bd ~ ~ ~")
+})"#;
+        let a = analyze_code(code, 64).unwrap();
+        assert_eq!(a.period_cycles, Some(32), "pickRestart total should drive length");
+        assert!(a.repeats);
+        // 120 BPM → cps 0.5 → 2s/cycle → 32 × 2 = 64s.
+        let secs = a.total_seconds.expect("total_seconds");
+        assert!((secs - 64.0).abs() < 0.01, "total_seconds = {secs}");
+    }
+
+    #[test]
+    fn arrangement_length_falls_back_to_fingerprint_without_selector() {
+        // No pickRestart → onset-fingerprint period detection still applies.
+        let a = analyze_code("setbpm(120);\ns(\"<bd sd>\")", 8).unwrap();
+        assert_eq!(a.period_cycles, Some(2));
+        assert!(a.repeats);
     }
 
     /// Report bug 4 repro attempt: a sound introduced by a LATER pickRestart

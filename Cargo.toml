@@ -14,6 +14,7 @@ members = [
     "tools/strudel-search",
     "tools/agent-stats",
     "tools/gen-pattern",
+    "tools/gen-recipes",
     "tools/song-check",
 ]
 resolver = "2"
@@ -30,11 +31,14 @@ cycletron-agent = { path = "crates/cycletron-agent" }
 cycletron-corpus = { path = "crates/cycletron-corpus" }
 cycletron-gen = { path = "crates/cycletron-gen" }
 cycletron-analysis = { path = "crates/cycletron-analysis" }
-# strudel-rs crates (for pattern validation in the backend)
-strudel-core = { path = "../strudel-rs/crates/strudel-core" }
-strudel-mini = { path = "../strudel-rs/crates/strudel-mini", default-features = false }
-strudel-dsl = { path = "../strudel-rs/crates/strudel-dsl" }
-midi-to-strudel = { path = "../strudel-rs/crates/midi-to-strudel" }
+# strudel-rs engine crates — pinned to public Codeberg main so the app builds
+# from a clean clone (no sibling checkout needed). Bump `rev` to move the engine.
+strudel-core = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff" }
+strudel-mini = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff", default-features = false }
+strudel-dsl = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff" }
+strudel-audio = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff" }
+strudel-music-theory = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff" }
+midi-to-strudel = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff" }
 
 # Shared external deps
 serde = { version = "1.0", features = ["derive"] }
@@ -48,3 +52,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 toml = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
+midly = "0.5"
+hound = "3.5"
+rustc-hash = "2"

@@ -289,30 +289,9 @@ fn validate(code: &str) -> Result<(), String> {
     if code.trim().is_empty() {
         return Err("empty pattern".to_string());
     }
-
-    if let Ok(file) = strudel_dsl::parse_strudel_file(code) {
-        let has_content = !file.tracks.is_empty()
-            || !file.directives.is_empty()
-            || !file.bindings.is_empty()
-            || !file.functions.is_empty();
-        if has_content {
-            return strudel_dsl::evaluate_file(&file)
-                .map_err(|e| e.to_string())
-                .and_then(|f| require_haps(&f.pattern));
-        }
-    }
-
-    match strudel_dsl::eval_dsl_with_tempo(code) {
-        Ok(out) => return require_haps(&out.pattern),
-        Err(dsl_err) => {
-            if let Ok(ast) = strudel_mini::parse(code)
-                && let Ok(pat) = strudel_mini::evaluate(&ast)
-            {
-                return require_haps(&pat);
-            }
-            return Err(dsl_err.to_string());
-        }
-    }
+    // Structural file → standalone DSL → mini-notation (strudel-rs cascade).
+    let out = strudel_dsl::execute(code).map_err(|e| e.to_string())?;
+    require_haps(&out.pattern)
 }
 
 fn require_haps(pattern: &strudel_core::Pattern) -> Result<(), String> {

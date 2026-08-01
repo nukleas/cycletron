@@ -122,6 +122,33 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "list_methods".to_string(),
+            description:
+                "List the strudel-rs DSL surface the validator ACCEPTS: free functions \
+                (stack, note, s, …), chainable pattern methods (fast, jux, lpf, room, chop, …), \
+                and file-level keywords (setbpm, hush). This is ground truth — call it before \
+                using any method/effect you are not 100% sure exists, instead of guessing a name \
+                and failing at validate time. Optionally narrow by `kind` (function|method|keyword) \
+                or by `category` (a section substring like 'filter', 'delay', 'reverb', 'fm'). \
+                For SOUND names use list_sounds instead."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": ["function", "method", "keyword"],
+                        "description": "Keep only this kind of symbol. Omit for all."
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "Case-insensitive substring of the doc section \
+                            (e.g. 'filter', 'delay', 'reverb', 'fm', 'conditionals'). Omit for all."
+                    }
+                }
+            }),
+        },
+        ToolDefinition {
             name: "generate_pattern".to_string(),
             description:
                 "Generate a ready-to-play strudel pattern from an algorithmic-composition \
@@ -367,18 +394,99 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
         ToolDefinition {
             name: "play_pattern".to_string(),
             description:
-                "Play a strudel pattern through the existing WASM REPL/editor playback path. \
-                Replaces any currently playing pattern."
+                "Play a WHOLE strudel document — use this to START A NEW SONG or replace the \
+                entire arrangement. It swaps the full editor buffer. To CHANGE ONE PART of a \
+                song that's already playing (the bass, the hats, a melody), do NOT call this — \
+                use upsert_track / mute_track so you edit one track and hot-swap without \
+                rewriting everything. When you write a new song here, split it into addressable \
+                tracks: one `$: <expr> // @<id>` line per part, e.g. \
+                `$: s(\"bd*4\") // @drums` and `$: note(\"c2 g2\").s(\"sawtooth\") // @bass`."
                     .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Strudel pattern code to play"
+                        "description": "Full strudel document to play (prefer one `$: … // @id` \
+                            track per part so parts stay individually editable)"
                     }
                 },
                 "required": ["code"]
+            }),
+        },
+        ToolDefinition {
+            name: "list_parts".to_string(),
+            description:
+                "List the addressable tracks (parts) of the song currently in the editor: each \
+                track's @id (or index), whether it's muted, and a code preview. Call this before \
+                upsert_track / mute_track so you target the right part. A song is made of `$:` \
+                lines the engine stacks; each is one part."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "upsert_track".to_string(),
+            description:
+                "Surgically add or replace ONE track in the current song, then hot-swap — every \
+                other track stays byte-identical (this is how you 'change the bass' or 'add a \
+                lead' without rewriting the song). `id` selects the track by its @id or 1-based \
+                index; if none matches, a new `$: <code> // @<id>` track is appended. `code` is \
+                just that track's expression (e.g. `note(\"c2 g2\").s(\"sawtooth\").lpf(400)`), \
+                NOT a full document — no `$:`, no `setbpm`. The whole result is re-validated \
+                before it plays. Call list_parts first if unsure of the ids."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Track @id (e.g. 'bass') or 1-based index (e.g. '2'). \
+                            A new, unused id creates a new track."
+                    },
+                    "code": {
+                        "type": "string",
+                        "description": "The track's strudel expression only (no `$:`, no directives)"
+                    }
+                },
+                "required": ["id", "code"]
+            }),
+        },
+        ToolDefinition {
+            name: "mute_track".to_string(),
+            description:
+                "Silence one track without deleting it (comments it out), then hot-swap. \
+                Reversible with unmute_track. Use for breakdowns/drops or to A/B a part. \
+                `id` is the track @id or 1-based index (see list_parts)."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Track @id or 1-based index to mute"
+                    }
+                },
+                "required": ["id"]
+            }),
+        },
+        ToolDefinition {
+            name: "unmute_track".to_string(),
+            description:
+                "Restore a track previously silenced with mute_track, then hot-swap. \
+                `id` is the track @id or 1-based index."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Track @id or 1-based index to unmute"
+                    }
+                },
+                "required": ["id"]
             }),
         },
         ToolDefinition {

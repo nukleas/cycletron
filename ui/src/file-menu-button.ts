@@ -172,6 +172,8 @@ class FileMenuButton {
             {label: 'Save As…', hint: '⌘⇧S', run: () => { void fileManager.saveAs(); }},
             {separator: true, label: ''},
             {label: 'Import MIDI…', run: () => { void fileManager.importMidiDialog(); }},
+            {label: 'Export Audio…', hint: '⌘⇧E', run: () => { void fileManager.exportAudio(); }},
+            {label: 'Export MIDI…', run: () => { void fileManager.exportMidi(); }},
             {label: 'Open MIDI Lab…', run: () => { void midiLab.openEmpty(); }},
         ];
     }

@@ -26,68 +26,18 @@ jobs:
           cache-dependency-path: ui/package-lock.json
       - name: Install deps
         run: npm ci
-      - name: Stub WASM package types (no nightly build in CI)
-        run: |
-          mkdir -p pkg
-          cat > pkg/strudel_audio_wasm.d.ts << 'EOF'
-          export declare class MainThreadProcessor {
-            free(): void;
-            constructor(...args: any[]);
-            static allocAudioSample(...args: any[]): any;
-            [key: string]: any;
-          }
-          export declare class PatternHandle {
-            free(): void;
-            queryCycleViewData(...args: any[]): any;
-            getTrackName(...args: any[]): any;
-            queryVizRectsView(...args: any[]): any;
-            [key: string]: any;
-          }
-          export declare class WorkletProcessor {
-            free(): void;
-            constructor(...args: any[]);
-            getLeftPtr(): number;
-            getRightPtr(): number;
-            getArgsPtr(): number;
-            renderBlock(...args: any[]): any;
-            [key: string]: any;
-          }
-          export declare function initSync(...args: any[]): any;
-          export declare function take_last_panic(): string | undefined;
-          export declare function getCycleViewBufPtr(...args: any[]): any;
-          export declare function getPianoRectsBufPtr(...args: any[]): any;
-          export declare function getActiveLocsBufPtr(...args: any[]): any;
-          export declare function getCurrentBpmPtr(...args: any[]): any;
-          export declare function getMissingGMBitsPtr(...args: any[]): any;
-          export declare function getMissingGMSampleBitsPtr(...args: any[]): any;
-          export declare function getAudioAllocLogPtr(...args: any[]): any;
-          export declare function getBankNameBufPtr(...args: any[]): any;
-          export declare function getMainAllocLogPtr(...args: any[]): any;
-          export declare function getVoiceCountPtr(...args: any[]): any;
-          export declare function parsePattern(...args: any[]): any;
-          export declare function version(...args: any[]): any;
-          export default function init(input?: any): Promise<any>;
-          EOF
-          printf "export * from './strudel_audio_wasm';\nexport { default } from './strudel_audio_wasm';\n" > pkg/index.d.ts
       - name: Typecheck
+        # The real WASM types are committed under ui/pkg (built from the pinned
+        # strudel-rs main rev), so tsc checks against the actual engine surface.
         run: npx tsc --noEmit
 
   rust:
     name: Rust test + corpus-check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Cycletron
-        uses: actions/checkout@v4
-        with:
-          path: cycletron
-
-      - name: Checkout strudel-rs (sibling path dep)
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ vars.STRUDEL_RS_REPO || 'nukleas/strudel-rs' }}
-          path: strudel-rs
-          # Private sibling: set repo secret STRUDEL_RS_TOKEN (read-only PAT) if needed.
-          token: ${{ secrets.STRUDEL_RS_TOKEN || github.token }}
+      # strudel-rs is a pinned git dependency (Codeberg, public), fetched by
+      # cargo — no sibling checkout needed.
+      - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -96,15 +46,11 @@ jobs:
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: cycletron -> target
 
       - name: cargo check (workspace)
-        working-directory: cycletron
         run: cargo check --workspace --locked
 
       - name: cargo test (lib crates, no Tauri GUI)
-        working-directory: cycletron
         run: |
           cargo test -p cycletron-core --locked
           cargo test -p cycletron-agent --locked
@@ -113,7 +59,6 @@ jobs:
           cargo test -p cycletron-gen --locked
 
       - name: corpus-check (curated patterns)
-        working-directory: cycletron
         run: cargo run -p corpus-check --locked
 
   gate-a-files:

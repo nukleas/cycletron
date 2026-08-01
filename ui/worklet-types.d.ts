@@ -6,6 +6,8 @@ interface AudioWorkletRegistry {
             wasmModule: WebAssembly.Module;
             sampleRate: number;
             sharedMemory: WebAssembly.Memory;
+            /** Seed for the audio-synthesis RNG (noise/crackle/grain). */
+            rngSeed: number;
         };
     };
 }

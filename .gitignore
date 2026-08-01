@@ -7,7 +7,6 @@
 # Node / Frontend
 **/node_modules/
 **/dist/
-ui/pkg/
 **/.vite/
 
 # Tauri generated
@@ -50,6 +49,10 @@ logs/
 # WASM / Strudel artifacts that are large or regenerated
 **/*.wasm
 **/*.wat
+# ...except the engine WASM, which is committed (built from the pinned strudel-rs
+# main rev) so a clean clone runs without nightly/wasm-pack. Rebuild via
+# `npm run build:wasm` only to bump the engine.
+!ui/pkg/strudel_audio_wasm_bg.wasm
 
 # Temporary / scratch
 *.tmp

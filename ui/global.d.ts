@@ -4,6 +4,19 @@ interface Window {
     strudelApp: import('./src/app.js').StrudelApp;
 }
 
+interface ImportMeta {
+    /** Vite's eager/lazy file glob. */
+    glob: (
+        pattern: string | string[],
+        options?: {
+            query?: string;
+            import?: string;
+            eager?: boolean;
+            as?: string;
+        },
+    ) => Record<string, unknown> | Promise<Record<string, unknown>>;
+}
+
 declare module '*?raw' {
     const content: string;
     export default content;

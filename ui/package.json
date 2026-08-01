@@ -4,12 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "npm run build:wasm",
+    "gen:dsl": "node scripts/gen-dsl-surface.mjs",
+    "predev": "npm run gen:dsl",
     "dev": "vite --port 5173",
-    "prebuild": "npm run build:wasm",
+    "prebuild": "npm run gen:dsl",
     "build": "vite build",
     "preview": "vite preview --port 5173",
-    "build:wasm": "cd ../../strudel-rs/crates/strudel-audio-wasm && env RUSTUP_TOOLCHAIN=nightly wasm-pack build . --target web --out-dir ../../../cycletron/ui/pkg -- -Z build-std=std,panic_abort"
+    "comment:build:wasm": "The prebuilt engine WASM is committed under ui/pkg (built from the pinned strudel-rs main rev). Only rerun build:wasm to bump the engine; it needs a strudel-rs checkout at that rev + nightly. Then commit ui/pkg.",
+    "build:wasm": "cd ../../clean-strudel-rs/crates/strudel-audio-wasm && wasm-pack build . --target web --out-dir ../../../cycletron/ui/pkg -- -Z build-std=std,panic_abort"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.1",

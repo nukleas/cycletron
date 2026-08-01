@@ -294,6 +294,8 @@ export class StrudelAudioManager {
                     sampleRate: this.audioContext.sampleRate,
                     // Pass the shared memory - worklet calls initSync with this.
                     sharedMemory,
+                    // Per-session seed for the worklet's audio-synthesis RNG.
+                    rngSeed: crypto.getRandomValues(new Uint32Array(1))[0],
                 },
             },
         );

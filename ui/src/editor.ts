@@ -24,6 +24,11 @@ import {closeBrackets, closeBracketsKeymap} from '@codemirror/autocomplete';
 import {highlightSelectionMatches, searchKeymap} from '@codemirror/search';
 import {lintGutter, setDiagnostics} from '@codemirror/lint';
 import {strudelThemeExtension} from './theme.js';
+import {
+    strudelAssistExtensions,
+    isAssistEnabled,
+    setAssistEnabledPref,
+} from './editor-completions.js';
 
 // Default pattern to show
 const defaultCode = `// Strudel core runs in Rust/WASM; UI and scheduling are TypeScript
@@ -195,6 +200,8 @@ export class StrudelEditor {
 
     private readonly themeCompartment: Compartment;
     private readonly fontSizeCompartment: Compartment;
+    /** Holds the autocomplete + hover extensions so they can be toggled live. */
+    private readonly assistCompartment: Compartment;
 
     private _flashTimer: ReturnType<typeof setTimeout> | null;
 
@@ -213,6 +220,7 @@ export class StrudelEditor {
 
         this.themeCompartment = new Compartment();
         this.fontSizeCompartment = new Compartment();
+        this.assistCompartment = new Compartment();
 
         this._flashTimer = null;
 
@@ -296,6 +304,11 @@ export class StrudelEditor {
                 // Language
                 javascript(),
 
+                // Autocomplete + hover docs (toggleable; off = empty compartment)
+                this.assistCompartment.of(
+                    isAssistEnabled() ? strudelAssistExtensions() : []
+                ),
+
                 // Theme
                 this.themeCompartment.of(strudelThemeExtension),
                 this.fontSizeCompartment.of(EditorView.theme({
@@ -340,6 +353,21 @@ export class StrudelEditor {
             effects: this.fontSizeCompartment.reconfigure(
                 EditorView.theme({'&': {fontSize: `${px}px`}})
             )
+        });
+    }
+
+    /** Whether autocomplete + hover docs are currently active. */
+    isAssistEnabled(): boolean {
+        return isAssistEnabled();
+    }
+
+    /** Toggle autocomplete + hover docs live, and remember the choice. */
+    setAssistEnabled(on: boolean): void {
+        setAssistEnabledPref(on);
+        this.view.dispatch({
+            effects: this.assistCompartment.reconfigure(
+                on ? strudelAssistExtensions() : []
+            ),
         });
     }
 

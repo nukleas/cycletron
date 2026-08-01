@@ -71,52 +71,14 @@ fn main() {
 }
 
 fn eval_code(code: &str) -> strudel_core::Pattern {
-    // If code looks like DSL (has quotes, dots, or parens following identifiers),
-    // try DSL first. Otherwise try mini notation first.
-    let looks_like_dsl = code.contains('"') || code.contains('\'') || code.contains(".(");
-
-    if looks_like_dsl {
-        // Try DSL eval (handles method chains, function calls)
-        if let Ok(output) = strudel_dsl::eval_dsl_with_tempo(code) {
-            return output.pattern;
-        }
-        // Try strudel file parse (multi-track with directives)
-        if let Ok(file) = strudel_dsl::parse_strudel_file(code) {
-            if let Ok(evaled) = strudel_dsl::evaluate_file(&file) {
-                return evaled.pattern;
-            }
+    // Structural file → standalone DSL → mini-notation.
+    match strudel_dsl::execute(code) {
+        Ok(output) => output.pattern,
+        Err(e) => {
+            eprintln!("Error: {e}");
+            std::process::exit(2);
         }
     }
-
-    // Try mini notation
-    if let Ok(ast) = strudel_mini::parse(code) {
-        if let Ok(pat) = strudel_mini::evaluate(&ast) {
-            // Check it actually produces events
-            let test = pat.query_arc(0i32, 1i32);
-            if !test.is_empty() {
-                return pat;
-            }
-        }
-    }
-
-    // Fall back to DSL if we haven't tried it yet
-    if !looks_like_dsl {
-        if let Ok(output) = strudel_dsl::eval_dsl_with_tempo(code) {
-            return output.pattern;
-        }
-        if let Ok(file) = strudel_dsl::parse_strudel_file(code) {
-            if let Ok(evaled) = strudel_dsl::evaluate_file(&file) {
-                return evaled.pattern;
-            }
-        }
-    }
-
-    let err = match strudel_dsl::eval_dsl_with_tempo(code) {
-        Err(e) => e.to_string(),
-        Ok(_) => "unknown evaluation error".to_string(),
-    };
-    eprintln!("Error: {err}");
-    std::process::exit(2);
 }
 
 fn frac_to_f64(f: &strudel_core::Fraction) -> f64 {

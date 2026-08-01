@@ -28,6 +28,9 @@ export async function initMenuEvents(): Promise<void> {
         'menu:save': async () => { await fileManager.saveCurrent(); },
         'menu:save_as': async () => { await fileManager.saveAs(); },
         'menu:import_midi': () => midiLab.openEmpty(),
+        'menu:export_audio': () => { void fileManager.exportAudio(); },
+        'menu:export_wav': () => { void fileManager.exportAudio(); },
+        'menu:export_midi': () => { void fileManager.exportMidi(); },
         'menu:clear_session': async () => {
             await invoke('clear_session');
             document.dispatchEvent(new CustomEvent('session:cleared'));

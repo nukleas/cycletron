@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-xai-oauth-logout"
+description = "Enables the xai_oauth_logout command without any pre-configured scope."
+commands.allow = ["xai_oauth_logout"]
+
+[[permission]]
+identifier = "deny-xai-oauth-logout"
+description = "Denies the xai_oauth_logout command without any pre-configured scope."
+commands.deny = ["xai_oauth_logout"]

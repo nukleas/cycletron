@@ -19,10 +19,15 @@ import {visualsMenu} from './visuals-menu.js';
 import {ExamplesBrowser} from './examples.js';
 import {notify} from './notifications.js';
 
+/** How many cycles the ⏮/⏭ transport buttons jump. */
+const SKIP_CYCLES = 5;
+
 interface AppElements {
     // -- Header controls --
     transportBtn: HTMLButtonElement;
     stopBtn: HTMLButtonElement;
+    skipBackBtn: HTMLButtonElement;
+    skipFwdBtn: HTMLButtonElement;
     bpmSlider: HTMLInputElement;
     bpmValue: HTMLInputElement;
     gainSlider: HTMLInputElement;
@@ -288,9 +293,53 @@ export class StrudelApp {
         this.editor.setFontSize(savedSize);
 
         window.addEventListener('beforeunload', this._onBeforeUnload);
+        // WKWebView throttles main-thread timers when unfocused; audio schedule
+        // runs on a Worker, and we drop rAF/stats work while hidden.
+        document.addEventListener('visibilitychange', this._onVisibilityChange);
+        window.addEventListener('focus', this._onWindowFocus);
 
         // Update status
         this.setStatus('Press Play to begin');
+    }
+
+    /**
+     * When the window is backgrounded, pause visual loops (cheap) while the
+     * Worker-driven scheduler keeps filling the audio lookahead. On return,
+     * resume visuals, force a schedule tick, and re-wake AudioContext if
+     * WebKit suspended it.
+     */
+    private _onVisibilityChange = (): void => {
+        const hidden = document.hidden;
+        this.scheduler?.setUiPaused(hidden);
+        if (hidden) {
+            this.scope?.pauseAnimation?.();
+            this.visualizer?.stopAnimation?.();
+            if (this.statsInterval) {
+                clearInterval(this.statsInterval);
+                this.statsInterval = null;
+            }
+        } else {
+            this._onBecameVisible();
+        }
+    };
+
+    private _onWindowFocus = (): void => {
+        // focus can fire without a visibilitychange in some Tauri/WKWebView paths.
+        if (!document.hidden) this._onBecameVisible();
+    };
+
+    private _onBecameVisible(): void {
+        const ctx = this.audioManager?.getAudioContext?.();
+        if (ctx && ctx.state !== 'running') {
+            void ctx.resume();
+        }
+        this.scheduler?.setUiPaused(false);
+        this.scheduler?.kickSchedule();
+        if (this.playbackState === PlaybackState.Playing) {
+            this.scope?.startAnimation?.();
+            this.visualizer?.startAnimation?.();
+            this.startStatsUpdate();
+        }
     }
 
     _onBeforeUnload = (): void => {
@@ -315,6 +364,8 @@ export class StrudelApp {
             // -- Header controls --
             transportBtn: document.getElementById('transportBtn') as HTMLButtonElement,
             stopBtn: document.getElementById('stopBtn') as HTMLButtonElement,
+            skipBackBtn: document.getElementById('skipBackBtn') as HTMLButtonElement,
+            skipFwdBtn: document.getElementById('skipFwdBtn') as HTMLButtonElement,
             bpmSlider: document.getElementById('bpmSlider') as HTMLInputElement,
             bpmValue: document.getElementById('bpmValue') as HTMLInputElement,
             gainSlider: document.getElementById('gainSlider') as HTMLInputElement,
@@ -339,6 +390,8 @@ export class StrudelApp {
         const handleTransport = async () => this.togglePlayPause();
 
         const handleStop = () => this.stop();
+
+        const handleSkip = (delta: number) => () => this.skipCycles(delta);
 
         const resetBpm = () => this.applyBpm(120);
 
@@ -439,6 +492,8 @@ export class StrudelApp {
         // Event listeners
         this.elements.transportBtn.addEventListener('click', handleTransport);
         this.elements.stopBtn.addEventListener('click', handleStop);
+        this.elements.skipBackBtn.addEventListener('click', handleSkip(-SKIP_CYCLES));
+        this.elements.skipFwdBtn.addEventListener('click', handleSkip(SKIP_CYCLES));
 
         this.elements.bpmSlider.addEventListener('input', onBpmInput);
         this.elements.bpmSlider.addEventListener('dblclick', resetBpm);
@@ -603,6 +658,8 @@ export class StrudelApp {
         el.transportBtn.textContent = '▶ Play';
         el.transportBtn.disabled = false;
         el.stopBtn.disabled = true;
+        el.skipBackBtn.disabled = true;
+        el.skipFwdBtn.disabled = true;
         el.cycleCount.textContent = '0.00';
         el.voiceCount.textContent = '0';
     }
@@ -957,6 +1014,8 @@ export class StrudelApp {
 
         this._setTransportPlaying();
         this.elements.stopBtn.disabled = false;
+        this.elements.skipBackBtn.disabled = false;
+        this.elements.skipFwdBtn.disabled = false;
         this.scope?.startAnimation();
         this.visualizer?.startAnimation();
         // Guard the analyser-fed visualizers against output-device resets
@@ -1065,6 +1124,8 @@ export class StrudelApp {
         btn.disabled = false;
 
         this.elements.stopBtn.disabled = true;
+        this.elements.skipBackBtn.disabled = true;
+        this.elements.skipFwdBtn.disabled = true;
         this.elements.liveIndicator.classList.remove('active', 'indicator-paused');
 
         this.showError('Audio engine crashed — press Play to restart.');
@@ -1119,6 +1180,16 @@ export class StrudelApp {
         btn.disabled = false;
     }
 
+    /**
+     * Jump the transport by `delta` cycles (negative = back). Works while
+     * playing or paused; a no-op when stopped. The scheduler re-anchors the
+     * clock so audio continues in phase from the new cycle.
+     */
+    skipCycles(delta: number): void {
+        if (this.playbackState === PlaybackState.Stopped) return;
+        this.scheduler?.seekBy(delta);
+    }
+
     stop(): void {
         if (this.playbackState === PlaybackState.Stopped) return;
 
@@ -1131,6 +1202,8 @@ export class StrudelApp {
         btn.disabled = false;
 
         this.elements.stopBtn.disabled = true;
+        this.elements.skipBackBtn.disabled = true;
+        this.elements.skipFwdBtn.disabled = true;
 
         this.elements.liveIndicator.classList.remove('active', 'indicator-paused');
 

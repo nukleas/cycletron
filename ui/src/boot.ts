@@ -279,6 +279,12 @@ async function applyPhase4Settings(): Promise<void> {
     if (!isTauri) return;
     try {
         const settings = await invoke<UserSettings>('get_user_settings');
+        // Rust settings are authoritative — reconcile the editor's localStorage-
+        // seeded assist state with the saved value (skip if already in sync so we
+        // don't reconfigure the editor on every launch).
+        const assist = settings.editor?.assist_enabled ?? true;
+        const editor = window.strudelApp?.editor;
+        if (editor && editor.isAssistEnabled() !== assist) editor.setAssistEnabled(assist);
         metronome.applyFromSettings(settings.metronome ?? {enabled: false, volume: 0.4});
         midiInput.applyFromSettings(settings.midi_input ?? {
             device_id: null, cc_gain: 7, cc_bpm: 74,

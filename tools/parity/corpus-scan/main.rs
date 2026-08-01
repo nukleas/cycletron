@@ -134,39 +134,11 @@ fn try_evaluate(code: &str) -> Result<&'static str, (&'static str, String)> {
     if code.trim().is_empty() {
         return Err(("empty", "empty pattern".to_string()));
     }
-
-    // 1. Multi-track .strudel with directives
-    if let Ok(file) = strudel_dsl::parse_strudel_file(code) {
-        let has_content = !file.tracks.is_empty()
-            || !file.directives.is_empty()
-            || !file.bindings.is_empty()
-            || !file.functions.is_empty();
-        if has_content {
-            match strudel_dsl::evaluate_file(&file) {
-                Ok(_) => return Ok("strudel-file"),
-                Err(e) => return Err(("strudel-file", e.to_string())),
-            }
-        }
+    // Structural file → standalone DSL → mini-notation (strudel-rs cascade).
+    match strudel_dsl::execute(code) {
+        Ok(_) => Ok("dsl-execute"),
+        Err(e) => Err(("dsl-execute", e.to_string())),
     }
-
-    // 2. DSL with optional tempo (setbpm/setcpm).
-    if strudel_dsl::eval_dsl_with_tempo(code).is_ok() {
-        return Ok("dsl-with-tempo");
-    }
-
-    // 3. Mini notation
-    if let Ok(ast) = strudel_mini::parse(code)
-        && strudel_mini::evaluate(&ast).is_ok()
-    {
-        return Ok("mini");
-    }
-
-    // 4. Surface the DSL error as the most useful diagnostic.
-    let err = match strudel_dsl::eval_dsl_with_tempo(code) {
-        Err(e) => e.to_string(),
-        Ok(_) => "pattern did not evaluate (all paths exhausted)".to_string(),
-    };
-    Err(("dsl-bare", err))
 }
 
 /// Bucket errors by rough cause so the summary can highlight the biggest
@@ -344,7 +316,7 @@ fn write_tickets(out_dir: &Path, rows: &[Row]) {
             files.len()
         ));
         md.push_str("See representative failures above. Target: compile + evaluate these via\n");
-        md.push_str("`strudel_dsl::eval_dsl_with_tempo` (or `parse_strudel_file` / `eval_file`).\n");
+        md.push_str("`strudel_dsl::execute` (structural file → DSL → mini-notation).\n");
         md.push_str("```\n\n");
     }
 

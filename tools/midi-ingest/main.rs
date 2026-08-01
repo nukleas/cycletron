@@ -199,7 +199,7 @@ fn convert(data: &[u8], bar_limit: usize) -> anyhow::Result<(String, f64)> {
     let midi = MidiData::from_bytes(data)?;
     let bpm = midi.bpm;
     let notes_per_bar =
-        suggest_notes_per_bar(&midi.track_info, midi.cycle_ticks).unwrap_or(16);
+        suggest_notes_per_bar(&midi.track_info, midi.cycle_ticks, midi.cycle_len).unwrap_or(16);
     let builder = TrackBuilder::new(
         midi.cycle_len,
         midi.cycle_ticks,
@@ -227,21 +227,8 @@ fn validate(code: &str, window: usize) -> Result<(), String> {
     if code.trim().is_empty() {
         return Err("empty conversion".to_string());
     }
-    if let Ok(file) = strudel_dsl::parse_strudel_file(code) {
-        let has_content = !file.tracks.is_empty()
-            || !file.directives.is_empty()
-            || !file.bindings.is_empty()
-            || !file.functions.is_empty();
-        if has_content {
-            return strudel_dsl::evaluate_file(&file)
-                .map_err(|e| e.to_string())
-                .and_then(|f| require_haps(&f.pattern, window));
-        }
-    }
-    match strudel_dsl::eval_dsl_with_tempo(code) {
-        Ok(out) => require_haps(&out.pattern, window),
-        Err(e) => Err(e.to_string()),
-    }
+    let out = strudel_dsl::execute(code).map_err(|e| e.to_string())?;
+    require_haps(&out.pattern, window)
 }
 
 fn require_haps(pattern: &strudel_core::Pattern, window: usize) -> Result<(), String> {

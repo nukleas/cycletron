@@ -33,6 +33,8 @@ pub struct UserSettings {
     #[serde(default)]
     pub metronome: MetronomeSettings,
     #[serde(default)]
+    pub editor: EditorSettings,
+    #[serde(default)]
     pub midi_input: MidiInputSettings,
     /// First-run welcome modal has been dismissed. Defaults to false so a
     /// fresh install sees the onboarding flow.
@@ -138,6 +140,22 @@ impl Default for NotificationSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorSettings {
+    /// Autocomplete + hover docs in the code editor (sourced from the
+    /// ground-truth DSL surface). Defaults to on.
+    #[serde(default = "default_true")]
+    pub assist_enabled: bool,
+}
+
+impl Default for EditorSettings {
+    fn default() -> Self {
+        Self {
+            assist_enabled: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AnthropicOverrides {
     /// API key. `None` means fall back to `ANTHROPIC_API_KEY` env var.
@@ -160,8 +178,8 @@ pub struct AnthropicOverrides {
 /// OS keychain (see `secrets.rs`), keyed by provider id.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmSettings {
-    /// Active provider id: `"anthropic"`, `"grok"`, `"openai"`, `"local"`, or
-    /// `"custom"`.
+    /// Active provider id: `"anthropic"`, `"grok"`, `"codex"`, `"openai"`,
+    /// `"local"`, or `"custom"`.
     #[serde(default = "default_active_provider")]
     pub active: String,
     /// Per-provider profiles keyed by id. Missing entries fall back to the
@@ -222,6 +240,13 @@ pub fn builtin_profile(id: &str) -> Option<ProviderProfile> {
     Some(match id {
         "anthropic" => p("anthropic", None, "claude-sonnet-4-6", 64000),
         "grok" => p("openai", Some("https://api.x.ai/v1"), "grok-4.5", 32000),
+        // ChatGPT subscription via Codex OAuth → Responses backend.
+        "codex" => p(
+            "codex",
+            Some("https://chatgpt.com/backend-api/codex"),
+            "gpt-5.6-sol",
+            32000,
+        ),
         "openai" => p("openai", Some("https://api.openai.com/v1"), "gpt-4.1", 16000),
         "local" => p("openai", Some("http://localhost:11434/v1"), "llama3.1", 8192),
         "custom" => p("openai", None, "", 8192),
@@ -230,7 +255,7 @@ pub fn builtin_profile(id: &str) -> Option<ProviderProfile> {
 }
 
 fn builtin_profiles() -> BTreeMap<String, ProviderProfile> {
-    ["anthropic", "grok", "openai", "local", "custom"]
+    ["anthropic", "grok", "codex", "openai", "local", "custom"]
         .into_iter()
         .filter_map(|id| builtin_profile(id).map(|p| (id.to_string(), p)))
         .collect()

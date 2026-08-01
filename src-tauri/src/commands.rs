@@ -32,10 +32,27 @@ pub async fn send_message(
         session.add_user_message(message.clone());
     }
 
+    // Refresh subscription OAuth before building the client so the bearer is not stale.
+    {
+        let active = state.user_settings.lock().unwrap().llm.active.clone();
+        if active == "grok" && crate::xai_oauth::has_session() {
+            if let Err(e) = crate::xai_oauth::ensure_fresh().await {
+                tracing::warn!(target: "cycletron::xai_oauth", "token refresh failed: {e}");
+            }
+            state.rebuild_agent_client();
+        }
+        if active == "codex" && crate::codex_oauth::has_session() {
+            if let Err(e) = crate::codex_oauth::ensure_fresh().await {
+                tracing::warn!(target: "cycletron::codex_oauth", "token refresh failed: {e}");
+            }
+            state.rebuild_agent_client();
+        }
+    }
+
     let client = match state.agent_client.lock().unwrap().clone() {
         Some(c) => c,
         None => {
-            let msg = "AI not configured. Open Preferences → AI to pick a provider and add a key.";
+            let msg = "AI not configured. Open Preferences → AI to pick a provider, sign in with SuperGrok, or add an API key.";
             let mut session = state.session.lock().unwrap();
             session.add_assistant_message(msg.to_string());
             return Ok(msg.to_string());
@@ -551,6 +568,7 @@ pub fn get_library_root(state: State<'_, AppState>) -> Result<String, String> {
 }
 
 /// Change the library root and persist the new setting.
+/// Initializes the folder the same way as first launch: create + seed `Demos/`.
 #[tauri::command]
 pub fn set_library_root(
     path: String,
@@ -558,8 +576,7 @@ pub fn set_library_root(
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let pb = PathBuf::from(&path);
-    library::ensure_root_exists(&pb)
-        .map_err(|e| format!("create {}: {e}", pb.display()))?;
+    library::prepare_root(&pb)?;
     {
         let mut lib = state.library.lock().unwrap();
         lib.root = pb.clone();
@@ -745,6 +762,116 @@ pub fn has_provider_key(provider: String) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// xAI SuperGrok / SuperHeavy OAuth
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn xai_oauth_status() -> crate::xai_oauth::OAuthStatus {
+    crate::xai_oauth::status()
+}
+
+/// Copy a Grok Build / Grok CLI session from `~/.grok/auth.json` into Cycletron.
+#[tauri::command]
+pub fn xai_oauth_import_grok_build(state: State<'_, AppState>) -> Result<crate::xai_oauth::OAuthStatus, String> {
+    let status = crate::xai_oauth::import_from_grok_build()?;
+    state.rebuild_agent_client();
+    Ok(status)
+}
+
+/// Begin device-code login. Opens the verification URL in the system browser.
+#[tauri::command]
+pub async fn xai_oauth_start_login(
+    app: tauri::AppHandle,
+) -> Result<crate::xai_oauth::DeviceStart, String> {
+    let start = crate::xai_oauth::start_device_login().await?;
+    let url = start
+        .verification_uri_complete
+        .clone()
+        .unwrap_or_else(|| start.verification_uri.clone());
+    // Best-effort browser open; UI also shows the code/URL.
+    use tauri_plugin_opener::OpenerExt as _;
+    let _ = app.opener().open_url(url, Option::<String>::None);
+    Ok(start)
+}
+
+/// Poll until the user approves the device code from [`xai_oauth_start_login`].
+#[tauri::command]
+pub async fn xai_oauth_poll_login(
+    device_code: String,
+    interval: u64,
+    expires_in: u64,
+    state: State<'_, AppState>,
+) -> Result<crate::xai_oauth::OAuthStatus, String> {
+    let status = crate::xai_oauth::poll_device_login(&device_code, interval, expires_in).await?;
+    // Prefer Grok as the active provider after a successful OAuth login.
+    {
+        let mut us = state.user_settings.lock().unwrap();
+        if us.llm.active != "grok" {
+            us.llm.active = "grok".into();
+            if let Some(dir) = state.app_data_dir() {
+                let _ = us.save(&dir);
+            }
+        }
+    }
+    state.rebuild_agent_client();
+    Ok(status)
+}
+
+#[tauri::command]
+pub fn xai_oauth_logout(state: State<'_, AppState>) -> Result<(), String> {
+    crate::xai_oauth::logout()?;
+    state.rebuild_agent_client();
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// ChatGPT / Codex OAuth (subscription)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn codex_oauth_status() -> crate::codex_oauth::CodexOAuthStatus {
+    crate::codex_oauth::status()
+}
+
+/// Copy a Codex CLI session from `~/.codex/auth.json` into Cycletron.
+#[tauri::command]
+pub fn codex_oauth_import_cli(state: State<'_, AppState>) -> Result<crate::codex_oauth::CodexOAuthStatus, String> {
+    let status = crate::codex_oauth::import_from_codex_cli()?;
+    // Prefer Codex as active after import.
+    {
+        let mut us = state.user_settings.lock().unwrap();
+        us.llm.active = "codex".into();
+        if let Some(dir) = state.app_data_dir() {
+            let _ = us.save(&dir);
+        }
+    }
+    state.rebuild_agent_client();
+    Ok(status)
+}
+
+/// Browser PKCE login (same client as `codex login`). Binds localhost:1455.
+#[tauri::command]
+pub async fn codex_oauth_login(state: State<'_, AppState>) -> Result<crate::codex_oauth::CodexOAuthStatus, String> {
+    let status = crate::codex_oauth::login_with_browser().await?;
+    {
+        let mut us = state.user_settings.lock().unwrap();
+        us.llm.active = "codex".into();
+        if let Some(dir) = state.app_data_dir() {
+            let _ = us.save(&dir);
+        }
+    }
+    state.rebuild_agent_client();
+    Ok(status)
+}
+
+#[tauri::command]
+pub fn codex_oauth_logout(state: State<'_, AppState>) -> Result<(), String> {
+    crate::codex_oauth::logout()?;
+    state.rebuild_agent_client();
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // App metadata (About modal)
 // ---------------------------------------------------------------------------
 
@@ -866,6 +993,64 @@ pub fn write_binary_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     std::fs::write(&pb, &bytes).map_err(|e| format!("write {}: {e}", pb.display()))
+}
+
+// ---------------------------------------------------------------------------
+// Offline export (WAV / MP3 / stems / MIDI) — ported from robostrudel
+// ---------------------------------------------------------------------------
+
+/// Offline-render the editor pattern to WAV and/or MP3 (same engine as
+/// `strudio render`), optionally splitting multi-track stems.
+///
+/// `format` is `"wav"`, `"mp3"`, or `"both"`. MP3 requires `ffmpeg` on PATH.
+/// `stems` splits `$:` tracks or a top-level `stack(...)` into separate files.
+#[tauri::command]
+pub async fn export_audio(
+    code: String,
+    path: String,
+    duration_secs: f64,
+    bpm: Option<f64>,
+    gain: Option<f32>,
+    format: String,
+    stems: bool,
+) -> Result<crate::export::ExportAudioResult, String> {
+    let fmt = crate::export::AudioFormat::parse(&format)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::export::export_audio(&code, &path, duration_secs, bpm, gain, fmt, stems)
+    })
+    .await
+    .map_err(|e| format!("export task failed: {e}"))?
+}
+
+/// Backward-compatible WAV-only export.
+#[tauri::command]
+pub async fn export_wav(
+    code: String,
+    path: String,
+    duration_secs: f64,
+    bpm: Option<f64>,
+    gain: Option<f32>,
+) -> Result<crate::export::ExportAudioResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::export::export_wav(&code, &path, duration_secs, bpm, gain)
+    })
+    .await
+    .map_err(|e| format!("export task failed: {e}"))?
+}
+
+/// Convert the current pattern to a Standard MIDI File (`strudio to-midi`).
+#[tauri::command]
+pub async fn export_midi(
+    code: String,
+    path: String,
+    cycles: u32,
+    bpm: Option<f64>,
+) -> Result<crate::export::ExportMidiResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::export::export_midi(&code, &path, cycles, bpm)
+    })
+    .await
+    .map_err(|e| format!("export task failed: {e}"))?
 }
 
 // ---------------------------------------------------------------------------

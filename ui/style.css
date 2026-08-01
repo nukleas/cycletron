@@ -1440,8 +1440,8 @@ button.danger:hover:not(:disabled) {
 }
 
 .ex-modal {
-    width: min(520px, 92vw);
-    max-height: min(520px, 80vh);
+    width: min(640px, 94vw);
+    max-height: min(720px, 88vh);
     background: var(--bg-light);
     border: 1px solid var(--neon-subtle);
     border-radius: 0;
@@ -1457,6 +1457,56 @@ button.danger:hover:not(:disabled) {
     font-size: 10px;
     color: var(--text-muted);
     border-bottom: 1px solid var(--neon-subtle);
+}
+
+.ex-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--neon-subtle);
+}
+
+.ex-search {
+    flex: 1;
+    background: rgba(5, 6, 10, 0.6);
+    border: 1px solid var(--neon-subtle);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 6px 10px;
+    outline: none;
+}
+
+.ex-search:focus {
+    border-color: var(--neon);
+    box-shadow: 0 0 8px var(--neon-glow);
+}
+
+.ex-search::placeholder {
+    color: var(--text-muted);
+}
+
+.ex-filter-count {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.ex-section-count {
+    margin-left: 8px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    opacity: 0.8;
+}
+
+.ex-empty {
+    padding: 24px 12px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
 }
 
 .ex-tip kbd {
@@ -3105,6 +3155,28 @@ body.is-drop-target::after {
 }
 .metronome-btn svg { display: block; }
 
+.skip-btn {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    background: rgba(5, 6, 10, 0.55);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.skip-btn:hover:not(:disabled) {
+    color: var(--neon);
+    border-color: var(--neon-subtle);
+    box-shadow: 0 0 8px var(--neon-glow);
+}
+.skip-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
 .midi-in-status {
     width: 9px;
     height: 9px;
@@ -3999,6 +4071,21 @@ body.is-drop-target::after {
     background: var(--accent-subtle);
     box-shadow: 0 0 10px var(--neon-glow);
 }
+.prefs-oauth {
+    margin: 6px 0 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.prefs-oauth-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+.prefs-field-hint.is-ok {
+    color: var(--neon);
+}
 .prefs-hint {
     font-size: 9px;
     letter-spacing: 0.1em;
@@ -4424,3 +4511,128 @@ body.immersive-viz-active #editor .cm-gutters {
 
 .no-scanlines .app-modal-backdrop { background: rgba(5, 6, 10, 0.82); }
 .no-scanlines .fullscreen-viz::after { display: none; }
+
+/* Offline audio/MIDI export options (reuses picker-overlay shell) */
+.export-modal {
+    width: min(420px, 90vw);
+    padding-bottom: 12px;
+}
+
+.export-modal-help {
+    margin: 12px 14px 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.export-modal-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 14px 14px 0;
+    font-size: 13px;
+    color: var(--text);
+}
+
+.export-modal-field input,
+.export-modal-field select {
+    width: 120px;
+    padding: 6px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.export-modal-field input:focus,
+.export-modal-field select:focus {
+    outline: none;
+    border-color: var(--neon);
+}
+
+.export-modal-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 12px 14px 0;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.export-modal-check input {
+    margin-top: 2px;
+}
+
+/* Length mode (auto full-loop vs custom): a radio column, not a 120px field. */
+.export-length-modes {
+    align-items: flex-start;
+}
+.export-length-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+}
+.export-length-choices label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.export-length-choices input {
+    width: auto;
+    padding: 0;
+    margin: 0;
+}
+.export-length-choices input:disabled + * ,
+.export-length-choices label:has(input:disabled) {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.export-modal-help code {
+    font-size: 11px;
+    padding: 0 3px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+}
+
+.export-modal-meta {
+    margin: 10px 14px 0;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.export-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin: 16px 14px 0;
+}
+
+.export-modal-actions button {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    cursor: pointer;
+    border: 1px solid var(--neon-subtle);
+    background: transparent;
+    color: var(--text);
+}
+
+.export-modal-actions button.primary {
+    background: var(--neon);
+    color: var(--bg);
+    border-color: var(--neon);
+}
+
+.export-modal-actions button:hover {
+    box-shadow: 0 0 10px var(--neon-glow);
+}

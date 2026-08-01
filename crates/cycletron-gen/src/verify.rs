@@ -33,20 +33,9 @@ pub fn validate_doc(code: &str) -> Result<(), String> {
     if code.trim().is_empty() {
         return Err("empty document".to_string());
     }
-    if let Ok(file) = strudel_dsl::parse_strudel_file(code) {
-        let has_content = !file.tracks.is_empty()
-            || !file.directives.is_empty()
-            || !file.bindings.is_empty()
-            || !file.functions.is_empty();
-        if has_content {
-            let out = strudel_dsl::evaluate_file(&file).map_err(|e| e.to_string())?;
-            return require_haps(&out.pattern);
-        }
-    }
-    match strudel_dsl::eval_dsl_with_tempo(code) {
-        Ok(out) => require_haps(&out.pattern),
-        Err(e) => Err(e.to_string()),
-    }
+    // Structural file → standalone DSL → mini-notation (strudel-rs cascade).
+    let out = strudel_dsl::execute(code).map_err(|e| e.to_string())?;
+    require_haps(&out.pattern)
 }
 
 fn require_haps(pattern: &strudel_core::Pattern) -> Result<(), String> {
@@ -79,7 +68,7 @@ pub fn note_tokens(mini_str: &str) -> Result<Vec<String>, String> {
 /// so `let` bindings + `arrange(...)` resolve).
 fn eval_doc(doc: &str) -> Result<strudel_core::Pattern, String> {
     let file = strudel_dsl::parse_strudel_file(doc).map_err(|e| e.to_string())?;
-    let out = strudel_dsl::evaluate_file(&file).map_err(|e| e.to_string())?;
+    let out = strudel_dsl::evaluate_file(file).map_err(|e| e.to_string())?;
     Ok(out.pattern)
 }
 

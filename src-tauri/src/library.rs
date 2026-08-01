@@ -47,6 +47,18 @@ pub fn ensure_root_exists(root: &Path) -> std::io::Result<()> {
     fs::create_dir_all(root)
 }
 
+/// Create the library root (if needed) and seed bundled demos into `Demos/`.
+///
+/// This is the single entry point for “user has a library folder” — called
+/// when the app first loads the configured root and whenever the user picks
+/// a new root (welcome wizard / Preferences). Seeding is idempotent and
+/// never overwrites files the user already has.
+pub fn prepare_root(root: &Path) -> Result<(), String> {
+    ensure_root_exists(root).map_err(|e| format!("create {}: {e}", root.display()))?;
+    crate::demos::seed_into_library(root).map_err(|e| format!("seed demos: {e}"))?;
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct DirEntry {
     pub name: String,

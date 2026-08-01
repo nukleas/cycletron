@@ -15,111 +15,115 @@ mod sounds;
 mod state;
 mod strudel;
 mod telemetry;
+mod tracks;
 mod tray;
+mod xai_oauth;
+mod codex_oauth;
+mod demos;
+mod export;
 
 
 
-use http_body_util::Full;
-use hyper::body::Bytes;
-use hyper::server::conn::http1;
-use hyper::service::service_fn;
-use hyper::{Request, Response, StatusCode};
-use hyper_util::rt::TokioIo;
-use rust_embed::Embed;
 use state::AppState;
 use tauri::Manager;
-use tauri::async_runtime;
 use tauri::{WebviewUrl, WebviewWindowBuilder};
-use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::util::SubscriberInitExt as _;
 
-/// Embeds the production frontend (`ui/dist`) at compile time.
-/// This lets us serve it from a real `http://127.0.0.1` origin in production,
-/// which is required for WebKit to expose SharedArrayBuffer + Atomics.
-#[derive(Embed)]
-#[folder = "$CARGO_MANIFEST_DIR/../ui/dist"]
-struct FrontendAssets;
+// Production-only: embed `ui/dist` and serve it over localhost with COOP/COEP
+// so WebKit grants SharedArrayBuffer. Dev builds talk to Vite instead, so we
+// do not require `ui/dist` (or npm install) just to compile `cargo tauri dev`.
+#[cfg(not(debug_assertions))]
+mod production_frontend {
+    use http_body_util::Full;
+    use hyper::body::Bytes;
+    use hyper::server::conn::http1;
+    use hyper::service::service_fn;
+    use hyper::{Request, Response, StatusCode};
+    use hyper_util::rt::TokioIo;
+    use rust_embed::Embed;
+    use tauri::async_runtime;
+    use tokio::net::TcpListener;
 
-/// Starts a minimal HTTP server on a random localhost port that serves the
-/// embedded `FrontendAssets` and **always** sets the three critical headers
-/// required for SharedArrayBuffer:
-///   - Cross-Origin-Opener-Policy: same-origin
-///   - Cross-Origin-Embedder-Policy: require-corp
-///   - Cross-Origin-Resource-Policy: same-origin
-///
-/// Returns the port it bound to.
-async fn start_local_frontend_server() -> u16 {
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("failed to bind local frontend server");
-    let port = listener.local_addr().unwrap().port();
+    /// Embeds the production frontend (`ui/dist`) at compile time.
+    /// Built by `beforeBuildCommand` (`npm run build`) before release compiles.
+    #[derive(Embed)]
+    #[folder = "$CARGO_MANIFEST_DIR/../ui/dist"]
+    struct FrontendAssets;
 
-    async_runtime::spawn(async move {
-        loop {
-            let (stream, _) = match listener.accept().await {
-                Ok(s) => s,
-                Err(e) => {
-                    tracing::error!("frontend server accept error: {e}");
-                    continue;
-                }
-            };
+    /// Minimal HTTP server on a random localhost port that always sets the
+    /// headers required for SharedArrayBuffer.
+    pub async fn start_local_frontend_server() -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("failed to bind local frontend server");
+        let port = listener.local_addr().unwrap().port();
 
-            let io = TokioIo::new(stream);
+        async_runtime::spawn(async move {
+            loop {
+                let (stream, _) = match listener.accept().await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        tracing::error!("frontend server accept error: {e}");
+                        continue;
+                    }
+                };
 
-            async_runtime::spawn(async move {
-                let service = service_fn(|req: Request<hyper::body::Incoming>| async move {
-                    serve_embedded_asset(req).await
+                let io = TokioIo::new(stream);
+
+                async_runtime::spawn(async move {
+                    let service = service_fn(|req: Request<hyper::body::Incoming>| async move {
+                        serve_embedded_asset(req).await
+                    });
+
+                    if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+                        tracing::debug!("frontend server connection error: {err}");
+                    }
                 });
+            }
+        });
 
-                if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
-                    tracing::debug!("frontend server connection error: {err}");
-                }
-            });
-        }
-    });
+        port
+    }
 
-    port
-}
+    async fn serve_embedded_asset(
+        req: Request<hyper::body::Incoming>,
+    ) -> Result<Response<Full<Bytes>>, hyper::Error> {
+        let path = req.uri().path().trim_start_matches('/');
 
-async fn serve_embedded_asset(
-    req: Request<hyper::body::Incoming>,
-) -> Result<Response<Full<Bytes>>, hyper::Error> {
-    let path = req.uri().path().trim_start_matches('/');
+        // Default to index.html for SPA-style routing
+        let file_path = if path.is_empty() || path == "index.html" {
+            "index.html"
+        } else {
+            path
+        };
 
-    // Default to index.html for SPA-style routing
-    let file_path = if path.is_empty() || path == "index.html" {
-        "index.html"
-    } else {
-        path
-    };
+        let file = FrontendAssets::get(file_path);
 
-    let file = FrontendAssets::get(file_path);
+        let response = if let Some(content) = file {
+            let mime = mime_guess::from_path(file_path).first_or_octet_stream();
 
-    let response = if let Some(content) = file {
-        let mime = mime_guess::from_path(file_path).first_or_octet_stream();
+            Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", mime.as_ref())
+                .header("Cross-Origin-Opener-Policy", "same-origin")
+                .header("Cross-Origin-Embedder-Policy", "require-corp")
+                .header("Cross-Origin-Resource-Policy", "same-origin")
+                .body(Full::from(Bytes::from(content.data.into_owned())))
+                .unwrap()
+        } else {
+            Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .header("Cross-Origin-Opener-Policy", "same-origin")
+                .header("Cross-Origin-Embedder-Policy", "require-corp")
+                .header("Cross-Origin-Resource-Policy", "same-origin")
+                .body(Full::from(Bytes::from_static(b"Not Found")))
+                .unwrap()
+        };
 
-        Response::builder()
-            .status(StatusCode::OK)
-            .header("Content-Type", mime.as_ref())
-            // === The magic headers for SharedArrayBuffer ===
-            .header("Cross-Origin-Opener-Policy", "same-origin")
-            .header("Cross-Origin-Embedder-Policy", "require-corp")
-            .header("Cross-Origin-Resource-Policy", "same-origin")
-            .body(Full::from(Bytes::from(content.data.into_owned())))
-            .unwrap()
-    } else {
-        Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .header("Cross-Origin-Opener-Policy", "same-origin")
-            .header("Cross-Origin-Embedder-Policy", "require-corp")
-            .header("Cross-Origin-Resource-Policy", "same-origin")
-            .body(Full::from(Bytes::from_static(b"Not Found")))
-            .unwrap()
-    };
-
-    Ok(response)
+        Ok(response)
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -213,7 +217,8 @@ pub fn run() {
             // injected on every response). This makes WebKit grant full SAB support.
             //
             // In debug builds we keep pointing at the Vite dev server (fast HMR).
-            let main_window = if cfg!(debug_assertions) {
+            #[cfg(debug_assertions)]
+            let main_window = {
                 // Dev: use Vite dev server (headers already set in vite.config.ts)
                 WebviewWindowBuilder::new(
                     app,
@@ -234,11 +239,14 @@ pub fn run() {
                 .min_inner_size(900.0, 600.0)
                 .resizable(true)
                 .build()?
-            } else {
-                // Production: start our own localhost HTTP server that
-                // guarantees the COOP/COEP + CORP headers.
-                // We use block_on here because setup() is synchronous.
-                let port = async_runtime::block_on(start_local_frontend_server());
+            };
+            #[cfg(not(debug_assertions))]
+            let main_window = {
+                // Production: localhost HTTP server with COOP/COEP + CORP headers.
+                // block_on because setup() is synchronous.
+                let port = tauri::async_runtime::block_on(
+                    production_frontend::start_local_frontend_server(),
+                );
                 let url = format!("http://127.0.0.1:{}/index.html", port);
 
                 tracing::info!("Production frontend served at {}", url);
@@ -298,8 +306,20 @@ pub fn run() {
             commands::set_user_settings,
             commands::set_provider_key,
             commands::has_provider_key,
+            commands::xai_oauth_status,
+            commands::xai_oauth_import_grok_build,
+            commands::xai_oauth_start_login,
+            commands::xai_oauth_poll_login,
+            commands::xai_oauth_logout,
+            commands::codex_oauth_status,
+            commands::codex_oauth_import_cli,
+            commands::codex_oauth_login,
+            commands::codex_oauth_logout,
             commands::get_app_info,
             commands::write_binary_file,
+            commands::export_audio,
+            commands::export_wav,
+            commands::export_midi,
             commands::list_snapshots,
             commands::read_snapshot,
             commands::get_logs,
