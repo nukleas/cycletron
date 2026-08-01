@@ -186,7 +186,7 @@ fn event_energy(sound: &str, f0: Option<f64>, cutoff: Option<f64>, hpf: Option<f
 }
 
 fn getf(h: &strudel_core::Hap, k: ContextKey) -> Option<f64> {
-    h.context.get(&k).and_then(super::value_to_f64)
+    h.context.get(&k).and_then(crate::inspect::value_to_f64)
 }
 
 /// Read the sound name from a hap (context first, then the bare value).
@@ -224,7 +224,7 @@ fn hap_fundamental(h: &strudel_core::Hap) -> Option<f64> {
         .get(&ContextKey::Note)
         .cloned()
         .unwrap_or_else(|| h.value.clone());
-    let (_, midi) = super::resolve_note(&cand);
+    let (_, midi) = crate::inspect::resolve_note(&cand);
     midi.map(|m| midi_hz(m as f64))
 }
 
