@@ -297,9 +297,9 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                     "generator": {
                         "type": "string",
                         "enum": ["genre", "infinity", "hexbeat", "numerals", "palindrome", "automaton"],
-                        "description": "Which generator to run"
+                        "description": "Which generator to run. OPTIONAL — defaults to 'genre', and is otherwise inferred from whichever param you set (hex→hexbeat, motif→palindrome, numerals→numerals, rule→automaton). For a genre/style request just pass `genre` and leave this out."
                     },
-                    "genre": { "type": "string", "description": "genre: kebab-case name from the genre map (e.g. deep-house, psytrance, gabber, amapiano, synthwave); family names and aliases also route" },
+                    "genre": { "type": "string", "description": "The genre/style to generate — kebab-case name from the genre map (e.g. deep-house, psytrance, gabber, amapiano, synthwave); family names and aliases also route. Setting this runs the genre generator." },
                     "seed": { "type": "integer", "description": "genre: varies the generated melodic parts (default 7)" },
                     "count": { "type": "integer", "description": "infinity: number of notes (default 16)" },
                     "root": { "type": "integer", "description": "infinity: root MIDI note (default 60)" },
@@ -310,8 +310,7 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                     "rule": { "type": "integer", "description": "automaton: Wolfram rule 0-255 (default 90)" },
                     "width": { "type": "integer", "description": "automaton: number of steps per cycle (default 8)" },
                     "gens": { "type": "integer", "description": "automaton: number of cycles/generations (default 4)" }
-                },
-                "required": ["generator"]
+                }
             }),
         },
         ToolDefinition {

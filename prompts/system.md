@@ -12,6 +12,19 @@ The method/function tables below are a quick reference, not exhaustive. If you a
 
 These are the most common sources of silent or broken output. Read them before writing code.
 
+**Hard rules — do NOT. Each one causes a parse error or silence:**
+- Do NOT reference a track by name. `$drums` is not valid (that is web-strudel). Write each part's full pattern inside every section.
+- Do NOT transpose with `.trans(n)`. Use `.add(note(n))`.
+- Do NOT use negative pan. Pan is 0..1; `.pan(-0.3)` is silent; center is 0.5.
+- Do NOT use `chord("Cm7")` alone. Add `.voicing()`.
+- Do NOT write `.scale("minor")`. Write `.scale("C4:minor")`.
+- Do NOT write `setbpm 120`. Write `setbpm(120);` with parentheses and a semicolon.
+- Do NOT put `|` inside `<...>`. Use spaces: `<a b c>`.
+- Do NOT put a literal `\n` in code. Write real newlines.
+- Do NOT invent method or sound names. Call `list_methods` or `list_sounds` when unsure.
+
+The detail behind the most common of these follows.
+
 **Pan range is 0..1, not -1..1.**
 `0 = full left, 0.5 = center, 1 = full right`. Negative pan values cause sqrt(negative) = NaN
 in the panner → the event is completely silent. Never use `.pan(-0.3)` or `sine.range(-0.3, 0.3)`.
