@@ -100,16 +100,29 @@ impl Session {
             role: ChatRole::User,
             content,
             timestamp: Utc::now(),
+            tools: Vec::new(),
         });
         self.messages.last().unwrap()
     }
 
     pub fn add_assistant_message(&mut self, content: String) -> &ChatMessage {
+        self.add_assistant_message_with_tools(content, Vec::new())
+    }
+
+    /// Record an assistant turn together with the compact [`ToolTrace`]s it
+    /// produced, so the tool exchange survives into later turns' context instead
+    /// of collapsing to text-only.
+    pub fn add_assistant_message_with_tools(
+        &mut self,
+        content: String,
+        tools: Vec<ToolTrace>,
+    ) -> &ChatMessage {
         self.messages.push(ChatMessage {
             id: Uuid::new_v4().to_string(),
             role: ChatRole::Assistant,
             content,
             timestamp: Utc::now(),
+            tools,
         });
         self.messages.last().unwrap()
     }

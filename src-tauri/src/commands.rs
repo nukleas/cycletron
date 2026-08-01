@@ -69,9 +69,9 @@ pub async fn send_message(
     let _ = forwarder.await;
 
     match result {
-        Ok(response) => {
+        Ok((response, tools)) => {
             let mut session = state.session.lock().unwrap();
-            session.add_assistant_message(response.clone());
+            session.add_assistant_message_with_tools(response.clone(), tools);
             Ok(response)
         }
         Err(e) => {

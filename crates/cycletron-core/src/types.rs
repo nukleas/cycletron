@@ -58,6 +58,23 @@ pub struct CorpusQuery {
     pub limit: Option<usize>,
 }
 
+/// A compact record of one tool the assistant invoked during a turn, persisted
+/// on the assistant [`ChatMessage`] so the model can recall what it already
+/// tried on later turns — otherwise the tool exchange is lost to text-only
+/// history and it re-tries the same things. Inputs are kept in full (they are
+/// small and must round-trip back into a valid `tool_use` on replay); results
+/// are truncated, since large payloads (file / corpus dumps) are what would
+/// balloon per-turn input tokens if replayed verbatim.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolTrace {
+    pub id: String,
+    pub name: String,
+    pub input: serde_json::Value,
+    pub result: String,
+    #[serde(default)]
+    pub is_error: bool,
+}
+
 /// A message in the chat conversation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
@@ -65,6 +82,12 @@ pub struct ChatMessage {
     pub role: ChatRole,
     pub content: String,
     pub timestamp: DateTime<Utc>,
+    /// Structured tool exchange for assistant turns that called tools. Empty for
+    /// plain-text turns and for older snapshots (serde default), and skipped on
+    /// the wire when empty so the persisted format is byte-identical for
+    /// text-only chats and the frontend contract is unchanged.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<ToolTrace>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

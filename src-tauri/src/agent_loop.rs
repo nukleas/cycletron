@@ -3,7 +3,9 @@ use crate::strudel;
 use cycletron_agent::LlmProvider;
 use cycletron_agent::types::*;
 use cycletron_core::traits::CorpusIndex;
-use cycletron_core::types::{ChatMessage, ChatRole, CorpusQuery, MusicalRole, PlaybackState};
+use cycletron_core::types::{
+    ChatMessage, ChatRole, CorpusQuery, MusicalRole, PlaybackState, ToolTrace,
+};
 use std::sync::LazyLock;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
@@ -25,13 +27,19 @@ static SYSTEM_PROMPT: LazyLock<String> = LazyLock::new(|| {
     include_str!("../../prompts/system.md").to_string()
 });
 
-/// Run the full agent loop: conversation with Claude, tool execution, return final text.
+/// How much of each tool result to keep in cross-turn memory. Inputs are stored
+/// in full (small, and must rebuild a valid tool_use); results are capped here
+/// so replaying past turns doesn't resend large file/corpus dumps every time.
+const TOOL_RESULT_MEMORY_CHARS: usize = 600;
+
+/// Run the full agent loop: conversation with Claude, tool execution, return the
+/// final text plus the compact tool traces to persist for cross-turn memory.
 pub async fn run_agent_loop(
     client: &dyn LlmProvider,
     session_messages: &[ChatMessage],
     state: &AppState,
     event_tx: mpsc::UnboundedSender<AgentEvent>,
-) -> Result<String, String> {
+) -> Result<(String, Vec<ToolTrace>), String> {
     let mut api_messages = session_to_api_messages(session_messages);
     let tool_defs = cycletron_agent::tools::music_tool_definitions();
 
@@ -52,6 +60,10 @@ pub async fn run_agent_loop(
     };
 
     let mut full_text = String::new();
+    // Compact record of every tool this turn called, persisted onto the
+    // assistant message so the next turn's context includes what was already
+    // tried instead of collapsing to text-only.
+    let mut turn_tools: Vec<ToolTrace> = Vec::new();
     // Run id groups all tool calls made for this one user message, so the
     // telemetry analyzer can see retries within a single request.
     let run = crate::telemetry::now_millis();
@@ -164,6 +176,17 @@ pub async fn run_agent_loop(
                 },
             );
 
+            // Persist a compact trace of the call for cross-turn memory: full
+            // input (must round-trip into a valid tool_use on replay), result
+            // truncated so large dumps don't inflate later turns' input tokens.
+            turn_tools.push(ToolTrace {
+                id: id.clone(),
+                name: name.clone(),
+                input: input.clone(),
+                result: crate::telemetry::truncate(&content, TOOL_RESULT_MEMORY_CHARS),
+                is_error: is_error.unwrap_or(false),
+            });
+
             tool_results.push(ContentBlock::ToolResult {
                 tool_use_id: id.clone(),
                 content,
@@ -181,7 +204,7 @@ pub async fn run_agent_loop(
         full_text: full_text.clone(),
     });
 
-    Ok(full_text)
+    Ok((full_text, turn_tools))
 }
 
 /// Execute a tool by name.
@@ -1181,21 +1204,66 @@ fn tool_set_tempo(
 }
 
 /// Convert session ChatMessages to Claude API messages.
+///
+/// Assistant turns that called tools are expanded back into their structured
+/// exchange — the assistant's `tool_use` blocks followed by a matching `user`
+/// turn of `tool_result` blocks — so the model recalls what it already tried.
+/// Without this, tool activity is lost to text-only history and the model
+/// repeats itself. The system prompt is passed separately, so System messages
+/// are skipped.
 fn session_to_api_messages(messages: &[ChatMessage]) -> Vec<ApiMessage> {
-    messages
-        .iter()
-        .filter(|m| m.role != ChatRole::System)
-        .map(|m| ApiMessage {
-            role: match m.role {
-                ChatRole::User => "user".to_string(),
-                ChatRole::Assistant => "assistant".to_string(),
-                ChatRole::System => unreachable!(),
-            },
-            content: vec![ContentBlock::Text {
-                text: m.content.clone(),
-            }],
-        })
-        .collect()
+    let mut out = Vec::new();
+    for m in messages {
+        let role = match m.role {
+            ChatRole::User => "user",
+            ChatRole::Assistant => "assistant",
+            ChatRole::System => continue,
+        };
+
+        if role == "assistant" && !m.tools.is_empty() {
+            // Rebuild the assistant turn: any prose, then each tool_use.
+            let mut content = Vec::new();
+            if !m.content.is_empty() {
+                content.push(ContentBlock::Text {
+                    text: m.content.clone(),
+                });
+            }
+            for t in &m.tools {
+                content.push(ContentBlock::ToolUse {
+                    id: t.id.clone(),
+                    name: t.name.clone(),
+                    input: t.input.clone(),
+                });
+            }
+            out.push(ApiMessage {
+                role: "assistant".to_string(),
+                content,
+            });
+
+            // The paired user turn carrying every tool_result (order matches).
+            let results = m
+                .tools
+                .iter()
+                .map(|t| ContentBlock::ToolResult {
+                    tool_use_id: t.id.clone(),
+                    content: t.result.clone(),
+                    is_error: t.is_error.then_some(true),
+                })
+                .collect();
+            out.push(ApiMessage {
+                role: "user".to_string(),
+                content: results,
+            });
+        } else {
+            out.push(ApiMessage {
+                role: role.to_string(),
+                content: vec![ContentBlock::Text {
+                    text: m.content.clone(),
+                }],
+            });
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -1264,5 +1332,117 @@ mod generator_inference_tests {
         // explicit discriminator still wins; empty defaults to genre.
         assert_eq!(infer_generator(&json!({"generator": "hexbeat"})), "hexbeat");
         assert_eq!(infer_generator(&json!({})), "genre");
+    }
+}
+
+#[cfg(test)]
+mod session_history_tests {
+    use super::*;
+    use chrono::Utc;
+    use cycletron_core::types::ToolTrace;
+    use serde_json::json;
+
+    fn chat(role: ChatRole, content: &str, tools: Vec<ToolTrace>) -> ChatMessage {
+        ChatMessage {
+            id: "m".to_string(),
+            role,
+            content: content.to_string(),
+            timestamp: Utc::now(),
+            tools,
+        }
+    }
+
+    #[test]
+    fn tool_turns_replay_as_structured_exchange() {
+        // An assistant turn that called a tool must come back as the assistant
+        // tool_use + a paired user tool_result — otherwise the model forgets
+        // what it already did (the #2 amnesia bug).
+        let history = vec![
+            chat(ChatRole::User, "make a house beat", vec![]),
+            chat(
+                ChatRole::Assistant,
+                "Here you go",
+                vec![ToolTrace {
+                    id: "call_1".into(),
+                    name: "play_pattern".into(),
+                    input: json!({ "code": "bd*4" }),
+                    result: "playing".into(),
+                    is_error: false,
+                }],
+            ),
+            chat(ChatRole::User, "louder", vec![]),
+        ];
+
+        let api = session_to_api_messages(&history);
+        // user, assistant(text+tool_use), user(tool_result), user.
+        assert_eq!(api.len(), 4);
+
+        assert_eq!(api[1].role, "assistant");
+        assert!(
+            matches!(&api[1].content[0], ContentBlock::Text { text } if text == "Here you go")
+        );
+        match &api[1].content[1] {
+            ContentBlock::ToolUse { id, name, input } => {
+                assert_eq!(id, "call_1");
+                assert_eq!(name, "play_pattern");
+                assert_eq!(input["code"], "bd*4");
+            }
+            other => panic!("expected tool_use, got {other:?}"),
+        }
+
+        assert_eq!(api[2].role, "user");
+        match &api[2].content[0] {
+            ContentBlock::ToolResult {
+                tool_use_id,
+                content,
+                is_error,
+            } => {
+                assert_eq!(tool_use_id, "call_1");
+                assert_eq!(content, "playing");
+                assert_eq!(*is_error, None);
+            }
+            other => panic!("expected tool_result, got {other:?}"),
+        }
+
+        assert_eq!(api[3].role, "user");
+    }
+
+    #[test]
+    fn text_only_history_is_flat_and_system_is_skipped() {
+        let history = vec![
+            chat(ChatRole::System, "sys", vec![]),
+            chat(ChatRole::User, "hi", vec![]),
+            chat(ChatRole::Assistant, "hello", vec![]),
+        ];
+        let api = session_to_api_messages(&history);
+        // System dropped (passed separately); two plain text turns remain.
+        assert_eq!(api.len(), 2);
+        assert_eq!(api[0].role, "user");
+        assert_eq!(api[1].role, "assistant");
+        assert!(matches!(&api[1].content[0], ContentBlock::Text { text } if text == "hello"));
+    }
+
+    #[test]
+    fn errored_tool_and_toolless_prose_round_trip() {
+        // Empty assistant prose + an errored tool: the assistant turn is just
+        // the tool_use, and the result carries is_error = Some(true).
+        let history = vec![chat(
+            ChatRole::Assistant,
+            "",
+            vec![ToolTrace {
+                id: "c9".into(),
+                name: "save_song".into(),
+                input: json!({ "name": "x" }),
+                result: "denied".into(),
+                is_error: true,
+            }],
+        )];
+        let api = session_to_api_messages(&history);
+        assert_eq!(api[0].content.len(), 1);
+        assert!(matches!(&api[0].content[0], ContentBlock::ToolUse { .. }));
+        match &api[1].content[0] {
+            ContentBlock::ToolResult { is_error, .. } => assert_eq!(*is_error, Some(true)),
+            other => panic!("expected tool_result, got {other:?}"),
+        }
     }
 }
