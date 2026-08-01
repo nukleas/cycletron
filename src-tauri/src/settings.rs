@@ -331,19 +331,6 @@ impl UserSettings {
 
     /// Apply user overrides on top of an [`AppConfig`]. Mutates in place.
     pub fn apply_to(&self, config: &mut cycletron_core::config::AppConfig) {
-        if let Some(key) = &self.anthropic.api_key {
-            if !key.is_empty() {
-                config.anthropic.api_key = Some(key.clone());
-            }
-        }
-        if let Some(model) = &self.anthropic.model {
-            if !model.is_empty() {
-                config.anthropic.model = model.clone();
-            }
-        }
-        if let Some(n) = self.anthropic.max_tokens {
-            config.anthropic.max_tokens = n;
-        }
         if let Some(t) = self.audio.default_tempo {
             config.audio.default_tempo = t;
         }

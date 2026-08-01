@@ -3,22 +3,9 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    pub anthropic: AnthropicConfig,
     pub corpus: CorpusConfig,
     pub audio: AudioConfig,
     pub ui: UiConfig,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnthropicConfig {
-    /// API key, or read from ANTHROPIC_API_KEY env var.
-    pub api_key: Option<String>,
-    /// Model to use.
-    #[serde(default = "default_model")]
-    pub model: String,
-    /// Max tokens per response.
-    #[serde(default = "default_max_tokens")]
-    pub max_tokens: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,21 +53,6 @@ pub struct UiConfig {
     pub theme: String,
 }
 
-fn default_model() -> String {
-    "claude-sonnet-4-6".to_string()
-}
-
-fn default_max_tokens() -> u32 {
-    // Multi-section patterns are large backtick strings emitted alongside
-    // prose; 8192 routinely truncated the tool-call JSON mid-stream, which
-    // surfaced as empty `{}` tool inputs and a validate retry loop. 32000
-    // still left songs/recipes truncating, so use the full Sonnet 4.6 output
-    // ceiling (64K). Responses stream over SSE, so the non-streaming HTTP
-    // timeout that caps large one-shot requests doesn't apply here. This also
-    // stays valid for Opus/Fable (128K ceiling) if the model is changed.
-    64000
-}
-
 fn default_tempo() -> f64 {
     120.0
 }
@@ -112,11 +84,6 @@ impl AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            anthropic: AnthropicConfig {
-                api_key: None,
-                model: default_model(),
-                max_tokens: default_max_tokens(),
-            },
             corpus: CorpusConfig {
                 path: PathBuf::from("../strudel-corpus"),
                 metadata_index: None,
