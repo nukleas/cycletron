@@ -55,6 +55,9 @@ pub async fn run_agent_loop(
     // Run id groups all tool calls made for this one user message, so the
     // telemetry analyzer can see retries within a single request.
     let run = crate::telemetry::now_millis();
+    // Fresh per-turn egress budget: bounds how much library content read_song can
+    // send to the (possibly cloud) model in one user turn — no folder-dumping.
+    state.reset_read_budget();
     let telemetry_dir = state.app_data_dir();
     // 20 leaves the agent room to call tools several times (each tool round
     // is one iteration) before the loop forces an answer. 10 was tight
@@ -185,6 +188,14 @@ async fn execute_tool(
     match name {
         "search_corpus" => tool_search_corpus(input, state),
         "get_example" => tool_get_example(input, state),
+        "list_library" => tool_list_library(input, state),
+        "search_library" => tool_search_library(input, state),
+        "read_song" => tool_read_song(input, state),
+        "save_song" => tool_save_song(input, state, event_tx),
+        "save_current_as" => tool_save_current_as(input, state, event_tx),
+        "rename_song" => tool_rename_song(input, state, event_tx),
+        "move_song" => tool_move_song(input, state, event_tx),
+        "new_folder" => tool_new_folder(input, state, event_tx),
         "list_sounds" => tool_list_sounds(state),
         "list_methods" => tool_list_methods(input),
         "generate_pattern" => tool_generate_pattern(input),
@@ -251,6 +262,172 @@ fn tool_get_example(input: &serde_json::Value, state: &AppState) -> Result<Strin
         Some(index) => index.get_source(id).map_err(|e| e.to_string()),
         None => Err("corpus not loaded".to_string()),
     }
+}
+
+// --- Library awareness (read-only) -------------------------------------------
+// The agent can see and read the user's OWN saved songs, not just the curated
+// corpus. All three tools are read-only and confined to the library root.
+
+/// One line per song for the agent: name, tempo, tags, sounds, path, preview.
+fn format_song_line(s: &crate::library_index::LibrarySong) -> String {
+    let bpm = s.bpm.map(|b| format!("{b:.0} BPM")).unwrap_or_else(|| "—".into());
+    let tags = if s.tags.is_empty() { String::new() } else { format!(" · #{}", s.tags.join(" #")) };
+    let sounds = if s.sounds.is_empty() {
+        String::new()
+    } else {
+        format!(" · sounds: {}", s.sounds.iter().take(6).cloned().collect::<Vec<_>>().join(", "))
+    };
+    format!("• {} [{bpm}]{tags}  @{}{sounds}\n    {}", s.name, s.rel_path, s.preview)
+}
+
+/// List the user's saved songs (newest first). Optional `limit` (default 30).
+fn tool_list_library(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
+    let root = state.library_root();
+    let warn = crate::library_index::root_warning(&root)
+        .map(|w| format!("{w}\n\n"))
+        .unwrap_or_default();
+    let idx = crate::library_index::LibraryIndex::build(&root);
+    if idx.songs.is_empty() {
+        return Ok(format!("{warn}Your library is empty — no saved songs yet."));
+    }
+    let limit = input["limit"].as_u64().map(|n| n as usize).unwrap_or(30);
+    let shown = idx.songs.len().min(limit);
+    let mut out = format!("{warn}Your library: {} song(s){}\n", idx.songs.len(),
+        if shown < idx.songs.len() { format!(" (showing newest {shown})") } else { String::new() });
+    for s in idx.songs.iter().take(limit) {
+        out.push_str(&format_song_line(s));
+        out.push('\n');
+    }
+    out.push_str("\nUse read_song with an @path to open one.");
+    Ok(out)
+}
+
+/// Search the user's saved songs by keyword / tag / sound / tempo range.
+fn tool_search_library(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
+    let q = crate::library_index::LibraryQuery {
+        keyword: input["keyword"].as_str().map(String::from),
+        tag: input["tag"].as_str().map(String::from),
+        sound: input["sound"].as_str().map(String::from),
+        bpm_min: input["bpm_min"].as_f64(),
+        bpm_max: input["bpm_max"].as_f64(),
+        limit: input["limit"].as_u64().map(|n| n as usize).or(Some(15)),
+    };
+    let root = state.library_root();
+    let warn = crate::library_index::root_warning(&root)
+        .map(|w| format!("{w}\n\n"))
+        .unwrap_or_default();
+    let idx = crate::library_index::LibraryIndex::build(&root);
+    let hits = idx.search(&q);
+    if hits.is_empty() {
+        return Ok(format!("{warn}No songs in your library match that. Try list_library to see everything."));
+    }
+    let mut out = format!("{warn}{} matching song(s):\n", hits.len());
+    for s in hits {
+        out.push_str(&format_song_line(s));
+        out.push('\n');
+    }
+    Ok(out)
+}
+
+/// Open one of the user's saved songs (by its @rel_path) to remix or continue it.
+fn tool_read_song(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
+    let path = input["path"]
+        .as_str()
+        .ok_or("missing 'path' — use the @path from list_library/search_library")?
+        .trim()
+        .trim_start_matches('@');
+    let root = state.library_root();
+    let doc = crate::library_index::read_song(&root, path)?;
+    // Charge this read against the per-turn egress budget; if it would exceed the
+    // ceiling, refuse — the content is NOT returned, so nothing leaves the machine.
+    state.account_read(doc.code.len())?;
+    let fm = doc.frontmatter.unwrap_or_default();
+    let header = format!(
+        "// {} — {}{}\n",
+        fm.name.unwrap_or_else(|| path.to_string()),
+        fm.bpm.map(|b| format!("{b:.0} BPM")).unwrap_or_else(|| "tempo unset".into()),
+        if fm.tags.is_empty() { String::new() } else { format!(" · #{}", fm.tags.join(" #")) },
+    );
+    Ok(format!("{header}{}", doc.code))
+}
+
+// --- Library writes (Tier B) — optimistic + reversible, root-confined --------
+
+/// Notify the frontend that the library changed: refresh the file tree + toast.
+/// Mirrors the `__set_code_and_play` sentinel pattern (tools have no AppHandle).
+fn emit_library_changed(event_tx: &mpsc::UnboundedSender<AgentEvent>, rel_path: &str) {
+    let _ = event_tx.send(AgentEvent::ToolResult {
+        name: "__library_changed".to_string(),
+        result: rel_path.to_string(),
+    });
+}
+
+/// Save agent-supplied code as a named song in the library.
+fn tool_save_song(
+    input: &serde_json::Value,
+    state: &AppState,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+) -> Result<String, String> {
+    let name = input["name"].as_str().ok_or("missing 'name'")?;
+    let code = input["code"].as_str().ok_or("missing 'code'")?;
+    let folder = input["folder"].as_str();
+    let root = state.library_root();
+    let rel = crate::library_index::save_song(&root, state.app_data_dir().as_deref(), name, code, folder)?;
+    emit_library_changed(event_tx, &rel);
+    Ok(format!("Saved '{name}' to your library at @{rel} (prior version snapshotted; undo from the file's history)."))
+}
+
+/// Save the CURRENT editor buffer as a named song.
+fn tool_save_current_as(
+    input: &serde_json::Value,
+    state: &AppState,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+) -> Result<String, String> {
+    let name = input["name"].as_str().ok_or("missing 'name'")?;
+    let folder = input["folder"].as_str();
+    let code = current_document(state)?;
+    let root = state.library_root();
+    let rel = crate::library_index::save_song(&root, state.app_data_dir().as_deref(), name, &code, folder)?;
+    emit_library_changed(event_tx, &rel);
+    Ok(format!("Saved the current song as '{name}' at @{rel}."))
+}
+
+fn tool_rename_song(
+    input: &serde_json::Value,
+    state: &AppState,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+) -> Result<String, String> {
+    let path = input["path"].as_str().ok_or("missing 'path'")?;
+    let new_name = input["new_name"].as_str().ok_or("missing 'new_name'")?;
+    let root = state.library_root();
+    let rel = crate::library_index::rename_song(&root, path, new_name)?;
+    emit_library_changed(event_tx, &rel);
+    Ok(format!("Renamed to '{new_name}' — now at @{rel}."))
+}
+
+fn tool_move_song(
+    input: &serde_json::Value,
+    state: &AppState,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+) -> Result<String, String> {
+    let path = input["path"].as_str().ok_or("missing 'path'")?;
+    let folder = input["folder"].as_str().ok_or("missing 'folder'")?;
+    let root = state.library_root();
+    let rel = crate::library_index::move_song(&root, path, folder)?;
+    emit_library_changed(event_tx, &rel);
+    Ok(format!("Moved to @{rel}."))
+}
+
+fn tool_new_folder(
+    input: &serde_json::Value,
+    state: &AppState,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+) -> Result<String, String> {
+    let path = input["path"].as_str().ok_or("missing 'path'")?;
+    let root = state.library_root();
+    let rel = crate::library_index::create_folder(&root, path)?;
+    emit_library_changed(event_tx, &rel);
+    Ok(format!("Created folder @{rel}."))
 }
 
 /// Report the sounds currently playable (synths, drums, GM instruments, and

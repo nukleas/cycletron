@@ -2,6 +2,7 @@ mod agent_loop;
 mod commands;
 mod files;
 mod library;
+mod library_index;
 mod logs;
 mod menu;
 mod midi;

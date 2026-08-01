@@ -108,6 +108,121 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "list_library".to_string(),
+            description: "List the USER'S OWN saved songs (their personal library, not the \
+                curated corpus), newest first — name, tempo, tags, sounds, and a preview. Use \
+                this to know what the user has already made, to reference or continue their work."
+                .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "limit": { "type": "integer", "description": "Max songs to list (default 30)" }
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "search_library".to_string(),
+            description: "Search the USER'S OWN saved songs by keyword (name/tag/sound/path), \
+                tag, sound name, or tempo range. Use it for requests like 'remix my acid track' \
+                or 'what have I made around 90 BPM'."
+                .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "keyword": { "type": "string", "description": "Substring across name, tags, sounds, path" },
+                    "tag": { "type": "string", "description": "Match a frontmatter tag" },
+                    "sound": { "type": "string", "description": "A sound/sample name the song uses (e.g. '303', 'bd')" },
+                    "bpm_min": { "type": "number", "description": "Minimum tempo in BPM" },
+                    "bpm_max": { "type": "number", "description": "Maximum tempo in BPM" },
+                    "limit": { "type": "integer", "description": "Max results (default 15)" }
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "read_song".to_string(),
+            description: "Open one of the user's saved songs to read its full code — so you can \
+                remix, continue, or reference it. Pass the @path from list_library/search_library. \
+                Read-only and confined to the user's library."
+                .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "The song's library path (the @path from list/search)" }
+                },
+                "required": ["path"]
+            }),
+        },
+        ToolDefinition {
+            name: "save_song".to_string(),
+            description: "Save code as a NAMED song in the user's library (persists to disk). Use \
+                when the user says 'save this as …'. Overwriting an existing song is allowed and \
+                snapshots the old version first, but announce the overwrite in your reply. Never \
+                organize or overwrite unless the user asked."
+                .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string", "description": "Display name (becomes a slugified filename)" },
+                    "code": { "type": "string", "description": "The strudel code to save" },
+                    "folder": { "type": "string", "description": "Optional library subfolder to save into" }
+                },
+                "required": ["name", "code"]
+            }),
+        },
+        ToolDefinition {
+            name: "save_current_as".to_string(),
+            description: "Save the CURRENT editor buffer as a named song in the library — for \
+                'save what I'm hearing as …' without re-sending the code."
+                .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string", "description": "Display name (becomes a slugified filename)" },
+                    "folder": { "type": "string", "description": "Optional library subfolder" }
+                },
+                "required": ["name"]
+            }),
+        },
+        ToolDefinition {
+            name: "rename_song".to_string(),
+            description: "Rename a saved song (keeps its folder). Only when the user asks to rename."
+                .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "The song's current @path" },
+                    "new_name": { "type": "string", "description": "New display name" }
+                },
+                "required": ["path", "new_name"]
+            }),
+        },
+        ToolDefinition {
+            name: "move_song".to_string(),
+            description: "Move a saved song into a library folder (created if needed). Only when \
+                the user asks to organize."
+                .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "The song's current @path" },
+                    "folder": { "type": "string", "description": "Destination folder in the library" }
+                },
+                "required": ["path", "folder"]
+            }),
+        },
+        ToolDefinition {
+            name: "new_folder".to_string(),
+            description: "Create a folder in the user's library (for organizing). Only when asked."
+                .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "Folder path within the library" }
+                },
+                "required": ["path"]
+            }),
+        },
+        ToolDefinition {
             name: "list_sounds".to_string(),
             description:
                 "List the sounds currently playable: built-in synth/oscillator names, the \

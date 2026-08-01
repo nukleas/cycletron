@@ -35,6 +35,10 @@ pub struct AppState {
     /// Genre recipes loaded from `<corpus>/genres/*.md` — the knowledge base
     /// behind the `genre_recipe` tool.
     pub recipes: Mutex<Vec<Recipe>>,
+    /// Per-turn library read budget `(files, bytes)` — bounds how much of the
+    /// user's own files `read_song` can send to the model in one turn, so a
+    /// broad library root can't be dumped to a cloud provider. Reset each turn.
+    pub read_budget: Mutex<(usize, usize)>,
 }
 
 impl AppState {
@@ -56,7 +60,38 @@ impl AppState {
             last_autosave: Mutex::new(None),
             loaded_sample_banks: Mutex::new(Vec::new()),
             recipes: Mutex::new(Vec::new()),
+            read_budget: Mutex::new((0, 0)),
         }
+    }
+
+    /// Start a fresh per-turn library read budget.
+    pub fn reset_read_budget(&self) {
+        *self.read_budget.lock().unwrap() = (0, 0);
+    }
+
+    /// Account one `read_song` against this turn's egress budget. Returns an
+    /// error (and does NOT charge the budget) when the read would exceed the
+    /// per-turn file-count or byte ceiling — the caller then refuses the read so
+    /// the content never leaves the machine.
+    pub fn account_read(&self, bytes: usize) -> Result<(), String> {
+        let mut b = self.read_budget.lock().unwrap();
+        if b.0 >= crate::library_index::MAX_READ_FILES_PER_TURN {
+            return Err(format!(
+                "Read limit reached: {} songs already opened this turn. Be selective about which \
+                 song you open, or ask the user to narrow it down.",
+                crate::library_index::MAX_READ_FILES_PER_TURN
+            ));
+        }
+        if b.1 + bytes > crate::library_index::MAX_READ_BYTES_PER_TURN {
+            return Err(format!(
+                "Read size budget reached (~{} KB of library content this turn). Open fewer or \
+                 smaller songs.",
+                crate::library_index::MAX_READ_BYTES_PER_TURN / 1024
+            ));
+        }
+        b.0 += 1;
+        b.1 += bytes;
+        Ok(())
     }
 
     /// Initialize corpus, Claude client, and load persisted state from disk.
@@ -262,4 +297,27 @@ fn resolve_corpus_path(path: &std::path::Path) -> PathBuf {
         .map(|p| p.to_path_buf())
         .unwrap_or(manifest_dir);
     workspace_root.join(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::library_index::{MAX_READ_BYTES_PER_TURN, MAX_READ_FILES_PER_TURN};
+
+    #[test]
+    fn read_budget_bounds_files_and_bytes_per_turn() {
+        let s = AppState::new();
+        s.reset_read_budget();
+        // up to the file limit is fine…
+        for _ in 0..MAX_READ_FILES_PER_TURN {
+            assert!(s.account_read(1_000).is_ok());
+        }
+        // …the next read is refused (file-count ceiling).
+        assert!(s.account_read(1_000).is_err());
+
+        // A fresh turn resets, and the BYTE ceiling also bites.
+        s.reset_read_budget();
+        assert!(s.account_read(MAX_READ_BYTES_PER_TURN).is_ok());
+        assert!(s.account_read(1).is_err());
+    }
 }

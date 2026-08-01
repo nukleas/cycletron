@@ -196,6 +196,12 @@ async function initAiBridge() {
                     stopPlayback();
                 } else if (data.name === '__set_tempo') {
                     setTempo(parseFloat(data.result));
+                } else if (data.name === '__library_changed') {
+                    // Agent wrote to the library — refresh the file tree + toast.
+                    try {
+                        (window as any).__TAURI__?.event?.emit?.('library-changed', data.result);
+                    } catch { /* non-tauri */ }
+                    void notify('Library updated', data.result);
                 }
                 break;
         }
