@@ -52,16 +52,18 @@ pub struct Fragment {
 }
 
 impl Recipe {
-    /// Does this recipe answer to `query` (case-insensitive match on genre or
-    /// an alias, exact or substring)?
+    /// Does this recipe answer to `query` (match on genre or an alias, exact or
+    /// substring)? Normalizes spaces/underscores to hyphens on both sides so a
+    /// natural-language query ("drum and bass") finds a kebab genre
+    /// (`drum-and-bass`) — matching how `spec::find` routes for generation.
     pub fn matches(&self, query: &str) -> bool {
-        let q = query.trim().to_lowercase();
+        let q = normalize_genre(query);
         if q.is_empty() {
             return false;
         }
         let names = std::iter::once(&self.genre).chain(self.aliases.iter());
         names.into_iter().any(|n| {
-            let n = n.to_lowercase();
+            let n = normalize_genre(n);
             n == q || n.contains(&q) || q.contains(&n)
         })
     }
@@ -102,6 +104,12 @@ pub fn parse_recipe(name: &str, text: &str) -> Result<Recipe, String> {
         sources: fm.array("sources").unwrap_or_default(),
         sections,
     })
+}
+
+/// Normalize a genre string for matching: lowercase, trim, spaces/underscores
+/// → hyphens (mirrors `cycletron_gen::spec::normalize`).
+fn normalize_genre(s: &str) -> String {
+    s.trim().to_ascii_lowercase().replace([' ', '_'], "-")
 }
 
 /// Load every `*.md` recipe under `dir`. Missing dir → empty (not an error).
@@ -423,6 +431,8 @@ note("c2 c2").s("sawtooth").lpf(400)
     fn matches_genre_and_aliases() {
         let r = parse_recipe("x", SAMPLE).unwrap();
         assert!(r.matches("acid-techno"));
+        assert!(r.matches("acid techno")); // space form normalizes to hyphen
+        assert!(r.matches("acid_techno")); // underscore form too
         assert!(r.matches("ACID"));
         assert!(r.matches("house")); // substring of "acid house"
         assert!(!r.matches("jazz"));

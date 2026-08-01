@@ -18,9 +18,9 @@ Psytrance â€” four-on-floor with the rolling offbeat psy bass engine. Tempo 142â
 setbpm(145);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.9),
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.9).every(4, x => x.fast(2)),
   note("f#2 ~ f#2 ~ f#2 ~ f#2 ~ f#2 ~ f#2 g2 f#2 ~ f#2 ~").s("sawtooth").lpf(650).resonance(10).gain(0.52),
   note("<[f#3, a3, c#4, e4] [g3, b3, d4, f#4]>").s("sawtooth").struct("~ ~ ~ 1").release(0.12).lpf(1800).gain(0.26).room(0.3).pan(0.42),
-  note("f#5 ~ ~ ~ e6 ~ ~ ~").s("wt_lead").delay(0.25).room(0.35).gain(0.28).pan(0.62)
+  note("<[f#5 ~ ~ ~ e6 ~ ~ ~] [f#5 ~ ~ ~ e6 ~ ~ ~] [a5 ~ ~ ~ g6 ~ ~ ~] [d6 ~ ~ ~ d6 ~ ~ ~]>").s("wt_lead").delay(0.25).room(0.35).gain(0.28).pan(0.62)
 )
 ```

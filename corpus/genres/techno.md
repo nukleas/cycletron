@@ -18,7 +18,7 @@ Techno — four-on-floor, euclid tom, driving bass. Tempo 128–132 BPM in c phr
 setbpm(130);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh, mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ ~").gain(0.9),
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh, mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ ~").gain(0.9).every(4, x => x.fast(2)),
   note("c2 ~ c2 ~ c2 ~ c2 ~ c2 ~ c2 c#2 c2 ~ c2 ~").s("sawtooth").lpf(900).resonance(8).gain(0.5),
   note("<[c3, d#3, g3, a#3] [c#3, f3, g#3, c4]>").s("sawtooth").struct("~ ~ 1 ~").release(0.2).lpf(1400).gain(0.3).room(0.2)
 )

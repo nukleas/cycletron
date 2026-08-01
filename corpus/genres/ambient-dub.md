@@ -18,9 +18,9 @@ Ambient dub — slow skank pulse, sub swells, echoing chords. Tempo 65–75 BPM 
 setbpm(70);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ rs ~ ~ ~ ~ ~ ~ ~ rs ~ ~ ~, hh ~ ~ ~ ~ ~ ~ ~ hh ~ ~ ~ ~ ~ ~ ~").gain(0.5).room(0.6),
+  s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ rs ~ ~ ~ ~ ~ ~ ~ rs ~ ~ ~, hh ~ ~ ~ ~ ~ ~ ~ hh ~ ~ ~ ~ ~ ~ ~").gain(0.5).room(0.6).every(4, x => x.fast(2)),
   note("c1 ~ ~ ~ ~ ~ ~ ~ ~ ~ c1 ~ ~ ~ ~ ~").s("sine").attack(0.05).release(1).gain(0.55),
   note("<[c3, d#3, g3, a#3] [f3, g#3, c4, d#4]>").s("gm_epiano1").struct("~ 1 ~ ~").release(0.6).gain(0.34).room(0.8).delay(0.5).pan(0.42),
-  note("c5 ~ ~ g5 ~ ~ f5 ~").s("gm_kalimba").room(0.7).delay(0.45).gain(0.3).pan(0.62)
+  note("<[c5 ~ ~ g5 ~ ~ f5 ~] [c5 ~ ~ g5 ~ ~ f5 ~] [d#5 ~ ~ a#5 ~ ~ g#5 ~] [f5 ~ ~ g5 ~ ~ d#5 ~]>").s("gm_kalimba").room(0.7).delay(0.45).gain(0.3).pan(0.62)
 )
 ```

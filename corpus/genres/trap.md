@@ -18,7 +18,7 @@ Trap — half-time 808s, hat rolls, cold two-chord loop. Tempo 138–142 BPM in 
 setbpm(140);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~, ~ ~ ~ ~ ~ ~ ~ hh*3 ~ ~ ~ ~ ~ ~ ~ hh*4").gain(0.92),
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~, ~ ~ ~ ~ ~ ~ ~ hh*3 ~ ~ ~ ~ ~ ~ ~ hh*4").gain(0.92).every(4, x => x.fast(2)),
   note("c#1 ~ ~ ~ ~ ~ ~ ~ ~ ~ c#1 ~ ~ ~ ~ ~").s("sine").attack(0.01).release(0.8).gain(0.6),
   note("<[c#3, e3, g#3, b3] [d3, f#3, a3, c#4]>").s("wt_pad").attack(0.5).release(1.2).lpf(1000).gain(0.3).room(0.5).pan(0.42)
 )

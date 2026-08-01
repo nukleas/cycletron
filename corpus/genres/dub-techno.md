@@ -18,7 +18,7 @@ Dub techno — four-on-floor under washed minor chords and a slow sub. Tempo 118
 setbpm(120);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.9),
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.9).every(4, x => x.fast(2)),
   note("c1 ~ ~ ~ c1 ~ ~ ~").s("sine").attack(0.05).release(0.8).gain(0.55),
   note("<[c3, d#3, g3, a#3] [f3, g#3, c4, d#4]>").s("sawtooth").struct("~ 1 ~ ~").release(0.5).lpf(900).gain(0.34).room(0.8).delay(0.45).pan(0.42)
 )

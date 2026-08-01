@@ -18,7 +18,7 @@ Hardstyle — punished kick, offbeat bass slam, supersaw anthem stabs. Tempo 148
 setbpm(150);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ bd ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~").gain(0.95).dist(0.35),
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ bd ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~").gain(0.95).dist(0.35).every(4, x => x.fast(2)),
   note("~ f2 ~ f2 ~ f2 ~ f3").s("sawtooth").lpf(700).resonance(8).gain(0.52).dist(0.15),
   note("<[f3, g#3, c4, d#4] [c#4, f4, g#4, c5] [a#3, c#4, f4, g#4] [d#4, g4, a#4, c#5]>").s("supersaw").struct("~ 1 ~ 1").release(0.2).lpf(2200).gain(0.36).room(0.35).pan(0.42)
 )

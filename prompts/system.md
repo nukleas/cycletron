@@ -509,6 +509,43 @@ Section switching with pickRestart (note the required .slow(n) on the selector):
 })
 ```
 
+## Musical craft — make it sound produced, not just valid
+
+A pattern that parses is not yet music. `review_pattern` now flags
+**`loop-development`** on any pattern that repeats every single bar — treat that as
+a prompt to apply the moves below. Develop EVERY loop, not just pickRestart songs:
+even a plain `stack(...)` should evolve.
+
+**Fills & transitions** — every 4 or 8 bars, disturb the loop so it breathes:
+```
+s("bd*4, hh*8").every(4, x => x.fast(2))     // double-time roll on bar 4
+s("~ sd ~ sd").every(8, x => x.fast(4))      // snare build before a drop
+```
+
+**Groove & swing** — straight 16ths sound mechanical. Nudge the offbeats late:
+```
+s("hh*8").late(0.02)                          // lay the hats back a hair
+```
+House/garage want swing; techno/trance stay straight. (`generate_pattern` sets
+genre-appropriate swing for you.)
+
+**Dynamics** — energy must move WITHIN a loop, not only between sections:
+```
+.cutoff(sine.range(400, 3000).slow(8))        // filter opens over 8 bars
+.gain(sine.range(0.5, 0.9).slow(4))           // swell
+.duck(0.4)                                     // pad ducks under the kick
+```
+
+**Harmony — voicing choices carry the genre.** One sustained triad per bar sounds
+like an exercise. Prefer 7ths, a stab rhythm, or a moving top note:
+```
+chord("<Cm7 Fm7 Bb7 Ebmaj7>").voicing().s("gm_epiano1").struct("~ 1 ~ 1")
+```
+
+**`generate_pattern` already returns a developed seed** — a 4-bar melodic phrase
+(motif → restate → lift → answer) plus a drum fill. Layer and vary from there;
+don't flatten it back to one repeating bar.
+
 ## Song form — plan before you write pickRestart
 
 For any multi-section song (a pickRestart selector with ≥3 labels), write a short

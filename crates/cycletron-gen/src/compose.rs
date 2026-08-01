@@ -82,6 +82,44 @@ fn assemble(title: &str, bpm: u32, grid: &Grid, parts: Vec<Part>) -> Result<Piec
     Ok(piece)
 }
 
+/// A 4-bar developing lead from a walk motif: state it, restate it, lift it a
+/// diatonic third, then answer with its retrograde — so the lead EVOLVES across
+/// the phrase instead of looping one robotic bar. The rhythm (density thinning)
+/// stays constant; only the pitch content develops. Emits `<[bar] [bar] [bar]
+/// [bar]>` (one bar per cycle), every note diatonic by construction.
+fn developed_phrase(
+    scale: &Scale,
+    seed: u64,
+    len: usize,
+    start: i32,
+    max_step: i32,
+    lo: i32,
+    hi: i32,
+    density: usize,
+    octave: i32,
+) -> Mini {
+    let motif = melody::walk(seed, len, start, max_step, lo, hi);
+    let bars = [
+        motif.clone(),
+        motif.clone(),
+        melody::transpose(&motif, 2), // lift a diatonic third
+        melody::retrograde(&motif),   // answer / resolve
+    ];
+    let d = density.max(1);
+    let groups = bars
+        .iter()
+        .map(|deg| {
+            let slots: Vec<Option<i32>> = deg
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| if i % d == 0 { Some(v) } else { None })
+                .collect();
+            Mini::Group(Box::new(scale.to_mini_slots(&slots, octave)))
+        })
+        .collect();
+    Mini::Alt(groups)
+}
+
 /// Helper: a verified `note("…")` part from a slot line.
 fn note_part(scale: &Scale, slots: &[Option<i32>], octave: i32, chain: &str) -> Result<Part, String> {
     let m = scale.to_mini_slots(slots, octave);
@@ -344,7 +382,12 @@ pub fn compose_from_spec(genre: &GenreSpec, seed: u64) -> Result<Piece, String> 
 
     let mut parts: Vec<Part> = Vec::new();
     if grid.has_onsets() {
-        parts.push(sound_part(&grid.to_string(), &genre.drum_fx));
+        // A fill every 4th bar so the groove breaks the loop (double-time roll),
+        // aligned with the 4-bar melodic phrase above.
+        parts.push(sound_part(
+            &grid.to_string(),
+            &format!("{}.every(4, x => x.fast(2))", genre.drum_fx),
+        ));
     }
     parts.extend(swung_parts);
 
@@ -378,18 +421,15 @@ pub fn compose_from_spec(genre: &GenreSpec, seed: u64) -> Result<Piece, String> 
     match &genre.melody {
         MelodySpec::None => {}
         MelodySpec::Walk { len, start, max_step, lo, hi, density, octave, sound, fx } => {
-            let degrees = melody::walk(seed, *len, *start, *max_step, *lo, *hi);
-            let slots: Vec<Option<i32>> = degrees
-                .iter()
-                .enumerate()
-                .map(|(i, &d)| if i % density == 0 { Some(d) } else { None })
-                .collect();
-            parts.push(note_part(
-                &scale,
-                &slots,
-                *octave,
-                &format!(".s(\"{sound}\"){fx}"),
-            )?);
+            // A 4-bar developing phrase (not a 1-bar random loop). Diatonic by
+            // construction, so we build the Part directly and let the whole-doc
+            // validate in `assemble` confirm it plays.
+            let phrase =
+                developed_phrase(&scale, seed, *len, *start, *max_step, *lo, *hi, *density, *octave);
+            parts.push(Part {
+                src: phrase.as_note(),
+                chain: format!(".s(\"{sound}\"){fx}"),
+            });
         }
         MelodySpec::Arpeggio { chord, octaves, dir, octave, sound, fx } => {
             let degrees = melody::arpeggio(chord, *octaves, scale.len(), *dir);
@@ -469,16 +509,37 @@ mod tests {
             ("ambient", ambient),
             ("hip-hop", hip_hop),
         ];
+        // The spec path used to reproduce these hand-composers byte-for-byte
+        // (the migration guard). compose_from_spec now INTENTIONALLY diverges —
+        // it adds 4-bar melodic development and a drum fill — so we no longer
+        // assert equality; we assert both paths still produce a valid, playable
+        // piece (the unwraps run each through `assemble`'s whole-doc validation).
         for seed in [1u64, 7, 42, 1234] {
             for (name, oracle) in oracles {
                 let s = spec::find(name).unwrap_or_else(|| panic!("no spec for {name}"));
-                let from_spec = compose_from_spec(&s, seed)
-                    .unwrap_or_else(|e| panic!("{name} spec failed: {e}"))
-                    .to_strudel();
-                let legacy = oracle(seed).unwrap().to_strudel();
-                assert_eq!(from_spec, legacy, "{name} (seed {seed}) diverged from oracle");
+                compose_from_spec(&s, seed)
+                    .unwrap_or_else(|e| panic!("{name} spec failed: {e}"));
+                oracle(seed).unwrap_or_else(|e| panic!("{name} legacy failed: {e}"));
             }
         }
+    }
+
+    #[test]
+    fn generated_lead_develops_across_bars_and_drums_fill() {
+        // A genre with a walk melody (house) should now emit a multi-bar
+        // developing lead (`<[ ] [ ] [ ] [ ]>`) and a `.every(4, …)` drum fill —
+        // not a one-bar loop.
+        let s = spec::find("house").unwrap();
+        let doc = compose_from_spec(&s, 1).unwrap().to_strudel();
+        assert!(doc.contains(".every(4, x => x.fast(2))"), "no drum fill:\n{doc}");
+        // The lead line is a 4-bar slowcat of bracketed bars.
+        let note_line = doc
+            .lines()
+            .find(|l| l.contains("note(\"<[") && l.contains("] [") )
+            .unwrap_or_else(|| panic!("no multi-bar developed lead in:\n{doc}"));
+        // bars 1 and 2 restate the motif, bar 4 is its retrograde → not all
+        // four bars identical.
+        assert!(note_line.matches("] [").count() >= 2, "lead not 4 bars: {note_line}");
     }
 
     /// Every archetype in the library lowers to a grid the strudel-rs

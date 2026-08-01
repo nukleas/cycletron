@@ -18,7 +18,7 @@ Jump-up — two-step break with a talking octave bass hook. Tempo 172–176 BPM 
 setbpm(174);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").gain(0.9),
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").gain(0.9).every(4, x => x.fast(2)),
   note("g1 ~ g2 ~ g1 ~ g2 ~").s("supersquare").lpf(900).resonance(12).gain(0.5),
   note("<[g3, a#3, d4, f4] [d#4, g4, a#4, d5]>").s("sawtooth").struct("~ 1").release(0.14).lpf(1500).gain(0.3).room(0.25).pan(0.42)
 )

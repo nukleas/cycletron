@@ -18,9 +18,9 @@ Phonk — crushed boom-bap with rolls, 808 sub, icy stabs. Tempo 128–134 BPM i
 setbpm(131);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~, ~ ~ ~ ~ ~ ~ ~ hh*3 ~ ~ ~ ~ ~ ~ ~ hh*4").gain(0.9).crush(8),
+  s("bd ~ ~ ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~, ~ ~ ~ ~ ~ ~ ~ hh*3 ~ ~ ~ ~ ~ ~ ~ hh*4").gain(0.9).crush(8).every(4, x => x.fast(2)),
   note("a1 ~ ~ ~ ~ ~ ~ ~ ~ ~ a1 ~ ~ ~ ~ ~").s("sine").attack(0.01).release(0.7).gain(0.58),
   note("<[a3, c4, e4, g4] [a#3, d4, f4, a4]>").s("sawtooth").struct("~ 1 ~ ~").release(0.2).lpf(1200).gain(0.3).room(0.35).pan(0.42),
-  note("a5 ~ ~ ~ e6 ~ ~ ~").s("wt_bell").room(0.4).delay(0.3).gain(0.28).pan(0.62)
+  note("<[a5 ~ ~ ~ e6 ~ ~ ~] [a5 ~ ~ ~ e6 ~ ~ ~] [c6 ~ ~ ~ g6 ~ ~ ~] [d6 ~ ~ ~ e6 ~ ~ ~]>").s("wt_bell").room(0.4).delay(0.3).gain(0.28).pan(0.62)
 )
 ```

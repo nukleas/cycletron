@@ -18,7 +18,7 @@ Gqom — broken half-time weight, tom triplet pull, dark sub. Tempo 122–128 BP
 setbpm(125);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~, mt ~ ~ mt ~ ~ mt ~ mt ~ ~ mt ~ ~ mt ~").gain(0.95),
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~, mt ~ ~ mt ~ ~ mt ~ mt ~ ~ mt ~ ~ mt ~").gain(0.95).every(4, x => x.fast(2)),
   note("c1 ~ ~ ~ ~ ~ ~ ~ ~ ~ c1 ~ ~ ~ ~ ~").s("sine").attack(0.02).release(0.7).gain(0.58),
   note("<[c3, d#3, g3, a#3] [c#3, f3, g#3, c4]>").s("wt_pad").struct("~ ~ 1 ~").attack(0.4).release(1).lpf(900).gain(0.28).room(0.5).pan(0.42)
 )

@@ -18,7 +18,7 @@ Breakcore — amen chop at breakneck tempo, reese growl. Tempo 190–210 BPM in 
 setbpm(200);
 
 stack(
-  s("bd ~ bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ sd ~, hh*16").gain(0.95),
+  s("bd ~ bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ sd ~, hh*16").gain(0.95).every(4, x => x.fast(2)),
   note("d1 ~ ~ c2 ~ ~ d2 ~").s("supersaw").lpf(650).resonance(12).gain(0.5),
   note("<[d3, f3, a3, c4] [d#3, g3, a#3, d4]>").s("sawtooth").struct("~ ~ 1 ~").release(0.1).lpf(1600).gain(0.28).pan(0.42)
 )

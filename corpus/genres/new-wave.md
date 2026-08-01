@@ -18,7 +18,7 @@ New wave â€” driving backbeat, insistent octave bass, angular stabs. Tempo 128â€
 setbpm(130);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").gain(0.9),
+  s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").gain(0.9).every(4, x => x.fast(2)),
   note("b2 ~ b3 ~ b2 ~ b3 ~").s("sawtooth").lpf(850).resonance(7).gain(0.5),
   note("<[b3, d4, f#4, a4] [g4, b4, d5, f#5] [a4, c#5, e5, g5] [g4, b4, d5, f#5]>").s("sawtooth").struct("1 ~ 1 ~").release(0.15).lpf(1900).gain(0.34).room(0.3).pan(0.42)
 )

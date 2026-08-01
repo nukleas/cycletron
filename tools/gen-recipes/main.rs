@@ -36,9 +36,13 @@ fn main() {
     for spec in spec::registry() {
         let path = genres_dir.join(format!("{}.md", spec.name));
         if path.exists() {
-            // Hand-written or already-generated recipe — never clobber.
-            skipped += 1;
-            continue;
+            // Regenerate OUR own output (carries the generated banner) so recipe
+            // skeletons track the generator; never clobber a hand-written recipe.
+            let existing = fs::read_to_string(&path).unwrap_or_default();
+            if !existing.contains("Generated from a GenreSpec") {
+                skipped += 1;
+                continue;
+            }
         }
         match render_recipe(&spec) {
             Ok(md) => match fs::write(&path, md) {

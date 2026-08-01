@@ -18,10 +18,10 @@ Future garage — shuffled 2-step, hollow pads, sparse bell fragments. Tempo 132
 setbpm(135);
 
 stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~").gain(0.9),
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~").gain(0.9).every(4, x => x.fast(2)),
   s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").late(0.0156).gain(0.9),
   note("a1 ~ ~ ~ ~ ~ ~ ~ ~ ~ a1 ~ ~ ~ ~ ~").s("sine").attack(0.03).release(0.6).gain(0.55),
   note("<[a3, c4, e4, g4] [f4, a4, c5, e5] [d4, f4, a4, c5] [f4, a4, c5, e5]>").s("wt_pad").attack(0.8).release(1.5).lpf(1100).gain(0.3).room(0.7).pan(0.42),
-  note("a5 ~ ~ e6 ~ ~ d6 ~").s("wt_bell").delay(0.4).room(0.6).gain(0.28).pan(0.62)
+  note("<[a5 ~ ~ e6 ~ ~ d6 ~] [a5 ~ ~ e6 ~ ~ d6 ~] [c6 ~ ~ g6 ~ ~ f6 ~] [d6 ~ ~ e6 ~ ~ c6 ~]>").s("wt_bell").delay(0.4).room(0.6).gain(0.28).pan(0.62)
 )
 ```

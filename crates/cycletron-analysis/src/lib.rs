@@ -980,6 +980,21 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
         ));
     }
 
+    // --- Static one-bar loop (develop it) ---------------------------------
+    // A pitched piece whose ENTIRE content repeats every single cycle is a
+    // robotic one-bar loop — the thing the form critique never caught because it
+    // only runs on pickRestart/arrange. Nudge toward multi-bar development. (A
+    // developed piece has a longer period, so it won't trip this.)
+    if d.period_cycles == Some(1) && d.note_low.is_some() {
+        findings.push(note(
+            "loop-development",
+            "The whole pattern repeats every bar — a robotic one-bar loop. Develop it across \
+             several bars: a `<[bar] [bar] [bar] [bar]>` phrase (motif + variation), `every()`/`off()` \
+             variation, or a section arrangement, so the music evolves."
+                .to_string(),
+        ));
+    }
+
     // --- No low-end anchor ------------------------------------------------
     let has_pitched = d.note_low.is_some();
     let low_pitch = d.note_low.as_ref().is_some_and(|n| n.midi < 48); // below C3
@@ -1873,6 +1888,24 @@ mod tests {
             !c.findings.iter().any(|f| f.code == "mono"),
             "unexpected mono nag: {:?}",
             c.findings
+        );
+    }
+
+    #[test]
+    fn critique_flags_static_one_bar_loop_but_not_a_developed_phrase() {
+        // Whole piece repeats every bar + pitched → loop-development nudge.
+        let c = critique_code(r#"stack(s("bd*4"), note("c4 e4 g4 e4").s("sine"))"#, 8).unwrap();
+        assert!(
+            c.findings.iter().any(|f| f.code == "loop-development"),
+            "static loop not flagged: {:?}",
+            c.findings
+        );
+        // A multi-bar developing phrase (period > 1) must NOT trip it.
+        let c2 = critique_code(r#"note("<[c4 e4 g4 e4] [g4 e4 c4 e4]>").s("sine")"#, 8).unwrap();
+        assert!(
+            !c2.findings.iter().any(|f| f.code == "loop-development"),
+            "developed phrase wrongly flagged: {:?}",
+            c2.findings
         );
     }
 

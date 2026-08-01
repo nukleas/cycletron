@@ -18,7 +18,7 @@ Jumpstyle — stomping four-on-floor, springy offbeat bass. Tempo 142–148 BPM 
 setbpm(145);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~").gain(0.95),
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~").gain(0.95).every(4, x => x.fast(2)),
   note("~ g2 ~ g2 ~ g2 ~ g3").s("sawtooth").lpf(750).resonance(7).gain(0.5),
   note("<[g3, a#3, d4, f4] [d#4, g4, a#4, d5] [f4, a4, c5, d#5] [d#4, g4, a#4, d5]>").s("sawtooth").struct("~ 1 ~ 1").release(0.16).lpf(1900).gain(0.34).room(0.3).pan(0.42)
 )

@@ -18,7 +18,7 @@ Acid house — four-on-floor, squelching 303 line, sparse stabs. Tempo 123–127
 setbpm(125);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~").gain(0.9),
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~ ~ ~ oh ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~").gain(0.9).every(4, x => x.fast(2)),
   note("a2 d3 c3 ~ d3 e3 a3 ~ a3 a3 f3 ~ a3 f3 d3 ~").s("sawtooth").lpf(1100).resonance(18).gain(0.48),
   note("<[a3, c4, e4, g4] [f4, a4, c5, e5]>").s("sawtooth").struct("~ ~ 1 ~").release(0.15).lpf(1600).gain(0.32).room(0.3).pan(0.42)
 )

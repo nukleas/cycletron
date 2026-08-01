@@ -25,8 +25,14 @@ struct Event {
     result: String,
 }
 
-/// Outcome classification. A tool can return Ok yet report failure in its text
-/// (validate_pattern → "INVALID: …"); that's the struggle signal we care about.
+/// Outcome classification. A tool can return Ok yet report failure in its text;
+/// those *soft* failures are the struggle signal we care about (they don't set
+/// `ok:false`, so they're invisible unless we sniff the result text):
+///   - `invalid`     — validate/review "INVALID: …"
+///   - `not-applied` — play/upsert fail-closed "NOT APPLIED/NOT PLAYED — …"
+///   - `recipe-miss` — genre_recipe "No recipe matches …" / "No genre recipes …"
+///   - `silent`      — inspect/analyze reported a silent pattern (0 events)
+///   - `failed`      — "Could not …" / "error …"
 fn outcome(e: &Event) -> &'static str {
     if !e.ok {
         return "error";
@@ -34,8 +40,17 @@ fn outcome(e: &Event) -> &'static str {
     let r = e.result.trim_start();
     if r.starts_with("INVALID") {
         "invalid"
+    } else if r.starts_with("NOT APPLIED") || r.starts_with("NOT PLAYED") {
+        "not-applied"
+    } else if r.starts_with("No recipe matches") || r.starts_with("No genre recipes") {
+        "recipe-miss"
     } else if r.starts_with("Could not") || r.starts_with("error") {
         "failed"
+    } else if e.result.contains("(silent)")
+        || e.result.contains("emits no events")
+        || e.result.contains("silent pattern")
+    {
+        "silent"
     } else {
         "ok"
     }

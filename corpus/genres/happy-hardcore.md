@@ -18,7 +18,7 @@ Happy hardcore — 4/4 kick over a break, bouncing octave bass, rave arp. Tempo 
 setbpm(170);
 
 stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ ~ ~").gain(0.95),
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ ~ ~").gain(0.95).every(4, x => x.fast(2)),
   note("c2 ~ c3 ~ c2 ~ c3 ~").s("sawtooth").lpf(800).resonance(6).gain(0.5),
   note("<[c3, e3, g3, b3] [g3, b3, d4, f4] [a3, c4, e4, g4] [f3, a3, c4, e4]>").s("supersaw").struct("~ 1 ~ 1").release(0.18).lpf(2400).gain(0.36).room(0.35).pan(0.42),
   note("c4 e4 g4 e4").s("square").release(0.2).delay(0.25).room(0.3).gain(0.32).pan(0.62)
