@@ -10,20 +10,23 @@ use std::sync::LazyLock;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
-/// System prompt loaded from prompts/system.md at runtime or embedded.
+/// System prompt: the embedded copy is authoritative. In dev we also probe a
+/// few cwd-relative paths first so `prompts/system.md` can be hot-edited without
+/// a rebuild; release builds skip the probing (it only ever succeeds in the repo
+/// tree) and use the embedded copy silently — no misleading "file not found".
 static SYSTEM_PROMPT: LazyLock<String> = LazyLock::new(|| {
-    let paths = [
+    #[cfg(debug_assertions)]
+    for path in [
         "prompts/system.md",
         "../prompts/system.md",
         "src-tauri/../prompts/system.md",
-    ];
-    for path in &paths {
+    ] {
         if let Ok(content) = std::fs::read_to_string(path) {
             tracing::info!("loaded system prompt from {path}");
             return content;
         }
     }
-    tracing::warn!("using embedded system prompt (file not found)");
+    tracing::debug!("using embedded system prompt");
     include_str!("../../prompts/system.md").to_string()
 });
 

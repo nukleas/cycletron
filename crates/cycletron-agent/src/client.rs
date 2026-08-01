@@ -19,7 +19,12 @@ pub struct ClaudeClient {
 impl ClaudeClient {
     pub fn new(api_key: &str, model: &str, max_tokens: u32) -> Self {
         let mut headers = HeaderMap::new();
-        headers.insert("x-api-key", HeaderValue::from_str(api_key).unwrap());
+        // Trim so a pasted key with a stray newline/space doesn't produce an
+        // invalid header value; if it's still unrepresentable, skip the header
+        // (requests then fail with a clean 401 rather than panicking here).
+        if let Ok(v) = HeaderValue::from_str(api_key.trim()) {
+            headers.insert("x-api-key", v);
+        }
         headers.insert("anthropic-version", HeaderValue::from_static(API_VERSION));
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
