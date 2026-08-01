@@ -25,10 +25,10 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+
+use crate::oauth_store::{self, TokenStore};
 
 const CLIENT_ID: &str = "app_EMoamEEZ73f0CkXaXp7hrann";
 const TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
@@ -39,12 +39,10 @@ const SCOPE: &str =
 const TOKEN_FILE: &str = "codex-oauth.json";
 const EXPIRY_SKEW_SECS: i64 = 300; // 5 min — matches Codex CLI practice
 
-static APP_DATA: Mutex<Option<PathBuf>> = Mutex::new(None);
+static STORE: TokenStore = TokenStore::new(TOKEN_FILE, "Codex");
 
 pub fn init(app_data_dir: &Path) {
-    if let Ok(mut guard) = APP_DATA.lock() {
-        *guard = Some(app_data_dir.to_path_buf());
-    }
+    STORE.init(app_data_dir);
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,66 +73,20 @@ pub struct CodexOAuthStatus {
 
 // ── Storage ───────────────────────────────────────────────────────────────
 
-fn token_path() -> Result<PathBuf, String> {
-    APP_DATA
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .map(|d| d.join(TOKEN_FILE))
-        .ok_or_else(|| "Codex OAuth store not initialized".into())
-}
-
 fn load_tokens() -> Option<CodexTokens> {
-    let path = token_path().ok()?;
-    let raw = fs::read_to_string(path).ok()?;
-    serde_json::from_str(&raw).ok()
+    STORE.load()
 }
 
 fn save_tokens(tokens: &CodexTokens) -> Result<(), String> {
-    let path = token_path()?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    let raw = serde_json::to_string_pretty(tokens).map_err(|e| e.to_string())?;
-    write_private(&path, raw.as_bytes())
+    STORE.save(tokens)
 }
 
 fn clear_tokens() -> Result<(), String> {
-    let path = token_path()?;
-    let _ = fs::remove_file(path);
-    Ok(())
-}
-
-#[cfg(unix)]
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    let mut f = fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path)
-        .map_err(|e| e.to_string())?;
-    f.write_all(bytes).map_err(|e| e.to_string())?;
-    f.sync_all().map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    fs::write(path, bytes).map_err(|e| e.to_string())
-}
-
-fn now_unix() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
+    STORE.clear()
 }
 
 fn access_still_valid(t: &CodexTokens) -> bool {
-    t.expires_at - EXPIRY_SKEW_SECS > now_unix() && !t.access_token.is_empty()
+    t.expires_at - EXPIRY_SKEW_SECS > oauth_store::now_unix() && !t.access_token.is_empty()
 }
 
 // ── Status / credentials ──────────────────────────────────────────────────
@@ -205,14 +157,7 @@ struct CodexCliTokens {
 }
 
 fn codex_auth_path() -> PathBuf {
-    dirs_home().join(".codex").join("auth.json")
-}
-
-fn dirs_home() -> PathBuf {
-    std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
+    oauth_store::home_dir().join(".codex").join("auth.json")
 }
 
 fn codex_cli_session() -> Option<CodexTokens> {
@@ -229,12 +174,12 @@ fn codex_cli_session() -> Option<CodexTokens> {
     if account_id.is_empty() {
         return None;
     }
-    let expires_at = exp_from_jwt(&access).unwrap_or_else(|| now_unix() + 3600);
+    let expires_at = oauth_store::exp_from_jwt(&access).unwrap_or_else(|| oauth_store::now_unix() + 3600);
     let email = t
         .id_token
         .as_deref()
-        .and_then(email_from_jwt)
-        .or_else(|| email_from_jwt(&access));
+        .and_then(oauth_store::email_from_jwt)
+        .or_else(|| oauth_store::email_from_jwt(&access));
     Some(CodexTokens {
         access_token: access,
         refresh_token: refresh,
@@ -323,13 +268,13 @@ async fn refresh_token(refresh: &str) -> Result<CodexTokens, String> {
     if account_id.is_empty() {
         return Err("refresh response missing ChatGPT account id".into());
     }
-    let expires_at = exp_from_jwt(&access)
-        .or_else(|| body.expires_in.map(|e| now_unix() + e))
-        .unwrap_or_else(|| now_unix() + 3600);
+    let expires_at = oauth_store::exp_from_jwt(&access)
+        .or_else(|| body.expires_in.map(|e| oauth_store::now_unix() + e))
+        .unwrap_or_else(|| oauth_store::now_unix() + 3600);
     let email = body
         .id_token
         .as_deref()
-        .and_then(email_from_jwt)
+        .and_then(oauth_store::email_from_jwt)
         .or_else(|| prev.as_ref().and_then(|p| p.email.clone()));
 
     Ok(CodexTokens {
@@ -494,14 +439,14 @@ pub async fn login_with_browser() -> Result<CodexOAuthStatus, String> {
         .ok_or_else(|| "token exchange missing refresh_token".to_string())?;
     let account_id = account_id_from_jwt(&access)
         .ok_or_else(|| "token missing chatgpt_account_id claim".to_string())?;
-    let expires_at = exp_from_jwt(&access)
-        .or_else(|| body.expires_in.map(|e| now_unix() + e))
-        .unwrap_or_else(|| now_unix() + 3600);
+    let expires_at = oauth_store::exp_from_jwt(&access)
+        .or_else(|| body.expires_in.map(|e| oauth_store::now_unix() + e))
+        .unwrap_or_else(|| oauth_store::now_unix() + 3600);
     let email = body
         .id_token
         .as_deref()
-        .and_then(email_from_jwt)
-        .or_else(|| email_from_jwt(&access));
+        .and_then(oauth_store::email_from_jwt)
+        .or_else(|| oauth_store::email_from_jwt(&access));
 
     let tokens = CodexTokens {
         access_token: access,
@@ -521,32 +466,12 @@ pub async fn login_with_browser() -> Result<CodexOAuthStatus, String> {
     Ok(status())
 }
 
-// ── JWT helpers (unverified decode) ───────────────────────────────────────
+// ── JWT / PKCE helpers ─────────────────────────────────────────────────────
 
-fn jwt_payload(jwt: &str) -> Option<serde_json::Value> {
-    let payload = jwt.split('.').nth(1)?;
-    let padded = match payload.len() % 4 {
-        2 => format!("{payload}=="),
-        3 => format!("{payload}="),
-        _ => payload.to_string(),
-    };
-    let bytes = base64_url_decode(&padded)?;
-    serde_json::from_slice(&bytes).ok()
-}
-
-fn exp_from_jwt(jwt: &str) -> Option<i64> {
-    jwt_payload(jwt)?.get("exp")?.as_i64()
-}
-
-fn email_from_jwt(jwt: &str) -> Option<String> {
-    jwt_payload(jwt)?
-        .get("email")?
-        .as_str()
-        .map(str::to_string)
-}
-
+/// The Codex/ChatGPT account id claim from an access-token JWT (Codex-specific;
+/// generic JWT payload/email/exp decode lives in [`crate::oauth_store`]).
 fn account_id_from_jwt(jwt: &str) -> Option<String> {
-    let v = jwt_payload(jwt)?;
+    let v = oauth_store::jwt_payload(jwt)?;
     // Nested claim used by Codex / ChatGPT OAuth access tokens.
     v.pointer("/https://api.openai.com/auth/chatgpt_account_id")
         .and_then(|x| x.as_str())
@@ -556,45 +481,6 @@ fn account_id_from_jwt(jwt: &str) -> Option<String> {
                 .and_then(|x| x.as_str())
                 .map(str::to_string)
         })
-}
-
-fn base64_url_decode(s: &str) -> Option<Vec<u8>> {
-    let standard = s.replace('-', "+").replace('_', "/");
-    const T: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = Vec::new();
-    let bytes: Vec<u8> = standard
-        .bytes()
-        .filter(|&b| b != b'=')
-        .map(|b| T.iter().position(|&c| c == b).unwrap_or(0) as u8)
-        .collect();
-    let mut i = 0;
-    while i < bytes.len() {
-        let remaining = bytes.len() - i;
-        if remaining >= 4 {
-            let n = ((bytes[i] as u32) << 18)
-                | ((bytes[i + 1] as u32) << 12)
-                | ((bytes[i + 2] as u32) << 6)
-                | (bytes[i + 3] as u32);
-            out.push(((n >> 16) & 0xff) as u8);
-            out.push(((n >> 8) & 0xff) as u8);
-            out.push((n & 0xff) as u8);
-            i += 4;
-        } else if remaining == 3 {
-            let n = ((bytes[i] as u32) << 18)
-                | ((bytes[i + 1] as u32) << 12)
-                | ((bytes[i + 2] as u32) << 6);
-            out.push(((n >> 16) & 0xff) as u8);
-            out.push(((n >> 8) & 0xff) as u8);
-            break;
-        } else if remaining == 2 {
-            let n = ((bytes[i] as u32) << 18) | ((bytes[i + 1] as u32) << 12);
-            out.push(((n >> 16) & 0xff) as u8);
-            break;
-        } else {
-            break;
-        }
-    }
-    Some(out)
 }
 
 fn base64_url_encode(bytes: &[u8]) -> String {
@@ -634,7 +520,7 @@ fn random_urlsafe(n_bytes: usize) -> String {
     let mut buf = vec![0u8; n_bytes];
     if getrandom_fill(&mut buf).is_err() {
         let mut h = DefaultHasher::new();
-        now_unix().hash(&mut h);
+        oauth_store::now_unix().hash(&mut h);
         std::process::id().hash(&mut h);
         let seed = h.finish();
         for (i, b) in buf.iter_mut().enumerate() {

@@ -21,10 +21,11 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+
+use crate::oauth_store::{self, TokenStore};
 
 /// Public Grok CLI OIDC client (no secret; device + PKCE clients use `none`).
 const CLIENT_ID: &str = "b1a00492-073a-47ea-816f-4c329264a828";
@@ -36,13 +37,11 @@ const TOKEN_FILE: &str = "xai-oauth.json";
 /// Refresh this many seconds before JWT/expiry.
 const EXPIRY_SKEW_SECS: i64 = 120;
 
-static APP_DATA: Mutex<Option<PathBuf>> = Mutex::new(None);
+static STORE: TokenStore = TokenStore::new(TOKEN_FILE, "xAI");
 
 /// Call once at app startup with the resolved app-data directory.
 pub fn init(app_data_dir: &Path) {
-    if let Ok(mut guard) = APP_DATA.lock() {
-        *guard = Some(app_data_dir.to_path_buf());
-    }
+    STORE.init(app_data_dir);
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,66 +79,20 @@ pub struct DeviceStart {
 
 // ── Storage ───────────────────────────────────────────────────────────────
 
-fn token_path() -> Result<PathBuf, String> {
-    APP_DATA
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .map(|d| d.join(TOKEN_FILE))
-        .ok_or_else(|| "xAI OAuth store not initialized".into())
-}
-
 fn load_tokens() -> Option<OAuthTokens> {
-    let path = token_path().ok()?;
-    let raw = fs::read_to_string(path).ok()?;
-    serde_json::from_str(&raw).ok()
+    STORE.load()
 }
 
 fn save_tokens(tokens: &OAuthTokens) -> Result<(), String> {
-    let path = token_path()?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    let raw = serde_json::to_string_pretty(tokens).map_err(|e| e.to_string())?;
-    write_private(&path, raw.as_bytes())
+    STORE.save(tokens)
 }
 
 fn clear_tokens() -> Result<(), String> {
-    let path = token_path()?;
-    let _ = fs::remove_file(path);
-    Ok(())
-}
-
-#[cfg(unix)]
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    let mut f = fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path)
-        .map_err(|e| e.to_string())?;
-    f.write_all(bytes).map_err(|e| e.to_string())?;
-    f.sync_all().map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    fs::write(path, bytes).map_err(|e| e.to_string())
-}
-
-fn now_unix() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
+    STORE.clear()
 }
 
 fn access_token_still_valid(tokens: &OAuthTokens) -> bool {
-    tokens.expires_at - EXPIRY_SKEW_SECS > now_unix() && !tokens.access_token.is_empty()
+    tokens.expires_at - EXPIRY_SKEW_SECS > oauth_store::now_unix() && !tokens.access_token.is_empty()
 }
 
 // ── Public status / credential resolution ─────────────────────────────────
@@ -210,14 +163,7 @@ struct GrokBuildEntry {
 }
 
 fn grok_auth_path() -> PathBuf {
-    dirs_home().join(".grok").join("auth.json")
-}
-
-fn dirs_home() -> PathBuf {
-    std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
+    oauth_store::home_dir().join(".grok").join("auth.json")
 }
 
 fn grok_build_session() -> Option<OAuthTokens> {
@@ -235,7 +181,7 @@ fn grok_build_session() -> Option<OAuthTokens> {
         .expires_at
         .as_deref()
         .and_then(parse_rfc3339)
-        .unwrap_or_else(|| now_unix() + 3600);
+        .unwrap_or_else(|| oauth_store::now_unix() + 3600);
     Some(OAuthTokens {
         access_token: access,
         refresh_token: refresh,
@@ -332,11 +278,11 @@ pub async fn start_device_login() -> Result<DeviceStart, String> {
 /// Poll until the user approves the device code (or timeout / deny).
 pub async fn poll_device_login(device_code: &str, interval_secs: u64, expires_in: u64) -> Result<OAuthStatus, String> {
     let client = reqwest::Client::new();
-    let deadline = now_unix() + expires_in as i64;
+    let deadline = oauth_store::now_unix() + expires_in as i64;
     let mut interval = Duration::from_secs(interval_secs.max(1));
 
     loop {
-        if now_unix() >= deadline {
+        if oauth_store::now_unix() >= deadline {
             return Err("xAI sign-in timed out. Try again.".into());
         }
         tokio::time::sleep(interval).await;
@@ -390,11 +336,11 @@ pub async fn poll_device_login(device_code: &str, interval_secs: u64, expires_in
         let email = body
             .id_token
             .as_deref()
-            .and_then(email_from_jwt);
+            .and_then(oauth_store::email_from_jwt);
         let tokens = OAuthTokens {
             access_token: access,
             refresh_token: refresh,
-            expires_at: now_unix() + expires_in,
+            expires_at: oauth_store::now_unix() + expires_in,
             email,
             source: Some("device-code".into()),
         };
@@ -464,7 +410,7 @@ async fn refresh_token(refresh: &str) -> Result<OAuthTokens, String> {
     Ok(OAuthTokens {
         access_token: access,
         refresh_token: new_refresh,
-        expires_at: now_unix() + expires_in,
+        expires_at: oauth_store::now_unix() + expires_in,
         email: prev.as_ref().and_then(|p| p.email.clone()),
         source: prev
             .as_ref()
@@ -473,70 +419,3 @@ async fn refresh_token(refresh: &str) -> Result<OAuthTokens, String> {
     })
 }
 
-/// Best-effort email from an ID token payload (unverified decode).
-fn email_from_jwt(jwt: &str) -> Option<String> {
-    let payload = jwt.split('.').nth(1)?;
-    let padded = match payload.len() % 4 {
-        2 => format!("{payload}=="),
-        3 => format!("{payload}="),
-        _ => payload.to_string(),
-    };
-    let bytes = base64_url_decode(&padded)?;
-    let v: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-    v.get("email")?.as_str().map(str::to_string)
-}
-
-fn base64_url_decode(s: &str) -> Option<Vec<u8>> {
-    // Minimal URL-safe base64 decode without extra deps.
-    let standard = s.replace('-', "+").replace('_', "/");
-    // Manual base64 alphabet
-    const T: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = Vec::new();
-    let bytes: Vec<u8> = standard
-        .bytes()
-        .filter(|&b| b != b'=')
-        .map(|b| T.iter().position(|&c| c == b).unwrap_or(0) as u8)
-        .collect();
-    let mut i = 0;
-    while i + 3 < bytes.len() || (i < bytes.len() && bytes.len() - i >= 2) {
-        let remaining = bytes.len() - i;
-        if remaining >= 4 {
-            let n = ((bytes[i] as u32) << 18)
-                | ((bytes[i + 1] as u32) << 12)
-                | ((bytes[i + 2] as u32) << 6)
-                | (bytes[i + 3] as u32);
-            out.push(((n >> 16) & 0xff) as u8);
-            out.push(((n >> 8) & 0xff) as u8);
-            out.push((n & 0xff) as u8);
-            i += 4;
-        } else if remaining == 3 {
-            let n = ((bytes[i] as u32) << 18)
-                | ((bytes[i + 1] as u32) << 12)
-                | ((bytes[i + 2] as u32) << 6);
-            out.push(((n >> 16) & 0xff) as u8);
-            out.push(((n >> 8) & 0xff) as u8);
-            break;
-        } else if remaining == 2 {
-            let n = ((bytes[i] as u32) << 18) | ((bytes[i + 1] as u32) << 12);
-            out.push(((n >> 16) & 0xff) as u8);
-            break;
-        } else {
-            break;
-        }
-    }
-    Some(out)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn base64_roundtrip_email_payload() {
-        // {"email":"a@b.c"}
-        let b64 = "eyJlbWFpbCI6ImFAYi5jIn0";
-        let bytes = base64_url_decode(b64).unwrap();
-        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(v["email"], "a@b.c");
-    }
-}
