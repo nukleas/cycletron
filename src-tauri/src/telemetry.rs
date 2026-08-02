@@ -28,6 +28,38 @@ pub struct ToolEvent {
     pub input: String,
     /// Truncated tool result (captures "INVALID: …" / "Could not …" prefixes).
     pub result: String,
+    /// Char length of any `code` / section body the model emitted (0 if none).
+    /// Primary proxy for LLM output cost on write tools.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_chars: Option<usize>,
+    /// Write-path classification when relevant: `full`, `reuse`, `track`,
+    /// `section`, `binding`, `review`, `review_cache`, `review_budget`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub write_kind: Option<String>,
+}
+
+/// Char count of the code the model emitted on a write tool — the primary proxy
+/// for LLM output cost. Reads top-level `code` (play/upsert_track/upsert_section/
+/// upsert_binding), else sums the per-patch `code` bodies of a batch call
+/// (`upsert_tracks` / `upsert_sections`), which would otherwise report nothing.
+pub fn code_chars_of(input: &serde_json::Value) -> Option<usize> {
+    if let Some(n) = input
+        .get("code")
+        .and_then(|v| v.as_str())
+        .map(|s| s.chars().count())
+        .filter(|&n| n > 0)
+    {
+        return Some(n);
+    }
+    let sum: usize = input
+        .get("patches")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|p| p.get("code").and_then(|v| v.as_str()))
+        .map(|s| s.chars().count())
+        .sum();
+    (sum > 0).then_some(sum)
 }
 
 pub fn now_millis() -> u128 {
@@ -58,5 +90,35 @@ pub fn record(dir: Option<&Path>, ev: &ToolEvent) {
     };
     if let Ok(line) = serde_json::to_string(ev) {
         let _ = writeln!(f, "{line}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn code_chars_reads_top_level_code() {
+        assert_eq!(code_chars_of(&json!({ "code": "s(\"bd*4\")" })), Some(9));
+        assert_eq!(code_chars_of(&json!({ "code": "" })), None);
+        assert_eq!(code_chars_of(&json!({})), None);
+    }
+
+    #[test]
+    fn code_chars_sums_batch_patch_bodies() {
+        let input = json!({
+            "patches": [
+                { "id": "bass", "code": "s(\"bd*4\")" }, // 9
+                { "id": "hats", "code": "s(\"hh*8\")" }, // 9
+            ]
+        });
+        assert_eq!(code_chars_of(&input), Some(18));
+    }
+
+    #[test]
+    fn code_chars_none_for_empty_patches() {
+        assert_eq!(code_chars_of(&json!({ "patches": [] })), None);
+        assert_eq!(code_chars_of(&json!({ "patches": [{ "id": "x" }] })), None);
     }
 }

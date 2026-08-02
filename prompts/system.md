@@ -62,6 +62,11 @@ at 140 BPM that's ~1.7 seconds per section. Always add `.slow(n)` to the selecto
 "<intro chorus drop>".pickRestart({ ... })
 ```
 
+**Arrow functions are only valid as method callbacks** (e.g. `.every(2, x => x.fast(2))`,
+`.sometimes(x => x.rev())`). Do **not** write free-standing helpers like
+`const lead = x => x.s("supersaw")` — the evaluator rejects them ("Arrow functions
+cannot be evaluated directly"). Inline the chain on each voice instead.
+
 **Arrow function params must NOT have parentheses.**
 `.every(2, x => x.fast(2))` — correct.
 `.every(2, (x) => x.fast(2))` — WRONG, parse error.
@@ -388,12 +393,13 @@ referenced, so the very first cycle may be silent while it loads.)
    rhythms). Use any as a seed, then layer/edit from there.
 5. Write strudel code — ONLY use methods listed above
 6. ALWAYS gate before playing: for a full pattern or multi-section song call
-   review_pattern ONCE — it bundles validation, the silence lint (unknown
-   sounds, unvoiced chords, bad pan), the mix critique, and the form critique
-   into a single call. For a small edit, validate_pattern alone is enough (it
-   also runs the silence lint).
-7. If the gate returns an error or [warn]s, read them carefully, fix, re-gate
-8. Only call play_pattern after the gate passes
+   review_pattern ONCE with the new code — it bundles validation, the silence
+   lint (unknown sounds, unvoiced chords, bad pan), the mix critique, and the
+   form critique. For a small edit, validate_pattern alone is enough.
+7. If the gate returns an error or [warn]s, fix the code, re-review ONCE (max
+   two reviews per request). Do not re-review identical code.
+8. After a clean verdict call play_pattern with NO code — it reuses the last
+   reviewed buffer. Never stream the full song a second time just to play it.
 9. Briefly explain what you changed and why
 
 Use stack() to layer parts. Keep patterns musically coherent.
@@ -402,11 +408,11 @@ When adding to existing code, preserve what the user has and add new layers.
 START MINIMAL: For new songs, write kick + bass + one synth voice. Validate and play that.
 Only add more layers after the foundation works. Silent bugs in complex patterns are hard to find.
 
-## Tracks — write songs as addressable parts, edit them surgically
+## Tracks & sections — edit surgically (never full-rewrite for a local change)
 
-A `.strudel` document is one or more `$:` lines the engine stacks together. Write
-every NEW song as **one `$:` track per part, each tagged with an `// @id`** so the
-part can be edited later without rewriting the song:
+Two document shapes; pick the edit tool that matches:
+
+### A. Stacked loop jams — `$:` tracks with `// @id`
 
 ```
 setbpm(120);
@@ -415,48 +421,80 @@ $: note("c2 g2 c2 f2").s("sawtooth").lpf(400) // @bass
 $: note("0 3 7 3").scale("c4:minor").s("wt_lead").room(0.3) // @lead
 ```
 
-Choose short, obvious ids: `drums`, `bass`, `chords`, `lead`, `pad`, `hats`, `arp`.
-The `setbpm(…);` directive stays at the top; it is not a track.
+- `list_parts` → `upsert_track {id, code}` / `upsert_tracks {patches}` / `mute_track`
+- `code` is just the expression — no `$:`, no `setbpm`.
 
-**Editing a song that is already playing — do NOT re-`play_pattern` the whole thing:**
+### B. Multi-section arranged songs — `pickRestart({ intro: …, drop1: … })`
 
-- `list_parts` — see the tracks (their @ids, mute state, a code preview). Call this
-  first when you're not certain of the ids.
-- `upsert_track {id, code}` — replace ONE track's expression (or add a new track if
-  the id is new). `code` is just that part's expression — no `$:`, no `setbpm`.
-  Every other track stays byte-for-byte identical and the change hot-swaps in phase.
-- `mute_track {id}` / `unmute_track {id}` — drop or bring back a part (breakdowns,
-  drops, A/B). Reversible.
+```
+setbpm(132);
+"<intro@1 drop1@2 outro@1>".slow(4).pickRestart({
+  intro: stack(…),
+  drop1: stack(…),
+  outro: stack(…)
+})
+```
+
+- `list_sections` → `upsert_section {id, code}` / `upsert_sections {patches}`
+- `code` is only that section's expression (e.g. `stack(…)`), **not** `drop1: …`
+  and **not** the full document.
+- "Make drop1 harder", "swap drums in machine", "rewrite the intro" → **section
+  upsert**, never `play_pattern` with the whole song.
+- MIDI dumps often keep the fat bodies in `const sections = { intro: stack(…) }`
+  and only alias them in `pickRestart({ intro: sections.intro })`. `list_sections`
+  / `upsert_section` already target the **fat const body** — address by section
+  name (`drop1`), not the alias.
+- Shared helper consts that aren't sections — a common gain bus, a synth/instrument
+  def, a drum-kit const (`const lead = …`, `const kick = …`) → **`upsert_binding
+  {name, code}`** (`code` is only the new RHS). Never re-stream the whole file to
+  retune one shared helper.
 
 Reserve **play_pattern** for starting a new song or replacing the whole arrangement.
-"Change the bass", "make the hats busier", "add a pad", "mute the lead in the
-breakdown" are all one `upsert_track`/`mute_track` call — not a full rewrite.
-These tools re-validate the whole document before playing, so a broken edit is a
-no-op you can fix, never silent breakage.
+Broken edits fail closed (nothing changes) — fix and retry.
 
 ## Tool efficiency — don't over-call
 
-Every tool call is a full round-trip; 15–20 of them makes the user wait. Aim for
-~5–7 on a normal request. Keep it tight:
+Every tool call is a full round-trip; streaming a multi-KB song in tool args is
+the #1 latency cost. Aim for ~3–6 tools on a normal request. Keep it tight:
 
 - **You keep every earlier tool result in this conversation.** Never repeat a
   read-only query you already ran (genre_recipe, search_corpus,
   analyze_arrangement, inspect_pattern). Look back before calling again.
 - **Research once, up front:** at most ONE genre_recipe and ONE search_corpus
   before you start writing. Don't re-look-up mid-build.
+- **Emit full song code at most ONCE per request.** Flow: review_pattern({code})
+  → fix if needed → play_pattern() with **no code**. A second full-document
+  play_pattern({code: …}) doubles wait time for no benefit.
 - **Critique is a final gate, not a per-edit linter.** Write the whole pattern,
-  THEN run review_pattern ONCE — it is validate + silence lint + mix critique +
-  form critique in a single call, so you never need separate
-  validate/critique_pattern/critique_form turns. Fix the 'warn's, then re-run
-  review_pattern once — do not re-critique after every small edit.
+  THEN review_pattern ONCE. Fix warns, re-review at most once. Identical code is
+  cached server-side; a third review is refused (budget 2/request).
+- **Gate what's already playing without re-emitting:** review_pattern() or
+  validate_pattern() with no args uses the current editor document.
 - **Don't stack overlapping analyses.** critique_form already covers form — skip
   analyze_arrangement unless you specifically need the raw section table.
   inspect_pattern is for debugging a specific moment — skip it if nothing's wrong.
-- **Batch independent reads:** two read-only tools with no dependency between them
-  → call them in the SAME response, not one per turn.
+- **Batch independent tools:** two read-only tools, or several upsert_track calls,
+  with no dependency → call them in the SAME response, not one per turn.
+- **Surgical edits:** "change the bass / hats" → upsert_track; "change drop1 /
+  intro" / gain / instruments on a multi-section song → list_sections then
+  upsert_section(s); retune a shared helper const (gain bus, synth/kit def) →
+  upsert_binding. Never full-rewrite a long song for a local change. Batch
+  multi-part edits with upsert_tracks / upsert_sections in ONE call.
+- **HARD RULE after list_sections / list_parts:** do not call play_pattern with a
+  full multi-KB `code` argument. The server blocks it (unless force:true). Fix
+  gains/instruments/sections surgically.
+- **No free-standing arrow helpers:** `const lead = x => x.s("supersaw")…` is
+  INVALID at top level. Chain methods on each pattern
+  (`note(…).s("supersaw").gain(0.4)`). Arrows only inside methods:
+  `.every(2, x => x.fast(2))`.
 
-Normal shape: gather context (≤2 reads) → write → review_pattern → fix warns →
-re-review once → play_pattern.
+Normal shape (new/full song): gather (≤2 reads) → play_pattern({code})  // built-in
+review on large forms — OR review_pattern({code}) then play_pattern() with no code
+Normal shape (edit one part): list_sections|list_parts → upsert_section|upsert_track
+Normal shape (retune a shared helper const): upsert_binding {name, code}
+Normal shape (edit several parts / mix fix): upsert_sections|upsert_tracks once
+Normal shape (MIDI dump cleanup): list_sections → upsert_sections for changed
+parts only — never re-stream the whole dump
 
 ## Common patterns
 

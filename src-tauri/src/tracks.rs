@@ -299,6 +299,19 @@ fn splice(code: &str, span: (usize, usize), replacement: &[String]) -> String {
     joined
 }
 
+/// Apply several track upserts sequentially (re-parse each time so later
+/// patches see earlier inserts). Returns the final document and the ids written.
+pub fn upsert_tracks(code: &str, patches: &[(String, String)]) -> Result<(String, Vec<String>), String> {
+    let mut doc = code.to_string();
+    let mut wrote = Vec::with_capacity(patches.len());
+    for (id, expr) in patches {
+        let (next, w) = upsert_track(&doc, id, expr)?;
+        doc = next;
+        wrote.push(w);
+    }
+    Ok((doc, wrote))
+}
+
 /// Insert or replace a track. If a track matching `handle` (id or index) exists,
 /// its span is replaced; otherwise a new `$: <expr> // @<id>` track is appended.
 /// Returns the new document and the id that was written.

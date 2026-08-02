@@ -274,17 +274,17 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                 the syntax is fine, also lints for SILENT failures that parse but never sound: \
                 unknown sound names (silent layer), a chord symbol used without .voicing(), \
                 pan outside 0..1 (negative pan = NaN = silence), and expected gm_* first-cycle \
-                streaming silence. Treat every [warn] as a dead layer to fix before playing."
+                streaming silence. Treat every [warn] as a dead layer to fix before playing. \
+                Omit `code` to validate the document currently in the editor."
                     .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Strudel pattern code to validate"
+                        "description": "Strudel pattern code to validate. Omit to use the current editor document."
                     }
-                },
-                "required": ["code"]
+                }
             }),
         },
         ToolDefinition {
@@ -296,22 +296,23 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                 mix critique (clipping, mono, clashes, low-end), and — when the code uses \
                 pickRestart or arrange — the form critique (section lengths, energy arc, \
                 robotic loops). PREFER THIS over separate validate/critique/critique_form calls \
-                when reviewing a full pattern or multi-section song: it cuts the round-trip tax \
-                to a single turn. Ends with a verdict; fix every warn before playing."
+                when reviewing a full pattern or multi-section song. Ends with a verdict. \
+                After a clean verdict, call play_pattern with NO code to play the reviewed \
+                buffer (do not re-emit the full song). Omit `code` to review the current editor. \
+                Budget: at most TWO real reviews per user request; identical code is cached."
                     .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Strudel pattern code to review"
+                        "description": "Strudel pattern code to review. Omit to review the current editor document (no re-emit)."
                     },
                     "cycles": {
                         "type": "integer",
                         "description": "How many cycles to scan (default 8, max 64). Raise for long song forms."
                     }
-                },
-                "required": ["code"]
+                }
             }),
         },
         ToolDefinition {
@@ -462,24 +463,36 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
         ToolDefinition {
             name: "play_pattern".to_string(),
             description:
-                "Play a WHOLE strudel document — use this to START A NEW SONG or replace the \
-                entire arrangement. It swaps the full editor buffer. To CHANGE ONE PART of a \
-                song that's already playing (the bass, the hats, a melody), do NOT call this — \
-                use upsert_track / mute_track so you edit one track and hot-swap without \
-                rewriting everything. When you write a new song here, split it into addressable \
-                tracks: one `$: <expr> // @<id>` line per part, e.g. \
-                `$: s(\"bd*4\") // @drums` and `$: note(\"c2 g2\").s(\"sawtooth\") // @bass`."
+                "Play a WHOLE strudel document — ONLY to START A NEW SONG or fully replace the \
+                arrangement. AFTER review_pattern, call with NO code (reuses last reviewed buffer). \
+                After list_sections/list_parts in this request, a large full rewrite is BLOCKED \
+                (use upsert_section/upsert_track); set force:true only if you truly must replace \
+                everything. Large songs auto-review before play. Never use free-standing \
+                `const f = x => …` helpers — they fail validation."
                     .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Full strudel document to play (prefer one `$: … // @id` \
-                            track per part so parts stay individually editable)"
+                        "description": "Full strudel document to play. OMIT after a successful \
+                            review_pattern to play that reviewed buffer without re-emitting code."
+                    },
+                    "review": {
+                        "type": "boolean",
+                        "description": "Run the quality gate before playing (default: true for \
+                            large / multi-section songs). Set false only if you already reviewed."
+                    },
+                    "force": {
+                        "type": "boolean",
+                        "description": "Allow a full-document rewrite even after list_sections/list_parts \
+                            in this request. Default false. Prefer upsert_section instead."
+                    },
+                    "cycles": {
+                        "type": "integer",
+                        "description": "Cycles for built-in review when review is true (default 8)."
                     }
-                },
-                "required": ["code"]
+                }
             }),
         },
         ToolDefinition {
@@ -488,7 +501,19 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                 "List the addressable tracks (parts) of the song currently in the editor: each \
                 track's @id (or index), whether it's muted, and a code preview. Call this before \
                 upsert_track / mute_track so you target the right part. A song is made of `$:` \
-                lines the engine stacks; each is one part."
+                lines the engine stacks; each is one part. For pickRestart songs use list_sections."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "list_sections".to_string(),
+            description:
+                "List named sections of a pickRestart({…}) / arrange({…}) song currently in the \
+                editor (intro, drop1, outro, …). Use before upsert_section when changing one \
+                section of a multi-section arrangement without rewriting the whole song."
                     .to_string(),
             input_schema: json!({
                 "type": "object",
@@ -504,7 +529,8 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                 index; if none matches, a new `$: <code> // @<id>` track is appended. `code` is \
                 just that track's expression (e.g. `note(\"c2 g2\").s(\"sawtooth\").lpf(400)`), \
                 NOT a full document — no `$:`, no `setbpm`. The whole result is re-validated \
-                before it plays. Call list_parts first if unsure of the ids."
+                before it plays. Call list_parts first if unsure of the ids. For several tracks \
+                at once use upsert_tracks."
                     .to_string(),
             input_schema: json!({
                 "type": "object",
@@ -520,6 +546,107 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                     }
                 },
                 "required": ["id", "code"]
+            }),
+        },
+        ToolDefinition {
+            name: "upsert_tracks".to_string(),
+            description:
+                "Batch-add or replace SEVERAL `$:` tracks in one call, then hot-swap once. Prefer \
+                this over N separate upsert_track turns when rebuilding multiple parts."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "patches": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "string" },
+                                "code": { "type": "string", "description": "Track expression only" }
+                            },
+                            "required": ["id", "code"]
+                        },
+                        "description": "List of {id, code} track patches applied in order"
+                    }
+                },
+                "required": ["patches"]
+            }),
+        },
+        ToolDefinition {
+            name: "upsert_section".to_string(),
+            description:
+                "Surgically replace ONE named section inside pickRestart({…}) / arrange({…}), \
+                then hot-swap — every other section stays byte-identical. Use for 'make drop1 \
+                harder', 'rewrite the intro', etc. on multi-section songs. `code` is only that \
+                section's expression (e.g. stack(…)), NOT `drop1: …` and NOT the full document. \
+                Call list_sections first if unsure of names. Prefer this over play_pattern for \
+                local edits on arranged songs."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Section name (e.g. 'drop1') or 1-based index"
+                    },
+                    "code": {
+                        "type": "string",
+                        "description": "The section's strudel expression only (no `id:` key)"
+                    }
+                },
+                "required": ["id", "code"]
+            }),
+        },
+        ToolDefinition {
+            name: "upsert_sections".to_string(),
+            description:
+                "Batch-replace SEVERAL pickRestart/arrange sections in one call, then hot-swap \
+                once. Prefer this over N upsert_section turns or a full play_pattern rewrite."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "patches": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "string" },
+                                "code": { "type": "string" }
+                            },
+                            "required": ["id", "code"]
+                        }
+                    }
+                },
+                "required": ["patches"]
+            }),
+        },
+        ToolDefinition {
+            name: "upsert_binding".to_string(),
+            description:
+                "Surgically replace ONE top-level const/let binding's body, then hot-swap — every \
+                other byte stays identical and the whole result is re-validated before it plays. \
+                Use for shared helpers that aren't sections: a common gain bus, a synth/instrument \
+                def, a drum-kit const, a tempo helper (e.g. 'const lead = …', 'const kick = …'). \
+                `name` is the binding identifier; `code` is only the new expression body (the RHS \
+                of `=`, no `const name =`, no trailing `;`). For a pickRestart section use \
+                upsert_section; for a `$:` track use upsert_track. Prefer this over a full \
+                play_pattern rewrite for a local change to a shared binding."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The binding identifier (e.g. 'lead', 'sections')"
+                    },
+                    "code": {
+                        "type": "string",
+                        "description": "The new expression body only (RHS of `=`; no `const name =`, no `;`)"
+                    }
+                },
+                "required": ["name", "code"]
             }),
         },
         ToolDefinition {

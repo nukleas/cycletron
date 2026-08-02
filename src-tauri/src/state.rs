@@ -39,7 +39,45 @@ pub struct AppState {
     /// user's own files `read_song` can send to the model in one turn, so a
     /// broad library root can't be dumped to a cloud provider. Reset each turn.
     pub read_budget: Mutex<(usize, usize)>,
+    /// Per-user-message write-path bookkeeping: review budget, review cache,
+    /// and the last successfully reviewed code so `play_pattern` can omit
+    /// re-emitting a full document after a gate.
+    pub agent_write: Mutex<AgentWriteState>,
 }
+
+/// Agent write-path state that survives across tool calls within (and between)
+/// user messages. `review_calls` is reset every agent run; the last-reviewed
+/// buffer is kept so a later "play that" doesn't force a full rewrite.
+#[derive(Debug, Default, Clone)]
+pub struct AgentWriteState {
+    /// How many non-cached `review_pattern` calls have run this user message.
+    pub review_calls: usize,
+    /// Hash of the code for the last review (cache key).
+    pub last_review_hash: Option<u64>,
+    /// Full tool result text of the last review (served on cache hit).
+    pub last_review_result: Option<String>,
+    /// Code body of the last successful (non-INVALID) review — playable via
+    /// `play_pattern` with no `code` argument.
+    pub last_reviewed_code: Option<String>,
+    /// One-shot write-kind stamp for telemetry (set by a tool, taken by the
+    /// agent loop when recording the event).
+    pub pending_write_kind: Option<String>,
+    /// True if this user message already called list_sections / list_parts.
+    /// Full `play_pattern({code})` after structure listing is the #1 latency
+    /// footgun (telemetry: list_sections → 34k-char play ×2 ≈ 9 min).
+    pub listed_structure: bool,
+    /// Allow one full play_pattern after a structure list when `force: true`.
+    pub force_full_play: bool,
+}
+
+/// Hard cap on real (non-cached) `review_pattern` calls per user message.
+/// Prompt says gate once + re-gate once after fixes; thrash beyond that is pure
+/// latency (telemetry: one run paid for 7 full-song reviews).
+pub const MAX_REVIEWS_PER_RUN: usize = 2;
+
+/// Full `play_pattern` rewrites above this size, after list_sections/list_parts
+/// in the same request, are blocked unless `force: true`.
+pub const FULL_REWRITE_GUARD_CHARS: usize = 4_000;
 
 impl AppState {
     pub fn new() -> Self {
@@ -61,12 +99,46 @@ impl AppState {
             loaded_sample_banks: Mutex::new(Vec::new()),
             recipes: Mutex::new(Vec::new()),
             read_budget: Mutex::new((0, 0)),
+            agent_write: Mutex::new(AgentWriteState::default()),
         }
     }
 
     /// Start a fresh per-turn library read budget.
     pub fn reset_read_budget(&self) {
         *self.read_budget.lock().unwrap() = (0, 0);
+    }
+
+    /// Start a fresh per-user-message review budget. Keeps the last-reviewed
+    /// buffer so a clean review can be played without re-emitting code.
+    pub fn reset_agent_write_run(&self) {
+        let mut w = self.agent_write.lock().unwrap();
+        w.review_calls = 0;
+        w.listed_structure = false;
+        w.force_full_play = false;
+    }
+
+    pub fn mark_listed_structure(&self) {
+        self.agent_write.lock().unwrap().listed_structure = true;
+    }
+
+    pub fn listed_structure(&self) -> bool {
+        self.agent_write.lock().unwrap().listed_structure
+    }
+
+    /// Snapshot of the last successfully reviewed code, if any.
+    pub fn last_reviewed_code(&self) -> Option<String> {
+        self.agent_write.lock().unwrap().last_reviewed_code.clone()
+    }
+
+    /// Stamp a write-kind label the agent loop will attach to the next telemetry
+    /// event for this tool call (e.g. `review_cache`, `reuse`).
+    pub fn stamp_write_kind(&self, kind: &str) {
+        self.agent_write.lock().unwrap().pending_write_kind = Some(kind.to_string());
+    }
+
+    /// Take and clear any pending write-kind stamp.
+    pub fn take_write_kind(&self) -> Option<String> {
+        self.agent_write.lock().unwrap().pending_write_kind.take()
     }
 
     /// Account one `read_song` against this turn's egress budget. Returns an

@@ -23,6 +23,10 @@ struct Event {
     ok: bool,
     #[serde(default)]
     result: String,
+    #[serde(default)]
+    code_chars: Option<usize>,
+    #[serde(default)]
+    write_kind: Option<String>,
 }
 
 /// Outcome classification. A tool can return Ok yet report failure in its text;
@@ -131,6 +135,38 @@ fn main() -> ExitCode {
 
     let runs = events.iter().map(|e| e.run).collect::<std::collections::BTreeSet<_>>().len();
     println!("agent-stats: {} tool calls across {} run(s)\n", events.len(), runs);
+
+    // Write-path cost proxy: code chars the model emitted into tools, and kinds.
+    let mut total_code_chars: usize = 0;
+    let mut n_with_code = 0usize;
+    let mut kind_counts: BTreeMap<String, usize> = BTreeMap::new();
+    for e in &events {
+        if let Some(n) = e.code_chars {
+            total_code_chars += n;
+            n_with_code += 1;
+        }
+        if let Some(k) = &e.write_kind {
+            *kind_counts.entry(k.clone()).or_default() += 1;
+        }
+    }
+    if n_with_code > 0 || !kind_counts.is_empty() {
+        println!("Write-path telemetry:");
+        if n_with_code > 0 {
+            println!(
+                "  code_chars total={total_code_chars}  across {n_with_code} tool call(s)  \
+                 mean={:.0}",
+                total_code_chars as f64 / n_with_code as f64
+            );
+        }
+        if !kind_counts.is_empty() {
+            print!("  write_kind:");
+            for (k, n) in &kind_counts {
+                print!("  {k}={n}");
+            }
+            println!();
+        }
+        println!();
+    }
 
     // Per-tool table, worst failure-rate first.
     println!("Per-tool (calls · fails · fail-rate):");

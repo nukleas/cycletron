@@ -17,6 +17,8 @@ mod snapshots;
 mod sounds;
 mod state;
 mod strudel;
+mod sections;
+mod structure;
 mod telemetry;
 mod tracks;
 mod tray;
