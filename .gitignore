@@ -71,3 +71,7 @@ tmp/
 # Rendered audio (regenerate with strudio render — see exports/agency/README)
 /exports/
 /Demos/
+
+# User-local sample pack library (installed in-app; contents are
+# user-provided and may not be redistributable)
+/Packs/

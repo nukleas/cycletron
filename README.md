@@ -21,7 +21,9 @@ Cycletron is a Tauri v2 desktop app: a WASM live-coding REPL, file library, MIDI
 
 ## Status
 
-Early private development (`0.1.0`). Not a public 1.0 yet.
+**Public alpha** (`0.1.0-alpha`). It works — expect rough edges. The supported
+DSL is a documented subset of web Strudel (see below); issues and patterns are
+welcome.
 
 - **User guide:** [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) (also Help → User Guide in-app)
 - **Dialect footguns:** [`docs/DIALECT.md`](docs/DIALECT.md) (Help → Cycletron Dialect)
@@ -78,7 +80,9 @@ drum machines, soundfonts) is credited in [`ATTRIBUTION.md`](ATTRIBUTION.md).
 
 ## Privacy
 
-Prompts and pattern text go to the AI provider you choose. API keys stay in the
+AI features are **off until you enable them** — Cycletron is a fully usable
+live-coding instrument without any provider configured. When enabled, prompts
+and pattern text go to the AI provider you choose. API keys stay in the
 local secrets store (keychain in release builds). SuperGrok / Codex OAuth tokens
 live in app data (`xai-oauth.json`, `codex-oauth.json`, owner-only). Logs and
 agent stats remain on this machine.
