@@ -61,9 +61,11 @@ jobs:
           export VERSION="${V#v}"
           echo "Releasing version $VERSION"
           # The updater compares against tauri.conf.json's version, so it must
-          # match the tag or installed apps won't see the update. node keeps this
-          # identical on macOS/Linux/Windows.
-          node -e "const fs=require('fs'),f='src-tauri/tauri.conf.json',c=JSON.parse(fs.readFileSync(f));c.version=process.env.VERSION;fs.writeFileSync(f,JSON.stringify(c,null,2)+'\n')"
+          # match the tag or installed apps won't see the update. Also blank out
+          # beforeBuildCommand: the frontend is built by the explicit step below
+          # (the config's `cd ../ui && …` resolves its cwd differently on the
+          # Windows runner and fails). node keeps this identical across OSes.
+          node -e "const fs=require('fs'),f='src-tauri/tauri.conf.json',c=JSON.parse(fs.readFileSync(f));c.version=process.env.VERSION;c.build=c.build||{};c.build.beforeBuildCommand='';fs.writeFileSync(f,JSON.stringify(c,null,2)+'\n')"
           node -e "console.log('version =', require('./src-tauri/tauri.conf.json').version)"
 
       - name: Rust stable
@@ -73,6 +75,10 @@ jobs:
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+
+      - name: Build frontend
+        working-directory: ui
+        run: npm ci && npm run build
 
       - name: Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04'
