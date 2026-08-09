@@ -1,0 +1,46 @@
+githubConfigUrl: https://github.com/nukleas/cycletron
+githubConfigSecret: arc-cycletron-github
+runnerScaleSetName: cycletron-runners
+minRunners: 0
+maxRunners: 3
+controllerServiceAccount:
+  name: arc-gha-rs-controller
+  namespace: arc-systems
+template:
+  spec:
+    # Pin to the 8-core node so the node-local hostPath cache is always warm
+    # and Rust builds get more cores.
+    nodeSelector:
+      kubernetes.io/hostname: omniarch
+    # Ensure the cache dirs exist and are owned by the runner user (uid 1001).
+    initContainers:
+      - name: init-cache
+        image: busybox:1.36
+        command: ["sh", "-c", "mkdir -p /cache/cargo /cache/target /cache/rustup && chown -R 1001:1001 /cache"]
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+          - name: cache
+            mountPath: /cache
+    containers:
+      - name: runner
+        image: ghcr.io/actions/actions-runner:latest
+        command: ["/home/runner/run.sh"]
+        env:
+          # Redirect cargo/rustup into the persistent node-local cache so crate
+          # downloads, the toolchain, and compiled artifacts survive across the
+          # ephemeral runner pods.
+          - name: CARGO_HOME
+            value: /cache/cargo
+          - name: CARGO_TARGET_DIR
+            value: /cache/target
+          - name: RUSTUP_HOME
+            value: /cache/rustup
+        volumeMounts:
+          - name: cache
+            mountPath: /cache
+    volumes:
+      - name: cache
+        hostPath:
+          path: /opt/arc-cache/cycletron
+          type: DirectoryOrCreate
