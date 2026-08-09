@@ -35,23 +35,6 @@ export interface SessionSnapshot {
     saved_at: string;
 }
 
-export interface CorpusEntry {
-    id: string;
-    filename: string;
-    /** "strudel", "js-song", "tidal", "curated", etc. — lets the UI distinguish native strudel-rs mini-notation entries from ones authored for the full JS web-strudel runtime. */
-    file_type: string | null;
-    title: string | null;
-    author: string | null;
-    tempo: number | null;
-    sounds: string[];
-    effects: string[];
-    scales: string[];
-    tags: string[];
-    features: string[];
-    complexity: string | null;
-    source_code: string | null;
-}
-
 export interface MidiImport {
     code: string;
     bpm: number;
@@ -207,15 +190,4 @@ export interface ImportMidiOptions {
     instrumentMode?: 'hybrid' | 'waveforms' | 'gm' | 'auto';
     drumBank?: 'simple' | '808' | '909' | '707' | 'linn' | 'dmx' | 'auto';
     includedChannels?: number[];
-}
-
-export interface CorpusQuery {
-    tags: string[];
-    role: string | null;
-    tempo_min: number | null;
-    tempo_max: number | null;
-    complexity: string | null;
-    sounds: string[];
-    keyword: string | null;
-    limit: number | null;
 }

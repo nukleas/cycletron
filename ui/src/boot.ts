@@ -13,7 +13,6 @@ import {invoke} from './tauri.js';
 import {fileManager} from './file-manager.js';
 import {initMenuEvents} from './menu-events.js';
 import {initDragDrop} from './drag-drop.js';
-import {corpusBrowser} from './corpus-browser.js';
 import {soundsBrowser} from './sounds-browser.js';
 import {fileExplorer} from './file-explorer.js';
 import {midiLab} from './midi-lab.js';
@@ -91,13 +90,6 @@ function setupTitleBar(): void {
         });
     }) as EventListener);
 
-    document.addEventListener('corpus:loaded', ((e: CustomEvent) => {
-        update({
-            name: `${e.detail?.title ?? 'corpus'} (unsaved)`,
-            dirty: true,
-        });
-    }) as EventListener);
-
     document.addEventListener('session:cleared', () => {
         update({name: 'untitled', dirty: false});
     });
@@ -170,7 +162,6 @@ async function boot(): Promise<void> {
     await Promise.all([
         initMenuEvents(),
         initDragDrop(),
-        corpusBrowser.init(),
         soundsBrowser.init(),
         fileManager.init(),
         fileExplorer.init(),

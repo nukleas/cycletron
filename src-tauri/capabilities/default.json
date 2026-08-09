@@ -34,8 +34,6 @@
     "allow-critique-pattern",
     "allow-critique-form",
     "allow-genre-recipe",
-    "allow-search-corpus",
-    "allow-get-corpus-source",
     "allow-get-pattern-history",
     "allow-get-config",
     "allow-clear-session",

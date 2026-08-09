@@ -8,8 +8,6 @@ use crate::snapshots::{self, Snapshot};
 use crate::state::AppState;
 use crate::strudel;
 use midi_to_strudel::{InstrumentMode, SectionNamingStrategy, drums::DrumBank};
-use cycletron_core::traits::CorpusIndex;
-use cycletron_core::types::*;
 use serde::Deserialize;
 use std::path::PathBuf;
 use tauri::{Emitter, Manager, State};
@@ -153,29 +151,6 @@ pub fn genre_recipe(
 #[tauri::command]
 pub fn reload_corpus(state: State<'_, AppState>) -> Result<usize, String> {
     Ok(state.load_knowledge())
-}
-
-/// Search the corpus.
-#[tauri::command]
-pub fn search_corpus(
-    query: CorpusQuery,
-    state: State<'_, AppState>,
-) -> Result<Vec<CorpusEntry>, String> {
-    let corpus = state.corpus.lock().unwrap();
-    match &*corpus {
-        Some(index) => Ok(index.search(&query)),
-        None => Err("corpus not loaded".to_string()),
-    }
-}
-
-/// Get a corpus entry's full source code by ID.
-#[tauri::command]
-pub fn get_corpus_source(id: String, state: State<'_, AppState>) -> Result<String, String> {
-    let corpus = state.corpus.lock().unwrap();
-    match &*corpus {
-        Some(index) => index.get_source(&id).map_err(|e| e.to_string()),
-        None => Err("corpus not loaded".to_string()),
-    }
 }
 
 /// Get pattern history for the current session.

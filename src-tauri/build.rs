@@ -12,8 +12,6 @@ const COMMANDS: &[&str] = &[
     "critique_pattern",
     "critique_form",
     "genre_recipe",
-    "search_corpus",
-    "get_corpus_source",
     "get_pattern_history",
     "get_config",
     "clear_session",

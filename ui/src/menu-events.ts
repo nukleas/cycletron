@@ -39,9 +39,6 @@ export async function initMenuEvents(): Promise<void> {
         'menu:toggle_ai': () => {
             document.getElementById('aiPanel')?.classList.toggle('collapsed');
         },
-        'menu:toggle_corpus': () => {
-            document.getElementById('corpusPanel')?.classList.toggle('corpus-hidden');
-        },
         'menu:browse_examples': () => {
             document.getElementById('browseExamples')?.click();
         },

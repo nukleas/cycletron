@@ -1,5 +1,5 @@
 //! Native application menu. Emits `menu:<action>` events to the frontend,
-//! which translates them into file-manager / editor / corpus-browser calls.
+//! which translates them into file-manager / editor / examples calls.
 
 use std::path::Path;
 use tauri::menu::{Menu, MenuBuilder, MenuEvent, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
@@ -120,9 +120,6 @@ pub fn build_app_menu<R: Runtime>(
                 .build(app)?,
         )
         .item(
-            &MenuItemBuilder::with_id("view.toggle_corpus", "Toggle Corpus Browser").build(app)?,
-        )
-        .item(
             &MenuItemBuilder::with_id("view.browse_examples", "Browse Examples").build(app)?,
         )
         .item(
@@ -239,7 +236,6 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "edit.redo" => "menu:redo",
         "edit.clear_session" => "menu:clear_session",
         "view.toggle_ai" => "menu:toggle_ai",
-        "view.toggle_corpus" => "menu:toggle_corpus",
         "view.browse_examples" => "menu:browse_examples",
         "view.reload_corpus" => "menu:reload_corpus",
         "view.immersive_viz" => "menu:immersive_viz",
