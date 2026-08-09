@@ -248,6 +248,24 @@ impl AppState {
             .map(|p| resolve_corpus_path(p));
         drop(config);
 
+        // In a packaged build the compile-time `corpus/` dir isn't on the
+        // user's disk. Fall back to the corpus embedded in the binary,
+        // materialized once into the app data dir so the on-disk loader (and
+        // the agent's search_corpus) still have the curated knowledge base.
+        let curated_path = curated_path.and_then(|p| {
+            if p.exists() {
+                return Some(p);
+            }
+            let dest = self.app_data_dir()?.join("corpus");
+            match crate::demos::export_corpus_assets(&dest) {
+                Ok(()) => Some(dest),
+                Err(e) => {
+                    tracing::warn!("could not export embedded corpus: {e}");
+                    None
+                }
+            }
+        });
+
         match InMemoryCorpusIndex::load_with_curated(&corpus_path, curated_path.as_deref()) {
             Ok(corpus) => *self.corpus.lock().unwrap() = Some(corpus),
             Err(e) => tracing::warn!("corpus failed to load: {e}"),

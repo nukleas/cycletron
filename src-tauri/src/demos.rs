@@ -154,6 +154,35 @@ pub struct SeedReport {
     pub skipped: usize,
 }
 
+/// Materialize the embedded corpus into `dest`, mirroring the repo's `corpus/`
+/// layout verbatim (category dirs, `genres/<slug>/…`, `lessons/`, …). The
+/// on-disk corpus loader can then read it in a packaged build, where the
+/// compile-time `corpus/` path isn't present on the user's machine.
+///
+/// Idempotent per app version: a `.corpus-version` marker skips the copy when
+/// already current, and a version bump re-exports so the agent's knowledge
+/// tracks the shipped release.
+pub fn export_corpus_assets(dest: &Path) -> Result<(), String> {
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    let marker = dest.join(".corpus-version");
+    if fs::read_to_string(&marker).ok().as_deref() == Some(VERSION) {
+        return Ok(());
+    }
+    for path in CorpusAssets::iter() {
+        let rel = path.as_ref();
+        let Some(file) = CorpusAssets::get(rel) else {
+            continue;
+        };
+        let out = dest.join(rel);
+        if let Some(parent) = out.parent() {
+            fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
+        }
+        fs::write(&out, file.data.as_ref()).map_err(|e| format!("write {}: {e}", out.display()))?;
+    }
+    fs::create_dir_all(dest).map_err(|e| format!("mkdir {}: {e}", dest.display()))?;
+    fs::write(&marker, VERSION).map_err(|e| format!("write {}: {e}", marker.display()))
+}
+
 fn write_if_missing(dest: &Path, data: Option<&[u8]>) -> Result<bool, String> {
     let Some(bytes) = data else {
         return Ok(false);
@@ -195,6 +224,20 @@ mod tests {
     fn title_case_kebab_basic() {
         assert_eq!(title_case_kebab("drum-and-bass"), "Drum And Bass");
         assert_eq!(title_case_kebab("rhythm"), "Rhythm");
+    }
+
+    #[test]
+    fn export_corpus_writes_curated_tree() {
+        let dir = env::temp_dir().join(format!("cycletron-corpus-export-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        export_corpus_assets(&dir).expect("export");
+        // A migrated lesson + a curated technique category + a genre recipe.
+        assert!(dir.join("lessons/01-first-steps.strudel").is_file());
+        assert!(dir.join("rhythm").is_dir());
+        assert!(dir.join(".corpus-version").is_file());
+        // Second call is a no-op once the version marker is current.
+        export_corpus_assets(&dir).expect("re-export noop");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
