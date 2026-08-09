@@ -47,7 +47,9 @@ jobs:
             args: ''
             rust-targets: ''
           - platform: windows-latest
-            args: ''
+            # NSIS only: the MSI/WiX target rejects pre-release versions
+            # (0.1.0-alpha.N) — "pre-release identifier must be numeric-only".
+            args: '--bundles nsis'
             rust-targets: ''
     steps:
       - uses: actions/checkout@v4
