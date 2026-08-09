@@ -164,7 +164,9 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg 2>/dev/null | head -1)
+          # Workspace target dir is at the repo root (not src-tauri/target); find
+          # the DMG wherever the bundler put it.
+          DMG=$(find . -path '*universal-apple-darwin/release/bundle/dmg/*.dmg' 2>/dev/null | head -1)
           if [ -z "$DMG" ]; then
             echo "::error::No DMG produced to notarize."
             exit 1
