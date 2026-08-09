@@ -3,12 +3,10 @@
  * open the folder in the OS file manager.
  */
 
-import {invoke} from './tauri.js';
+import {invoke, isTauri} from './tauri.js';
 import {dismissibleModal} from './modal-utils.js';
 import {escapeHtml} from './html.js';
 import {notify} from './notifications.js';
-
-const isTauri = !!(window as any).__TAURI__;
 
 interface PackSummary {
     id: string;

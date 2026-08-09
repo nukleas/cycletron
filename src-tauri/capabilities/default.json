@@ -93,7 +93,6 @@
     "allow-register-sound-banks",
     "allow-list-sounds",
     "allow-list-packs",
-    "allow-get-pack",
     "allow-enable-pack",
     "allow-disable-pack",
     "allow-load-enabled-packs",

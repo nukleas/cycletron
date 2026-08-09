@@ -18,6 +18,7 @@ import {ambientViz} from './ambient-viz.js';
 import {visualsMenu} from './visuals-menu.js';
 import {ExamplesBrowser} from './examples.js';
 import {notify} from './notifications.js';
+import {invoke, isTauri} from './tauri.js';
 
 /** How many cycles the ⏮/⏭ transport buttons jump. */
 const SKIP_CYCLES = 5;
@@ -780,10 +781,7 @@ export class StrudelApp {
                 if (!this.isInitialized) return;
                 const total = drums + machineCount + colorNames.length + packSamples;
                 this.elements.sampleCount.textContent = `${total}`;
-                const invoke = (window as any).__TAURI__?.core?.invoke as
-                    | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
-                    | undefined;
-                if (colorNames.length && invoke) {
+                if (colorNames.length && isTauri) {
                     void invoke('register_sound_banks', {names: colorNames}).catch(() => {});
                 }
                 document.dispatchEvent(new CustomEvent('sounds:changed'));
@@ -863,11 +861,7 @@ export class StrudelApp {
     async loadPackBanks(
         banks: Array<{name: string; files: string[]}>,
     ): Promise<number> {
-        if (!this.sampleLoader || !this.isInitialized) return 0;
-        const invoke = (window as any).__TAURI__?.core?.invoke as
-            | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
-            | undefined;
-        if (!invoke) return 0;
+        if (!this.sampleLoader || !this.isInitialized || !isTauri) return 0;
 
         let total = 0;
         const loadedNames: string[] = [];
@@ -890,11 +884,7 @@ export class StrudelApp {
 
     /** Load every pack listed in `Packs/enabled.json`. Returns sample count. */
     async loadEnabledPacks(): Promise<number> {
-        if (!this.sampleLoader || !this.isInitialized) return 0;
-        const invoke = (window as any).__TAURI__?.core?.invoke as
-            | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
-            | undefined;
-        if (!invoke) return 0;
+        if (!this.sampleLoader || !this.isInitialized || !isTauri) return 0;
         try {
             const packs = await invoke<
                 Array<{id: string; banks: Array<{name: string; files: string[]}>; skipped: string[]}>
@@ -922,11 +912,7 @@ export class StrudelApp {
      * the backend which banks exist so the AI's `list_sounds` tool knows.
      */
     async loadSampleFolder(): Promise<void> {
-        if (!this.sampleLoader || !this.isInitialized) return;
-        const invoke = (window as any).__TAURI__?.core?.invoke as
-            | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
-            | undefined;
-        if (!invoke) return;
+        if (!this.sampleLoader || !this.isInitialized || !isTauri) return;
 
         let dir: string | null = null;
         try {
@@ -1357,10 +1343,7 @@ export class StrudelApp {
      * editor. Fire-and-forget; failures just hide the strip.
      */
     async updateInspect(code: string): Promise<void> {
-        const invoke = (window as any).__TAURI__?.core?.invoke as
-            | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
-            | undefined;
-        if (!invoke || !code.trim()) {
+        if (!isTauri || !code.trim()) {
             this.editor?.clearInspect();
             return;
         }

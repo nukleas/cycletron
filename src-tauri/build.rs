@@ -71,7 +71,6 @@ const COMMANDS: &[&str] = &[
     "register_sound_banks",
     "list_sounds",
     "list_packs",
-    "get_pack",
     "enable_pack",
     "disable_pack",
     "load_enabled_packs",

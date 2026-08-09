@@ -339,7 +339,6 @@ pub fn run() {
             sounds::register_sound_banks,
             sounds::list_sounds,
             packs::list_packs,
-            packs::get_pack,
             packs::enable_pack,
             packs::disable_pack,
             packs::load_enabled_packs,

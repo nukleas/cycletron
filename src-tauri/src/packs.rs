@@ -54,21 +54,13 @@ pub struct PackManifest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackBank {
     pub name: String,
-    #[serde(default)]
-    pub pitched: bool,
     pub files: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct EnabledFile {
-    #[serde(default = "enabled_version")]
-    version: u32,
     #[serde(default)]
     enabled: Vec<String>,
-}
-
-fn enabled_version() -> u32 {
-    1
 }
 
 // --- IPC shapes -----------------------------------------------------------
@@ -111,6 +103,13 @@ pub fn packs_root(library_root: &Path) -> PathBuf {
 pub fn ensure_packs_dir(library_root: &Path) -> Result<(), String> {
     let root = packs_root(library_root);
     fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))
+}
+
+/// `Packs/` under the current library root, best-effort created.
+fn ensured_packs_root(state: &State<'_, AppState>) -> PathBuf {
+    let lib = state.library_root();
+    let _ = ensure_packs_dir(&lib);
+    packs_root(&lib)
 }
 
 fn read_enabled(packs: &Path) -> EnabledFile {
@@ -303,9 +302,7 @@ fn resolve_load(dir: &Path, m: &PackManifest) -> Result<PackLoadResult, String> 
 
 #[tauri::command]
 pub fn list_packs(state: State<'_, AppState>) -> Result<Vec<PackSummary>, String> {
-    let lib = state.library_root();
-    let packs = packs_root(&lib);
-    let _ = ensure_packs_dir(&lib);
+    let packs = ensured_packs_root(&state);
     let enabled: HashSet<String> = read_enabled(&packs).enabled.into_iter().collect();
     let mut out = Vec::new();
     for (dir, m) in scan_installed(&packs) {
@@ -322,18 +319,6 @@ pub fn list_packs(state: State<'_, AppState>) -> Result<Vec<PackSummary>, String
         });
     }
     Ok(out)
-}
-
-#[tauri::command]
-pub fn get_pack(id: String, state: State<'_, AppState>) -> Result<PackManifest, String> {
-    if !is_valid_pack_id(&id) {
-        return Err(format!("invalid pack id {id:?}"));
-    }
-    let dir = packs_root(&state.library_root()).join(&id);
-    if !dir.is_dir() {
-        return Err(format!("pack not installed: {id}"));
-    }
-    load_manifest(&dir)
 }
 
 #[tauri::command]
@@ -363,9 +348,7 @@ pub fn disable_pack(id: String, state: State<'_, AppState>) -> Result<(), String
 /// Resolve every enabled pack for the frontend to decode.
 #[tauri::command]
 pub fn load_enabled_packs(state: State<'_, AppState>) -> Result<Vec<PackLoadResult>, String> {
-    let lib = state.library_root();
-    let packs = packs_root(&lib);
-    let _ = ensure_packs_dir(&lib);
+    let packs = ensured_packs_root(&state);
     let en = read_enabled(&packs);
     let mut out = Vec::new();
     for id in &en.enabled {
@@ -453,6 +436,20 @@ fn pack_id_from_folder_name(raw: &str) -> String {
     }
 }
 
+/// Clip `base` so `base_<suffix>` fits in 31 chars, trimming any trailing `_`
+/// left by the cut before appending the `_<suffix>` tag.
+fn clip_with_suffix(base: &str, suffix: &str) -> String {
+    let tag = format!("_{suffix}");
+    let keep = 31usize.saturating_sub(tag.len()).max(1);
+    let mut s: String = base.chars().take(keep).collect();
+    while s.ends_with('_') {
+        s.pop();
+    }
+    s.push_str(&tag);
+    s.truncate(31);
+    s
+}
+
 /// If `name` collides with a core bank, append `_{pack_id}` (clipped to 31).
 /// Bank tokens are `[a-z0-9_]` only — pack id hyphens become underscores.
 fn bank_name_for_pack(
@@ -466,17 +463,7 @@ fn bank_name_for_pack(
         .map(|c| if c == '-' { '_' } else { c })
         .collect();
     let candidate = if core.contains(name) {
-        let suffix = format!("_{id_suffix}");
-        let keep = 31usize.saturating_sub(suffix.len()).max(1);
-        let mut s: String = name.chars().take(keep).collect();
-        while s.ends_with('_') {
-            s.pop();
-        }
-        s.push_str(&suffix);
-        if s.len() > 31 {
-            s.truncate(31);
-        }
-        s
+        clip_with_suffix(name, &id_suffix)
     } else {
         name.to_string()
     };
@@ -484,10 +471,7 @@ fn bank_name_for_pack(
     let mut final_name = candidate.clone();
     let mut n = 2u32;
     while !used.insert(final_name.clone()) {
-        let suffix = format!("_{n}");
-        let keep = 31usize.saturating_sub(suffix.len());
-        final_name = candidate.chars().take(keep).collect();
-        final_name.push_str(&suffix);
+        final_name = clip_with_suffix(&candidate, &n.to_string());
         n += 1;
     }
 
@@ -636,7 +620,6 @@ pub fn install_pack_from_folder(
         bank_names.push(bank_name.clone());
         manifest_banks.push(PackBank {
             name: bank_name,
-            pitched: false,
             files: rel_files,
         });
     }
@@ -916,7 +899,6 @@ mod tests {
             }
             manifest_banks.push(PackBank {
                 name: bank_name,
-                pitched: false,
                 files: rels,
             });
         }

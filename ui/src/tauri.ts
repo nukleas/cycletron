@@ -8,3 +8,6 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
     if (!api) throw new Error('Tauri not available');
     return api.invoke(cmd, args);
 }
+
+/** True when running inside the Tauri desktop shell (vs. a plain browser). */
+export const isTauri = !!(window as any).__TAURI__;
