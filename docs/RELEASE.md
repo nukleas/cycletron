@@ -43,36 +43,62 @@ Artifacts land under `src-tauri/target/release/bundle/`.
 debugging, temporarily set `"devtools": true` or inspect via the platform
 WebView tools. Do not ship with DevTools enabled.
 
-## Auto-updater keys
+## Auto-updater keys — done
 
-Updater is configured but **`pubkey` is empty** until you generate a keypair.
+Signing keypair generated with `cargo tauri signer generate`:
+
+- **Public key** is committed in `src-tauri/tauri.conf.json` → `plugins.updater.pubkey`.
+- **Private key** is at `~/.tauri/cycletron-updater.key` (password in
+  `~/.tauri/cycletron-updater.pw`) and is set as repo secrets
+  `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+
+> ⚠️ **Back up the private key + password offline.** If they are lost you cannot
+> ship an update that existing installs will accept — every user would have to
+> reinstall. Never commit the `.key` (gitignored).
+
+Endpoint: `https://github.com/nukleas/cycletron/releases/latest/download/latest.json`.
+The repo is **private**, so that URL isn't publicly reachable yet — auto-update
+begins working once the repo (or a public releases mirror) serves the assets.
+Until then the build/sign/publish pipeline is validated via **draft** releases.
+
+## Apple Developer ID signing + notarization
+
+`.github/workflows/release.yml` signs + notarizes when these repo secrets exist.
+Create them once (macOS Keychain → export **Developer ID Application** cert as a
+`.p12`):
 
 ```bash
-# install CLI if needed: cargo install tauri-cli --version "^2"
-cargo tauri signer generate -w ~/.tauri/cycletron.key
+base64 -i cycletron-devid.p12 | pbcopy   # value for APPLE_CERTIFICATE
+
+gh secret set APPLE_CERTIFICATE          --repo nukleas/cycletron   # base64 of the .p12
+gh secret set APPLE_CERTIFICATE_PASSWORD --repo nukleas/cycletron   # the .p12 export password
+gh secret set APPLE_SIGNING_IDENTITY     --repo nukleas/cycletron   # "Developer ID Application: Name (TEAMID)"
+gh secret set APPLE_ID                   --repo nukleas/cycletron   # your Apple ID email
+gh secret set APPLE_PASSWORD             --repo nukleas/cycletron   # app-specific password (appleid.apple.com)
+gh secret set APPLE_TEAM_ID              --repo nukleas/cycletron   # 10-char team id
 ```
 
-1. Put the **public** key string into `src-tauri/tauri.conf.json` →
-   `plugins.updater.pubkey`.
-2. Keep the **private** key offline / in CI secrets only (`TAURI_SIGNING_PRIVATE_KEY`).
-3. Never commit `*.pem` / `*.key` (already gitignored).
-4. Release workflow should upload `latest.json` + signed bundles to
-   `https://github.com/nukleas/cycletron/releases/...` (endpoint already set).
+Without these the workflow still builds, but ships **unsigned** (testers
+right-click → Open past Gatekeeper once).
 
-Until the pubkey is set, in-app “Check for Updates” cannot verify packages —
-that is expected for pre-alpha.
+## CI secrets — current state
 
-## CI secrets / vars
+| Name | Set? | Purpose |
+|------|------|---------|
+| `TAURI_SIGNING_PRIVATE_KEY` | ✅ | Updater signature |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | ✅ | Updater key password |
+| `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` | ⬜ you | Developer ID cert (.p12, base64) |
+| `APPLE_SIGNING_IDENTITY` | ⬜ you | Signing identity string |
+| `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` | ⬜ you | Notarization |
 
-The engine is a **public** Codeberg git dependency and the audio WASM is committed,
-so CI needs no engine token and no sibling checkout — it builds from a single clone.
+The engine is a public Codeberg git dependency and the audio WASM is committed,
+so CI needs no engine token and no sibling checkout.
 
-| Name | Purpose |
-|------|---------|
-| `TAURI_SIGNING_PRIVATE_KEY` | Updater signing (release job, later) |
-| `APPLE_*` | Notarization (later) |
+## Cutting a release
 
-## Tagging a private alpha
+`.github/workflows/release.yml` runs on a `v*` tag and produces a **draft**
+pre-release (macOS universal) with signed bundles + `latest.json`. Nothing is
+public until you review the draft on GitHub and hit **Publish**.
 
 ```bash
 # clean tree, green CI

@@ -98,7 +98,7 @@
       "endpoints": [
         "https://github.com/nukleas/cycletron/releases/latest/download/latest.json"
       ],
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQzODA5MzlGRDAzOTk4OEQKUldTTm1EblFuNU9BMHdmSEp5RzlZNHFXb1NhRmFlaHpBalZhUWRTdGEzSU9mcEJWNk9YdFF2cDAK",
       "dialog": false
     }
   }
