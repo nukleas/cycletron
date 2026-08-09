@@ -1,9 +1,0 @@
-// ambient in C major (generated) — drone, long-attack pad, drifting bells
-setbpm(58);
-
-stack(
-  s("hh ~ ~ ~ ~ ~ ~ ~ hh ~ ~ ~ ~ ~ ~ ~").gain(0.2).room(0.6),
-  note("c2").s("sine").attack(3).release(5).gain(0.45),
-  note("<[c3, e3, g3, b3] [f3, a3, c4, e4] [a3, c4, e4, g4] [g3, b3, d4, f4]>").s("sawtooth").attack(2).release(4).lpf(1000).gain(0.32).room(0.85),
-  note("c5 ~ ~ c5 ~ ~ g4 ~").s("gm_kalimba").room(0.7).delay(0.4).gain(0.33)
-)

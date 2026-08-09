@@ -1,9 +1,0 @@
-// Halftime feel: snare moved from 2/4 to beat 3 only.
-// Common in trap, drum-and-bass breakdowns, and lo-fi hip hop.
-setbpm(140);
-
-stack(
-  s("bd ~ ~ bd ~ ~ ~ ~"),
-  s("~ ~ ~ ~ sd ~ ~ ~"),
-  s("hh*16").gain(0.4)
-)

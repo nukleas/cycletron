@@ -70,3 +70,4 @@ tmp/
 
 # Rendered audio (regenerate with strudio render — see exports/agency/README)
 /exports/
+/Demos/

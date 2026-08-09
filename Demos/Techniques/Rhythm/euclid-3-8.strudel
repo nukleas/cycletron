@@ -1,9 +1,0 @@
-// Bjorklund 3-in-8: classic Cuban tresillo distribution.
-// Three pulses spread as evenly as possible across eight steps.
-setbpm(110);
-
-stack(
-  s("bd(3,8)"),
-  s("~ ~ sd ~ ~ ~ sd ~"),
-  s("hh*8").gain(0.4)
-)

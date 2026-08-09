@@ -1,9 +1,0 @@
-// Song form via `arrange`: each [bars, pattern] pair plays at its native rate
-// for that many cycles, then the whole thing loops. Intro -> groove -> break.
-setbpm(120);
-
-arrange(
-  [2, s("hh*8").gain(0.4)],
-  [4, stack(s("bd*4"), s("~ cp ~ cp"), note("c2 ~ g2 ~").s("sawtooth").gain(0.6))],
-  [2, note("<c3 eb3 g3>").s("wt_pad").room(0.6).gain(0.4)]
-)

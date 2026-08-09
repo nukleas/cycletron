@@ -1,9 +1,0 @@
-// Elementary cellular automaton (Wolfram rule 90) drives an evolving
-// hat line. A single seed cell evolves over 4 generations; each row
-// becomes one cycle, so the rhythm reorganises itself every bar.
-setbpm(120);
-
-stack(
-  s("bd*4"),
-  s("<[~ ~ ~ ~ hh ~ ~ ~] [~ ~ ~ hh ~ hh ~ ~] [~ ~ hh ~ ~ ~ hh ~] [~ hh ~ hh ~ hh ~ hh]>").gain(0.5)
-)

@@ -1,9 +1,0 @@
-// Rotating Euclidean rhythm: each cycle uses a different rotation
-// of the same 5-in-8 distribution, so the clap walks around the bar.
-setbpm(120);
-
-stack(
-  s("bd*4"),
-  s("<cp(5,8) cp(5,8,1) cp(5,8,2) cp(5,8,3)>").gain(0.6),
-  s("hh*8").gain(0.4)
-)

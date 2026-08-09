@@ -1,8 +1,0 @@
-// darksynth in C phrygian (generated) — pounding retro beat, grinding octave bass, sinister stabs
-setbpm(110);
-
-stack(
-  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.92).dist(0.2),
-  note("c2 ~ c3 ~ c2 ~ c3 ~").s("sawtooth").lpf(700).resonance(9).gain(0.52).dist(0.1),
-  note("<[c3, d#3, g3, a#3] [c#3, f3, g#3, c4] [c3, d#3, g3, a#3] [g#3, c4, d#4, g4]>").s("supersaw").struct("~ 1 ~ 1").release(0.2).lpf(1800).gain(0.32).room(0.35).pan(0.42)
-)

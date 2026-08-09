@@ -1,9 +1,0 @@
-// Four-on-the-floor: house/techno foundation.
-// Kick on every beat, closed hat doubled up, snare on 2 and 4.
-setbpm(124);
-
-stack(
-  s("bd bd bd bd"),
-  s("~ sd ~ sd"),
-  s("hh*8").gain(0.5)
-)

@@ -1,8 +1,0 @@
-// Walking bass using GM acoustic bass: two-note phrases per cycle.
-setbpm(110);
-
-note("<[c2 e2] [f2 a2] [g2 b2] [c2 e2]>")
-  .s("gm_acoustic_bass")
-  .attack(0.02)
-  .release(0.5)
-  .gain(0.72)

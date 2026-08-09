@@ -1,7 +1,0 @@
-// A slowly "breathing" low-pass: the cutoff rides a sine over 8 cycles,
-// opening and closing the pad like a tide. Continuous automation, no notes move.
-setbpm(110);
-
-note("<c2 g2 a2 f2>").s("supersaw")
-  .cutoff(sine.range(300, 2600).slow(8))
-  .resonance(0.3).room(0.4).gain(0.4)

@@ -1,8 +1,0 @@
-// drum & bass in C minor (generated) — two-step break, reese bass, minor stabs
-setbpm(174);
-
-stack(
-  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh*16").gain(0.92),
-  note("c1 ~ ~ a#1 ~ ~ c2 ~").s("supersaw").lpf(700).resonance(9).gain(0.5),
-  note("<[c3, d#3, g3, a#3] [g#3, c4, d#4, g4] [d#3, g3, a#3, d4] [a#3, d4, f4, g#4]>").s("sawtooth").struct("~ 1").release(0.18).lpf(1500).gain(0.34).room(0.3)
-)

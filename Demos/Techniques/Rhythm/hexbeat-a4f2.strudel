@@ -1,9 +1,0 @@
-// Hex beat "a4f2": each hex digit is four binary steps, 1 = kick onset.
-// a4f2 → 1010010011110010 (16 steps). A compact way to notate a whole bar of
-// rhythm as a short string. Steady hats sit underneath for pulse.
-setbpm(120);
-
-stack(
-  s("bd ~ bd ~ ~ bd ~ ~ bd bd bd bd ~ ~ bd ~"),
-  s("hh*8").gain(0.45)
-)

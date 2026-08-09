@@ -1,9 +1,0 @@
-// Ascending C-major scale, one note per beat, sine timbre.
-// A baseline check that pitch + envelope plumbing is sane.
-setbpm(96);
-
-note("c4 d4 e4 f4 g4 a4 b4 c5")
-  .s("sine")
-  .attack(0.01)
-  .release(0.3)
-  .gain(0.7)

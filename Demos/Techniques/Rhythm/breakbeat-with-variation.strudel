@@ -1,9 +1,0 @@
-// Breakbeat with `every` variation: reverse the snare line every 4 cycles.
-// The pattern stays recognisable but gains forward motion from the flip.
-setbpm(170);
-
-stack(
-  s("bd ~ ~ bd ~ ~ bd ~"),
-  s("~ ~ sd ~ ~ sd ~ ~").every(4, x => x.rev),
-  s("hh*8").gain(0.45)
-)

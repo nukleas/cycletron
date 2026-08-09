@@ -1,8 +1,0 @@
-// 3-against-4 polyrhythm: hat triplets over a straight four-on-the-floor kick.
-// Each pattern locks to its own subdivision of the same cycle.
-setbpm(100);
-
-stack(
-  s("bd*4"),
-  s("hh*3").gain(0.55)
-)

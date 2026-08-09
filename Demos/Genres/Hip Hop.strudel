@@ -1,9 +1,0 @@
-// lo-fi hip-hop in D dorian (generated) — boom-bap, walking bass, Rhodes 7ths
-setbpm(85);
-
-stack(
-  s("bd ~ ~ ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").gain(0.85),
-  note("d2 ~ a2 ~ d2 ~ c3 ~").s("gm_acoustic_bass").gain(0.6),
-  note("<[d3, f3, a3, c4] [g3, b3, d4, f4] [a3, c4, e4, g4] [d3, f3, a3, c4]>").s("gm_epiano1").release(0.4).gain(0.42).room(0.3),
-  note("a4 ~ c5 ~ g4 ~ f4 ~").s("triangle").room(0.3).delay(0.2).gain(0.3)
-)

@@ -1,8 +1,0 @@
-// drill 'n' bass in E phrygian (generated) — amen shrapnel at speed, growling reese, needle stabs
-setbpm(170);
-
-stack(
-  s("bd ~ bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ sd ~ ~ ~ ~ sd ~ sd ~, hh*16").gain(0.92),
-  note("e1 ~ ~ d2 ~ ~ e2 ~").s("supersaw").lpf(700).resonance(11).gain(0.5),
-  note("<[e3, g3, b3, d4] [f3, a3, c4, e4]>").s("sawtooth").struct("~ ~ 1 ~").release(0.1).lpf(1700).gain(0.28).pan(0.42)
-)
