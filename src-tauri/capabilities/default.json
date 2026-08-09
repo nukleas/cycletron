@@ -98,6 +98,7 @@
     "allow-disable-pack",
     "allow-load-enabled-packs",
     "allow-packs-dir",
+    "allow-install-pack-from-folder",
     "allow-list-midi-input-devices",
     "allow-start-midi-input-listening",
     "allow-stop-midi-input-listening",

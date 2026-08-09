@@ -344,6 +344,7 @@ pub fn run() {
             packs::disable_pack,
             packs::load_enabled_packs,
             packs::packs_dir,
+            packs::install_pack_from_folder,
             midi_input::list_midi_input_devices,
             midi_input::start_midi_input_listening,
             midi_input::stop_midi_input_listening,

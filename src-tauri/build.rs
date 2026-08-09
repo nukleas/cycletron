@@ -76,6 +76,7 @@ const COMMANDS: &[&str] = &[
     "disable_pack",
     "load_enabled_packs",
     "packs_dir",
+    "install_pack_from_folder",
     "list_midi_input_devices",
     "start_midi_input_listening",
     "stop_midi_input_listening",

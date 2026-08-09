@@ -85,25 +85,28 @@ fn audio_files_in(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
-/// Scan a folder into sample banks using the Strudel convention:
-/// each immediate subfolder is a bank (its audio files become indices 0,1,2…
-/// in alphabetical order); each loose audio file at the root is a one-shot
-/// bank named after the file stem.
-#[tauri::command]
-pub fn scan_sample_folder(path: String) -> Result<SampleFolder, String> {
-    let root = PathBuf::from(&path);
+/// One bank from a folder scan: sanitized name + absolute source paths.
+#[derive(Debug, Clone)]
+pub struct ScannedBank {
+    pub name: String,
+    pub files: Vec<PathBuf>,
+}
+
+/// Scan a folder into banks (Strudel layout: each subfolder is a bank; loose
+/// audio files at the root are one-shot banks named after the file stem).
+pub fn scan_folder_banks(root: &Path) -> Result<Vec<ScannedBank>, String> {
     if !root.is_dir() {
-        return Err(format!("not a folder: {path}"));
+        return Err(format!("not a folder: {}", root.display()));
     }
 
-    let mut entries: Vec<PathBuf> = std::fs::read_dir(&root)
+    let mut entries: Vec<PathBuf> = std::fs::read_dir(root)
         .map_err(|e| format!("read {}: {e}", root.display()))?
         .flatten()
         .map(|e| e.path())
         .collect();
     entries.sort();
 
-    let mut banks: Vec<SampleBank> = Vec::new();
+    let mut banks: Vec<ScannedBank> = Vec::new();
     let mut used_names: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for entry in &entries {
@@ -120,24 +123,42 @@ pub fn scan_sample_folder(path: String) -> Result<SampleFolder, String> {
             if name.is_empty() {
                 continue;
             }
-            banks.push(SampleBank {
-                name,
-                files: files.iter().map(|p| p.to_string_lossy().into_owned()).collect(),
-            });
+            banks.push(ScannedBank { name, files });
         } else if entry.is_file() && is_audio(entry) {
             let raw = entry.file_stem().and_then(|n| n.to_str()).unwrap_or_default();
             let name = unique_name(sanitize_bank_name(raw), &mut used_names);
             if name.is_empty() {
                 continue;
             }
-            banks.push(SampleBank {
+            banks.push(ScannedBank {
                 name,
-                files: vec![entry.to_string_lossy().into_owned()],
+                files: vec![entry.clone()],
             });
         }
     }
 
     banks.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(banks)
+}
+
+/// Scan a folder into sample banks using the Strudel convention:
+/// each immediate subfolder is a bank (its audio files become indices 0,1,2…
+/// in alphabetical order); each loose audio file at the root is a one-shot
+/// bank named after the file stem.
+#[tauri::command]
+pub fn scan_sample_folder(path: String) -> Result<SampleFolder, String> {
+    let root = PathBuf::from(&path);
+    let banks = scan_folder_banks(&root)?
+        .into_iter()
+        .map(|b| SampleBank {
+            name: b.name,
+            files: b
+                .files
+                .iter()
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect(),
+        })
+        .collect();
     Ok(SampleFolder { root: path, banks })
 }
 

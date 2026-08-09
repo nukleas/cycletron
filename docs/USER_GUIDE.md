@@ -113,7 +113,8 @@ A default drum kit and a few texture banks ship with the app. For more:
 | Action | Where |
 |--------|--------|
 | Load a folder for this session | Command palette → **Load Sample Folder…** |
-| Installable packs (persist across launches) | Command palette → **Sample Packs…** |
+| Install a folder as a lasting pack | Command palette → **Install Sample Pack…** |
+| Manage / enable packs | Command palette → **Sample Packs…** |
 
 Packs live under `{library}/Packs/`. Format: [SAMPLE_PACKS.md](./SAMPLE_PACKS.md).
 

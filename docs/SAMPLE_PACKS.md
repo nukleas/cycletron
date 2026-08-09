@@ -83,15 +83,27 @@ same name is skipped. Prefer distinct names for expansion packs
 | `load_enabled_packs` | Startup batch |
 | `packs_dir` | Absolute Packs path |
 
-## Not in v1
+## Install from folder
 
-- Install-from-folder wizard (use a hand-built pack layout for now)
+Palette → **Install Sample Pack…** (or Sample Packs → **Install from Folder…**).
+
+Picks a Strudel-style folder (subfolder = bank, or loose audio at root), copies
+it into `Packs/<id>/`, writes `pack.json` + `LICENSE` (`LicenseRef-UserProvided`),
+and enables the pack.
+
+- Pack id defaults from the folder name (`Dirt-Samples` → `dirt-samples`)
+- Core bank name collisions are renamed: `bd` → `bd_dirt_samples`
+- Caps: 8000 files, 768 MB (thin large libraries first)
+- Source path is recorded in `pack.json` for provenance; audio is **copied**, not linked
+
+## Not yet
+
 - Remote download
 - Agent `list_packs` / `enable_pack` tools
 - Pitched multisample metadata
 
-## Example: enable a hand-built pack
+## Example: hand-built pack
 
 1. Create `{library}/Packs/my-pack/` with `pack.json`, `LICENSE`, and wavs.
 2. Palette → Sample Packs… → enable **my-pack**.
-3. Play: `s("my_bank my_bank:1")` (use the bank names from the pack).
+3. Play: `s("my_bank my_bank:1")`.

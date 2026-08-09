@@ -193,6 +193,7 @@ const COMMANDS: Item[] = [
     {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => { void midiLab.openEmpty(); }},
     {id: 'cmd.load_samples',title: 'Load Sample Folder…',   section: 'Commands',                 run: () => { void window.strudelApp?.loadSampleFolder?.(); }},
     {id: 'cmd.sample_packs',title: 'Sample Packs…',         section: 'Commands',                 run: () => { void packsModal.open(); }},
+    {id: 'cmd.install_pack',title: 'Install Sample Pack…',  section: 'Commands',                 run: () => { void packsModal.installFromFolder(); }},
     {id: 'cmd.preferences', title: 'Preferences…',          section: 'Commands', hint: '⌘,',     run: () => { void preferencesModal.open(); }},
     {id: 'cmd.examples',    title: 'Browse Examples…',      section: 'Commands',                 run: () => { document.getElementById('browseExamples')?.click(); }},
     {id: 'cmd.help_guide',  title: 'User Guide…',           section: 'Commands',                 run: () => { helpModal.open('guide'); }},

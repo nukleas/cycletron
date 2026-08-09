@@ -42,6 +42,9 @@ export class PacksModal {
         document.getElementById('packsReload')?.addEventListener('click', () => {
             void this.reloadEnabled();
         });
+        document.getElementById('packsInstall')?.addEventListener('click', () => {
+            void this.installFromFolder();
+        });
         this.inited = true;
     }
 
@@ -74,7 +77,7 @@ export class PacksModal {
                 this.listEl.innerHTML = '';
                 this.emptyEl.hidden = false;
                 this.emptyEl.textContent =
-                    'No packs installed. Put a pack folder under Packs/ in your library (see docs/SAMPLE_PACKS.md).';
+                    'No packs installed. Use Install from Folder… or place a pack under Packs/ (see docs/SAMPLE_PACKS.md).';
                 return;
             }
             this.emptyEl.hidden = true;
@@ -142,6 +145,54 @@ export class PacksModal {
             await invoke('reveal_in_os', {path: dir});
         } catch (e) {
             void notify('Could not open Packs folder', String(e));
+        }
+    }
+
+    /** Copy a Strudel-style sample folder into Packs/ and enable it. */
+    async installFromFolder(): Promise<void> {
+        this.init();
+        if (!isTauri) return;
+        try {
+            const {open} = await import('@tauri-apps/plugin-dialog');
+            const picked = await open({
+                directory: true,
+                multiple: false,
+                title: 'Choose a sample folder to install as a pack',
+            });
+            const dir = typeof picked === 'string' ? picked : null;
+            if (!dir) return;
+
+            void notify('Installing pack…', 'Copying samples into your library');
+            const result = await invoke<{
+                id: string;
+                name: string;
+                banks: string[];
+                renamed: Array<{from: string; to: string}>;
+                file_count: number;
+                load: {banks: Array<{name: string; files: string[]}>; skipped: string[]} | null;
+            }>('install_pack_from_folder', {
+                path: dir,
+                id: null,
+                name: null,
+                enable: true,
+            });
+
+            let loaded = 0;
+            if (result.load?.banks?.length) {
+                loaded = (await window.strudelApp?.loadPackBanks?.(result.load.banks)) ?? 0;
+            }
+
+            const renameNote = result.renamed?.length
+                ? ` Renamed ${result.renamed.length} bank(s) that collide with the core kit.`
+                : '';
+            void notify(
+                'Pack installed',
+                `${result.id}: ${result.file_count} files, ${result.banks.length} banks, ${loaded} loaded.${renameNote}`,
+            );
+            await this.refresh();
+            document.dispatchEvent(new CustomEvent('sounds:changed'));
+        } catch (e) {
+            void notify('Install failed', String(e));
         }
     }
 
