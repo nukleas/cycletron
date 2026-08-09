@@ -39,50 +39,98 @@ const WAF_BASE_URL = 'https://felixroos.github.io/webaudiofontdata/sound';
 const LOCAL_WAF_BASE = '/soundfonts';
 /** Bundled drum kit served same-origin from `ui/public/samples/` (offline). */
 const LOCAL_SAMPLES_BASE = '/samples/';
-/** Remote drum kit, used as a fallback when a sample isn't bundled. */
-const DIRT_SAMPLES_BASE = 'https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/';
-/** Bundled drum machine kits in `ui/public/machines/`. */
-const LOCAL_MACHINES_BASE = '/machines/';
+/**
+ * Michael Fischer's 1994 TR-808 sample set (CC0), the source of the bundled
+ * default kit — remote fallback if a file is somehow missing from the bundle.
+ */
+const FISCHER_808_BASE = 'https://raw.githubusercontent.com/tidalcycles/sounds-tr808-fischer/main/';
 
 /**
- * All bundled drum machine voices.
+ * Streamed drum machine kits live in the upstream tidal-drum-machines repo.
+ * That collection carries no license, so we never redistribute it — kits
+ * without a cleanly licensed replacement stream from here at runtime (as
+ * strudel.cc does) and are simply absent offline.
+ */
+const TDM_BASE = 'https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/';
+
+/**
+ * All drum machine voices, each mapped to the URL it loads from.
  * Naming: `{MachineName}_{voice}` — these are the canonical web-strudel names.
  * The engine supports `.bank()` prefix lookup, so `s("bd").bank("RolandTR808")`
  * resolves to `RolandTR808_bd`; the full underscore name works too. A voice the
  * kit lacks (e.g. LinnDrum has no `cr`) resolves to nothing and plays silent.
  *
- * Grouped as [machineName, displayName, voices[]].
+ * TR-808 (Michael Fischer's CC0 set), TR-707 (public-domain hyperreal set),
+ * and LinnDrum (BushDrum, CC0) are bundled in `ui/public/machines/`; TR-909
+ * and DR-55 have no cleanly licensed sample set, so they stream from upstream.
+ * See ATTRIBUTION.md. Grouped as [machineName, displayName, [voice, url][]].
  */
-export const BUNDLED_MACHINE_KITS: Array<[string, string, string[]]> = [
-    ['RolandTR808', 'TR-808',   ['bd','sd','hh','oh','cp','rim','lt','mt','ht','cb']],
-    ['RolandTR909', 'TR-909',   ['bd','sd','hh','oh','cp','rd','rim']],
-    ['RolandTR707', 'TR-707',   ['bd','sd','hh','oh','cp','lt','ht']],
-    ['LinnDrum',    'LinnDrum', ['bd','sd','hh','cp']],
-    ['BossDR55',    'DR-55',    ['bd','sd','hh','rim']],
+export const MACHINE_KITS: Array<[string, string, Array<[string, string]>]> = [
+    ['RolandTR808', 'TR-808', [
+        ['bd',  '/machines/RolandTR808_bd.wav'],
+        ['sd',  '/machines/RolandTR808_sd.wav'],
+        ['hh',  '/machines/RolandTR808_hh.wav'],
+        ['oh',  '/machines/RolandTR808_oh.wav'],
+        ['cp',  '/machines/RolandTR808_cp.wav'],
+        ['rim', '/machines/RolandTR808_rim.wav'],
+        ['lt',  '/machines/RolandTR808_lt.wav'],
+        ['mt',  '/machines/RolandTR808_mt.wav'],
+        ['ht',  '/machines/RolandTR808_ht.wav'],
+        ['cb',  '/machines/RolandTR808_cb.wav'],
+    ]],
+    ['RolandTR909', 'TR-909', [
+        ['bd',  TDM_BASE + 'RolandTR909/rolandtr909-bd/Bassdrum-01.wav'],
+        ['sd',  TDM_BASE + 'RolandTR909/rolandtr909-sd/naredrum.wav'],
+        ['hh',  TDM_BASE + 'RolandTR909/rolandtr909-hh/hh01.wav'],
+        ['oh',  TDM_BASE + 'RolandTR909/rolandtr909-oh/Hat%20Open.wav'],
+        ['cp',  TDM_BASE + 'RolandTR909/rolandtr909-cp/Clap.wav'],
+        ['rd',  TDM_BASE + 'RolandTR909/rolandtr909-rd/Ride.wav'],
+        ['rim', TDM_BASE + 'RolandTR909/rolandtr909-rim/Rimhot.wav'],
+    ]],
+    ['RolandTR707', 'TR-707', [
+        ['bd',  '/machines/RolandTR707_bd.wav'],
+        ['sd',  '/machines/RolandTR707_sd.wav'],
+        ['hh',  '/machines/RolandTR707_hh.wav'],
+        ['oh',  '/machines/RolandTR707_oh.wav'],
+        ['cp',  '/machines/RolandTR707_cp.wav'],
+        ['lt',  '/machines/RolandTR707_lt.wav'],
+        ['ht',  '/machines/RolandTR707_ht.wav'],
+    ]],
+    ['LinnDrum', 'LinnDrum', [
+        ['bd',  '/machines/LinnDrum_bd.wav'],
+        ['sd',  '/machines/LinnDrum_sd.wav'],
+        ['hh',  '/machines/LinnDrum_hh.wav'],
+        ['cp',  '/machines/LinnDrum_cp.wav'],
+    ]],
+    ['BossDR55', 'DR-55', [
+        ['bd',  TDM_BASE + 'BossDR55/bossdr55-bd/Bassdrum-01.wav'],
+        ['sd',  TDM_BASE + 'BossDR55/bossdr55-sd/Snaredrum-01.wav'],
+        ['hh',  TDM_BASE + 'BossDR55/bossdr55-hh/Hihat1.wav'],
+        ['rim', TDM_BASE + 'BossDR55/bossdr55-rim/Rimshot.wav'],
+    ]],
 ];
 
 /**
- * Percussion & texture "color" banks — a curated slice of Dirt-Samples bundled
- * in `ui/public/samples/` (offline-first, Dirt CDN fallback). These break the
- * agent out of the 12-drum default kit: instead of reaching for `rs(3,16).hpf()`
- * as the only dry/metallic percussion, it gets real perc, industrial, hand, and
- * ethnic voices plus a bass, a pluck, an atmosphere, and a breakbeat. One
- * representative sample per bank (index 0); use `s("perc:2")` for variety once
- * more indices are bundled. Each entry is [bankName, relativePath].
+ * Percussion & texture "color" banks — CC0 recordings from the Versilian
+ * Community Sample Library (VCSL, https://github.com/sgossner/VCSL) bundled in
+ * `ui/public/samples/` (see ATTRIBUTION.md for the per-bank source mapping).
+ * These break the agent out of the 12-drum default kit: instead of reaching
+ * for `rs(3,16).hpf()` as the only dry/metallic percussion, it gets real perc,
+ * industrial, hand, and ethnic voices plus a bass, a pluck, and an atmosphere.
+ * One representative sample per bank (index 0); use `s("perc:2")` for variety
+ * once more indices are bundled. Each entry is [bankName, relativePath].
  */
 export const PERCUSSION_COLORS: Array<[string, string]> = [
-    ['perc',       'perc/000_perc0.wav'],
-    ['click',      'click/000_click0.wav'],
-    ['metal',      'metal/000_0.wav'],
-    ['east',       'east/000_nipon_wood_block.wav'],
-    ['hand',       'hand/hand1-mono.wav'],
-    ['industrial', 'industrial/000_01.wav'],
-    ['space',      'space/000_0.wav'],
-    ['arpy',       'arpy/arpy01.wav'],
-    ['tabla',      'tabla/000_bass_flick1.wav'],
-    ['jvbass',     'jvbass/000_01.wav'],
-    ['amencutup',  'amencutup/000_AMENCUT_001.wav'],
-    ['breaks165',  'breaks165/000_RAWCLN.WAV'],
+    ['perc',       'perc/Cajon_hit1_f_rr1.wav'],
+    ['click',      'click/claves_mf.wav'],
+    ['metal',      'metal/Anvil_Hit1_v1_rr1_Mid.wav'],
+    ['east',       'east/wood_click_ff.wav'],
+    ['hand',       'hand/Conga_HitN_v1_rr1_Sum.wav'],
+    ['industrial', 'industrial/BrakeDrum1_Hammer_v1_rr1_Mid.wav'],
+    ['space',      'space/glass3_Asharp4_Fast_1_Main.wav'],
+    ['arpy',       'arpy/Clavisynth_C4_vl2.wav'],
+    ['tabla',      'tabla/Darbuka_1_hit_vl2_rr1.wav'],
+    ['jvbass',     'jvbass/FMPiano_C1_vl3.wav'],
 ];
 
 /**
@@ -243,26 +291,28 @@ export class SampleLoader {
     }
 
     async loadEssentialDrums(): Promise<number> {
-        // Bundled in ui/public/samples/ (offline); falls back to Dirt-Samples
-        // over the network if a file is somehow missing from the bundle.
-        const subs: Array<{ name: string; sub: string }> = [
-            {name: 'bd', sub: 'bd/BT0A0A7.wav'},
-            {name: 'sd', sub: 'sd/rytm-00-hard.wav'},
-            {name: 'sn', sub: 'sn/ST0T0S0.wav'},
-            {name: 'hh', sub: 'hh/000_hh3closedhh.wav'},
-            {name: 'cp', sub: 'cp/HANDCLP0.wav'},
-            {name: 'oh', sub: '808oh/OH00.WAV'},
-            {name: 'ht', sub: 'ht/HT0D0.wav'},
-            {name: 'mt', sub: 'mt/MT0D0.wav'},
-            {name: 'lt', sub: 'lt/LT0D0.wav'},
-            {name: 'cr', sub: 'cr/RIDED0.wav'},
-            {name: 'cb', sub: 'cb/rytm-cb.wav'},
-            {name: 'rs', sub: 'rs/rytm-rs.wav'},
+        // The default 12-voice kit is Michael Fischer's 1994 TR-808 set (CC0),
+        // bundled in ui/public/samples/ (offline); falls back to the upstream
+        // repo if a file is somehow missing from the bundle. `sub` is the
+        // bundled path, `src` the path inside the Fischer repo.
+        const subs: Array<{ name: string; sub: string; src: string }> = [
+            {name: 'bd', sub: 'bd/BD0050.WAV', src: 'bd8/BD0050.WAV'},
+            {name: 'sd', sub: 'sd/SD5050.WAV', src: 'sd8/SD5050.WAV'},
+            {name: 'sn', sub: 'sn/SD0075.WAV', src: 'sd8/SD0075.WAV'},
+            {name: 'hh', sub: 'hh/CH.WAV',     src: 'ch8/CH.WAV'},
+            {name: 'cp', sub: 'cp/CP.WAV',     src: 'cp8/CP.WAV'},
+            {name: 'oh', sub: 'oh/OH00.WAV',   src: 'oh8/OH00.WAV'},
+            {name: 'ht', sub: 'ht/HT50.WAV',   src: 'ht8/HT50.WAV'},
+            {name: 'mt', sub: 'mt/MT50.WAV',   src: 'mt8/MT50.WAV'},
+            {name: 'lt', sub: 'lt/LT50.WAV',   src: 'lt8/LT50.WAV'},
+            {name: 'cr', sub: 'cr/CY0050.WAV', src: 'cy8/CY0050.WAV'},
+            {name: 'cb', sub: 'cb/CB.WAV',     src: 'cb8/CB.WAV'},
+            {name: 'rs', sub: 'rs/RS.WAV',     src: 'rs8/RS.WAV'},
         ];
-        const essentials = subs.map(({name, sub}) => ({
+        const essentials = subs.map(({name, sub, src}) => ({
             name,
             url: LOCAL_SAMPLES_BASE + sub,
-            fallback: DIRT_SAMPLES_BASE + sub,
+            fallback: FISCHER_808_BASE + src,
         }));
 
         const result = await this._loadKitBatch(essentials, 'Essential Drums');
@@ -271,23 +321,23 @@ export class SampleLoader {
 
     /**
      * Load the bundled percussion & texture color pack ([`PERCUSSION_COLORS`])
-     * from `ui/public/samples/` (offline-first, Dirt CDN fallback). Returns the
-     * bank names that loaded, so the caller can register them with the backend
-     * (`register_sound_banks`) — that's how the agent's `list_sounds` learns they
-     * exist and stops defaulting to a lone rimshot for every percussion part.
+     * from `ui/public/samples/`. Returns the bank names that loaded, so the
+     * caller can register them with the backend (`register_sound_banks`) —
+     * that's how the agent's `list_sounds` learns they exist and stops
+     * defaulting to a lone rimshot for every percussion part.
      */
     async loadPercussionColors(): Promise<string[]> {
         const samples = PERCUSSION_COLORS.map(([name, sub]) => ({
             name,
             url: LOCAL_SAMPLES_BASE + sub,
-            fallback: DIRT_SAMPLES_BASE + sub,
         }));
         const {names} = await this._loadKitBatch(samples, 'Percussion Colors');
         return names;
     }
 
     /**
-     * Load all bundled drum machine kits from `ui/public/machines/` (offline-first).
+     * Load all drum machine kits ([`MACHINE_KITS`]) — bundled kits from
+     * `ui/public/machines/`, unlicensed-upstream kits streamed at runtime.
      * Each voice is registered under `{MachineName}_{voice}`, e.g. `RolandTR808_bd`.
      * Use either the full name `s("RolandTR808_bd")` or the `.bank()` form
      * `s("bd").bank("RolandTR808")` — the engine resolves both to the same sample.
@@ -295,42 +345,15 @@ export class SampleLoader {
      */
     async loadMachineKits(): Promise<number> {
         let total = 0;
-        for (const [machine, displayName, voices] of BUNDLED_MACHINE_KITS) {
-            const samples = voices.map(v => ({
+        for (const [machine, displayName, voices] of MACHINE_KITS) {
+            const samples = voices.map(([v, url]) => ({
                 name: `${machine}_${v}`,
-                url:  `${LOCAL_MACHINES_BASE}${machine}_${v}.wav`,
+                url,
             }));
             const {loaded} = await this._loadKitBatch(samples, displayName);
             total += loaded;
         }
         return total;
-    }
-
-    async loadTR808(): Promise<LoadKitResult> {
-        const base = 'https://raw.githubusercontent.com/ritchse/tidal-drum-machines/main/machines/RolandTR808/';
-        const samples = [
-            {name: 'bd', url: base + 'roland808-bd/BD.wav'},
-            {name: 'sd', url: base + 'roland808-sd/SD0010.wav'},
-            {name: 'hh', url: base + 'roland808-hh/CH.wav'},
-            {name: 'oh', url: base + 'roland808-oh/OH00.wav'},
-            {name: 'cp', url: base + 'roland808-cp/CP.wav'},
-            {name: 'cb', url: base + 'roland808-cb/CB.wav'},
-            {name: 'rs', url: base + 'roland808-rim/RS.wav'},
-        ];
-        return this._loadKitBatch(samples, 'TR-808');
-    }
-
-    async loadTR909(): Promise<LoadKitResult> {
-        const base = 'https://raw.githubusercontent.com/ritchse/tidal-drum-machines/main/machines/RolandTR909/';
-        const samples = [
-            {name: 'bd', url: base + 'roland909-bd/BT3A0A7.wav'},
-            {name: 'sd', url: base + 'roland909-sd/ST0T0S3.wav'},
-            {name: 'hh', url: base + 'roland909-hh/HHCD4.wav'},
-            {name: 'oh', url: base + 'roland909-oh/OHHD0.wav'},
-            {name: 'cp', url: base + 'roland909-cp/HANDCLP1.wav'},
-            {name: 'rd', url: base + 'roland909-rd/RD0010.wav'},
-        ];
-        return this._loadKitBatch(samples, 'TR-909');
     }
 
     /**

@@ -67,7 +67,14 @@ cd ui && npm run build:wasm   # rebuild strudel-audio-wasm → ui/pkg, then comm
 
 ## License
 
-**AGPL-3.0-or-later** — see [`LICENSE`](LICENSE) and workspace `Cargo.toml`.
+**AGPL-3.0-or-later** — see [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), and workspace `Cargo.toml`.
+
+Cycletron builds on and adapts **Strudel** ([codeberg.org/uzu/strudel](https://codeberg.org/uzu/strudel))
+and **strudel-rs** ([codeberg.org/nukleas/strudel-rs](https://codeberg.org/nukleas/strudel-rs)),
+both AGPL-3.0-or-later — see [`NOTICE`](NOTICE). The prebuilt engine WASM in `ui/pkg/`
+is an AGPL binary; its corresponding source (AGPL §6) is strudel-rs at the `rev`
+pinned in the workspace `Cargo.toml`. Bundled third-party audio (samples,
+drum machines, soundfonts) is credited in [`ATTRIBUTION.md`](ATTRIBUTION.md).
 
 ## Privacy
 

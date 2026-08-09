@@ -344,7 +344,6 @@ Percussion & texture colors (bundled offline — real voices beyond the default 
   perc, click, metal, east, hand, industrial  — dry / clicky / metallic hits
   space, arpy                                  — atmosphere pad, plucked tone
   tabla, jvbass                                — hand drum, sampled bass
-  amencutup, breaks165                         — breakbeat chops (jungle/DnB/breakcore)
   Use s("perc:2") to pick a variant. IMPORTANT for percussion variety: do NOT
   default to a high-passed rimshot (`rs(3,16).hpf(...)`) for every "metallic" or
   "industrial" part — it reads as a typewriter tapping. Reach for `industrial`,

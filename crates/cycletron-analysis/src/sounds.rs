@@ -23,7 +23,7 @@ pub const DEFAULT_DRUMS: &[&str] = &[
     "bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs",
 ];
 
-/// Percussion & texture "color" banks — a curated Dirt-Samples slice bundled in
+/// Percussion & texture "color" banks — CC0 recordings (VCSL) bundled in
 /// `ui/public/samples/` and loaded in the background at startup (see
 /// `PERCUSSION_COLORS` in `ui/sample-loader.ts`, which must stay in sync). These
 /// exist so the agent has real percussion/texture voices beyond the 12 default
@@ -31,7 +31,7 @@ pub const DEFAULT_DRUMS: &[&str] = &[
 /// One representative sample per bank (index 0); `s("perc:2")` selects variants.
 pub const PERCUSSION: &[&str] = &[
     "perc", "click", "metal", "east", "hand", "industrial",
-    "space", "arpy", "tabla", "jvbass", "amencutup", "breaks165",
+    "space", "arpy", "tabla", "jvbass",
 ];
 
 /// Single source of truth for how `.bank()` behaves, surfaced to the agent via

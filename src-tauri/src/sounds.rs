@@ -233,7 +233,7 @@ pub fn sound_catalog(state: &AppState) -> serde_json::Value {
         "wavetables": WAVETABLES,
         "drums": DEFAULT_DRUMS,
         "percussion": PERCUSSION,
-        "percussion_note": "Percussion & texture color banks (perc/click/metal/east/hand/industrial for dry & metallic hits; space/arpy atmosphere & pluck; tabla/jvbass tonal; amencutup/breaks165 breakbeats). Prefer these over stacking hpf'd rimshots. Use s(\"perc:2\") for variants.",
+        "percussion_note": "Percussion & texture color banks (perc/click/metal/east/hand/industrial for dry & metallic hits; space/arpy atmosphere & pluck; tabla/jvbass tonal). Prefer these over stacking hpf'd rimshots. Use s(\"perc:2\") for variants.",
         "drum_machines": machines,
         "drum_machine_note": DRUM_MACHINE_NOTE,
         "gm_instruments": GM_INSTRUMENTS,

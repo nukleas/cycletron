@@ -1,0 +1,34 @@
+Cycletron
+Copyright (C) 2026 NaderLabs and Cycletron contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. See the LICENSE file for the full text.
+
+------------------------------------------------------------------------------
+Derivation & upstream credits
+------------------------------------------------------------------------------
+
+Cycletron is built on, and derived from, the Strudel live-coding ecosystem:
+
+- Strudel — the pattern language and web live-coding environment.
+  Copyright (C) Strudel contributors. Licensed under AGPL-3.0-or-later.
+  https://strudel.cc  ·  https://codeberg.org/uzu/strudel
+  Cycletron's frontend (the WASM REPL: editor, scheduler, audio-manager,
+  worklet, visualizer) is adapted from Strudel / strudel-rs and its
+  mini-notation dialect is Strudel-compatible. Cycletron is not affiliated
+  with or endorsed by strudel.cc.
+
+- strudel-rs — the Rust port of the Strudel engine that powers Cycletron's
+  audio (embedded as a pinned git dependency and as the prebuilt WASM in
+  `ui/pkg/`). Copyright (C) strudel-rs contributors. Licensed under
+  AGPL-3.0-or-later.
+  https://codeberg.org/nukleas/strudel-rs
+
+Corresponding source (AGPL §6) for the prebuilt engine binary in `ui/pkg/`
+is the strudel-rs tree at the exact revision pinned in the workspace
+`Cargo.toml` (`strudel-*` / `midi-to-strudel` git `rev`).
+
+Bundled third-party audio assets (samples, drum machines, soundfonts) and
+their licenses are credited in ATTRIBUTION.md.
