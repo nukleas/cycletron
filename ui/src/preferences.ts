@@ -34,6 +34,7 @@ export class PreferencesModal {
     private cleanup: (() => void) | null = null;
 
     // Form refs
+    private aiConsent: HTMLInputElement | null = null;
     private provider: HTMLSelectElement | null = null;
     private apiKey: HTMLInputElement | null = null;
     private keyStatus: HTMLElement | null = null;
@@ -69,6 +70,7 @@ export class PreferencesModal {
         this.root = document.getElementById('prefsModal');
         if (!this.root) return;
 
+        this.aiConsent = document.getElementById('prefsAiConsent') as HTMLInputElement;
         this.provider = document.getElementById('prefsProvider') as HTMLSelectElement;
         this.apiKey = document.getElementById('prefsApiKey') as HTMLInputElement;
         this.keyStatus = document.getElementById('prefsKeyStatus');
@@ -137,6 +139,7 @@ export class PreferencesModal {
                 invoke<string>('get_library_root').catch(() => ''),
             ]);
             this.loaded = settings;
+            if (this.aiConsent) this.aiConsent.checked = !!settings.ai_consent;
             // AI: seed the in-memory provider map, select the active provider,
             // and paint its fields. Keys are write-only (secrets store),
             // so the key input starts empty and a status line reports whether one
@@ -515,6 +518,7 @@ export class PreferencesModal {
                 pad_assignments: midiPads.getAssignments(),
             },
             first_run_done: firstRunDone,
+            ai_consent: this.aiConsent ? !!this.aiConsent.checked : (this.loaded?.ai_consent ?? false),
         };
     }
 
@@ -674,6 +678,8 @@ export class PreferencesModal {
             }
             await invoke<void>('set_user_settings', {settings: next});
             await this.refreshKeyStatus(this.currentProviderId);
+            // Let the AI panel wire/unwire itself to match the consent flag.
+            document.dispatchEvent(new CustomEvent('ai-consent:changed'));
             this.flash('Saved');
             // Reflect immediate-effect prefs in the running UI without a reload.
             const tempo = parseFloat(this.defaultTempo?.value ?? '');

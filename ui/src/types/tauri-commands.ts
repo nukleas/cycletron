@@ -190,6 +190,8 @@ export interface UserSettings {
     editor: EditorSettings;
     midi_input: MidiInputSettings;
     first_run_done: boolean;
+    /** User has explicitly turned the AI assistant on. Off by default. */
+    ai_consent: boolean;
 }
 
 /// Mirror of `commands::ImportMidiOptions`. Keys are camelCase to match the

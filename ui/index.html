@@ -81,6 +81,11 @@
                     <button id="aiToggle" class="ai-toggle" title="Toggle AI panel">&#9664;</button>
                 </div>
             </div>
+            <div id="aiEnableCta" class="ai-enable-cta">
+                <p class="ai-enable-lead">AI assistant</p>
+                <p class="ai-enable-sub">Optional. Off until you say so.</p>
+                <button id="aiEnable" class="ai-enable-btn" type="button">Enable AI…</button>
+            </div>
             <div id="aiMessages" class="ai-messages"></div>
             <div id="aiQuickPrompts" class="ai-quick-prompts">
                 <button class="ai-quick" data-prompt="add a melody">+ melody</button>
@@ -323,23 +328,9 @@
                     </ul>
                 </div>
                 <div class="welcome-step" data-step="1" hidden>
-                    <h3>Choose your AI provider</h3>
-                    <p>Pick a model and paste its key to enable the AI composer. You can change this any time in Preferences.</p>
-                    <label class="welcome-field">
-                        <span>Provider</span>
-                        <select id="welcomeProvider">
-                            <option value="anthropic">Claude (Anthropic)</option>
-                            <option value="grok">Grok (xAI)</option>
-                            <option value="openai">OpenAI</option>
-                            <option value="local">Local (Ollama / LM Studio)</option>
-                            <option value="custom">Custom (OpenAI-compatible)</option>
-                        </select>
-                    </label>
-                    <label class="welcome-field">
-                        <span>API key</span>
-                        <input type="password" id="welcomeApiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
-                    </label>
-                    <p class="prefs-note" id="welcomeProviderNote">Stored locally by Cycletron (not in chat). Leave blank to use the provider env var instead.</p>
+                    <h3>The AI assistant is optional</h3>
+                    <p>Cycletron runs fully by hand — editor, samples, MIDI, the whole engine. The AI composer is there if you want it, and it stays <strong>off</strong> until you turn it on.</p>
+                    <p>When you're ready, hit <strong>Enable AI…</strong> in the AI panel and pick a provider. It's your call, any time.</p>
                 </div>
                 <div class="welcome-step" data-step="2" hidden>
                     <h3>Library location</h3>
@@ -360,6 +351,27 @@
                 <span class="app-modal-spacer"></span>
                 <button id="welcomeBack">Back</button>
                 <button id="welcomeNext" class="app-modal-primary">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI consent — opt-in, off by default. Nothing AI runs until Enable. -->
+    <div id="aiConsentModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="aiConsentTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window app-modal-window--small" role="document">
+            <div class="app-modal-header">
+                <span id="aiConsentTitle">Turn on the AI assistant?</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="ai-consent-body">
+                <p>Cycletron includes an AI assistant that can write, edit, and arrange patterns with you. It's yours to switch on — or leave off.</p>
+                <p>Turning it on sends your prompts and the code in your editor to your chosen model provider. Your call.</p>
+                <p class="ai-consent-fine">You can run Cycletron fully by hand. You'll just be leaving some of its range on the table.</p>
+            </div>
+            <div class="app-modal-actions">
+                <button data-dismiss>Not now</button>
+                <span class="app-modal-spacer"></span>
+                <button id="aiConsentEnable" class="app-modal-primary">Enable AI — I'm in</button>
             </div>
         </div>
     </div>
@@ -499,6 +511,11 @@
             <div class="prefs-body">
                 <section class="prefs-section">
                     <h4>AI</h4>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsAiConsent">
+                        <span>Enable AI features</span>
+                    </label>
+                    <p class="prefs-note">Off by default. When on, your prompts and editor code go to the provider you pick below. Turn it off any time to keep Cycletron fully offline.</p>
                     <label class="prefs-field">
                         <span>Provider</span>
                         <select id="prefsProvider">

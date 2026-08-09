@@ -2283,6 +2283,58 @@ body.is-drop-target::after {
  * View menu (Cmd+Shift+A) or the Command Palette ("Toggle AI Panel"). */
 .ai-panel.collapsed { display: none; }
 
+/* Consent gate: AI is off by default. Hide the chat surface and show a single
+ * Enable call-to-action until the user opts in (see ai-consent.ts). */
+.ai-enable-cta { display: none; }
+.ai-panel.ai-off .ai-messages,
+.ai-panel.ai-off .ai-quick-prompts,
+.ai-panel.ai-off .ai-form,
+.ai-panel.ai-off #aiClear { display: none; }
+.ai-panel.ai-off .ai-enable-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex: 1;
+    padding: 24px 18px;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+}
+.ai-enable-lead {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ai-neon);
+    text-shadow: var(--text-glitch);
+}
+.ai-enable-sub {
+    margin: 0;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.ai-enable-btn {
+    margin-top: 6px;
+    padding: 8px 16px;
+    border: 1px solid var(--ai-neon);
+    background: transparent;
+    color: var(--ai-neon);
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    text-shadow: var(--text-glitch);
+}
+.ai-enable-btn:hover { background: var(--ai-neon-subtle); }
+
+/* AI consent modal body */
+.ai-consent-body { padding: 16px 20px; line-height: 1.5; }
+.ai-consent-body p { margin: 0 0 12px; }
+.ai-consent-fine { font-size: 12px; color: var(--text-dim); }
+
 /* Header */
 .ai-panel-header {
     padding: 0 10px;

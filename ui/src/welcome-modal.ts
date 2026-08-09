@@ -1,14 +1,14 @@
 /**
  * First-run onboarding. Loaded on every boot, but only opens itself when
- * `userSettings.first_run_done` is false. Walks the user through four
- * cards (intro shortcuts, API key, library root, success) and marks the
- * flag on Finish or any explicit dismiss.
+ * `userSettings.first_run_done` is false. Walks the user through four cards
+ * (intro shortcuts, AI-is-optional note, library root, success) and marks the
+ * flag on Finish or any explicit dismiss. AI stays off — turning it on lives
+ * solely in the AI panel's Enable dialog, not here.
  */
 
 import {invoke} from './tauri.js';
 import {dismissibleModal} from './modal-utils.js';
 import type {UserSettings} from './types/tauri-commands.js';
-import {presetById, normalizeLlm} from './providers.js';
 
 const isTauri = !!(window as any).__TAURI__;
 const STEP_COUNT = 4;
@@ -19,9 +19,6 @@ class WelcomeModal {
     private back: HTMLButtonElement | null = null;
     private next: HTMLButtonElement | null = null;
     private label: HTMLElement | null = null;
-    private providerSelect: HTMLSelectElement | null = null;
-    private providerNote: HTMLElement | null = null;
-    private apiKeyInput: HTMLInputElement | null = null;
     private libraryRoot: HTMLElement | null = null;
     private cleanup: (() => void) | null = null;
     private idx = 0;
@@ -34,27 +31,11 @@ class WelcomeModal {
         this.back = document.getElementById('welcomeBack') as HTMLButtonElement | null;
         this.next = document.getElementById('welcomeNext') as HTMLButtonElement | null;
         this.label = document.getElementById('welcomeStepLabel');
-        this.providerSelect = document.getElementById('welcomeProvider') as HTMLSelectElement | null;
-        this.providerNote = document.getElementById('welcomeProviderNote');
-        this.apiKeyInput = document.getElementById('welcomeApiKey') as HTMLInputElement | null;
         this.libraryRoot = document.getElementById('welcomeLibraryRoot');
 
         this.back?.addEventListener('click', () => this.go(-1));
         this.next?.addEventListener('click', () => void this.advance());
-        this.providerSelect?.addEventListener('change', () => this.updateProviderUi());
         document.getElementById('welcomeChangeLibrary')?.addEventListener('click', () => void this.changeLibrary());
-        this.updateProviderUi();
-    }
-
-    /** Reflect the selected provider's key placeholder + hint. */
-    private updateProviderUi(): void {
-        const preset = presetById(this.providerSelect?.value ?? 'anthropic');
-        if (this.apiKeyInput) this.apiKeyInput.placeholder = preset?.keyPlaceholder ?? 'API key';
-        if (this.providerNote) {
-            const extra = preset?.note ? ` ${preset.note}` : '';
-            this.providerNote.textContent =
-                `Stored locally by Cycletron (not in chat). Leave blank to use the provider env var instead.${extra}`;
-        }
     }
 
     /** Show the modal if this is a first run. Resolves either way. */
@@ -107,22 +88,11 @@ class WelcomeModal {
         this.renderStep();
     }
 
-    private async finish(dismissed: boolean): Promise<void> {
-        const provider = this.providerSelect?.value || 'anthropic';
-        const apiKey = this.apiKeyInput?.value.trim() || '';
+    private async finish(_dismissed: boolean): Promise<void> {
         if (this.settings && isTauri) {
             try {
-                // Key goes to secrets store (dev file / release keychain), not settings.json.
-                if (apiKey.length > 0) {
-                    await invoke<void>('set_provider_key', {provider, key: apiKey});
-                }
-                const llm = normalizeLlm(this.settings.llm);
-                llm.active = provider;
-                const next: UserSettings = {
-                    ...this.settings,
-                    llm,
-                    first_run_done: true,
-                };
+                // Onboarding never turns AI on — only records that it was seen.
+                const next: UserSettings = {...this.settings, first_run_done: true};
                 await invoke<void>('set_user_settings', {settings: next});
                 this.settings = next;
             } catch (e) {
@@ -130,10 +100,6 @@ class WelcomeModal {
             }
         }
         this.close();
-        if (!dismissed) {
-            // Subtle nudge: focus the AI input so the user has somewhere to go.
-            (document.getElementById('aiInput') as HTMLInputElement | null)?.focus();
-        }
     }
 
     private close(): void {

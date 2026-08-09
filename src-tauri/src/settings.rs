@@ -40,6 +40,11 @@ pub struct UserSettings {
     /// fresh install sees the onboarding flow.
     #[serde(default)]
     pub first_run_done: bool,
+    /// The user has explicitly turned the AI assistant on. Defaults to false:
+    /// AI stays fully inert (no client built, no request sent) until the user
+    /// opts in via the AI panel's consent dialog. See `build_agent_client`.
+    #[serde(default)]
+    pub ai_consent: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -283,6 +283,11 @@ impl AppState {
     fn build_agent_client(&self) -> Option<Arc<dyn LlmProvider>> {
         let (active, profile) = {
             let us = self.user_settings.lock().unwrap();
+            // AI is opt-in: without explicit consent the client is never built,
+            // so no provider is contacted regardless of configured keys.
+            if !us.ai_consent {
+                return None;
+            }
             (us.llm.active.clone(), us.llm.active_profile())
         };
         // Prefer a still-valid SuperGrok OAuth access token for Grok; fall

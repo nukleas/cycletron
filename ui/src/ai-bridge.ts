@@ -12,18 +12,52 @@ import {notify} from './notifications.js';
 import {addTask, removeTask} from './dock-badge.js';
 import {renderMarkdownToHtml, enhanceCodeBlocks} from './markdown.js';
 import {openExternal} from './external-link.js';
+import {aiConsent} from './ai-consent.js';
+import {invoke as ipc} from './tauri.js';
+import type {UserSettings} from './types/tauri-commands.js';
 
 const isTauri = !!(window as any).__TAURI__;
+
+// The chat UI + agent-event stream are wired at most once, and only after the
+// user consents. Toggling AI back off later leaves the (harmless, Rust-gated)
+// listeners in place and simply hides the chat behind the Enable CTA.
+let chatWired = false;
 
 // --- Main Init ---
 
 async function initAiBridge() {
+    const panel = document.getElementById('aiPanel');
     if (!isTauri) {
         console.log('[ai-bridge] Not running in Tauri — AI features disabled');
-        document.getElementById('aiPanel')?.classList.add('collapsed');
+        panel?.classList.add('collapsed');
         return;
     }
+    aiConsent.init();
+    document.getElementById('aiEnable')?.addEventListener('click', () => aiConsent.open());
+    document.addEventListener('ai-consent:changed', () => void applyConsent());
+    await applyConsent();
+}
 
+/** Read consent and reflect it: show the Enable CTA, or wire the chat once. */
+async function applyConsent() {
+    const panel = document.getElementById('aiPanel');
+    if (!panel) return;
+    let consent = false;
+    try {
+        const s = await ipc<UserSettings>('get_user_settings');
+        consent = !!s.ai_consent;
+    } catch {
+        /* default off */
+    }
+    panel.classList.toggle('ai-off', !consent);
+    if (consent && !chatWired) {
+        chatWired = true;
+        await wireAiChat();
+    }
+}
+
+/** Wire the chat form, quick prompts, and agent-event stream. Runs once. */
+async function wireAiChat() {
     const { invoke } = (window as any).__TAURI__.core;
     const { listen } = (window as any).__TAURI__.event;
 

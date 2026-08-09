@@ -44,7 +44,7 @@ pub async fn send_message(
     let client = match state.agent_client.lock().unwrap().clone() {
         Some(c) => c,
         None => {
-            let msg = "AI not configured. Open Preferences → AI to pick a provider, sign in with SuperGrok, or add an API key.";
+            let msg = "AI is off. Turn it on with “Enable AI” in the AI panel, then pick a provider in Preferences → AI (or sign in with SuperGrok / add an API key).";
             let mut session = state.session.lock().unwrap();
             session.add_assistant_message(msg.to_string());
             return Ok(msg.to_string());
