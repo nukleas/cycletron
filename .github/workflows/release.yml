@@ -23,6 +23,12 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  # The strudel-rs engine is a Codeberg git dependency; libgit2's SSL stack
+  # flakes fetching it on CI runners ("SSL error: unknown error; class=Ssl").
+  # Shell out to the system git, which fetches reliably.
+  CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
+
 jobs:
   release:
     name: Build & release (${{ matrix.platform }})
