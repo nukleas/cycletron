@@ -3,10 +3,13 @@ name: Release
 # Cut a release by pushing a version tag, e.g.:
 #   git tag v0.1.0-alpha.1 && git push origin v0.1.0-alpha.1
 #
-# The build is signed (Tauri updater signature + Apple Developer ID /
-# notarization) and published as a DRAFT pre-release — nothing is public until
-# you review the draft in GitHub and hit Publish. `latest.json` (the updater
-# manifest) is generated and attached automatically.
+# Mirrors the opensauna signing convention (docs/RELEASE.md): the Developer ID
+# cert is an Environment secret in `release` (only v* tags may deploy to it), the
+# identity is auto-detected from the imported cert, and the DMG is notarized +
+# stapled separately (Tauri only does the .app). On top of that this also signs
+# the Tauri updater artifacts and publishes latest.json so auto-update works.
+#
+# Publishes a DRAFT pre-release — nothing is public until you review and Publish.
 
 on:
   push:
@@ -18,14 +21,26 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write # create the GitHub Release + upload assets
+  contents: write
 
 jobs:
   release-macos:
-    name: Build & sign (macOS universal)
-    runs-on: macos-14
+    name: Build, sign & notarize (macOS universal)
+    runs-on: macos-latest
+    # Holds APPLE_CERTIFICATE_BASE64; its deployment policy permits only v* tags,
+    # so the Developer ID key is unreachable from PRs, forks, or branch pushes.
+    environment: release
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set app version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Releasing version $VERSION"
+          # The updater compares against tauri.conf.json's version, so it must
+          # match the tag or installed apps won't see the update.
+          sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
+          grep -m1 '"version"' src-tauri/tauri.conf.json
 
       - name: Node 22
         uses: actions/setup-node@v4
@@ -42,22 +57,52 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Build, sign, notarize, and draft the release
+      # ── Apple Developer ID: import the cert into a temp keychain and
+      #    auto-detect the identity (don't trust a hand-set string). ──────────
+      - name: Import Apple Developer ID certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::error::APPLE_CERTIFICATE_BASE64 is not set — cannot sign/notarize the macOS release for $GITHUB_REF_NAME. See docs/RELEASE.md."
+            exit 1
+          fi
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PW="$APPLE_CERTIFICATE_PASSWORD"
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN_PATH"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          # Import the whole .p12 (cert + private key) so a Developer ID identity
+          # lands in the chain (do NOT use -t cert, which drops the key).
+          if ! security import "$RUNNER_TEMP/cert.p12" -P "$APPLE_CERTIFICATE_PASSWORD" \
+                 -A -f pkcs12 -k "$KEYCHAIN_PATH"; then
+            echo "::error::Could not import the .p12 — wrong APPLE_CERTIFICATE_PASSWORD, or not a valid PKCS#12 export."
+            exit 1
+          fi
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PW" "$KEYCHAIN_PATH" >/dev/null 2>&1 || true
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain
+          SIGN_ID=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | sed -n 's/.*"\(Developer ID Application:.*\)".*/\1/p' | head -1)
+          if [ -z "$SIGN_ID" ]; then
+            echo "::error::No 'Developer ID Application' identity in the .p12 — the export likely omitted the private key. In Keychain Access expand the cert, select BOTH the cert and its key, and 'Export 2 items' as .p12."
+            exit 1
+          fi
+          echo "Signing with: $SIGN_ID"
+          echo "APPLE_SIGNING_IDENTITY=$SIGN_ID" >> "$GITHUB_ENV"
+
+      - name: Build, sign (updater + Apple), notarize .app, draft release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Updater signature — required so installed apps accept the update.
-          # Generated locally with `cargo tauri signer generate`; pubkey lives in
-          # tauri.conf.json (plugins.updater.pubkey).
+          # Updater signature (installed apps verify this against pubkey in conf).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Apple Developer ID signing + notarization (Gatekeeper). If these
-          # secrets are absent the build still runs but ships unsigned.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # Apple: identity auto-detected above; the trio drives .app notarization.
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
@@ -67,3 +112,26 @@ jobs:
           prerelease: true
           includeUpdaterJson: true
           args: --target universal-apple-darwin
+
+      # Tauri notarizes the .app (used by the updater), but NOT the .dmg users
+      # download — so notarize + staple the DMG and replace it on the release.
+      - name: Notarize and staple the DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg 2>/dev/null | head -1)
+          if [ -z "$DMG" ]; then
+            echo "::error::No DMG produced to notarize."
+            exit 1
+          fi
+          echo "Notarizing $DMG"
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_PASSWORD" --wait
+          xcrun stapler staple "$DMG"
+          # Fail if Gatekeeper would still reject the downloaded DMG.
+          spctl -a -t open --context context:primary-signature -vvv "$DMG"
+          # Replace the un-notarized DMG that tauri-action uploaded.
+          gh release upload "$GITHUB_REF_NAME" "$DMG" --clobber --repo "$GITHUB_REPOSITORY"

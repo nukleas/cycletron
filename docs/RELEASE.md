@@ -63,33 +63,52 @@ Until then the build/sign/publish pipeline is validated via **draft** releases.
 
 ## Apple Developer ID signing + notarization
 
-`.github/workflows/release.yml` signs + notarizes when these repo secrets exist.
-Create them once (macOS Keychain → export **Developer ID Application** cert as a
-`.p12`):
+`.github/workflows/release.yml` follows the **same convention as `opensauna`**
+(one Apple Developer account signs every app), so the secret *values* are shared
+across repos — Cycletron just needs its own copies. The workflow imports the
+cert into a temp keychain, **auto-detects** the Developer ID identity (no
+`APPLE_SIGNING_IDENTITY` secret), notarizes the `.app` via Tauri, then
+**separately notarizes + staples the `.dmg`** (Tauri skips the DMG wrapper).
+
+Secret placement matches opensauna: the cert lives in a **`release`
+environment** whose deployment policy permits only `v*` tags (so the key is
+unreachable from PRs/branches); the rest are ordinary repo secrets.
+
+| Secret | Scope | Value (same as opensauna) |
+|--------|-------|---------------------------|
+| `APPLE_CERTIFICATE_BASE64` | **`release` env** | `base64 -i ~/Code/Certificates.p12` |
+| `APPLE_CERTIFICATE_PASSWORD` | repo | the `.p12` export password |
+| `APPLE_ID` | repo | Apple ID email |
+| `APPLE_APP_SPECIFIC_PASSWORD` | repo | app-specific password (account.apple.com) |
+| `APPLE_TEAM_ID` | repo | `8832K8LBLC` |
+
+Copy them to Cycletron (values are the same you set on `nukleas/opensauna`):
 
 ```bash
-base64 -i cycletron-devid.p12 | pbcopy   # value for APPLE_CERTIFICATE
-
-gh secret set APPLE_CERTIFICATE          --repo nukleas/cycletron   # base64 of the .p12
-gh secret set APPLE_CERTIFICATE_PASSWORD --repo nukleas/cycletron   # the .p12 export password
-gh secret set APPLE_SIGNING_IDENTITY     --repo nukleas/cycletron   # "Developer ID Application: Name (TEAMID)"
-gh secret set APPLE_ID                   --repo nukleas/cycletron   # your Apple ID email
-gh secret set APPLE_PASSWORD             --repo nukleas/cycletron   # app-specific password (appleid.apple.com)
-gh secret set APPLE_TEAM_ID              --repo nukleas/cycletron   # 10-char team id
+# One-time: create the tag-restricted release environment (see below), then:
+base64 -i ~/Code/Certificates.p12 | gh secret set APPLE_CERTIFICATE_BASE64 --env release --repo nukleas/cycletron
+gh secret set APPLE_CERTIFICATE_PASSWORD  --repo nukleas/cycletron   # p12 password
+gh secret set APPLE_ID                    --repo nukleas/cycletron   # Apple ID email
+gh secret set APPLE_APP_SPECIFIC_PASSWORD --repo nukleas/cycletron   # app-specific password
+gh secret set APPLE_TEAM_ID --repo nukleas/cycletron --body 8832K8LBLC
 ```
 
-Without these the workflow still builds, but ships **unsigned** (testers
-right-click → Open past Gatekeeper once).
+> Re-export gotchas (learned on opensauna): must be a **Developer ID Application**
+> cert (not *Apple Distribution*); the `.p12` export must include the **private
+> key** (Keychain Access → expand cert → select cert **and** key → *Export 2
+> items*), or you get "0 valid identities".
 
 ## CI secrets — current state
 
-| Name | Set? | Purpose |
+| Name | Set on cycletron? | Purpose |
 |------|------|---------|
 | `TAURI_SIGNING_PRIVATE_KEY` | ✅ | Updater signature |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | ✅ | Updater key password |
-| `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` | ⬜ you | Developer ID cert (.p12, base64) |
-| `APPLE_SIGNING_IDENTITY` | ⬜ you | Signing identity string |
-| `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` | ⬜ you | Notarization |
+| `APPLE_TEAM_ID` | ✅ | Apple team id (`8832K8LBLC`) |
+| `APPLE_CERTIFICATE_BASE64` | ✅ (`release` env) | Developer ID cert (.p12 base64) |
+| `APPLE_CERTIFICATE_PASSWORD` | ⬜ you | `.p12` password |
+| `APPLE_ID` | ⬜ you | Apple ID email |
+| `APPLE_APP_SPECIFIC_PASSWORD` | ⬜ you | app-specific password |
 
 The engine is a public Codeberg git dependency and the audio WASM is committed,
 so CI needs no engine token and no sibling checkout.
