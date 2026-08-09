@@ -133,7 +133,10 @@ jobs:
       - name: Build, sign, and draft the release
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The default GITHUB_TOKEN is refused for release creation on this repo
+          # ("Resource not accessible by integration") even with contents:write,
+          # so use a PAT (RELEASE_TOKEN) which can create releases here.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           # Updater signature (all platforms).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
