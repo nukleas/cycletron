@@ -481,8 +481,10 @@ export class StrudelApp {
                 e.preventDefault();
                 await this.togglePlayPause();
             }
-            // Escape anywhere to stop
-            if (e.key === 'Escape') {
+            // Escape anywhere to stop — unless something already handled it
+            // (e.g. the editor dismissed an open autocomplete popup, or already
+            // stopped from its own keymap). Those call preventDefault.
+            if (e.key === 'Escape' && !e.defaultPrevented) {
                 this.stop();
             }
         };

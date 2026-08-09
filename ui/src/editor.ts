@@ -20,7 +20,7 @@ import {
     foldGutter,
     indentOnInput
 } from '@codemirror/language';
-import {closeBrackets, closeBracketsKeymap} from '@codemirror/autocomplete';
+import {closeBrackets, closeBracketsKeymap, completionStatus, closeCompletion} from '@codemirror/autocomplete';
 import {highlightSelectionMatches, searchKeymap} from '@codemirror/search';
 import {lintGutter, setDiagnostics} from '@codemirror/lint';
 import {strudelThemeExtension} from './theme.js';
@@ -261,7 +261,14 @@ export class StrudelEditor {
             },
             {
                 key: 'Escape',
-                run: () => {
+                run: (view) => {
+                    // If the autocomplete popup is open, Escape only dismisses it —
+                    // it must not stop playback. Returning true marks the event
+                    // handled so the global Escape handler skips the stop too.
+                    if (completionStatus(view.state) != null) {
+                        closeCompletion(view);
+                        return true;
+                    }
                     self.onStop();
                     return true;
                 }
