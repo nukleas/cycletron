@@ -3,13 +3,13 @@ name: Release
 # Cut a release by pushing a version tag, e.g.:
 #   git tag v0.1.0-alpha.1 && git push origin v0.1.0-alpha.1
 #
-# Mirrors the opensauna signing convention (docs/RELEASE.md): the Developer ID
-# cert is an Environment secret in `release` (only v* tags may deploy to it), the
-# identity is auto-detected from the imported cert, and the DMG is notarized +
-# stapled separately (Tauri only does the .app). On top of that this also signs
-# the Tauri updater artifacts and publishes latest.json so auto-update works.
+# Builds macOS (universal, signed + notarized — .app AND .dmg), Linux
+# (AppImage/deb), and Windows (NSIS/MSI, intentionally UNSIGNED — SmartScreen
+# "More info → Run anyway"; see docs/RELEASE.md). Signs the Tauri updater
+# artifacts and publishes latest.json so auto-update works.
 #
-# Publishes a DRAFT pre-release — nothing is public until you review and Publish.
+# Everything lands in a single DRAFT pre-release — nothing is public until you
+# review it and hit Publish.
 
 on:
   push:
@@ -24,23 +24,27 @@ permissions:
   contents: write
 
 jobs:
-  release-macos:
-    name: Build, sign & notarize (macOS universal)
-    runs-on: macos-latest
+  release:
+    name: Build & release (${{ matrix.platform }})
+    runs-on: ${{ matrix.platform }}
     # Holds APPLE_CERTIFICATE_BASE64; its deployment policy permits only v* tags,
     # so the Developer ID key is unreachable from PRs, forks, or branch pushes.
     environment: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+            rust-targets: 'aarch64-apple-darwin,x86_64-apple-darwin'
+          - platform: ubuntu-22.04
+            args: ''
+            rust-targets: ''
+          - platform: windows-latest
+            args: ''
+            rust-targets: ''
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set app version from tag
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "Releasing version $VERSION"
-          # The updater compares against tauri.conf.json's version, so it must
-          # match the tag or installed apps won't see the update.
-          sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
-          grep -m1 '"version"' src-tauri/tauri.conf.json
 
       - name: Node 22
         uses: actions/setup-node@v4
@@ -49,17 +53,37 @@ jobs:
           cache: npm
           cache-dependency-path: ui/package-lock.json
 
-      - name: Rust stable (+ universal targets)
+      - name: Set app version from tag
+        shell: bash
+        env:
+          V: ${{ github.ref_name }}
+        run: |
+          export VERSION="${V#v}"
+          echo "Releasing version $VERSION"
+          # The updater compares against tauri.conf.json's version, so it must
+          # match the tag or installed apps won't see the update. node keeps this
+          # identical on macOS/Linux/Windows.
+          node -e "const fs=require('fs'),f='src-tauri/tauri.conf.json',c=JSON.parse(fs.readFileSync(f));c.version=process.env.VERSION;fs.writeFileSync(f,JSON.stringify(c,null,2)+'\n')"
+          node -e "console.log('version =', require('./src-tauri/tauri.conf.json').version)"
+
+      - name: Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.rust-targets }}
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      # ── Apple Developer ID: import the cert into a temp keychain and
-      #    auto-detect the identity (don't trust a hand-set string). ──────────
+      - name: Linux system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      # ── macOS only: import the Developer ID cert into a temp keychain and
+      #    auto-detect the identity. ──────────────────────────────────────────
       - name: Import Apple Developer ID certificate
+        if: matrix.platform == 'macos-latest'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -74,8 +98,7 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN_PATH"
           echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          # Import the whole .p12 (cert + private key) so a Developer ID identity
-          # lands in the chain (do NOT use -t cert, which drops the key).
+          # Import the whole .p12 (cert + private key); do NOT use -t cert.
           if ! security import "$RUNNER_TEMP/cert.p12" -P "$APPLE_CERTIFICATE_PASSWORD" \
                  -A -f pkcs12 -k "$KEYCHAIN_PATH"; then
             echo "::error::Could not import the .p12 — wrong APPLE_CERTIFICATE_PASSWORD, or not a valid PKCS#12 export."
@@ -86,20 +109,20 @@ jobs:
           SIGN_ID=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
             | sed -n 's/.*"\(Developer ID Application:.*\)".*/\1/p' | head -1)
           if [ -z "$SIGN_ID" ]; then
-            echo "::error::No 'Developer ID Application' identity in the .p12 — the export likely omitted the private key. In Keychain Access expand the cert, select BOTH the cert and its key, and 'Export 2 items' as .p12."
+            echo "::error::No 'Developer ID Application' identity in the .p12 — the export likely omitted the private key."
             exit 1
           fi
           echo "Signing with: $SIGN_ID"
           echo "APPLE_SIGNING_IDENTITY=$SIGN_ID" >> "$GITHUB_ENV"
 
-      - name: Build, sign (updater + Apple), notarize .app, draft release
+      - name: Build, sign, and draft the release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Updater signature (installed apps verify this against pubkey in conf).
+          # Updater signature (all platforms).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Apple: identity auto-detected above; the trio drives .app notarization.
+          # Apple (macOS only; empty + ignored elsewhere). Identity auto-detected above.
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -111,11 +134,12 @@ jobs:
           releaseDraft: true
           prerelease: true
           includeUpdaterJson: true
-          args: --target universal-apple-darwin
+          args: ${{ matrix.args }}
 
       # Tauri notarizes the .app (used by the updater), but NOT the .dmg users
       # download — so notarize + staple the DMG and replace it on the release.
       - name: Notarize and staple the DMG
+        if: matrix.platform == 'macos-latest'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -131,7 +155,5 @@ jobs:
           xcrun notarytool submit "$DMG" \
             --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_PASSWORD" --wait
           xcrun stapler staple "$DMG"
-          # Fail if Gatekeeper would still reject the downloaded DMG.
           spctl -a -t open --context context:primary-signature -vvv "$DMG"
-          # Replace the un-notarized DMG that tauri-action uploaded.
           gh release upload "$GITHUB_REF_NAME" "$DMG" --clobber --repo "$GITHUB_REPOSITORY"

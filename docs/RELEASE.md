@@ -113,8 +113,15 @@ so CI needs no engine token and no sibling checkout.
 ## Cutting a release
 
 `.github/workflows/release.yml` runs on a `v*` tag and produces a **draft**
-pre-release (macOS universal) with signed bundles + `latest.json`. Nothing is
-public until you review the draft on GitHub and hit **Publish**.
+pre-release with signed bundles + `latest.json`, across three platforms:
+
+| Platform | Artifact | Signing |
+|----------|----------|---------|
+| macOS | universal `.dmg` + `.app` | Developer ID + notarized (app **and** dmg) |
+| Linux | `.AppImage`, `.deb` | unsigned (n/a) |
+| Windows | NSIS `.exe`, `.msi` | **intentionally unsigned** — SmartScreen "More info → Run anyway" (Authenticode cert not worth it for alpha; see opensauna `docs/SIGNING.md`) |
+
+Nothing is public until you review the draft on GitHub and hit **Publish**.
 
 ```bash
 # clean tree, green CI
