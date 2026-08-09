@@ -64,7 +64,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      # On self-hosted runners a node-local hostPath cache (CARGO_HOME /
+      # CARGO_TARGET_DIR / RUSTUP_HOME) persists across ephemeral pods, so skip
+      # the GitHub cache-service round-trip there.
       - name: Cache cargo
+        if: runner.environment == 'github-hosted'
         uses: Swatinem/rust-cache@v2
 
       - name: cargo check (workspace)
