@@ -1,0 +1,8 @@
+// stack() layers drums and bass.
+stack(
+  s("bd*4"),
+  s("~ sd ~ sd").gain(0.6),
+  s("hh*8").gain(0.3),
+  note("c2 ~ eb2 ~")
+    .s("sawtooth").cutoff(400).gain(0.5)
+)

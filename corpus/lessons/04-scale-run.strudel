@@ -1,0 +1,5 @@
+// Numeric degrees + scale("root:mode").
+note("0 1 2 3 4 5 6 7")
+  .scale("C4:major")
+  .s("sine")
+  .fast(2)

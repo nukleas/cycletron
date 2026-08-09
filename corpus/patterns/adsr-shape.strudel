@@ -1,0 +1,8 @@
+// Full ADSR envelope on a saw.
+note("c3 eb3 g3 bb3")
+  .s("sawtooth")
+  .attack(0.01)
+  .decay(0.2)
+  .sustain(0.3)
+  .release(0.4)
+  .cutoff(1200)

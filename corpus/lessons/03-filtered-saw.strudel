@@ -1,0 +1,6 @@
+// Synth + filter + resonance.
+note("c3 eb3 g3 bb3")
+  .s("sawtooth")
+  .cutoff(600)
+  .resonance(10)
+  .gain(0.5)

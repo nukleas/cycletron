@@ -1,0 +1,5 @@
+// Alternate whole patterns each cycle.
+slowcat(
+  s("bd*4, hh*8"),
+  s("bd sd bd sd, hh*4")
+)

@@ -29,6 +29,26 @@ const genreModules = import.meta.glob('../../corpus/genres/*/generated-*.strudel
     eager: true,
 }) as Record<string, string>;
 
+// Progressive teaching set — was a hand-written TS array, now on-disk `.strudel`
+// files so `corpus-check` validates them against strudel-rs like everything else.
+const lessonModules = import.meta.glob('../../corpus/lessons/*.strudel', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+}) as Record<string, string>;
+
+const patternModules = import.meta.glob('../../corpus/patterns/*.strudel', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+}) as Record<string, string>;
+
+const showcaseModules = import.meta.glob('../../corpus/showcase/*.strudel', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+}) as Record<string, string>;
+
 function basename(path: string): string {
     const parts = path.replace(/\\/g, '/').split('/');
     return parts[parts.length - 1] ?? path;
@@ -165,6 +185,39 @@ export function loadTechniqueExamples(): Example[] {
         if (ca !== cb) return ca.localeCompare(cb);
         return a.title.localeCompare(b.title);
     });
+}
+
+/** Progressive lessons (`corpus/lessons/NN-*.strudel`), ordered by prefix. */
+export function loadLessonExamples(): Example[] {
+    const out: Example[] = [];
+    for (const [path, code] of Object.entries(lessonModules)) {
+        if (typeof code !== 'string' || !code.trim()) continue;
+        const entry = entryFromModule(path, code, 'lessons');
+        const num = stripExt(basename(path)).match(/^(\d+)/);
+        if (num) entry.lesson = Number(num[1]);
+        out.push(entry);
+    }
+    return out.sort((a, b) => (a.lesson ?? 0) - (b.lesson ?? 0));
+}
+
+/** Short single-technique patterns (`corpus/patterns/*.strudel`). */
+export function loadPatternExamples(): Example[] {
+    const out: Example[] = [];
+    for (const [path, code] of Object.entries(patternModules)) {
+        if (typeof code !== 'string' || !code.trim()) continue;
+        out.push(entryFromModule(path, code, 'patterns'));
+    }
+    return out.sort((a, b) => a.title.localeCompare(b.title));
+}
+
+/** Longer demo pieces (`corpus/showcase/*.strudel`). */
+export function loadShowcaseExamples(): Example[] {
+    const out: Example[] = [];
+    for (const [path, code] of Object.entries(showcaseModules)) {
+        if (typeof code !== 'string' || !code.trim()) continue;
+        out.push(entryFromModule(path, code, 'showcase'));
+    }
+    return out.sort((a, b) => a.title.localeCompare(b.title));
 }
 
 /** One sketch per genre recipe. */

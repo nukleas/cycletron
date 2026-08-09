@@ -1,0 +1,4 @@
+// ply() repeats each event n times.
+s("bd sd hh cp")
+  .ply(3)
+  .gain(0.5)

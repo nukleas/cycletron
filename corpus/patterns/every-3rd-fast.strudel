@@ -1,0 +1,3 @@
+// every(3) doubles the speed on each third cycle.
+s("bd sd hh cp")
+  .every(3, x => x.fast(2))

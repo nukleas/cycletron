@@ -1,0 +1,10 @@
+// Minimal techno: four-on-the-floor + euclid stab.
+stack(
+  s("bd*4").gain(0.8),
+  s("~ cp ~ cp").gain(0.5),
+  s("hh(3,8)").gain(0.25).hpf(6000),
+  note("c2(5,8)")
+    .s("square")
+    .cutoff(400)
+    .gain(0.4)
+)

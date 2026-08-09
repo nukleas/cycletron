@@ -1,0 +1,6 @@
+// Resonant saw bass, acid-style.
+note("c2 c2 eb2 c2 f2 c2 g2 c2")
+  .s("sawtooth")
+  .cutoff(800)
+  .resonance(15)
+  .gain(0.6)

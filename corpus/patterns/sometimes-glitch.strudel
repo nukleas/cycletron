@@ -1,0 +1,4 @@
+// sometimes() applies a transform at random.
+s("bd*4, hh*8")
+  .sometimes(x => x.speed(2))
+  .room(0.3)

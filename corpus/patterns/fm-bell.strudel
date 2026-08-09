@@ -1,0 +1,6 @@
+// FM synth voice as a bell.
+note("c5 e5 g5 c6")
+  .s("fm")
+  .gain(0.4)
+  .room(0.6)
+  .delay(0.3)

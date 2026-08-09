@@ -1,0 +1,6 @@
+// palindrome() plays forward then back.
+note("c4 d4 e4 f4 g4 a4 b4 c5")
+  .s("sine")
+  .palindrome()
+  .delay(0.25)
+  .room(0.4)

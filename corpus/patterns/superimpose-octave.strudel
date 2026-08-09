@@ -1,0 +1,5 @@
+// superimpose() adds an octave-up copy on top.
+note("c4 e4 g4")
+  .s("sine")
+  .superimpose(x => x.transpose(12))
+  .room(0.5)

@@ -1,0 +1,5 @@
+// chop() slices a sample into grains.
+s("bd")
+  .chop(8)
+  .rev()
+  .room(0.4)

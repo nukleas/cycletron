@@ -1,0 +1,2 @@
+// Euclid rhythms: bd(hits, steps).
+s("bd(3,8), hh*8, ~ cp ~ cp")

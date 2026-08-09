@@ -1,0 +1,15 @@
+// OST motif: dark ambient boot · 56 BPM · full tracks in ui/songs/agency/
+setbpm(56);
+
+stack(
+  note("c#1").s("sine").slow(4).attack(4).release(12).gain(0.55),
+  note("c#2").s("sine").slow(4).attack(6).release(12).detune(9).gain(0.26),
+  note("0 2 4 6 7 4 2 0")
+    .scale("C#4:minor")
+    .s("sine")
+    .slow(2)
+    .attack(0.05)
+    .release(0.8)
+    .room(0.85)
+    .gain(0.22)
+).room(0.9)
