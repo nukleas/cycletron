@@ -26,6 +26,7 @@ mod xai_oauth;
 mod codex_oauth;
 mod demos;
 mod export;
+mod packs;
 
 
 
@@ -337,6 +338,12 @@ pub fn run() {
             sounds::read_audio_file,
             sounds::register_sound_banks,
             sounds::list_sounds,
+            packs::list_packs,
+            packs::get_pack,
+            packs::enable_pack,
+            packs::disable_pack,
+            packs::load_enabled_packs,
+            packs::packs_dir,
             midi_input::list_midi_input_devices,
             midi_input::start_midi_input_listening,
             midi_input::stop_midi_input_listening,

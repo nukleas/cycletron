@@ -56,6 +56,7 @@ pub fn ensure_root_exists(root: &Path) -> std::io::Result<()> {
 pub fn prepare_root(root: &Path) -> Result<(), String> {
     ensure_root_exists(root).map_err(|e| format!("create {}: {e}", root.display()))?;
     crate::demos::seed_into_library(root).map_err(|e| format!("seed demos: {e}"))?;
+    crate::packs::ensure_packs_dir(root)?;
     Ok(())
 }
 

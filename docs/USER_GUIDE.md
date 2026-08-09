@@ -106,6 +106,19 @@ data directory and is not uploaded.
 
 ---
 
+## Samples
+
+A default drum kit and a few texture banks ship with the app. For more:
+
+| Action | Where |
+|--------|--------|
+| Load a folder for this session | Command palette → **Load Sample Folder…** |
+| Installable packs (persist across launches) | Command palette → **Sample Packs…** |
+
+Packs live under `{library}/Packs/`. Format: [SAMPLE_PACKS.md](./SAMPLE_PACKS.md).
+
+---
+
 ## MIDI
 
 | Feature | Where |

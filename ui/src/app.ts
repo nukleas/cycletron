@@ -771,24 +771,21 @@ export class StrudelApp {
             const drums = await this.sampleLoader!.loadEssentialDrums();
             if (!this.isInitialized) return;
 
-            // Load bundled drum machine kits + the percussion/texture color pack in
-            // the background after essentials are ready.
+            // Load bundled kits + colors, then library packs the user enabled.
             void Promise.all([
                 this.sampleLoader!.loadMachineKits(),
                 this.sampleLoader!.loadPercussionColors(),
-            ]).then(([machineCount, colorNames]) => {
+                this.loadEnabledPacks(),
+            ]).then(([machineCount, colorNames, packSamples]) => {
                 if (!this.isInitialized) return;
-                const total = drums + machineCount + colorNames.length;
+                const total = drums + machineCount + colorNames.length + packSamples;
                 this.elements.sampleCount.textContent = `${total}`;
-                // Tell the backend which color banks are live so the agent's
-                // `list_sounds` reports them and stops defaulting to a lone rimshot.
                 const invoke = (window as any).__TAURI__?.core?.invoke as
                     | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
                     | undefined;
                 if (colorNames.length && invoke) {
                     void invoke('register_sound_banks', {names: colorNames}).catch(() => {});
                 }
-                // Refresh Sounds panel with newly available banks.
                 document.dispatchEvent(new CustomEvent('sounds:changed'));
             });
 
@@ -857,6 +854,64 @@ export class StrudelApp {
                 console.warn(`[App] soundfont load failed for '${bankName}:${sampleIdx}':`, e);
                 this._loadedSoundfonts.delete(key);
             });
+    }
+
+    /**
+     * Decode banks returned by pack commands (`enable_pack` / `load_enabled_packs`).
+     * Returns total samples loaded across banks.
+     */
+    async loadPackBanks(
+        banks: Array<{name: string; files: string[]}>,
+    ): Promise<number> {
+        if (!this.sampleLoader || !this.isInitialized) return 0;
+        const invoke = (window as any).__TAURI__?.core?.invoke as
+            | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
+            | undefined;
+        if (!invoke) return 0;
+
+        let total = 0;
+        const loadedNames: string[] = [];
+        for (const bank of banks) {
+            const datas = await Promise.all(
+                bank.files.map((p) => invoke<ArrayBuffer>('read_audio_file', {path: p})),
+            );
+            const n = await this.sampleLoader.loadLocalBank(bank.name, datas);
+            if (!this.isInitialized) return total;
+            if (n > 0) {
+                total += n;
+                loadedNames.push(bank.name);
+            }
+        }
+        if (loadedNames.length) {
+            await invoke('register_sound_banks', {names: loadedNames});
+        }
+        return total;
+    }
+
+    /** Load every pack listed in `Packs/enabled.json`. Returns sample count. */
+    async loadEnabledPacks(): Promise<number> {
+        if (!this.sampleLoader || !this.isInitialized) return 0;
+        const invoke = (window as any).__TAURI__?.core?.invoke as
+            | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
+            | undefined;
+        if (!invoke) return 0;
+        try {
+            const packs = await invoke<
+                Array<{id: string; banks: Array<{name: string; files: string[]}>; skipped: string[]}>
+            >('load_enabled_packs');
+            let total = 0;
+            for (const pack of packs) {
+                if (pack.skipped?.length) {
+                    console.warn(`[packs] ${pack.id} skipped banks:`, pack.skipped);
+                }
+                total += await this.loadPackBanks(pack.banks);
+                if (!this.isInitialized) return total;
+            }
+            return total;
+        } catch (e) {
+            console.warn('[packs] load_enabled_packs failed', e);
+            return 0;
+        }
     }
 
     /**

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-enable-pack"
+description = "Enables the enable_pack command without any pre-configured scope."
+commands.allow = ["enable_pack"]
+
+[[permission]]
+identifier = "deny-enable-pack"
+description = "Denies the enable_pack command without any pre-configured scope."
+commands.deny = ["enable_pack"]

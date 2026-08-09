@@ -491,14 +491,14 @@ export class SampleLoader {
      */
     async loadLocalBank(name: string, datas: ArrayBuffer[]): Promise<number> {
         const decoded = await Promise.all(
-            datas.map(async (data): Promise<DecodedSample | null> => {
+            datas.map(async (data, i): Promise<DecodedSample | null> => {
                 try {
                     const audioBuffer = await this.audioContext.decodeAudioData(data);
                     return {
                         name,
                         audioBuffer,
                         midiNote: UNPITCHED,
-                        sampleIdx: 0,
+                        sampleIdx: i,
                         loopStart: 0,
                         loopEnd: 0,
                         keyRangeLow: 255,

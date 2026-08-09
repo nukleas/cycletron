@@ -432,6 +432,28 @@
         </div>
     </div>
 
+    <!-- Sample packs -->
+    <div id="packsModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="packsTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window" role="document">
+            <div class="app-modal-header">
+                <span id="packsTitle">Sample Packs</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="packs-modal-body">
+                <p class="packs-intro">Optional sample packs live in your library under <code>Packs/</code>. Enable a pack to load its banks for <code>s("…")</code>.</p>
+                <div id="packsList" class="packs-list"></div>
+                <div id="packsEmpty" class="packs-empty" hidden></div>
+            </div>
+            <div class="app-modal-actions">
+                <button type="button" id="packsOpenFolder" class="app-modal-link">Open Packs Folder</button>
+                <button type="button" id="packsReload" class="app-modal-link">Reload Enabled</button>
+                <span class="app-modal-spacer"></span>
+                <button data-dismiss class="app-modal-primary">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- About modal -->
     <div id="aboutModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
         <div class="app-modal-backdrop" data-dismiss></div>

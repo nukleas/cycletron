@@ -4636,3 +4636,61 @@ body.immersive-viz-active #editor .cm-gutters {
 .export-modal-actions button:hover {
     box-shadow: 0 0 10px var(--neon-glow);
 }
+
+/* Sample packs manager */
+.packs-modal-body {
+    padding: 12px 16px 8px;
+    max-height: min(420px, 60vh);
+    overflow: auto;
+}
+.packs-intro {
+    margin: 0 0 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-dim, #9aa);
+}
+.packs-intro code {
+    font-size: 11px;
+}
+.packs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.packs-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 8px 10px;
+    border: 1px solid var(--neon-subtle, #333);
+    cursor: pointer;
+}
+.packs-row input {
+    margin-top: 3px;
+}
+.packs-row-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.packs-row-title {
+    font-size: 13px;
+    font-weight: 600;
+}
+.packs-row-meta {
+    margin-left: 8px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-dim, #9aa);
+}
+.packs-row-banks {
+    font-size: 11px;
+    color: var(--text-dim, #9aa);
+    word-break: break-all;
+}
+.packs-empty {
+    font-size: 12px;
+    color: var(--text-dim, #9aa);
+    line-height: 1.45;
+}

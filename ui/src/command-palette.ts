@@ -15,6 +15,7 @@ import {invoke} from './tauri.js';
 import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
 import {aboutModal} from './about-modal.js';
+import {packsModal} from './packs-modal.js';
 import {helpModal} from './help-modal.js';
 import {preferencesModal, persistEditorAssist} from './preferences.js';
 import {midiLab} from './midi-lab.js';
@@ -191,6 +192,7 @@ const COMMANDS: Item[] = [
     {id: 'cmd.export_midi', title: 'Export MIDI…',          section: 'Commands',                 run: () => { void fileManager.exportMidi(); }},
     {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => { void midiLab.openEmpty(); }},
     {id: 'cmd.load_samples',title: 'Load Sample Folder…',   section: 'Commands',                 run: () => { void window.strudelApp?.loadSampleFolder?.(); }},
+    {id: 'cmd.sample_packs',title: 'Sample Packs…',         section: 'Commands',                 run: () => { void packsModal.open(); }},
     {id: 'cmd.preferences', title: 'Preferences…',          section: 'Commands', hint: '⌘,',     run: () => { void preferencesModal.open(); }},
     {id: 'cmd.examples',    title: 'Browse Examples…',      section: 'Commands',                 run: () => { document.getElementById('browseExamples')?.click(); }},
     {id: 'cmd.help_guide',  title: 'User Guide…',           section: 'Commands',                 run: () => { helpModal.open('guide'); }},
