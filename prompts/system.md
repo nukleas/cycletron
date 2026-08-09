@@ -349,6 +349,14 @@ Percussion & texture colors (bundled offline — real voices beyond the default 
   "industrial" part — it reads as a typewriter tapping. Reach for `industrial`,
   `metal`, `perc`, `east`, or `hand` (optionally layered) instead; save `rs` for
   an actual rimshot accent.
+Melodic & speech samples (bundled offline — multi-variant one-shots):
+  flbass  — fretless bass (finger/pick/palm shorts); s("flbass:2") for variants
+  uke     — ukulele plucks
+  cpluck  — cello pizz / body hit
+  cbow    — cello short bow (hammered)
+  speech  — synth-speech chops (a–g voices)
+  These are unpitched one-shots (good for riffs, chops, texture). For in-tune
+  pitched melodies use gm_* soundfonts or wt_* wavetables with note()/n().
 Synths: sine, sawtooth, triangle, square, pulse, fm, supersaw, supersquare, superpwm, superzow, sbd, white, pink, brown, crackle
 Wavetable synths (richer timbres, use with note()): wt_flute, wt_clarinet, wt_oboe, wt_violin, wt_cello, wt_trumpet, wt_bassoon, wt_organ, wt_piano, wt_bell, wt_pluck, wt_bass, wt_lead, wt_pad, wt_choir, wt_strings, wt_sine, wt_tri, wt_square, wt_saw
 New effects: .chorus(depth) .chorusspeed(hz) .vowel(0-4: A/E/I/O/U) .grainsize(ms) .scatter(0-1) .ir(0-2: room/hall/plate)

@@ -203,8 +203,8 @@ pub fn register_sound_banks(names: Vec<String>, state: State<'_, AppState>) -> R
 // Built-in sound catalog lives in the shared analysis crate so CLI tools use
 // the same known-sound set; user-loaded banks are layered on here.
 pub use cycletron_analysis::sounds::{
-    builtin_sound_set, DEFAULT_DRUMS, DRUM_MACHINE_NOTE, GM_INSTRUMENTS, MACHINE_KITS, PERCUSSION,
-    SYNTHS, WAVETABLES,
+    builtin_sound_set, DEFAULT_DRUMS, DRUM_MACHINE_NOTE, GM_INSTRUMENTS, INSTRUMENTS, MACHINE_KITS,
+    PERCUSSION, SYNTHS, WAVETABLES,
 };
 
 /// Everything currently playable, for the UI and the agent's `list_sounds` tool.
@@ -234,6 +234,8 @@ pub fn sound_catalog(state: &AppState) -> serde_json::Value {
         "drums": DEFAULT_DRUMS,
         "percussion": PERCUSSION,
         "percussion_note": "Percussion & texture color banks (perc/click/metal/east/hand/industrial for dry & metallic hits; space/arpy atmosphere & pluck; tabla/jvbass tonal). Prefer these over stacking hpf'd rimshots. Use s(\"perc:2\") for variants.",
+        "instruments": INSTRUMENTS,
+        "instruments_note": "Melodic/speech expansion banks (CC0 Clean-Samples slices). flbass=fretless bass, uke=ukulele, cpluck=cello pluck, cbow=cello bow short, speech=synth speech chops. Multi-variant: s(\"flbass:2\"). Unpitched one-shots — for in-tune melodies prefer gm_* / wt_*.",
         "drum_machines": machines,
         "drum_machine_note": DRUM_MACHINE_NOTE,
         "gm_instruments": GM_INSTRUMENTS,

@@ -771,22 +771,25 @@ export class StrudelApp {
             const drums = await this.sampleLoader!.loadEssentialDrums();
             if (!this.isInitialized) return;
 
-            // Load bundled drum machine kits + the percussion/texture color pack in
-            // the background after essentials are ready.
+            // Load bundled drum machine kits + percussion colors + melodic/
+            // speech expansion banks in the background after essentials are ready.
             void Promise.all([
                 this.sampleLoader!.loadMachineKits(),
                 this.sampleLoader!.loadPercussionColors(),
-            ]).then(([machineCount, colorNames]) => {
+                this.sampleLoader!.loadInstrumentBanks(),
+            ]).then(([machineCount, colorNames, instrumentNames]) => {
                 if (!this.isInitialized) return;
-                const total = drums + machineCount + colorNames.length;
+                const extraBanks = [...colorNames, ...instrumentNames];
+                const total = drums + machineCount + extraBanks.length;
                 this.elements.sampleCount.textContent = `${total}`;
-                // Tell the backend which color banks are live so the agent's
-                // `list_sounds` reports them and stops defaulting to a lone rimshot.
+                // Tell the backend which color/instrument banks are live so the
+                // agent's `list_sounds` reports them (and the silence linter
+                // accepts them).
                 const invoke = (window as any).__TAURI__?.core?.invoke as
                     | (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>)
                     | undefined;
-                if (colorNames.length && invoke) {
-                    void invoke('register_sound_banks', {names: colorNames}).catch(() => {});
+                if (extraBanks.length && invoke) {
+                    void invoke('register_sound_banks', {names: extraBanks}).catch(() => {});
                 }
                 // Refresh Sounds panel with newly available banks.
                 document.dispatchEvent(new CustomEvent('sounds:changed'));

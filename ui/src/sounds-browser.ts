@@ -22,6 +22,7 @@ interface SoundCatalog {
     wavetables: string[];
     drums: string[];
     percussion?: string[];
+    instruments?: string[];
     drum_machines: DrumMachine[];
     gm_instruments: string[];
     gm_note?: string;
@@ -69,6 +70,7 @@ export class SoundsBrowser {
         if (!this.listEl) return;
         const total =
             cat.synths.length + cat.drums.length + (cat.percussion?.length ?? 0) +
+            (cat.instruments?.length ?? 0) +
             cat.gm_instruments.length + cat.user_sample_banks.length;
         if (this.countEl) this.countEl.textContent = String(total);
 
@@ -81,7 +83,8 @@ export class SoundsBrowser {
             this.group('Synths', cat.synths, 'synth'),
             this.group('Wavetables', cat.wavetables ?? [], 'synth', 'use with note(…).s("wt_…")'),
             this.group('Drums', cat.drums, 'drum'),
-            this.group('Percussion & Textures', cat.percussion ?? [], 'sample', 'perc/metal/east/hand/industrial · space/arpy · tabla/jvbass · breaks'),
+            this.group('Percussion & Textures', cat.percussion ?? [], 'sample', 'perc/metal/east/hand/industrial · space/arpy · tabla/jvbass'),
+            this.group('Melodic & Speech', cat.instruments ?? [], 'sample', 'flbass/uke/cpluck/cbow · speech · s("flbass:2") for variants'),
             ...machineGroups,
             this.group('GM Instruments', cat.gm_instruments, 'gm', '+ any gm_* name'),
             this.group(

@@ -38,6 +38,23 @@ contributors — **CC0** ([`licenses/VCSL-LICENSE.txt`](licenses/VCSL-LICENSE.tx
 | `tabla` | Darbuka |
 | `jvbass` | Yamaha TX81Z — FM Piano (low C, trimmed) |
 
+## Melodic & speech expansion — `ui/public/samples/{flbass,uke,cpluck,cbow,speech}/`
+
+Short **CC0** slices from the Tidal [Clean-Samples](https://github.com/tidalcycles/Clean-Samples)
+ecosystem. Bundled copies are mono 16-bit peak-normalized to −4 dB (same prep
+as the VCSL color banks). Multi-variant: `s("flbass")`, `s("flbass:2")`, …
+
+| Bank | Source | License text |
+|---|---|---|
+| `flbass` | [cleary/samples-flbass](https://github.com/cleary/samples-flbass) — fretless bass (finger/pick/palm shorts) | [`licenses/flbass-LICENSE.txt`](licenses/flbass-LICENSE.txt) |
+| `uke` | [thgrund/samples-ukulele](https://github.com/thgrund/samples-ukulele) — Ortega Lizard uke | [`licenses/uke-LICENSE.txt`](licenses/uke-LICENSE.txt) |
+| `cpluck` | [cleary/samples-cello-plucked](https://github.com/cleary/samples-cello-plucked) — plucked cello + body hit (Trevor Exter) | [`licenses/cpluck-LICENSE.txt`](licenses/cpluck-LICENSE.txt) |
+| `cbow` | [cleary/samples-cello-bowed](https://github.com/cleary/samples-cello-bowed) — bowed cello shorts (Trevor Exter) | [`licenses/cbow-LICENSE.txt`](licenses/cbow-LICENSE.txt) |
+| `speech` | [tidalcycles/sounds-repetition](https://github.com/tidalcycles/sounds-repetition) — synth-speech “repetition” chops (Alex McLean) | [`licenses/speech-LICENSE.txt`](licenses/speech-LICENSE.txt) |
+
+These are **unpitched one-shots** (rhythm/timbre/ad-lib use). For chromatically
+in-tune melodies prefer `gm_*` soundfonts or `wt_*` wavetables.
+
 ## Drum machines — `ui/public/machines/`
 
 - **TR-808** (`RolandTR808_*`): Michael Fischer's CC0 set, as above.

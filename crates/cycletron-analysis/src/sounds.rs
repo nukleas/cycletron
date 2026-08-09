@@ -34,6 +34,15 @@ pub const PERCUSSION: &[&str] = &[
     "space", "arpy", "tabla", "jvbass",
 ];
 
+/// Melodic / speech expansion banks — short CC0 slices from the Tidal
+/// Clean-Samples ecosystem (see `INSTRUMENT_BANKS` in `ui/sample-loader.ts`,
+/// which must stay in sync). Multi-variant unpitched one-shots: use
+/// `s("flbass:2")` for a different take. Not chromatically multisampled —
+/// for in-tune pitched melodies prefer `gm_*` or `wt_*`.
+pub const INSTRUMENTS: &[&str] = &[
+    "flbass", "uke", "cpluck", "cbow", "speech",
+];
+
 /// Single source of truth for how `.bank()` behaves, surfaced to the agent via
 /// `list_sounds` (see `src-tauri/src/sounds.rs`) so the claim lives in exactly
 /// one place. The `.bank()` half of this is verified against the real engine by
@@ -77,6 +86,7 @@ pub fn builtin_sound_set() -> std::collections::HashSet<String> {
         .chain(WAVETABLES.iter())
         .chain(DEFAULT_DRUMS.iter())
         .chain(PERCUSSION.iter())
+        .chain(INSTRUMENTS.iter())
         .chain(GM_INSTRUMENTS.iter())
         .map(|s| s.to_string())
         .collect();

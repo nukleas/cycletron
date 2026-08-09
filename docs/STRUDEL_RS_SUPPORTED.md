@@ -344,10 +344,11 @@ From `crates/strudel-sounds/src/synths.rs`. Pass to `s(...)` / `.sound(...)`.
 `s("bd")` / `s("sd")` etc. resolve to sample banks. The Cycletron UI ships
 a default drum kit (`bd sd sn hh cp oh ht mt lt cr cb rs` — see
 `ui/sample-loader.ts`), a curated percussion/texture pack (`perc click metal
-east hand industrial space arpy tabla jvbass`), and the
-five drum machine kits. Additional banks load on demand from the configured
-URL. Sample indices select variants: `bd:3` picks the 4th sample in the bd
-bank. Names are case-insensitive.
+east hand industrial space arpy tabla jvbass`), melodic/speech expansion
+banks (`flbass uke cpluck cbow speech` — multi-variant CC0 Clean-Samples
+slices), and the five drum machine kits. Additional banks load on demand from
+the configured URL. Sample indices select variants: `bd:3` / `flbass:2` pick
+the Nth sample in that bank. Names are case-insensitive.
 
 `.bank(name)` **is supported** and rewrites every sample name in the pattern to
 `{Bank}_{sound}`: `s("bd sd").bank("RolandTR808")` == `s("RolandTR808_bd

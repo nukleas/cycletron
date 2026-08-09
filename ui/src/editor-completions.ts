@@ -89,6 +89,8 @@ export async function refreshAssistSounds(): Promise<void> {
             synths?: string[];
             wavetables?: string[];
             drums?: string[];
+            percussion?: string[];
+            instruments?: string[];
             gm_instruments?: string[];
             user_sample_banks?: string[];
             drum_machines?: {banks?: string[]}[];
@@ -97,6 +99,8 @@ export async function refreshAssistSounds(): Promise<void> {
             ...(cat.synths ?? []),
             ...(cat.wavetables ?? []),
             ...(cat.drums ?? []),
+            ...(cat.percussion ?? []),
+            ...(cat.instruments ?? []),
             ...(cat.gm_instruments ?? []),
             ...(cat.user_sample_banks ?? []),
             ...(cat.drum_machines ?? []).flatMap((m) => m.banks ?? []),

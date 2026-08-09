@@ -134,6 +134,49 @@ export const PERCUSSION_COLORS: Array<[string, string]> = [
 ];
 
 /**
+ * Melodic / speech expansion banks — short CC0 slices from the Tidal
+ * Clean-Samples ecosystem, bundled in `ui/public/samples/`. Each bank has
+ * multiple variants selected with `s("flbass:2")` (sample index). See
+ * ATTRIBUTION.md for per-bank provenance. Must stay in sync with
+ * `INSTRUMENTS` in `crates/cycletron-analysis/src/sounds.rs`.
+ */
+export const INSTRUMENT_BANKS: Array<[string, string[]]> = [
+    ['flbass', [
+        'flbass/c2_finger_short.wav',
+        'flbass/c3_finger_short.wav',
+        'flbass/c2_palm_mute.wav',
+        'flbass/c3_pick_short.wav',
+    ]],
+    ['uke', [
+        'uke/c3_short_soft.wav',
+        'uke/c3_short_hard.wav',
+        'uke/c4_soft.wav',
+        'uke/c4_harmonic.wav',
+    ]],
+    ['cpluck', [
+        'cpluck/c2_short.wav',
+        'cpluck/c3_short.wav',
+        'cpluck/c4_pluck.wav',
+        'cpluck/body_low.wav',
+    ]],
+    ['cbow', [
+        'cbow/c2_short.wav',
+        'cbow/c3_short.wav',
+        'cbow/c4_short.wav',
+        'cbow/c5_short.wav',
+    ]],
+    ['speech', [
+        'speech/a.wav',
+        'speech/b.wav',
+        'speech/c.wav',
+        'speech/d.wav',
+        'speech/e.wav',
+        'speech/f.wav',
+        'speech/g.wav',
+    ]],
+];
+
+/**
  * Fetch the first URL that responds OK, trying each in order. Used for
  * offline-first loading: a bundled same-origin path first, then a remote CDN.
  */
@@ -336,6 +379,27 @@ export class SampleLoader {
     }
 
     /**
+     * Load the bundled melodic/speech expansion banks ([`INSTRUMENT_BANKS`]) —
+     * multi-variant unpitched one-shots (use `s("flbass:2")` for variants).
+     * Returns bank names that had at least one sample load successfully.
+     */
+    async loadInstrumentBanks(): Promise<string[]> {
+        const samples: Array<{name: string; url: string; sampleIdx: number}> = [];
+        for (const [name, files] of INSTRUMENT_BANKS) {
+            files.forEach((sub, i) => {
+                samples.push({
+                    name,
+                    url: LOCAL_SAMPLES_BASE + sub,
+                    sampleIdx: i,
+                });
+            });
+        }
+        const {names} = await this._loadKitBatch(samples, 'Instrument Banks');
+        // One entry per sample file was returned; unique bank names for the agent.
+        return [...new Set(names)];
+    }
+
+    /**
      * Load all drum machine kits ([`MACHINE_KITS`]) — bundled kits from
      * `ui/public/machines/`, unlicensed-upstream kits streamed at runtime.
      * Each voice is registered under `{MachineName}_{voice}`, e.g. `RolandTR808_bd`.
@@ -491,14 +555,14 @@ export class SampleLoader {
      */
     async loadLocalBank(name: string, datas: ArrayBuffer[]): Promise<number> {
         const decoded = await Promise.all(
-            datas.map(async (data): Promise<DecodedSample | null> => {
+            datas.map(async (data, i): Promise<DecodedSample | null> => {
                 try {
                     const audioBuffer = await this.audioContext.decodeAudioData(data);
                     return {
                         name,
                         audioBuffer,
                         midiNote: UNPITCHED,
-                        sampleIdx: 0,
+                        sampleIdx: i,
                         loopStart: 0,
                         loopEnd: 0,
                         keyRangeLow: 255,
@@ -520,11 +584,11 @@ export class SampleLoader {
     }
 
     private async _loadKitBatch(
-        samples: Array<{ name: string; url: string; fallback?: string }>,
+        samples: Array<{ name: string; url: string; fallback?: string; sampleIdx?: number }>,
         kit: string,
     ): Promise<LoadKitResult> {
         const decoded = await Promise.all(
-            samples.map(async ({name, url, fallback}) => {
+            samples.map(async ({name, url, fallback, sampleIdx}) => {
                 const resp = await fetchFirstOk(fallback ? [url, fallback] : [url]);
 
                 if (!resp?.ok) {
@@ -539,7 +603,7 @@ export class SampleLoader {
                         name,
                         audioBuffer,
                         midiNote: UNPITCHED,
-                        sampleIdx: 0,
+                        sampleIdx: sampleIdx ?? 0,
                         loopStart: 0,
                         loopEnd: 0,
                         keyRangeLow: 255,
@@ -556,8 +620,8 @@ export class SampleLoader {
 
         const valid = decoded.filter((x): x is DecodedSample => x !== null);
 
-        for (const {name} of valid) {
-            this._logSuccess(name);
+        for (const {name, sampleIdx} of valid) {
+            this._logSuccess(sampleIdx ? `${name}:${sampleIdx}` : name);
         }
 
         this.audioManager.sendSampleBatch(valid);
