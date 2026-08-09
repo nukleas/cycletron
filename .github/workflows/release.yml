@@ -84,7 +84,10 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          # webkit/rsvg/appindicator for Tauri; libasound2-dev + libudev-dev for
+          # the MIDI input crate (midir → alsa-sys) which otherwise fails at
+          # "Package alsa was not found in the pkg-config search path".
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libudev-dev xdg-utils
 
       # ── macOS only: import the Developer ID cert into a temp keychain and
       #    auto-detect the identity. ──────────────────────────────────────────
