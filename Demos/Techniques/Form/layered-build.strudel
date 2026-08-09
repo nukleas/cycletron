@@ -1,0 +1,10 @@
+// Layered build using `mask`: each layer gates in over consecutive cycles.
+// Cycle 0: kick only. Cycle 1: + snare. Cycle 2: + hats. Cycle 3: full.
+setbpm(120);
+
+stack(
+  s("bd*4"),
+  s("~ sd ~ sd").mask("<0 1 1 1>"),
+  s("hh*8").gain(0.45).mask("<0 0 1 1>"),
+  s("cp").mask("<0 0 0 1>")
+)

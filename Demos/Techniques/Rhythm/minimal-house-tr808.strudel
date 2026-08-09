@@ -1,0 +1,16 @@
+// TR-808 minimal house groove with sparse syncopation and saw bass.
+setbpm(124);
+
+stack(
+  s("RolandTR808_bd ~ RolandTR808_bd ~").gain(0.85),
+  s("~ RolandTR808_cp ~ RolandTR808_cp").gain(0.65),
+  s("RolandTR808_hh*8").gain(0.25),
+  s("~ ~ ~ RolandTR808_oh").gain(0.42),
+  note("<c2 c2 eb2 g2>")
+    .s("sawtooth")
+    .cutoff(600)
+    .resonance(6)
+    .attack(0.01)
+    .release(0.18)
+    .gain(0.58)
+)

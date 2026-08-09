@@ -1,0 +1,9 @@
+// indie synth-rock in E major (generated) — four-on-floor rock drive, octave bass, wide sustained synths
+setbpm(124);
+
+stack(
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").gain(0.92),
+  note("e2 ~ e3 ~ e2 ~ e3 ~").s("sawtooth").lpf(900).resonance(5).gain(0.5),
+  note("<[e3, g#3, b3, d#4] [b3, d#4, f#4, a4] [c#4, e4, g#4, b4] [a3, c#4, e4, g#4]>").s("supersaw").attack(0.2).release(0.8).lpf(2000).gain(0.34).room(0.45).pan(0.42),
+  note("e5 ~ g#5 ~ d#5 ~ b4 ~").s("wt_lead").delay(0.3).room(0.4).gain(0.3).pan(0.62)
+)

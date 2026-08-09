@@ -1,0 +1,95 @@
+// AGENCY OST — 08 · Green Build
+// It ships. Dawn through the blinds. Synthwave in E major — the relative major
+// of home. The mainframe drone from "Legacy System" returns and resolves up a
+// major third; the Agency motif (0 2 4 6 · 7 4 2 0) finally lands in major.
+//
+// FORM (102 BPM · 1 cycle = 1 bar · 68 bars ≈ 2:40 · loops):
+//   intro   8  e1  the old C# drone... resolves to E. Soft pad.
+//   verse   8  e2  + kick, round bass, pluck arp teases the motif
+//   lift    4  e3  + snare, line climbs into the light
+//   chorus  16 e4  full: gated snare, wide pad, the motif sung in major
+//   break   8  e2  drums out — choir and pad, deep breath, sunrise
+//   chorus2 16 e5  everything, octave double, all the hats
+//   outro   8  e1  drone on E alone. The build is green.
+// hook: the Agency motif, major-voiced — both choruses.
+
+setbpm(102);
+
+"<intro@2 verse@2 lift chorus@4 break@2 chorus2@4 outro@2>".slow(4).pickRestart({
+  intro: stack(
+    note("<c#1 c#1 c#1 c#1 e1 e1 e1 e1>").s("sine").attack(1.2).release(2.2).gain(0.42),
+    s("rs*4").gain(0.14).pan(0.45),
+    chord("<C#m C#m E E A A E E>").voicing().s("supersaw")
+      .attack(0.8).release(1.5).lpf(1000).chorus(0.4).room(0.6).gain(0.24)
+  ),
+  verse: stack(
+    note("e1").s("sine").attack(1.0).release(2.0).slow(2).gain(0.35),
+    s("bd*4").gain(0.8),
+    s("rs*4").gain(0.16).pan(0.45),
+    note("<[e1 e1 e1 e1] [e1 e1 e1 e1] [a1 a1 a1 a1] [b1 b1 b1 b1]>")
+      .s("sawtooth").lpf(650).decay(0.2).sustain(0.3).gain(0.55),
+    note("<[0 ~ ~ 2 ~ ~ 4 ~] [~ ~ 4 ~ ~ 2 ~ ~] [0 ~ ~ 2 ~ ~ 6 ~] [~ ~ 4 ~ ~ ~ ~ ~]>")
+      .scale("E5:major").s("wt_pluck").decay(0.12).sustain(0)
+      .delay(0.3).delaytime(0.368).gain(0.32).pan(0.6),
+    chord("<E E A B>").voicing().s("supersaw")
+      .attack(0.5).release(1.1).lpf(1200).chorus(0.4).room(0.5).gain(0.24)
+  ),
+  lift: stack(
+    s("bd*4").gain(0.85),
+    s("~ sd ~ sd").room(0.5).roomsize(0.7).gain(0.55),
+    note("e1*8").s("sawtooth").lpf(700).decay(0.15).sustain(0.3).gain(0.55),
+    note("<[0 2 4 6 7 9 11 12] [2 4 6 7 9 11 12 14] [4 6 7 9 11 12 14 16] [7 9 11 12 14 16 18 19]>")
+      .scale("E4:major").s("pulse")
+      .decay(0.15).sustain(0.1).lpf(saw.range(900, 2800).slow(4))
+      .delay(0.3).delaytime(0.368).gain(0.36),
+    chord("<E B C#m A>").voicing().s("supersaw")
+      .attack(0.3).release(1.0).lpf(1500).chorus(0.4).room(0.5).gain(0.26)
+  ),
+  chorus: stack(
+    s("bd*4").gain(0.9),
+    s("~ sd ~ sd").room(0.55).roomsize(0.7).gain(0.65),
+    s("hh*8").gain(0.2).pan(sine.range(0.35, 0.65)),
+    note("<[e1 e2]*4 [b0 b1]*4 [c#1 c#2]*4 [a0 a1]*4>")
+      .s("sawtooth").lpf(750).decay(0.18).sustain(0.25).gain(0.52),
+    note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 9 ~ 7 ~ 4 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [4 ~ 6 ~ 7 ~ 9 ~] [7 ~ ~ ~ ~ ~ ~ ~]>")
+      .scale("E4:major").s("wt_lead").release(0.3)
+      .delay(0.22).delaytime(0.368).room(0.3).gain(0.42),
+    chord("<E B C#m A>").voicing().s("supersaw")
+      .attack(0.3).release(0.9).lpf(1800).chorus(0.45).room(0.5).gain(0.26)
+  ),
+  break: stack(
+    note("e1").s("sine").attack(1.2).release(2.2).slow(2).gain(0.4),
+    s("rs*4").gain(0.14).pan(0.45),
+    note("<b4 ~ g#4 e4>").s("wt_choir").attack(1.2).release(1.8)
+      .lpf(1400).room(0.7).gain(0.22).pan(0.45),
+    note("<[0 ~ ~ ~ 2 ~ ~ ~] [4 ~ ~ ~ ~ ~ ~ ~] [6 ~ ~ ~ 4 ~ ~ ~] [2 ~ ~ ~ 0 ~ ~ ~]>")
+      .scale("E5:major").s("wt_bell")
+      .delay(0.4).delaytime(0.368).room(0.6).gain(0.26).pan(0.6),
+    chord("<A A E E>").voicing().s("supersaw")
+      .attack(1.0).release(1.6).lpf(1200).chorus(0.5).room(0.7).gain(0.26)
+  ),
+  chorus2: stack(
+    s("bd*4").gain(0.9),
+    s("~ sd ~ sd").room(0.55).roomsize(0.7).gain(0.65),
+    s("hh*8").gain(0.18).pan(sine.range(0.35, 0.65)),
+    s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.12).pan(0.3),
+    s("~ ~ oh ~").gain(0.14).pan(0.55),
+    note("<[e1 e2]*4 [b0 b1]*4 [c#1 c#2]*4 [a0 a1]*4>")
+      .s("sawtooth").lpf(820).decay(0.18).sustain(0.25).gain(0.5),
+    note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 9 ~ 7 ~ 4 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [4 ~ 6 ~ 7 ~ 9 ~] [7 ~ ~ ~ ~ ~ ~ ~]>")
+      .scale("E4:major").s("supersaw").release(0.3).lpf(2600)
+      .off(0.25, x => x.add(12).gain(0.4))
+      .delay(0.22).delaytime(0.368).room(0.3).gain(0.4),
+    chord("<E B C#m A>").voicing().s("supersaw")
+      .attack(0.3).release(0.9).lpf(2000).chorus(0.45).room(0.5).gain(0.24)
+  ),
+  outro: stack(
+    note("e1").s("sine").attack(1.5).release(2.5).slow(2).gain(0.42),
+    note("<[0 ~ ~ ~ 4 ~ ~ ~] [7 ~ ~ ~ ~ ~ ~ ~] [4 ~ ~ ~ 2 ~ ~ ~] [0 ~ ~ ~ ~ ~ ~ ~]>")
+      .scale("E5:major").s("wt_bell")
+      .delay(0.45).delaytime(0.368).room(0.7).gain(0.24).pan(0.55),
+    chord("<E E E E>").voicing().s("supersaw")
+      .attack(1.2).release(2.0).lpf(isaw.range(400, 1400).slow(8))
+      .chorus(0.5).room(0.7).gain(0.24)
+  )
+})

@@ -1,0 +1,21 @@
+// Three-section song form (verse/chorus/bridge) using pickRestart with .slow(8).
+// .slow(8) makes each label last 8 cycles (~16s at 120 BPM). Omit it and sections flash by in 1 cycle.
+setbpm(120);
+
+"<a a b b a a c a>".slow(8).pickRestart({
+  a: stack(
+    s("bd ~ bd ~").gain(0.78),
+    note("c4 e4 g4 e4").s("sine").gain(0.42).release(0.2)
+  ),
+  b: stack(
+    s("bd*4").gain(0.85),
+    s("~ sd ~ sd").gain(0.7),
+    note("<c4 g4 a4 f4>").s("triangle").gain(0.48)
+  ),
+  c: note("c3 eb3 g3 bb3 c3 g3 eb3 c3")
+    .s("sawtooth")
+    .slow(2)
+    .cutoff(1200)
+    .gain(0.55)
+    .room(0.4)
+})

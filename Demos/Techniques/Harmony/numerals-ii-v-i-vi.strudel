@@ -1,0 +1,12 @@
+// Diatonic triads from Roman numerals in C major: ii V I vi → Dm G C Am.
+// One chord per cycle via slowcat <...>. Quality follows the major scale
+// (I,IV,V major; ii,iii,vi minor; vii° diminished).
+setbpm(90);
+
+chord("<Dm G C Am>")
+  .voicing()
+  .s("sawtooth")
+  .cutoff(1200)
+  .attack(0.05)
+  .release(0.6)
+  .gain(0.55)

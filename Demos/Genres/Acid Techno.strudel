@@ -1,0 +1,8 @@
+// acid techno in A phrygian (generated) — four-on-floor with a resonant 303 walk and clap backbeat
+setbpm(130);
+
+stack(
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.9),
+  note("a2 c3 d3 ~ d3 e3 e3 ~ e3 a#2 e3 ~ c3 a2 f2 ~").s("sawtooth").lpf(1200).resonance(20).gain(0.48),
+  note("<[a3, c4, e4, g4] [a#3, d4, f4, a4]>").s("sawtooth").struct("~ ~ 1 ~").release(0.15).lpf(1400).gain(0.28).room(0.2).pan(0.42)
+)

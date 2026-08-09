@@ -121,14 +121,14 @@ export const MACHINE_KITS: Array<[string, string, Array<[string, string]>]> = [
  * once more indices are bundled. Each entry is [bankName, relativePath].
  */
 export const PERCUSSION_COLORS: Array<[string, string]> = [
-    ['perc',       'perc/Cajon_hit1_f_rr1.wav'],
-    ['click',      'click/claves_mf.wav'],
-    ['metal',      'metal/Anvil_Hit1_v1_rr1_Mid.wav'],
+    ['perc',       'perc/Cajon_hit1_fff_rr1.wav'],
+    ['click',      'click/claves_ff.wav'],
+    ['metal',      'metal/Anvil_Hit1_v3_rr1_Mid.wav'],
     ['east',       'east/wood_click_ff.wav'],
-    ['hand',       'hand/Conga_HitN_v1_rr1_Sum.wav'],
-    ['industrial', 'industrial/BrakeDrum1_Hammer_v1_rr1_Mid.wav'],
+    ['hand',       'hand/Conga_HitN_v3_rr1_Sum.wav'],
+    ['industrial', 'industrial/BrakeDrum1_Hammer_v3_rr1_Mid.wav'],
     ['space',      'space/glass3_Asharp4_Fast_1_Main.wav'],
-    ['arpy',       'arpy/Clavisynth_C4_vl2.wav'],
+    ['arpy',       'arpy/Clavisynth_C4_vl3.wav'],
     ['tabla',      'tabla/Darbuka_1_hit_vl2_rr1.wav'],
     ['jvbass',     'jvbass/FMPiano_C1_vl3.wav'],
 ];

@@ -1,0 +1,9 @@
+// ambient dub in C minor (generated) — slow skank pulse, sub swells, echoing chords
+setbpm(70);
+
+stack(
+  s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ rs ~ ~ ~ ~ ~ ~ ~ rs ~ ~ ~, hh ~ ~ ~ ~ ~ ~ ~ hh ~ ~ ~ ~ ~ ~ ~").gain(0.5).room(0.6),
+  note("c1 ~ ~ ~ ~ ~ ~ ~ ~ ~ c1 ~ ~ ~ ~ ~").s("sine").attack(0.05).release(1).gain(0.55),
+  note("<[c3, d#3, g3, a#3] [f3, g#3, c4, d#4]>").s("gm_epiano1").struct("~ 1 ~ ~").release(0.6).gain(0.34).room(0.8).delay(0.5).pan(0.42),
+  note("c5 ~ ~ c5 ~ ~ g4 ~").s("gm_kalimba").room(0.7).delay(0.45).gain(0.3).pan(0.62)
+)

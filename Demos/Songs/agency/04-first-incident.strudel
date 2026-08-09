@@ -1,0 +1,94 @@
+// AGENCY OST — 04 · First Incident
+// The pager goes off at 2 PM. First contact with the intruders. Darksynth:
+// gated snare, grinding octave bass, the palm-muted chug, horror pad.
+// The Agency motif returns — same shape as track 1, but in HARMONIC minor:
+// the raised 7th (b#) turns the badge-in theme into a threat.
+//
+// FORM (110 BPM · 1 cycle = 1 bar · 64 bars ≈ 2:20 · loops):
+//   intro  8  e1  horror pad + the pager beep + sparse kick
+//   verse  8  e2  + four-on-floor, octave bass, hats
+//   lift   4  e3  + gated snare, low chug rumbles awake
+//   drop   16 e5  full: chug engine + the motif lead, raised-7th bite
+//   break  8  e2  reading the logs — pad + pager + heartbeat kick
+//   drop2  16 e5  full + octave answer on the lead
+//   outro  4  e1  pad drains out; the pager is still beeping
+// hook: the Agency motif, harmonic-minor voicing — both drops.
+
+setbpm(110);
+
+"<intro@2 verse@2 lift drop@4 break@2 drop2@4 outro>".slow(4).pickRestart({
+  intro: stack(
+    chord("<C#m C#m A A>").voicing().s("supersaw")
+      .lpf(1300).attack(0.6).release(1.4).chorus(0.4).room(0.65).gain(0.26),
+    note("<[[c#6 c#6] ~ ~ ~] [~ ~ [c#6 c#6] ~] [[c#6 c#6] ~ ~ ~] [~ ~ ~ ~]>")
+      .s("square").decay(0.05).sustain(0)
+      .room(0.4).gain(0.24).pan(0.62),
+    s("bd ~ ~ ~").gain(0.8).dist(0.2)
+  ),
+  verse: stack(
+    s("bd*4").gain(0.92).dist(0.25),
+    s("hh*8").gain(0.24).pan(sine.range(0.4, 0.6)),
+    note("<[c#1 c#2 c#1 c#2 c#1 c#2 c#1 c#2] [c#1 c#2 c#1 c#2 c#1 c#2 c#1 c#2] [a0 a1 a0 a1 a0 a1 a0 a1] [b0 b1 b0 b1 g#0 g#1 b0 b1]>")
+      .s("sawtooth").lpf(760).resonance(9).decay(0.18).sustain(0.25)
+      .dist(0.2).gain(0.52),
+    note("<[[c#6 c#6] ~ ~ ~] [~ ~ ~ ~]>").s("square").decay(0.05).sustain(0)
+      .room(0.4).gain(0.18).pan(0.62),
+    chord("<C#m C#m A B>").voicing().s("supersaw")
+      .lpf(1400).attack(0.5).release(1.2).chorus(0.4).room(0.6).gain(0.24)
+  ),
+  lift: stack(
+    s("bd*4").gain(0.93).dist(0.25),
+    s("~ sd ~ sd").room(0.55).roomsize(0.75).gain(0.66),
+    note("c#1*16").s("supersaw")
+      .lpf(sine.range(250, 700).fast(4)).resonance(11)
+      .decay(0.08).sustain(0).dist(0.3).gain("0.5 0.35 0.42 0.35"),
+    note("<[0 ~ 0 ~ 2 ~ 2 ~] [4 ~ 4 ~ 6 ~ 6 ~] [7 ~ 7 ~ 6 ~ 6 ~] [7 7 7 7 9 9 9 9]>")
+      .scale("C#4:harmonic minor").s("sawtooth")
+      .lpf(saw.range(1200, 2800).slow(4)).decay(0.18).sustain(0.1)
+      .dist(0.12).gain(0.34)
+  ),
+  drop: stack(
+    s("bd*4").gain(0.95).dist(0.28),
+    s("~ sd ~ sd").room(0.55).roomsize(0.75).gain(0.7),
+    s("hh*8").gain(0.26).pan(sine.range(0.4, 0.6)),
+    s("~ ~ ~ oh").gain(0.3),
+    note("c#1*16").s("supersaw")
+      .lpf(sine.range(400, 1400).fast(4)).resonance(11)
+      .decay(0.08).sustain(0).dist(0.35).gain("0.6 0.4 0.5 0.4"),
+    note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 6 ~ 7 ~ 9 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [2 ~ 4 ~ 6 ~ 7 ~] [7 9 7 ~ 6 ~ ~ ~]>")
+      .scale("C#4:harmonic minor").s("sawtooth")
+      .lpf(2600).resonance(6).decay(0.2).sustain(0.12)
+      .dist(0.15).delay(0.25).delaytime(0.2045).room(0.3).gain(0.4)
+  ),
+  break: stack(
+    chord("<C#m G#m A E>").voicing().s("supersaw")
+      .lpf(1100).attack(0.8).release(1.6).chorus(0.5).room(0.7).gain(0.26),
+    note("<[[c#6 c#6] ~ ~ ~] [~ ~ ~ ~] [~ [c#6 c#6] ~ ~] [~ ~ ~ ~]>")
+      .s("square").decay(0.05).sustain(0)
+      .room(0.5).delay(0.3).delaytime(0.2045).gain(0.2).pan(0.62),
+    s("bd ~ ~ ~").gain(0.75).dist(0.2),
+    note("<c#1 ~ a0 b0>").s("sine").attack(0.1).release(1.0).gain(0.45)
+  ),
+  drop2: stack(
+    s("bd*4").gain(0.95).dist(0.28),
+    s("~ sd ~ sd").room(0.55).roomsize(0.75).gain(0.7),
+    s("hh*8").gain(0.26).pan(sine.range(0.4, 0.6)),
+    s("~ ~ ~ oh").gain(0.3),
+    note("c#1*16").s("supersaw")
+      .lpf(sine.range(400, 1500).fast(4)).resonance(11)
+      .decay(0.08).sustain(0).dist(0.35).gain("0.6 0.4 0.5 0.4"),
+    note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 6 ~ 7 ~ 9 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [9 ~ 7 ~ 6 ~ 4 ~] [2 ~ 0 ~ ~ ~ ~ ~]>")
+      .scale("C#4:harmonic minor").s("sawtooth")
+      .lpf(2600).resonance(6).decay(0.2).sustain(0.12)
+      .off(0.5, x => x.add(12).gain(0.42))
+      .dist(0.15).delay(0.25).delaytime(0.2045).room(0.3).gain(0.38)
+  ),
+  outro: stack(
+    chord("<C#m C#m C#m C#m>").voicing().s("supersaw")
+      .lpf(isaw.range(400, 1300).slow(4)).attack(0.8).release(1.8)
+      .chorus(0.4).room(0.7).gain(0.24),
+    note("<[[c#6 c#6] ~ ~ ~] [~ ~ [c#6 c#6] ~] [[c#6 c#6] ~ ~ ~] [~ ~ ~ ~]>")
+      .s("square").decay(0.05).sustain(0)
+      .room(0.5).delay(0.4).delaytime(0.2045).gain(0.2).pan(0.62)
+  )
+})

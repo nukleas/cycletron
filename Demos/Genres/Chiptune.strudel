@@ -1,0 +1,9 @@
+// chiptune in C major (generated) — 8-bit rock beat, square octave bass, mirrored square arp
+setbpm(130);
+
+stack(
+  s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh*16").gain(0.85).crush(6),
+  note("c2 ~ c3 ~ c2 ~ c3 ~").s("square").release(0.15).gain(0.45).crush(7),
+  note("<[c3, e3, g3] [g3, b3, d4] [a3, c4, e4] [f3, a3, c4]>").s("pulse").struct("~ 1 ~ 1").release(0.15).gain(0.32).crush(7).pan(0.42),
+  note("c4 e4 g4 e4").s("square").release(0.15).crush(7).gain(0.34).pan(0.62)
+)

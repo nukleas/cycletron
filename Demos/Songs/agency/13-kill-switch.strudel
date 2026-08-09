@@ -1,0 +1,102 @@
+// AGENCY OST — 13 · Kill Switch
+// ACT II finale. One command ends the rogue process — and the legacy system
+// with it. The Agency motif (0 2 4 6 · 7 4 2 0) is no longer a melody:
+// it IS the bass riff, distorted, full of stops, doubled by sub. Harmonic
+// minor's raised 7th (b#) twists the last turnaround. Then the switch.
+//
+// FORM (100 BPM · 1 cycle = 1 bar · 68 bars ≈ 2:43 · loops):
+//   intro   8  e1  sub drone + bells recall track 1; the console waits
+//   arm     8  e3  kick + the motif-riff enters low and filtered
+//   strike  16 e5  full: riff, half-time gated snare, lead doubles the motif
+//   doubt   8  e2  hard stop — pad and bells; the hand hovers
+//   strike2 16 e5  full + choir dread; the decision
+//   flip    4  eX  THE SWITCH — one sub hit, then ringing silence
+//   outro   8  e1  the old machine's drone, one last motif bell. Done.
+// hook: the motif-as-riff — arm/strike/strike2; bells carry it elsewhere.
+
+setbpm(100);
+
+"<intro@2 arm@2 strike@4 doubt@2 strike2@4 flip outro@2>".slow(4).pickRestart({
+  intro: stack(
+    note("c#1").s("sine").slow(4).attack(3).release(8).gain(0.48),
+    note("<[0 ~ ~ ~ 2 ~ ~ ~] [4 ~ ~ ~ 6 ~ ~ ~] [7 ~ ~ ~ ~ ~ ~ ~] [~ ~ 4 ~ ~ 2 ~ 0]>")
+      .scale("C#5:minor").s("wt_bell")
+      .delay(0.45).delaytime(0.1875).delayfeedback(0.5)
+      .room(0.75).gain(0.26).pan(0.6),
+    chord("<C#m C#m A A>").voicing().s("supersaw")
+      .attack(1.2).release(2.4).lpf(900).chorus(0.4).room(0.7).gain(0.24)
+  ),
+  arm: stack(
+    s("<[bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+      .gain(0.9).dist(0.22),
+    note("<[c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ b#1 ~ g#1 ~ c#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sawtooth").lpf(saw.range(500, 900).slow(8)).resonance(8)
+      .decay(0.1).sustain(0).dist(0.32).gain(0.55),
+    note("<[c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ b#1 ~ g#1 ~ c#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sine").lpf(190).decay(0.13).sustain(0).dist(0.15).gain(0.4),
+    chord("<C#m C#m A B>").voicing().s("supersaw")
+      .attack(0.05).release(1.0).lpf(950).chorus(0.4).room(0.6)
+      .gain(saw.range(0.1, 0.26).fast(4))
+  ),
+  strike: stack(
+    s("<[bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+      .gain(0.95).dist(0.25),
+    s("~ ~ sd ~").room(0.65).roomsize(0.85).gain(0.74),
+    s("hh*8").gain(0.2).pan(sine.range(0.4, 0.6)),
+    note("<[c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ b#1 ~ g#1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [a1 ~ ~ a1 ~ ~ g#1 ~ f#1 ~ ~ f#1 e1 ~ ~ ~] [d1 ~ ~ ~ b#1 ~ ~ ~ c#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sawtooth").lpf(950).resonance(8)
+      .decay(0.1).sustain(0).dist(0.35).gain(0.56),
+    note("<[c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ b#1 ~ g#1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [a1 ~ ~ a1 ~ ~ g#1 ~ f#1 ~ ~ f#1 e1 ~ ~ ~] [d1 ~ ~ ~ b#1 ~ ~ ~ c#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sine").lpf(190).decay(0.13).sustain(0).dist(0.15).gain(0.42),
+    note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 6 ~ 7 ~ ~ ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [2 ~ 4 ~ 6 ~ 7 ~] [9 ~ 7 ~ ~ ~ ~ ~]>")
+      .scale("C#4:harmonic minor").s("sawtooth")
+      .lpf(2600).resonance(6).decay(0.2).sustain(0.12)
+      .dist(0.15).delay(0.22).delaytime(0.1875).room(0.3).gain(0.36)
+  ),
+  doubt: stack(
+    chord("<C#m A F# G#m>").voicing().s("supersaw")
+      .attack(1.2).release(2.2).lpf(sine.range(600, 1100).slow(8))
+      .chorus(0.5).room(0.8).gain(0.28),
+    note("<[7 ~ ~ ~ ~ ~ 6 ~] [4 ~ ~ ~ ~ ~ ~ ~] [~ ~ 2 ~ ~ ~ 0 ~] [~ ~ ~ ~ ~ ~ ~ ~]>")
+      .scale("C#5:minor").s("wt_bell")
+      .delay(0.5).delaytime(0.1875).delayfeedback(0.55)
+      .room(0.8).gain(0.26).pan(0.6),
+    note("c#1").s("sine").slow(4).attack(2).release(6).gain(0.44),
+    s("<[~ ~ ~ ~] [~ ~ sd ~] [~ ~ ~ ~] [~ ~ ~ ~]>").room(0.75).roomsize(0.9).gain(0.36)
+  ),
+  strike2: stack(
+    s("<[bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+      .gain(0.95).dist(0.28),
+    s("~ ~ sd ~").room(0.65).roomsize(0.85).gain(0.76),
+    s("hh*8").gain(0.22).pan(sine.range(0.4, 0.6)),
+    s("~ ~ ~ oh").gain(0.24),
+    note("<[c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ b#1 ~ g#1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [a1 ~ ~ a1 ~ ~ g#1 ~ f#1 ~ ~ f#1 e1 ~ ~ ~] [d1 ~ ~ ~ b#1 ~ ~ ~ c#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sawtooth").lpf(1050).resonance(8)
+      .decay(0.1).sustain(0).dist(0.35).gain(0.56),
+    note("<[c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ b#1 ~ g#1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [a1 ~ ~ a1 ~ ~ g#1 ~ f#1 ~ ~ f#1 e1 ~ ~ ~] [d1 ~ ~ ~ b#1 ~ ~ ~ c#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sine").lpf(190).decay(0.13).sustain(0).dist(0.15).gain(0.42),
+    note("<[g#2, d#3, b2] [g#2, d#3, b2] [a2, e3, c#3] [g#2, d#3, b#2]>").s("wt_choir")
+      .attack(0.4).release(2.0).lpf(1000).room(0.75)
+      .gain(saw.range(0.1, 0.26).fast(4)).pan(0.42),
+    note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [12 ~ 9 ~ 7 ~ 6 ~] [7 ~ ~ ~ 6 ~ 7 ~]>")
+      .scale("C#4:harmonic minor").s("sawtooth")
+      .lpf(2800).resonance(6).decay(0.2).sustain(0.12)
+      .dist(0.15).delay(0.22).delaytime(0.1875).room(0.3).gain(0.34)
+  ),
+  flip: stack(
+    note("<[c#1 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sine").attack(0.001).decay(0.5).sustain(0).release(4)
+      .lpf(180).dist(0.4).room(0.7).roomsize(0.9).gain(0.6),
+    s("<[bd ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~]>")
+      .gain(0.95).dist(0.3).room(0.6).roomsize(0.9),
+    note("c#1").s("sine").slow(4).attack(1.5).release(10).gain(0.34)
+  ),
+  outro: stack(
+    note("c#1").s("sine").slow(4).attack(3).release(10).gain(0.46),
+    note("c#2").s("sine").slow(4).attack(4).release(10).detune(9).gain(0.2),
+    note("<[~ ~ ~ ~ 0 ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~] [~ ~ 4 ~ ~ ~ 2 ~] [0 ~ ~ ~ ~ ~ ~ ~]>")
+      .scale("C#5:minor").s("wt_bell")
+      .delay(0.55).delaytime(0.1875).delayfeedback(0.6)
+      .room(0.85).gain(0.24).pan(0.6)
+  )
+})

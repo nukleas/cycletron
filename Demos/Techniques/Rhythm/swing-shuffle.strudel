@@ -1,0 +1,9 @@
+// Swing feel via `late`: push the off-beat hats slightly back.
+// The kick stays straight so the swing only colours the higher voices.
+setbpm(96);
+
+stack(
+  s("bd ~ ~ ~ bd ~ ~ ~"),
+  s("~ ~ sd ~ ~ ~ sd ~"),
+  s("hh*8").late(0.06).gain(0.5)
+)

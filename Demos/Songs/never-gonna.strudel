@@ -1,0 +1,18 @@
+setcpm(50)
+
+// Track 1: 0013GIVE (Drums)
+$: s(`<
+    - - [- - - - - - ht ht - ht ht mt mt mt lt lt] [[hh,bd] - oh - [hh,sd,cp] - hh hh [hh,bd] - oh - [hh,sd,cp] - oh -]
+    [[hh,bd] oh [hh,sd,cp] oh [hh,bd] oh [hh,sd,cp] oh] [[hh,bd] - oh - [hh,sd,cp] - hh hh [hh,bd] - oh - [hh,sd,cp] - oh -] [[hh,bd] oh [hh,sd,cp] oh [hh,bd] oh [hh,sd,cp] oh] [[hh,bd] - oh - [hh,sd,cp] - hh hh [hh,bd] - oh - [hh,sd,cp] - oh -]>`).gain(0.51).room(0.79)
+// Track 2: 0013GIVE (C:phrygian)
+$: note(`<
+    - - - [[C#4,A#3,F4] - - [G#3,D#4,C4] - - - -]
+    [[C4,G#3,D#4] - - [C#4,F4,A#3] - - - -] [[C#4,A#3,F4] - - [G#3,D#4,C4] - - - -] [[G#3,C4,D#4] - - [A#3,C#4,F4] - - - -] [[C#4,A#3,F4] - - [G#3,D#4,C4] - - - -]>`).sound("gm_alto_sax").release(0.20).gain(0.84).room(0.79)
+// Track 3: 0013GIVE (C:phrygian)
+$: note(`<
+    - - - [D#1 - D#1 D#1 - C2 A#1 - G#1 - G#1 - - - F1 G#1]
+    [F1 - F1 F1 - C2 A#1 - - - A#1 A#1 A#1 C2 - A#1] [D#1 - D#1 D#1 - C2 A#1 - G#1 - G#1 - - - G#1 G#1] [F1 - F1 F1 - C2 A#1 - - - G#1 - G#1 G#1 - C#2] [D#1 - D#1 D#1 - C2 A#1 - G#1 - G#1 - - - F1 G#1]>`).sound("gm_alto_sax").release(0.05).gain(0.92).room(0.79)
+// Track 4: 0013GIVE (C:locrian)
+$: note(`<
+    - - - [C#5 - - D#5 - - G#4 -]
+    [D#5 - - - - - F5 - - - - - G#5 F#5 F5 C#5] [- - - D#5 - - G#4 -] [- - - - - - - - - - - - G#5 F#5 F5 C#5] [- - - D#5 - - G#4 -]>`).sound("gm_alto_sax").release(0.15).gain(0.87).room(0.79)

@@ -1,0 +1,25 @@
+// Sound check for the relicensed audio bundle (commit c713469).
+// Plays every replaced sound in labelled sections, then loops:
+//   1. (2 cycles) essential kit — Fischer TR-808 CC0: bd sd sn hh cp oh / ht mt lt cr cb rs
+//   2. (4 cycles) percussion colors — VCSL CC0: perc click metal east / hand industrial tabla /
+//      arpy jvbass / space (wine-glass pad rings a full cycle)
+//   3. (2 cycles) TR-808 machine kit (Fischer CC0)
+//   4. (1 cycle)  TR-707 (hyperreal public domain)
+//   5. (1 cycle)  LinnDrum (BushDrum CC0)
+//   6. (1 cycle)  TR-909  — STREAMED from upstream; silent while offline
+//   7. (1 cycle)  DR-55   — STREAMED from upstream; silent while offline
+//   8. (21 cycles) the 21 bundled FluidR3_GM soundfonts, one arpeggio each
+setbpm(120);
+
+arrange(
+  [2, s("<[bd sd sn hh cp oh] [ht mt lt cr cb rs]>").gain(0.8)],
+  [4, s("<[perc click metal east] [hand industrial tabla ~] [arpy ~ jvbass ~] [space ~ ~ ~]>").gain(0.8)],
+  [2, s("<[bd sd hh oh cp] [rim lt mt ht cb]>").bank("RolandTR808").gain(0.8)],
+  [1, s("bd sd hh oh cp lt ht").bank("RolandTR707").gain(0.8)],
+  [1, s("bd sd hh cp").bank("LinnDrum").gain(0.8)],
+  [1, s("bd sd hh oh cp rd rim").bank("RolandTR909").gain(0.8)],
+  [1, s("bd sd hh rim").bank("BossDR55").gain(0.8)],
+  [21, note("c3 e3 g3 c4")
+    .s("<gm_piano gm_epiano1 gm_harpsichord gm_marimba gm_xylophone gm_church_organ gm_acoustic_guitar_nylon gm_overdriven_guitar gm_acoustic_bass gm_electric_bass_finger gm_synth_bass_1 gm_violin gm_cello gm_string_ensemble_1 gm_trumpet gm_trombone gm_alto_sax gm_clarinet gm_flute gm_lead_1_square gm_pad_warm>")
+    .gain(0.7)]
+)

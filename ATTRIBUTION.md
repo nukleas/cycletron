@@ -22,6 +22,8 @@ directly from a TR-808 (serial no. 103852) — see
 contributors — **CC0** ([`licenses/VCSL-LICENSE.txt`](licenses/VCSL-LICENSE.txt)).
 
 - Source: https://github.com/sgossner/VCSL
+- The bundled copies are peak-normalized to −4 dB (and `space`/`jvbass`
+  trimmed for one-shot use); the original recordings are upstream.
 
 | Bank | VCSL instrument |
 |---|---|

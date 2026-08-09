@@ -1,0 +1,9 @@
+// amapiano in F# minor (generated) — log drum bounce, soft claps, glassy keys over quiet sub
+setbpm(112);
+
+stack(
+  s("~ ~ ~ lt ~ ~ lt ~ ~ ~ lt ~ ~ ~ lt ~, hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~, ~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~").gain(0.9),
+  note("f#1 ~ ~ ~ ~ ~ ~ ~ ~ ~ f#1 ~ ~ ~ ~ ~").s("sine").attack(0.03).release(0.6).gain(0.52),
+  note("<[f#3, a3, c#4, e4] [b3, d4, f#4, a4] [c#4, e4, g#4, b4] [b3, d4, f#4, a4]>").s("gm_epiano1").release(0.5).gain(0.38).room(0.45).pan(0.42),
+  note("f#5 ~ ~ f#5 ~ ~ c#5 ~").s("wt_pluck").delay(0.3).room(0.4).gain(0.3).pan(0.62)
+)
