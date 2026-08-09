@@ -82,15 +82,12 @@ unreachable from PRs/branches); the rest are ordinary repo secrets.
 | `APPLE_APP_SPECIFIC_PASSWORD` | repo | app-specific password (account.apple.com) |
 | `APPLE_TEAM_ID` | repo | `8832K8LBLC` |
 
-Copy them to Cycletron (values are the same you set on `nukleas/opensauna`):
+Most were copied from the shared Apple account already. **Only one remains** —
+the `.p12` export password (the same value as opensauna's
+`APPLE_CERTIFICATE_PASSWORD`); it isn't stored in any local file:
 
 ```bash
-# One-time: create the tag-restricted release environment (see below), then:
-base64 -i ~/Code/Certificates.p12 | gh secret set APPLE_CERTIFICATE_BASE64 --env release --repo nukleas/cycletron
-gh secret set APPLE_CERTIFICATE_PASSWORD  --repo nukleas/cycletron   # p12 password
-gh secret set APPLE_ID                    --repo nukleas/cycletron   # Apple ID email
-gh secret set APPLE_APP_SPECIFIC_PASSWORD --repo nukleas/cycletron   # app-specific password
-gh secret set APPLE_TEAM_ID --repo nukleas/cycletron --body 8832K8LBLC
+gh secret set APPLE_CERTIFICATE_PASSWORD --repo nukleas/cycletron   # the ~/Code/Certificates.p12 password
 ```
 
 > Re-export gotchas (learned on opensauna): must be a **Developer ID Application**
@@ -106,9 +103,9 @@ gh secret set APPLE_TEAM_ID --repo nukleas/cycletron --body 8832K8LBLC
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | ✅ | Updater key password |
 | `APPLE_TEAM_ID` | ✅ | Apple team id (`8832K8LBLC`) |
 | `APPLE_CERTIFICATE_BASE64` | ✅ (`release` env) | Developer ID cert (.p12 base64) |
-| `APPLE_CERTIFICATE_PASSWORD` | ⬜ you | `.p12` password |
-| `APPLE_ID` | ⬜ you | Apple ID email |
-| `APPLE_APP_SPECIFIC_PASSWORD` | ⬜ you | app-specific password |
+| `APPLE_ID` | ✅ | Apple ID email |
+| `APPLE_APP_SPECIFIC_PASSWORD` | ✅ | app-specific password |
+| `APPLE_CERTIFICATE_PASSWORD` | ⬜ **you** | `.p12` password (last one) |
 
 The engine is a public Codeberg git dependency and the audio WASM is committed,
 so CI needs no engine token and no sibling checkout.
