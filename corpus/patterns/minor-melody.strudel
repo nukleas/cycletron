@@ -1,0 +1,5 @@
+// Natural minor scale run.
+note("0 1 2 3 4 5 6 7")
+  .scale("A3:minor")
+  .s("triangle")
+  .room(0.3)

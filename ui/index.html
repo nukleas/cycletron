@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cycletron</title>
+    <link rel="icon" href="data:,">
+    <!-- COOP/COEP are set by the server: Vite (dev) via server.headers,
+         Tauri (prod) via app.security.headers. No service-worker shim
+         needed — in a Tauri WKWebView, the coi-serviceworker triggers a
+         reload loop that can leave SharedArrayBuffer permanently unreachable. -->
+    <link rel="stylesheet" href="style.css">
+    <script src="restore-saved.min.js" vite-ignore></script>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <h1>Cycletron</h1>
+        </div>
+
+        <div class="controls">
+            <div class="file-menu-group">
+                <button id="fileMenuBtn" class="file-menu-btn" title="File menu (New, Open, Save, Recent)" aria-haspopup="menu" aria-expanded="false">
+                    <span class="file-menu-btn-label">File</span>
+                    <span class="file-menu-btn-caret" aria-hidden="true">▾</span>
+                </button>
+                <div id="fileMenuPopover" class="file-menu-popover" role="menu" hidden></div>
+            </div>
+            <div class="header-menu">
+                <button id="visualsMenuBtn" class="header-menu-btn" aria-haspopup="menu" aria-expanded="false">Visuals ▾</button>
+                <div id="visualsMenu" class="dropdown-menu" role="menu" aria-labelledby="visualsMenuBtn" hidden></div>
+            </div>
+            <div class="transport-group">
+                <button id="skipBackBtn" class="skip-btn" disabled title="Back 5 cycles" aria-label="Skip back 5 cycles">⏮ 5</button>
+                <button id="transportBtn" class="primary" disabled>▶ Play</button>
+                <button id="stopBtn" class="danger" disabled>■ Stop</button>
+                <button id="skipFwdBtn" class="skip-btn" disabled title="Forward 5 cycles" aria-label="Skip forward 5 cycles">5 ⏭</button>
+                <button id="metronomeBtn" class="metronome-btn" title="Metronome off" aria-label="Metronome">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 22h14"/>
+                        <path d="M6 22 9 4h6l3 18"/>
+                        <line x1="12" y1="6" x2="12" y2="16"/>
+                    </svg>
+                </button>
+                <span id="midiInStatus" class="midi-in-status" hidden title="MIDI input"></span>
+            </div>
+             <div class="slider-group">
+                <div class="bpm-control">
+                    <label for="bpmSlider">BPM:</label>
+                    <input type="range" id="bpmSlider" min="30" max="300" value="120" aria-label="Beats per minute">
+                    <input
+                        type="number"
+                        class="bpm-value"
+                        id="bpmValue"
+                        min="30"
+                        max="300"
+                        value="120"
+                        title="Click to type a BPM (30–300)"
+                        aria-label="BPM value"
+                    >
+                </div>
+
+                <div class="gain-control">
+                    <label for="gainSlider">Vol:</label>
+                    <input type="range" id="gainSlider" min="0" max="200" value="100" aria-label="Master volume">
+                    <span id="gainValue">100%</span>
+                </div>
+
+
+            </div>
+        </div>
+    </header>
+
+    <div class="app-body">
+        <!-- AI Chat Panel (outside main grid) -->
+        <div class="ai-panel" id="aiPanel">
+            <div class="ai-panel-header">
+                <span>AI Operator</span>
+                <div class="ai-panel-actions">
+                    <button id="aiClear" class="ai-action-btn" title="New song / clear chat">New</button>
+                    <button id="aiToggle" class="ai-toggle" title="Toggle AI panel">&#9664;</button>
+                </div>
+            </div>
+            <div id="aiEnableCta" class="ai-enable-cta">
+                <p class="ai-enable-lead">AI assistant</p>
+                <p class="ai-enable-sub">Optional. Off until you say so.</p>
+                <button id="aiEnable" class="ai-enable-btn" type="button">Enable AI…</button>
+            </div>
+            <div id="aiMessages" class="ai-messages"></div>
+            <div id="aiQuickPrompts" class="ai-quick-prompts">
+                <button class="ai-quick" data-prompt="add a melody">+ melody</button>
+                <button class="ai-quick" data-prompt="add drums">+ drums</button>
+                <button class="ai-quick" data-prompt="add a bassline">+ bass</button>
+                <button class="ai-quick" data-prompt="make it darker">darker</button>
+                <button class="ai-quick" data-prompt="add reverb and delay effects">+ fx</button>
+                <button class="ai-quick" data-prompt="speed it up">faster</button>
+            </div>
+            <form id="aiForm" class="ai-form">
+                <input
+                    id="aiInput"
+                    type="text"
+                    placeholder="Describe the music you want..."
+                    autocomplete="off"
+                />
+                <button type="submit">Send</button>
+            </form>
+        </div>
+
+        <!-- File Explorer Panel -->
+        <div class="files-panel" id="filesPanel">
+            <div class="files-panel-header">
+                <span class="files-panel-title">File System</span>
+                <div class="files-panel-actions">
+                    <button id="filesNewFile" class="files-action-btn" title="New file" aria-label="New file">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="13" x2="12" y2="19"/>
+                            <line x1="9" y1="16" x2="15" y2="16"/>
+                        </svg>
+                    </button>
+                    <button id="filesNewFolder" class="files-action-btn" title="New folder" aria-label="New folder">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                            <line x1="12" y1="11" x2="12" y2="17"/>
+                            <line x1="9" y1="14" x2="15" y2="14"/>
+                        </svg>
+                    </button>
+                    <button id="filesMidiImport" class="files-action-btn" title="Import MIDI…" aria-label="Import MIDI">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="6" width="20" height="12" rx="1"/>
+                            <line x1="7" y1="6" x2="7" y2="14"/>
+                            <line x1="11" y1="6" x2="11" y2="14"/>
+                            <line x1="15" y1="6" x2="15" y2="14"/>
+                            <line x1="19" y1="6" x2="19" y2="14"/>
+                        </svg>
+                    </button>
+                    <button id="filesRefresh" class="files-action-btn" title="Refresh" aria-label="Refresh">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                        </svg>
+                    </button>
+                    <button id="filesChangeRoot" class="files-action-btn" title="Change library location" aria-label="Change library location">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                    </button>
+                    <button id="filesToggle" class="files-toggle" title="Toggle files panel" aria-label="Toggle files panel">&#9664;</button>
+                </div>
+            </div>
+            <div id="fileTree" class="file-tree" role="tree"></div>
+            <div class="files-panel-footer">
+                <span class="files-root-label" id="filesRootLabel" title=""></span>
+            </div>
+        </div>
+        <div class="file-context-menu" id="fileContextMenu" hidden></div>
+
+        <main>
+        <div class="editor-panel">
+            <div class="panel-header">
+                <span>Pattern Console</span>
+                <div class="shortcuts">
+                    <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> Play</span>
+                    <span><kbd>Esc</kbd> Stop</span>
+                    <span><kbd>⌘</kbd>+<kbd>O</kbd> Open</span>
+                    <span><kbd>⌘</kbd>+<kbd>S</kbd> Save</span>
+                </div>
+                <div class="panel-header-right">
+                    <button id="historyBtn" class="copy-btn" title="Snapshots of this file (saved on every save)">
+                        <span class="btn-text">History</span>
+                    </button>
+                    <div class="record-group" title="Record live audio to WAV. Leave bars empty for manual stop.">
+                        <button id="recordBtn" class="copy-btn record-btn">
+                            <span class="btn-text">Rec</span>
+                        </button>
+                        <input id="recordBars" type="number" min="0" step="1" placeholder="bars" class="record-bars" aria-label="Auto-stop after N bars">
+                        <span id="recordStatus" class="record-status" aria-live="polite"></span>
+                    </div>
+                    <button id="editorMidiBtn" class="copy-btn" title="Open MIDI Lab — convert .mid files to Strudel">
+                        <span class="btn-text">MIDI</span>
+                    </button>
+                    <button id="copyBtn" class="copy-btn" title="Copy to clipboard">
+                        <span class="btn-text">Copy</span>
+                    </button>
+                    <div class="editor-zoom">
+                        <button id="editorZoomOut" title="Decrease font size (Ctrl+-)">−</button>
+                        <span id="editorZoomValue"></span>
+                        <button id="editorZoomIn"  title="Increase font size (Ctrl+=)">+</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Ambient visualization — fills the editor pane, sits behind #editor -->
+            <div id="fullscreenViz" class="fullscreen-viz" aria-hidden="true"></div>
+            <div id="editor"></div>
+            <div id="editorEmptyState" class="editor-empty-state" hidden>
+                <div class="editor-empty-state-inner">
+                    <div class="editor-empty-state-wave" aria-hidden="true">▁▂▄▆█▆▄▂▁▂▄▆█▆▄▂▁</div>
+                    <div class="editor-empty-state-title">No file open</div>
+                    <div class="editor-empty-state-text">
+                        Drop a <code>.strudel</code> or <code>.mid</code> file here, or use
+                        <kbd>⌘</kbd>+<kbd>O</kbd> to open one.
+                    </div>
+                    <div class="editor-empty-state-actions">
+                        <button id="emptyOpenBtn" type="button" class="editor-empty-state-btn">Open file…</button>
+                        <button id="emptyNewBtn" type="button" class="editor-empty-state-btn editor-empty-state-btn--ghost">New</button>
+                        <button id="emptyExamplesBtn" type="button" class="editor-empty-state-btn editor-empty-state-btn--ghost">Browse examples</button>
+                    </div>
+                </div>
+            </div>
+            <div id="error"></div>
+        </div>
+
+        <div id="resizeHandle"></div>
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <h3>Sequence Grid</h3>
+                <div id="visualizer"></div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Signal Scope</h3>
+                <div id="scope"></div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Runtime</h3>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-label">Cycle</div>
+                        <div class="stat-value" id="cycleCount">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Voices</div>
+                        <div class="stat-value" id="voiceCount">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Samples</div>
+                        <div class="stat-value" id="sampleCount">-</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">BPM</div>
+                        <div class="stat-value" id="bpmDisplay">120</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section" id="soundsPanel">
+                <h3>Sounds <span id="soundsCount" class="section-count"></span></h3>
+                <div id="soundsList" class="sounds-list"></div>
+            </div>
+
+            <div class="sidebar-section sidebar-browse">
+                <button id="browseExamples" class="browse-btn">
+                    Browse Examples
+                    <span class="browse-hint" id="examplesCount"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span id="status">Press Play to begin</span>
+            <span class="status-file" id="currentFileName">untitled</span>
+            <span class="live" id="liveIndicator"></span>
+        </div>
+    </main>
+    </div><!-- .app-body -->
+
+    <!-- Command Palette -->
+    <div id="commandPalette" class="cmd-palette" hidden role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="cmd-palette-backdrop" data-dismiss></div>
+        <div class="cmd-palette-window" role="document">
+            <input id="cmdPaletteInput" type="text" class="cmd-palette-input" placeholder="Type a command, file, or recent…" autocomplete="off" spellcheck="false">
+            <div id="cmdPaletteList" class="cmd-palette-list" role="listbox"></div>
+            <div class="cmd-palette-footer">
+                <span><kbd>↑↓</kbd> navigate</span>
+                <span><kbd>Enter</kbd> run</span>
+                <span><kbd>Esc</kbd> close</span>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Compact auto-hiding HUD — sibling of the viz so it overlays the app -->
+    <div id="fullscreenVizHUD" class="fullscreen-viz-hud" hidden>
+        <div class="hud-left">
+            <span id="fsVizModeLabel">NEON CIRCUIT</span>
+            <span class="hud-divider">·</span>
+            <span id="fsBpm">120</span>
+            <span class="hud-unit">BPM</span>
+        </div>
+        <div class="hud-center">
+            <button id="fsVizPrev" class="hud-btn" title="Previous visualization ( [ )">◀</button>
+            <button id="fsVizNext" class="hud-btn" title="Next visualization ( ] )">▶</button>
+            <button id="fsVizAuto" class="hud-btn" title="Auto-cycle visualizations every 16 cycles">AUTO</button>
+        </div>
+        <div class="hud-right">
+            <button id="fsVizExit" class="hud-btn hud-exit" title="Hide visualization (Cmd+Shift+V)">HIDE</button>
+        </div>
+    </div>
+
+    <!-- Welcome (first-run) modal -->
+    <div id="welcomeModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window" role="document">
+            <div class="app-modal-header">
+                <span id="welcomeTitle">Welcome</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="welcome-body">
+                <div class="welcome-step" data-step="0">
+                    <h3>Cycletron</h3>
+                    <p>AI-first strudel music engine. A quick tour, then you're free.</p>
+                    <ul class="welcome-list">
+                        <li><span class="welcome-key">⌘⇧P</span> command palette — every action, every file</li>
+                        <li><span class="welcome-key">⌘O</span> / <span class="welcome-key">⌘S</span> open / save</li>
+                        <li><span class="welcome-key">⌘↩</span> play · <span class="welcome-key">Esc</span> stop</li>
+                        <li><span class="welcome-key">⌘F</span> find &amp; replace</li>
+                    </ul>
+                </div>
+                <div class="welcome-step" data-step="1" hidden>
+                    <h3>The AI assistant is optional</h3>
+                    <p>Cycletron runs fully by hand — editor, samples, MIDI, the whole engine. The AI composer is there if you want it, and it stays <strong>off</strong> until you turn it on.</p>
+                    <p>When you're ready, hit <strong>Enable AI…</strong> in the AI panel and pick a provider. It's your call, any time.</p>
+                </div>
+                <div class="welcome-step" data-step="2" hidden>
+                    <h3>Library location</h3>
+                    <p>Where Cycletron keeps the patterns you save and the MIDI conversions you import. You can move it later from Preferences.</p>
+                    <div class="prefs-row">
+                        <code id="welcomeLibraryRoot" class="prefs-path">—</code>
+                        <button id="welcomeChangeLibrary" class="prefs-inline-btn" type="button">Change…</button>
+                    </div>
+                </div>
+                <div class="welcome-step" data-step="3" hidden>
+                    <h3>You're all set</h3>
+                    <p>Press <strong>Play</strong>, open <strong>Examples</strong>, and load <strong>Lesson 1</strong>. The left panel is the AI Operator; Files is your library.</p>
+                    <p>Help → User Guide, Keyboard Shortcuts, and Dialect cover the rest. If anything breaks, Help → Show Logs for a diagnostic dump.</p>
+                </div>
+            </div>
+            <div class="app-modal-actions welcome-actions">
+                <span id="welcomeStepLabel" class="welcome-step-label">1 / 4</span>
+                <span class="app-modal-spacer"></span>
+                <button id="welcomeBack">Back</button>
+                <button id="welcomeNext" class="app-modal-primary">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI consent — opt-in, off by default. Nothing AI runs until Enable. -->
+    <div id="aiConsentModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="aiConsentTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window app-modal-window--small" role="document">
+            <div class="app-modal-header">
+                <span id="aiConsentTitle">Turn on the AI assistant?</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="ai-consent-body">
+                <p>Cycletron includes an AI assistant that can write, edit, and arrange patterns with you. It's yours to switch on — or leave off.</p>
+                <p>Turning it on sends your prompts and the code in your editor to your chosen model provider. Your call.</p>
+                <p class="ai-consent-fine">You can run Cycletron fully by hand. You'll just be leaving some of its range on the table.</p>
+            </div>
+            <div class="app-modal-actions">
+                <button data-dismiss>Not now</button>
+                <span class="app-modal-spacer"></span>
+                <button id="aiConsentEnable" class="app-modal-primary">Enable AI — I'm in</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs modal -->
+    <div id="logsModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="logsTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window logs-window" role="document">
+            <div class="app-modal-header">
+                <span id="logsTitle">Logs</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="logs-body">
+                <div class="logs-toolbar">
+                    <span id="logsCount">0 entries</span>
+                    <span class="app-modal-spacer"></span>
+                    <button id="logsRefresh" class="prefs-inline-btn" type="button">Refresh</button>
+                    <button id="logsClear" class="prefs-inline-btn" type="button">Clear</button>
+                </div>
+                <pre id="logsContent"></pre>
+            </div>
+            <div class="app-modal-actions">
+                <button data-dismiss>Close</button>
+                <span class="app-modal-spacer"></span>
+                <button id="logsCopyDump" class="app-modal-primary">Copy Diagnostic Dump</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History modal -->
+    <div id="historyModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window history-modal-window" role="document">
+            <div class="app-modal-header">
+                <span id="historyTitle">Version History</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="history-body">
+                <div class="history-list" id="historyList"></div>
+                <div class="history-preview">
+                    <pre id="historyPreview"></pre>
+                </div>
+            </div>
+            <div class="app-modal-actions">
+                <button data-dismiss>Cancel</button>
+                <span class="app-modal-spacer"></span>
+                <button id="historyRestore" class="app-modal-primary" disabled>Restore</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help modal (User Guide / Shortcuts / Dialect) -->
+    <div id="helpModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window app-modal-window--wide" role="document">
+            <div class="app-modal-header">
+                <span id="helpTitle">Help</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div id="helpTabs" class="help-tabs" role="tablist">
+                <button type="button" class="help-tab help-tab--active" data-help-section="guide">User Guide</button>
+                <button type="button" class="help-tab" data-help-section="shortcuts">Shortcuts</button>
+                <button type="button" class="help-tab" data-help-section="dialect">Dialect</button>
+            </div>
+            <div id="helpBody" class="help-body"></div>
+            <div class="app-modal-actions">
+                <span class="app-modal-spacer"></span>
+                <button data-dismiss class="app-modal-primary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sample packs -->
+    <div id="packsModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="packsTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window" role="document">
+            <div class="app-modal-header">
+                <span id="packsTitle">Sample Packs</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="packs-modal-body">
+                <p class="packs-intro">Optional sample packs live in your library under <code>Packs/</code>. Enable a pack to load its banks for <code>s("…")</code>.</p>
+                <div id="packsList" class="packs-list"></div>
+                <div id="packsEmpty" class="packs-empty" hidden></div>
+            </div>
+            <div class="app-modal-actions">
+                <button type="button" id="packsInstall" class="app-modal-link">Install from Folder…</button>
+                <button type="button" id="packsOpenFolder" class="app-modal-link">Open Packs Folder</button>
+                <button type="button" id="packsReload" class="app-modal-link">Reload Enabled</button>
+                <span class="app-modal-spacer"></span>
+                <button data-dismiss class="app-modal-primary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- About modal -->
+    <div id="aboutModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window app-modal-window--small" role="document">
+            <div class="app-modal-header">
+                <span id="aboutTitle">About</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="about-modal-body">
+                <div class="about-logo">CYCLE<span class="about-logo-accent">TRON</span></div>
+                <div class="about-tagline">Live coding for music, built on Rust</div>
+                <p class="about-credit">A NaderLabs project · engine: strudel-rs</p>
+                <p class="about-license">Licensed under AGPL-3.0-or-later</p>
+                <p class="about-privacy">Privacy: prompts and pattern text go to the AI provider you choose. API keys stay on this machine. Local logs and agent stats are not uploaded.</p>
+                <dl class="about-grid">
+                    <dt>Version</dt><dd id="aboutVersion">—</dd>
+                    <dt>Identifier</dt><dd id="aboutIdentifier">—</dd>
+                    <dt>Tauri</dt><dd id="aboutTauri">—</dd>
+                </dl>
+                <div class="about-links">
+                    <button id="aboutGuideBtn" class="app-modal-link">User Guide</button>
+                    <button id="aboutDialectBtn" class="app-modal-link">Dialect</button>
+                    <button id="aboutDocsBtn" class="app-modal-link">Strudel Docs (web)</button>
+                    <button id="aboutCheckUpdates" class="app-modal-link">Check for Updates</button>
+                </div>
+            </div>
+            <div class="app-modal-actions">
+                <span class="app-modal-spacer"></span>
+                <button data-dismiss class="app-modal-primary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preferences modal -->
+    <div id="prefsModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="prefsTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window" role="document">
+            <div class="app-modal-header">
+                <span id="prefsTitle">Preferences</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="prefs-body">
+                <section class="prefs-section">
+                    <h4>AI</h4>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsAiConsent">
+                        <span>Enable AI features</span>
+                    </label>
+                    <p class="prefs-note">Off by default. When on, your prompts and editor code go to the provider you pick below. Turn it off any time to keep Cycletron fully offline.</p>
+                    <label class="prefs-field">
+                        <span>Provider</span>
+                        <select id="prefsProvider">
+                            <option value="anthropic">Claude (Anthropic)</option>
+                            <option value="grok">Grok (xAI)</option>
+                            <option value="codex">Codex (ChatGPT)</option>
+                            <option value="openai">OpenAI (API key)</option>
+                            <option value="local">Local (Ollama / LM Studio)</option>
+                            <option value="custom">Custom (OpenAI-compatible)</option>
+                        </select>
+                    </label>
+                    <label class="prefs-field">
+                        <span>API key</span>
+                        <input type="password" id="prefsApiKey" placeholder="sk-…" autocomplete="off" spellcheck="false">
+                    </label>
+                    <div class="prefs-field-hint" id="prefsKeyStatus">No key set</div>
+                    <div id="prefsGrokOauth" class="prefs-oauth" hidden>
+                        <div class="prefs-row prefs-oauth-row">
+                            <button type="button" id="prefsGrokSignIn" class="prefs-inline-btn">Sign in with SuperGrok</button>
+                            <button type="button" id="prefsGrokImport" class="prefs-inline-btn">Import Grok Build session</button>
+                            <button type="button" id="prefsGrokSignOut" class="prefs-inline-btn" hidden>Sign out OAuth</button>
+                        </div>
+                        <div class="prefs-field-hint" id="prefsGrokOauthStatus">Use your SuperGrok / SuperHeavy subscription via OAuth — no API key required.</div>
+                    </div>
+                    <div id="prefsCodexOauth" class="prefs-oauth" hidden>
+                        <div class="prefs-row prefs-oauth-row">
+                            <button type="button" id="prefsCodexSignIn" class="prefs-inline-btn">Sign in with ChatGPT</button>
+                            <button type="button" id="prefsCodexImport" class="prefs-inline-btn">Import Codex CLI session</button>
+                            <button type="button" id="prefsCodexSignOut" class="prefs-inline-btn" hidden>Sign out OAuth</button>
+                        </div>
+                        <div class="prefs-field-hint" id="prefsCodexOauthStatus">Use your ChatGPT / Codex plan via OAuth — same as `codex login`.</div>
+                    </div>
+                    <label class="prefs-field" id="prefsBaseUrlField" hidden>
+                        <span>Base URL</span>
+                        <input type="text" id="prefsBaseUrl" placeholder="https://api.example.com/v1" autocomplete="off" spellcheck="false">
+                    </label>
+                    <label class="prefs-field">
+                        <span>Model</span>
+                        <input type="text" id="prefsModel" placeholder="claude-sonnet-4-6" autocomplete="off" spellcheck="false">
+                    </label>
+                    <label class="prefs-field">
+                        <span>Max tokens</span>
+                        <input type="number" id="prefsMaxTokens" min="256" max="200000" step="1000" placeholder="64000">
+                    </label>
+                    <div class="prefs-field-hint" id="prefsProviderNote" hidden></div>
+                </section>
+                <section class="prefs-section">
+                    <h4>Audio</h4>
+                    <label class="prefs-field">
+                        <span>Default tempo (BPM)</span>
+                        <input type="number" id="prefsDefaultTempo" min="30" max="300" step="1" placeholder="120">
+                    </label>
+                    <div class="prefs-field prefs-field-wide">
+                        <div class="prefs-row">
+                            <span>Output device</span>
+                            <button id="prefsAudioRefresh" class="prefs-inline-btn" type="button">Refresh</button>
+                        </div>
+                        <select id="prefsAudioOutput">
+                            <option value="">System default</option>
+                        </select>
+                    </div>
+                    <label class="prefs-field">
+                        <span>Metronome volume</span>
+                        <input type="range" id="prefsMetronomeVolume" min="0" max="100" step="1" value="40">
+                    </label>
+                </section>
+                <section class="prefs-section">
+                    <h4>MIDI Input</h4>
+                    <div class="prefs-field prefs-field-wide">
+                        <div class="prefs-row">
+                            <span>Device</span>
+                            <button id="prefsMidiRefresh" class="prefs-inline-btn" type="button">Refresh</button>
+                        </div>
+                        <select id="prefsMidiInput">
+                            <option value="">All inputs</option>
+                        </select>
+                    </div>
+                    <label class="prefs-field">
+                        <span>CC → master gain</span>
+                        <input type="number" id="prefsMidiCcGain" min="0" max="127" step="1" placeholder="7">
+                    </label>
+                    <label class="prefs-field">
+                        <span>CC → BPM</span>
+                        <input type="number" id="prefsMidiCcBpm" min="0" max="127" step="1" placeholder="74">
+                    </label>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsMidiMonitorEnabled">
+                        <span>Live monitor — hear the keyboard as you play</span>
+                    </label>
+                    <label class="prefs-field">
+                        <span>Monitor instrument</span>
+                        <select id="prefsMidiMonitorInstrument"></select>
+                    </label>
+                    <label class="prefs-field">
+                        <span>Monitor volume</span>
+                        <input type="range" id="prefsMidiMonitorGain" min="0" max="100" step="1" value="80">
+                    </label>
+                    <div class="prefs-field prefs-field-wide">
+                        <div class="prefs-row">
+                            <span>Pad / key actions</span>
+                            <span class="prefs-hint" id="prefsMidiPadsHint">Click Learn, then press a pad or key</span>
+                        </div>
+                        <div id="prefsMidiPads" class="prefs-midi-pads"></div>
+                    </div>
+                </section>
+                <section class="prefs-section">
+                    <h4>Library</h4>
+                    <div class="prefs-field prefs-field-wide">
+                        <span>Library root</span>
+                        <div class="prefs-row">
+                            <code id="prefsLibraryRoot" class="prefs-path">—</code>
+                            <button id="prefsChangeLibrary" class="prefs-inline-btn">Change…</button>
+                        </div>
+                    </div>
+                </section>
+                <section class="prefs-section">
+                    <h4>Editor</h4>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsEditorAssist">
+                        <span>Autocomplete &amp; hover docs</span>
+                    </label>
+                    <p class="prefs-note">Suggestions and hover help sourced from the strudel-rs DSL surface. Toggle live from the command palette too.</p>
+                </section>
+                <section class="prefs-section">
+                    <h4>Notifications</h4>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsNotifications">
+                        <span>Show system notifications</span>
+                    </label>
+                </section>
+                <section class="prefs-section">
+                    <h4>Updates</h4>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsAutoCheck">
+                        <span>Check for updates on startup</span>
+                    </label>
+                    <p class="prefs-note">Update endpoints are configured at build time in <code>tauri.conf.json</code> under <code>plugins.updater.endpoints</code>. <a href="https://v2.tauri.app/plugin/updater/" target="_blank" rel="noopener">Configure a release pipeline →</a></p>
+                </section>
+            </div>
+            <div class="app-modal-actions">
+                <button data-dismiss>Cancel</button>
+                <span class="app-modal-spacer"></span>
+                <button id="prefsSave" class="app-modal-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MIDI Lab modal -->
+    <div id="midiLab" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="midiLabTitle">
+        <div class="app-modal-backdrop" id="midiLabBackdrop"></div>
+        <div class="app-modal-window app-modal-window--wide" role="document">
+            <div class="app-modal-header">
+                <span id="midiLabTitle">MIDI LAB</span>
+                <button class="app-modal-close" id="midiLabClose" data-dismiss aria-label="Close">×</button>
+            </div>
+            <div class="midi-lab-fileline">
+                <button id="midiLabBrowse" class="midi-lab-browse">Browse…</button>
+                <span id="midiLabFileName" class="midi-lab-filename">no file</span>
+                <span id="midiLabMeta" class="midi-lab-meta"></span>
+            </div>
+            <div class="midi-lab-body">
+                <div class="midi-lab-tracks">
+                    <h4>Tracks</h4>
+                    <div id="midiLabTrackList" class="midi-lab-track-list">
+                        <div class="midi-lab-track-empty">Select a .mid file to inspect tracks.</div>
+                    </div>
+                </div>
+                <div class="midi-lab-options">
+                    <h4>Options</h4>
+                    <label class="midi-lab-field">
+                        <span>Drum bank</span>
+                        <select id="midiLabDrumBank">
+                            <option value="simple" selected>Simple</option>
+                            <option value="808">TR-808</option>
+                            <option value="909">TR-909</option>
+                            <option value="707">TR-707</option>
+                            <option value="linn">LinnDrum</option>
+                            <option value="dmx">Oberheim DMX</option>
+                            <option value="auto">Auto</option>
+                        </select>
+                    </label>
+                    <label class="midi-lab-field">
+                        <span>Instruments</span>
+                        <select id="midiLabInstrument">
+                            <option value="hybrid" selected>Hybrid</option>
+                            <option value="waveforms">Waveforms</option>
+                            <option value="gm">GM Soundfonts</option>
+                            <option value="auto">Auto</option>
+                        </select>
+                    </label>
+                    <label class="midi-lab-field midi-lab-check">
+                        <input type="checkbox" id="midiLabAutoRes" checked>
+                        <span>Auto resolution</span>
+                    </label>
+                    <label class="midi-lab-field">
+                        <span>Notes/bar</span>
+                        <input type="number" id="midiLabNotesPerBar" min="4" max="128" step="4" value="64" disabled>
+                    </label>
+                    <label class="midi-lab-field">
+                        <span>Bar limit</span>
+                        <input type="number" id="midiLabBarLimit" min="0" max="999" value="0">
+                    </label>
+                    <label class="midi-lab-field midi-lab-check">
+                        <input type="checkbox" id="midiLabCompact">
+                        <span>Compact repeats (!)</span>
+                    </label>
+                    <label class="midi-lab-field midi-lab-check">
+                        <input type="checkbox" id="midiLabCompose">
+                        <span>Split into sections (pickRestart)</span>
+                    </label>
+                    <label class="midi-lab-field">
+                        <span>Section naming</span>
+                        <select id="midiLabSectionNaming">
+                            <option value="heuristic" selected>Heuristic</option>
+                            <option value="generic">Generic</option>
+                        </select>
+                    </label>
+                    <label class="midi-lab-field midi-lab-check">
+                        <input type="checkbox" id="midiLabDetectDrums" checked>
+                        <span>Detect drum names</span>
+                    </label>
+                </div>
+            </div>
+            <div class="midi-lab-preview">
+                <div class="midi-lab-preview-header">
+                    <h4>Preview</h4>
+                    <span id="midiLabPreviewHint" class="midi-lab-preview-hint">Click <em>Preview</em> to generate.</span>
+                </div>
+                <pre id="midiLabPreview"></pre>
+            </div>
+            <div class="midi-lab-actions">
+                <button id="midiLabCancel" data-dismiss>Cancel</button>
+                <span class="midi-lab-spacer"></span>
+                <button id="midiLabPreviewBtn">Preview</button>
+                <button id="midiLabOpen">Open in Editor</button>
+                <button id="midiLabSave" class="midi-lab-primary">Save to Library</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="src/app.ts"></script>
+    <script type="module" src="src/ai-bridge.ts"></script>
+    <script type="module" src="src/boot.ts"></script>
+</body>
+</html>

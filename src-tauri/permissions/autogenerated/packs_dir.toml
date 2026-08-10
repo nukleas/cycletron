@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-packs-dir"
+description = "Enables the packs_dir command without any pre-configured scope."
+commands.allow = ["packs_dir"]
+
+[[permission]]
+identifier = "deny-packs-dir"
+description = "Denies the packs_dir command without any pre-configured scope."
+commands.deny = ["packs_dir"]

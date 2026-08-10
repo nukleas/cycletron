@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-sounds"
+description = "Enables the list_sounds command without any pre-configured scope."
+commands.allow = ["list_sounds"]
+
+[[permission]]
+identifier = "deny-list-sounds"
+description = "Denies the list_sounds command without any pre-configured scope."
+commands.deny = ["list_sounds"]

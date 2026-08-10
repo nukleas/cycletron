@@ -1,0 +1,15 @@
+[package]
+name = "dsl-eval"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "dsl-eval"
+path = "main.rs"
+
+[dependencies]
+strudel-dsl = { workspace = true }
+strudel-mini = { workspace = true }
+strudel-core = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }

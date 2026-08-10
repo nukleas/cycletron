@@ -1,0 +1,9 @@
+// Intro-then-loop using slowcat: the first cycle is sparse, then the
+// pattern settles into a four-bar loop that repeats indefinitely.
+setbpm(118);
+
+stack(
+  s("<bd bd*2 bd*4 bd*4>"),
+  s("<~ ~ [~ sd ~ sd] [~ sd ~ sd]>"),
+  s("hh*8").gain(0.45)
+)

@@ -1,0 +1,13 @@
+// Wavetable lead melody using scale degrees in C minor with rhythmic delay.
+setbpm(96);
+
+note("0 2 3 7 5 3 2 0")
+  .scale("C4:minor")
+  .s("wt_lead")
+  .attack(0.01)
+  .release(0.22)
+  .gain(0.52)
+  .cutoff(sine.slow(4).range(800, 3200))
+  .delay(0.25)
+  .delaytime(0.375)
+  .delayfeedback(0.35)

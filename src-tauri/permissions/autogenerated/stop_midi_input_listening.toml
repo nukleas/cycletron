@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-stop-midi-input-listening"
+description = "Enables the stop_midi_input_listening command without any pre-configured scope."
+commands.allow = ["stop_midi_input_listening"]
+
+[[permission]]
+identifier = "deny-stop-midi-input-listening"
+description = "Denies the stop_midi_input_listening command without any pre-configured scope."
+commands.deny = ["stop_midi_input_listening"]

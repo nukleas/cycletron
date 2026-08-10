@@ -1,0 +1,13 @@
+// Drum and bass halfstep break with rolling hats and sub bass.
+setbpm(174);
+
+stack(
+  s("bd ~ ~ ~ bd ~ bd ~").gain(0.88),
+  s("~ ~ sd ~ ~ ~ sd ~").gain(0.78),
+  s("hh*16").gain(0.22),
+  note("<c1 ~ c1 ~ eb1 ~ c1 ~>")
+    .s("sine")
+    .attack(0.01)
+    .release(0.22)
+    .gain(0.82)
+)

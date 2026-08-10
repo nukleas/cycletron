@@ -1,0 +1,57 @@
+[workspace]
+members = [
+    "crates/cycletron-core",
+    "crates/cycletron-agent",
+    "crates/cycletron-corpus",
+    "crates/cycletron-gen",
+    "crates/cycletron-analysis",
+    "src-tauri",
+    "tools/parity/dsl-eval",
+    "tools/parity/corpus-scan",
+    "tools/corpus-check",
+    "tools/midi-inspect",
+    "tools/midi-ingest",
+    "tools/strudel-search",
+    "tools/agent-stats",
+    "tools/gen-pattern",
+    "tools/gen-recipes",
+    "tools/song-check",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/nukleas/cycletron"
+
+[workspace.dependencies]
+# Internal crates
+cycletron-core = { path = "crates/cycletron-core" }
+cycletron-agent = { path = "crates/cycletron-agent" }
+cycletron-corpus = { path = "crates/cycletron-corpus" }
+cycletron-gen = { path = "crates/cycletron-gen" }
+cycletron-analysis = { path = "crates/cycletron-analysis" }
+# strudel-rs engine crates — pinned to public Codeberg main so the app builds
+# from a clean clone (no sibling checkout needed). Bump `rev` to move the engine.
+strudel-core = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff" }
+strudel-mini = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff", default-features = false }
+strudel-dsl = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff" }
+strudel-audio = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff" }
+strudel-music-theory = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff" }
+midi-to-strudel = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "770b63a7d1de474c312460ec365134f82df675ff" }
+
+# Shared external deps
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+toml = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+midly = "0.5"
+hound = "3.5"
+rustc-hash = "2"

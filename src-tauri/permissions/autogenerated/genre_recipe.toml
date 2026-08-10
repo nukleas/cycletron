@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-genre-recipe"
+description = "Enables the genre_recipe command without any pre-configured scope."
+commands.allow = ["genre_recipe"]
+
+[[permission]]
+identifier = "deny-genre-recipe"
+description = "Denies the genre_recipe command without any pre-configured scope."
+commands.deny = ["genre_recipe"]

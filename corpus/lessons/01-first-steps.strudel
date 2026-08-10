@@ -1,0 +1,2 @@
+// A short melody. Press Play, then load this.
+note("c4 e4 g4 c5").s("sine")

@@ -1,0 +1,6 @@
+// Dorian mode, slowed for space.
+note("0 1 2 3 4 5 6 7")
+  .scale("D4:dorian")
+  .s("triangle")
+  .slow(2)
+  .room(0.4)

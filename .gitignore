@@ -1,0 +1,77 @@
+# Rust / Cargo
+**/target/
+**/*.rs.bk
+# Track the root Cargo.lock for reproducible app builds (Gate A).
+# Nested lockfiles under tools/ remain untracked if created.
+
+# Node / Frontend
+**/node_modules/
+**/dist/
+**/.vite/
+
+# Tauri generated
+src-tauri/gen/
+src-tauri/target/
+src-tauri/icons/*.png
+src-tauri/icons/*.icns
+src-tauri/icons/*.ico
+src-tauri/icons/android/
+src-tauri/icons/ios/
+src-tauri/icons/*.png
+
+# Logo / design exploration (temporary)
+tinker/
+
+# Build tools output
+tools/*/node_modules/
+tools/*/dist/
+tools/parity/reports/
+
+# Environment & secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.sublime-*
+
+# Logs
+*.log
+logs/
+
+# WASM / Strudel artifacts that are large or regenerated
+**/*.wasm
+**/*.wat
+# ...except the engine WASM, which is committed (built from the pinned strudel-rs
+# main rev) so a clean clone runs without nightly/wasm-pack. Rebuild via
+# `npm run build:wasm` only to bump the engine.
+!ui/pkg/strudel_audio_wasm_bg.wasm
+
+# Temporary / scratch
+*.tmp
+*.bak
+scratch/
+.scratch/
+tmp/
+
+# Agent / tooling dev state (local-only)
+.grok/
+.playwright-mcp/
+
+# Local Supabase corpus cache (derived data)
+.corpus-cache/
+
+# Rendered audio (regenerate with strudio render — see exports/agency/README)
+/exports/
+/Demos/
+
+# User-local sample pack library (installed in-app; contents are
+# user-provided and may not be redistributable)
+/Packs/

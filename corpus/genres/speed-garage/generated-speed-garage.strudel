@@ -1,0 +1,9 @@
+// speed garage in F minor (generated) — two-step drive with a warped reese sub
+setbpm(135);
+
+stack(
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~").gain(0.9),
+  s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").late(0.0125).gain(0.9),
+  note("f1 ~ ~ d#2 ~ ~ f2 ~").s("supersaw").lpf(550).resonance(12).gain(0.55),
+  note("<[f3, g#3, c4, d#4] [c#4, f4, g#4, c5]>").s("sawtooth").struct("~ 1").release(0.15).lpf(1600).gain(0.3).room(0.3).pan(0.42)
+)

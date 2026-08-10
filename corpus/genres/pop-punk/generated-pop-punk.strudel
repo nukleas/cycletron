@@ -1,0 +1,8 @@
+// pop-punk in E major (generated) — fast rock beat, driving octave bass, power-chord triads
+setbpm(160);
+
+stack(
+  s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~, hh*16").gain(0.95),
+  note("e2 ~ e3 ~ e2 ~ e3 ~").s("sawtooth").lpf(1000).resonance(4).gain(0.52).dist(0.15),
+  note("<[e3, g#3, b3] [b3, d#4, f#4] [c#4, e4, g#4] [a3, c#4, e4]>").s("sawtooth").struct("1 ~ 1 ~").release(0.2).lpf(2400).gain(0.4).dist(0.2).pan(0.42)
+)

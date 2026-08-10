@@ -1,0 +1,7 @@
+// Wide supersaw pad with a long tail.
+note("<c3 eb3 g3 bb3>")
+  .s("supersaw")
+  .gain(0.2)
+  .room(0.8)
+  .attack(0.5)
+  .release(1)

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-critique-pattern"
+description = "Enables the critique_pattern command without any pre-configured scope."
+commands.allow = ["critique_pattern"]
+
+[[permission]]
+identifier = "deny-critique-pattern"
+description = "Denies the critique_pattern command without any pre-configured scope."
+commands.deny = ["critique_pattern"]

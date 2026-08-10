@@ -1,0 +1,4 @@
+// echo() repeats with decay.
+s("bd cp")
+  .echo(3, 0.125, 0.5)
+  .room(0.3)

@@ -1,0 +1,7 @@
+// Melodic motion from `.off`: a delayed copy shifted up an octave trails
+// the lead, turning a plain line into a cascading arpeggio.
+setbpm(125);
+
+note("0 2 4 7").scale("c4:major").s("wt_pluck")
+  .off(0.25, x => x.add(12).gain(0.5))
+  .delay(0.3).gain(0.55)

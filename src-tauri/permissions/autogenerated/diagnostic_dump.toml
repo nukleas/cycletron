@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-diagnostic-dump"
+description = "Enables the diagnostic_dump command without any pre-configured scope."
+commands.allow = ["diagnostic_dump"]
+
+[[permission]]
+identifier = "deny-diagnostic-dump"
+description = "Denies the diagnostic_dump command without any pre-configured scope."
+commands.deny = ["diagnostic_dump"]

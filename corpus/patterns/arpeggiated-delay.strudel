@@ -1,0 +1,7 @@
+// Fast arpeggio into delay + reverb.
+note("c4 e4 g4 b4 c5 b4 g4 e4")
+  .s("triangle")
+  .fast(2)
+  .delay(0.3)
+  .room(0.4)
+  .gain(0.5)

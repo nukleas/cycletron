@@ -1,0 +1,105 @@
+{
+  "productName": "Cycletron",
+  "version": "0.1.0",
+  "identifier": "com.nukleas.cycletron",
+  "build": {
+    "frontendDist": "../ui/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "cd ../ui && npm install && npm run dev",
+    "beforeBuildCommand": "cd ../ui && npm install && npm run build"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Cycletron",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "devtools": false,
+        "dragDropEnabled": true,
+        "create": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self' customprotocol: asset: http://asset.localhost http://ipc.localhost",
+        "connect-src": "ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*",
+        "script-src": "'self' 'unsafe-eval' 'wasm-unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' asset: http://asset.localhost data: blob:",
+        "media-src": "'self' asset: http://asset.localhost blob: data:",
+        "font-src": "'self' data:",
+        "worker-src": "'self' blob:",
+        "child-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'"
+      },
+      "headers": {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Resource-Policy": "same-origin"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "category": "Music",
+    "license": "AGPL-3.0-or-later",
+    "licenseFile": "../LICENSE",
+    "shortDescription": "Live coding for music, built on Rust",
+    "longDescription": "Cycletron is a desktop live-coding instrument with an AI operator. Patterns run on strudel-rs (Rust) using a Strudel-compatible mini-notation dialect. A NaderLabs project.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["strudel"],
+        "name": "Strudel Pattern",
+        "description": "Cycletron pattern file",
+        "role": "Editor",
+        "mimeType": "text/plain"
+      },
+      {
+        "ext": ["mid", "midi"],
+        "name": "MIDI File",
+        "description": "Standard MIDI file",
+        "role": "Editor"
+      }
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "entitlements": "Entitlements.plist"
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1"
+        ]
+      }
+    },
+    "iOS": {},
+    "android": {}
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/nukleas/cycletron/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQzODA5MzlGRDAzOTk4OEQKUldTTm1EblFuNU9BMHdmSEp5RzlZNHFXb1NhRmFlaHpBalZhUWRTdGEzSU9mcEJWNk9YdFF2cDAK",
+      "dialog": false
+    }
+  }
+}

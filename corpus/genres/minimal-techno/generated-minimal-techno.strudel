@@ -1,0 +1,8 @@
+// minimal techno in C phrygian (generated) — stripped four-on-floor, euclid tom, two-chord hypnosis
+setbpm(128);
+
+stack(
+  s("bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~, ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh, mt ~ ~ ~ ~ mt ~ ~ ~ ~ mt ~ ~ ~ ~ ~").gain(0.9),
+  note("c2 ~ c2 ~ c2 ~ c2 ~ c2 ~ c2 c#2 c2 ~ c2 ~").s("sawtooth").lpf(800).resonance(8).gain(0.5),
+  note("<[c3, d#3, g3, a#3] [c#3, f3, g#3, c4]>").s("sawtooth").struct("~ ~ ~ 1").release(0.16).lpf(1300).gain(0.28).room(0.2).pan(0.42)
+)

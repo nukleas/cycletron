@@ -1,0 +1,16 @@
+// TR-909 four-on-the-floor techno with Euclidean hats and sub bass sweep.
+setbpm(138);
+
+stack(
+  s("RolandTR909_bd*4").gain(0.9),
+  s("~ RolandTR909_sd ~ RolandTR909_sd").gain(0.72),
+  s("RolandTR909_hh(13,16)").gain(0.32),
+  s("~ ~ ~ RolandTR909_oh").gain(0.5).every(2, x => x.early(0.25)),
+  note("<c1 c1 eb1 bb0>")
+    .s("sine")
+    .cutoff(sine.slow(8).range(180, 600))
+    .resonance(12)
+    .attack(0.02)
+    .release(0.3)
+    .gain(0.72)
+)

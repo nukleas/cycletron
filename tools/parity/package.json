@@ -1,0 +1,15 @@
+{
+  "name": "strudel-parity",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node compare.mjs",
+    "js-eval": "node js-eval.mjs"
+  },
+  "dependencies": {
+    "@strudel/core": "file:../../../strudel/packages/core",
+    "@strudel/mini": "file:../../../strudel/packages/mini",
+    "@strudel/tonal": "file:../../../strudel/packages/tonal",
+    "@strudel/transpiler": "file:../../../strudel/packages/transpiler"
+  }
+}

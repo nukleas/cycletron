@@ -1,0 +1,10 @@
+// A minor blues scale: 1, b3, 4, b5, 5, b7.
+// The flat-five is the colour tone — held longer with `@2` weight.
+setbpm(90);
+
+note("a3 c4 d4 eb4@2 e4 g4 a4")
+  .s("sawtooth")
+  .cutoff(1400)
+  .attack(0.02)
+  .release(0.4)
+  .gain(0.6)

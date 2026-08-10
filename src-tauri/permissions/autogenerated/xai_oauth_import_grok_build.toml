@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-xai-oauth-import-grok-build"
+description = "Enables the xai_oauth_import_grok_build command without any pre-configured scope."
+commands.allow = ["xai_oauth_import_grok_build"]
+
+[[permission]]
+identifier = "deny-xai-oauth-import-grok-build"
+description = "Denies the xai_oauth_import_grok_build command without any pre-configured scope."
+commands.deny = ["xai_oauth_import_grok_build"]

@@ -1,0 +1,9 @@
+// Minor pentatonic arpeggio with `every` accent.
+// Every 4th cycle we double-time the line — a simple contour variation.
+setbpm(108);
+
+note("c4 eb4 f4 g4 bb4 c5 bb4 g4")
+  .s("triangle")
+  .every(4, x => x.fast(2))
+  .cutoff(2400)
+  .gain(0.6)

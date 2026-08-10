@@ -1,0 +1,11 @@
+// Bitcrushed stab: aggressive lo-fi colour via `crush` + `coarse`.
+// Use sparingly — the harmonics are unforgiving above 0.5 amplitude.
+setbpm(130);
+
+note("c3 ~ ~ c3 eb3 ~ g3 ~")
+  .s("square")
+  .crush(4)
+  .coarse(2)
+  .cutoff(2200)
+  .release(0.15)
+  .gain(0.5)

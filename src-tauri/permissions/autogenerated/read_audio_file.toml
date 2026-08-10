@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-read-audio-file"
+description = "Enables the read_audio_file command without any pre-configured scope."
+commands.allow = ["read_audio_file"]
+
+[[permission]]
+identifier = "deny-read-audio-file"
+description = "Denies the read_audio_file command without any pre-configured scope."
+commands.deny = ["read_audio_file"]

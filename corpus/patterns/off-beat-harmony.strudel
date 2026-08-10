@@ -1,0 +1,5 @@
+// off() overlays a shifted, transposed copy.
+note("c4 e4 g4 b4")
+  .s("sine")
+  .off(0.125, x => x.transpose(7))
+  .room(0.4)

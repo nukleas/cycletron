@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-recents"
+description = "Enables the get_recents command without any pre-configured scope."
+commands.allow = ["get_recents"]
+
+[[permission]]
+identifier = "deny-get-recents"
+description = "Denies the get_recents command without any pre-configured scope."
+commands.deny = ["get_recents"]

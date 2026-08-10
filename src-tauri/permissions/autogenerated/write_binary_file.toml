@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-write-binary-file"
+description = "Enables the write_binary_file command without any pre-configured scope."
+commands.allow = ["write_binary_file"]
+
+[[permission]]
+identifier = "deny-write-binary-file"
+description = "Denies the write_binary_file command without any pre-configured scope."
+commands.deny = ["write_binary_file"]

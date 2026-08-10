@@ -1,0 +1,11 @@
+[package]
+name = "song-check"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "song-check"
+path = "main.rs"
+
+[dependencies]
+cycletron-analysis = { workspace = true }

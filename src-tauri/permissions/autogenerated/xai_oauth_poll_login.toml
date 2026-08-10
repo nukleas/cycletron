@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-xai-oauth-poll-login"
+description = "Enables the xai_oauth_poll_login command without any pre-configured scope."
+commands.allow = ["xai_oauth_poll_login"]
+
+[[permission]]
+identifier = "deny-xai-oauth-poll-login"
+description = "Denies the xai_oauth_poll_login command without any pre-configured scope."
+commands.deny = ["xai_oauth_poll_login"]

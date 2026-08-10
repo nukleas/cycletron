@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-library-root"
+description = "Enables the get_library_root command without any pre-configured scope."
+commands.allow = ["get_library_root"]
+
+[[permission]]
+identifier = "deny-get-library-root"
+description = "Denies the get_library_root command without any pre-configured scope."
+commands.deny = ["get_library_root"]

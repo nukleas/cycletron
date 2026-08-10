@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-rename-library-path"
+description = "Enables the rename_library_path command without any pre-configured scope."
+commands.allow = ["rename_library_path"]
+
+[[permission]]
+identifier = "deny-rename-library-path"
+description = "Denies the rename_library_path command without any pre-configured scope."
+commands.deny = ["rename_library_path"]

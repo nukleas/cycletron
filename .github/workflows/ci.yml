@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main, 'feat/**']
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # strudel-rs is a Codeberg git dependency; libgit2's SSL flakes on some
+  # runners, so fetch git deps with the system git.
+  CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
+
+# Runner is selectable: set repo variable CI_RUNNER=cycletron-runners to use the
+# self-hosted k8s scale set; unset it (or set ubuntu-latest) to fall back to
+# GitHub-hosted — no workflow edit needed if the home cluster is offline.
+jobs:
+  ui:
+    name: UI typecheck
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        # The real WASM types are committed under ui/pkg (built from the pinned
+        # strudel-rs main rev), so tsc checks against the actual engine surface.
+        run: npx tsc --noEmit
+
+  rust:
+    name: Rust test + corpus-check
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      # strudel-rs is a pinned git dependency (Codeberg, public), fetched by
+      # cargo — no sibling checkout needed.
+      - uses: actions/checkout@v4
+
+      # The self-hosted runner image is bare; the cargo workspace includes the
+      # Tauri app (src-tauri), so its native deps must be present. Harmless on
+      # GitHub-hosted (already installed / quick no-op).
+      - name: System dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libssl-dev curl git file \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            libasound2-dev libudev-dev patchelf
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      # On self-hosted runners a node-local hostPath cache (CARGO_HOME /
+      # CARGO_TARGET_DIR / RUSTUP_HOME) persists across ephemeral pods, so skip
+      # the GitHub cache-service round-trip there.
+      - name: Cache cargo
+        if: runner.environment == 'github-hosted'
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo check (workspace)
+        run: cargo check --workspace --locked
+
+      - name: cargo test (lib crates, no Tauri GUI)
+        run: |
+          cargo test -p cycletron-core --locked
+          cargo test -p cycletron-agent --locked
+          cargo test -p cycletron-corpus --locked
+          cargo test -p cycletron-analysis --locked
+          cargo test -p cycletron-gen --locked
+
+      - name: corpus-check (curated patterns)
+        run: cargo run -p corpus-check --locked
+
+  gate-a-files:
+    name: Gate A file checklist
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Required release files
+        run: |
+          test -f LICENSE
+          test -f README.md
+          test -f docs/USER_GUIDE.md
+          test -f docs/DIALECT.md
+          test -f docs/RELEASE.md
+          test -f Cargo.lock
+          test -f src-tauri/tauri.conf.json
+          # CSP must not be null
+          ! grep -q '"csp": null' src-tauri/tauri.conf.json
+          # Production window: DevTools off
+          grep -q '"devtools": false' src-tauri/tauri.conf.json
+          echo "Gate A file checklist OK"

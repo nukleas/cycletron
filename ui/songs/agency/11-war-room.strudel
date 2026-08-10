@@ -1,0 +1,81 @@
+// AGENCY OST — 11 · War Room
+// ACT II. Screens wall-to-wall; the org mobilizes. The Rebel Path mold:
+// slow, brooding, enormous space — a mid-low staccato riff that keeps
+// stopping dead, a huge half-time snare, and a low choir of dread.
+// The silence between riff hits IS the menace.
+//
+// FORM (92 BPM · 1 cycle = 1 bar · 64 bars ≈ 2:47 · loops):
+//   intro   8  e1  drone + low choir; the room goes quiet
+//   path    16 e3  THE RIFF, bass-only lockstep with kick, snare on 3
+//   assault 16 e4  + string stabs answering in the riff's gaps
+//   hold    8  e2  riff stops mid-bar and never returns — choir holds
+//   path2   8  e4  the riff comes back an octave up, hats join
+//   outro   8  e1  choir + drone; one last riff hit rings out
+// hook: the stop-riff, answered in its own silences — path/assault/path2.
+
+setbpm(92);
+
+"<intro@2 path@4 assault@4 hold@2 path2@2 outro@2>".slow(4).pickRestart({
+  intro: stack(
+    note("g#1").s("sine").slow(2).attack(2).release(4).gain(0.44),
+    note("<[g#2, d#3] [g#2, d#3] [e2, b2] [f#2, c#3]>").s("wt_choir")
+      .attack(2).release(3.5).lpf(700).room(0.8).gain(0.24).pan(0.45),
+    s("<[~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~] [bd ~ ~ ~]>").lpf(300).gain(0.7)
+  ),
+  path: stack(
+    s("<[bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+      .gain(0.92).dist(0.2),
+    s("~ ~ sd ~").room(0.65).roomsize(0.85).gain(0.72),
+    note("<[g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ e1 ~ ~ e1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ d#1 ~ ~ ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [e1 ~ ~ e1 ~ ~ f#1 ~ g#1 ~ ~ ~ ~ ~ ~ ~] [d#1 ~ ~ ~ ~ ~ ~ ~ g#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sawtooth").lpf(750).resonance(7)
+      .decay(0.11).sustain(0).dist(0.3).gain(0.58),
+    note("<[g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ e1 ~ ~ e1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ d#1 ~ ~ ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [e1 ~ ~ e1 ~ ~ f#1 ~ g#1 ~ ~ ~ ~ ~ ~ ~] [d#1 ~ ~ ~ ~ ~ ~ ~ g#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sine").lpf(180).decay(0.14).sustain(0).dist(0.15).gain(0.4),
+    note("g#1").s("sine").slow(2).attack(2).release(4).gain(0.3)
+  ),
+  assault: stack(
+    s("<[bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+      .gain(0.93).dist(0.22),
+    s("~ ~ sd ~").room(0.65).roomsize(0.85).gain(0.74),
+    s("hh ~ hh hh ~ hh hh ~").gain(0.16).pan(0.58),
+    note("<[g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ e1 ~ ~ e1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ d#1 ~ ~ ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [e1 ~ ~ e1 ~ ~ f#1 ~ g#1 ~ ~ ~ ~ ~ ~ ~] [d#1 ~ ~ ~ ~ ~ ~ ~ g#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sawtooth").lpf(800).resonance(7)
+      .decay(0.11).sustain(0).dist(0.3).gain(0.56),
+    note("<[g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ e1 ~ ~ e1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ d#1 ~ ~ ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [e1 ~ ~ e1 ~ ~ f#1 ~ g#1 ~ ~ ~ ~ ~ ~ ~] [d#1 ~ ~ ~ ~ ~ ~ ~ g#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sine").lpf(180).decay(0.14).sustain(0).dist(0.15).gain(0.38),
+    note("<[~ ~ ~ ~ ~ [g#3,d#4] ~ ~] [~ ~ ~ ~ ~ ~ [b3,f#4] ~] [~ ~ ~ ~ ~ [g#3,d#4] ~ ~] [~ ~ ~ [f#3,c#4] ~ ~ ~ ~]>")
+      .s("wt_strings").attack(0.02).release(0.6)
+      .lpf(2000).room(0.6).gain(0.32).pan(0.42)
+  ),
+  hold: stack(
+    note("<[g#1 ~ ~ g#1 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sawtooth").lpf(700).decay(0.11).sustain(0).dist(0.3).gain(0.55),
+    note("g#1").s("sine").slow(4).attack(3).release(6).gain(0.46),
+    note("<[g#2, d#3, b2] [g#2, d#3, b2] [e2, b2, g#2] [f#2, c#3, a#2]>").s("wt_choir")
+      .attack(2.5).release(4).lpf(sine.range(500, 1000).slow(8))
+      .room(0.85).gain(0.28).pan(sine.range(0.4, 0.6).slow(12)),
+    s("<[~ ~ ~ ~] [~ ~ sd ~] [~ ~ ~ ~] [~ ~ sd ~]>").room(0.7).roomsize(0.9).gain(0.4)
+  ),
+  path2: stack(
+    s("<[bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+      .gain(0.95).dist(0.25),
+    s("~ ~ sd ~").room(0.65).roomsize(0.85).gain(0.76),
+    s("hh ~ hh hh ~ hh hh ~").gain(0.18).pan(0.58),
+    note("<[g#2 ~ ~ g#2 ~ ~ g#2 ~ b2 ~ ~ ~ ~ ~ ~ ~] [g#2 ~ ~ g#2 ~ ~ b2 ~ c#3 ~ ~ ~ ~ ~ ~ ~] [e2 ~ ~ e2 ~ ~ f#2 ~ g#2 ~ ~ ~ ~ ~ ~ ~] [d#2 ~ ~ ~ ~ ~ ~ ~ g#2 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sawtooth").lpf(1200).resonance(7)
+      .decay(0.11).sustain(0).dist(0.32).gain(0.5),
+    note("<[g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [e1 ~ ~ e1 ~ ~ f#1 ~ g#1 ~ ~ ~ ~ ~ ~ ~] [d#1 ~ ~ ~ ~ ~ ~ ~ g#1 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sine").lpf(180).decay(0.14).sustain(0).dist(0.15).gain(0.4),
+    note("<[g#2, d#3, b2] [g#2, d#3, b2] [e2, b2, g#2] [f#2, c#3, a#2]>").s("wt_choir")
+      .attack(1.5).release(3).lpf(900).room(0.8).gain(0.22).pan(0.45)
+  ),
+  outro: stack(
+    note("g#1").s("sine").slow(4).attack(3).release(7).gain(0.46),
+    note("<[g#2, d#3, b2] [e2, b2, g#2] [f#2, c#3, a#2] [g#2, d#3]>").s("wt_choir")
+      .attack(2.5).release(5).lpf(isaw.range(350, 900).slow(8))
+      .room(0.88).gain(0.26).pan(0.45),
+    note("<[g#1 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ g#1 ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sawtooth").lpf(600).decay(0.13).sustain(0).dist(0.25)
+      .room(0.5).gain(0.48)
+  )
+})

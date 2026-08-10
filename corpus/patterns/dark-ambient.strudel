@@ -1,0 +1,13 @@
+// Low drone under a floating sine line.
+stack(
+  note("<c2 bb1 ab1 g1>")
+    .s("sawtooth")
+    .cutoff(300)
+    .room(0.9)
+    .gain(0.3),
+  note("<eb4 d4 c4 bb3>")
+    .s("sine")
+    .gain(0.15)
+    .room(0.8)
+    .delay(0.4)
+)

@@ -1,0 +1,11 @@
+[package]
+name = "gen-recipes"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "gen-recipes"
+path = "main.rs"
+
+[dependencies]
+cycletron-gen = { workspace = true }

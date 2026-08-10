@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Cycletron uses the microphone for the live audio recording feature in the Pattern Console.</string>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Cycletron uses Apple Events to reveal files in Finder.</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.music</string>
+</dict>
+</plist>

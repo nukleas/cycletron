@@ -1,0 +1,11 @@
+// Drums + bass + lead in one stack.
+stack(
+  s("bd*4"),
+  s("~ cp ~ cp").gain(0.6),
+  s("hh*8").gain(0.3).hpf(5000),
+  note("<c2 ~ c2 ~> <~ eb2 ~ g2>")
+    .s("sawtooth").cutoff(500).gain(0.5),
+  note("c4 eb4 g4 bb4").fast(2)
+    .s("triangle")
+    .delay(0.3).room(0.3).gain(0.4)
+)

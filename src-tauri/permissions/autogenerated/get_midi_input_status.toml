@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-midi-input-status"
+description = "Enables the get_midi_input_status command without any pre-configured scope."
+commands.allow = ["get_midi_input_status"]
+
+[[permission]]
+identifier = "deny-get-midi-input-status"
+description = "Denies the get_midi_input_status command without any pre-configured scope."
+commands.deny = ["get_midi_input_status"]

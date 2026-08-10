@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-load-enabled-packs"
+description = "Enables the load_enabled_packs command without any pre-configured scope."
+commands.allow = ["load_enabled_packs"]
+
+[[permission]]
+identifier = "deny-load-enabled-packs"
+description = "Denies the load_enabled_packs command without any pre-configured scope."
+commands.deny = ["load_enabled_packs"]

@@ -1,0 +1,40 @@
+{
+  "name": "cycletron-ui",
+  "private": true,
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "gen:dsl": "node scripts/gen-dsl-surface.mjs",
+    "predev": "npm run gen:dsl",
+    "dev": "vite --port 5173",
+    "prebuild": "npm run gen:dsl",
+    "build": "vite build",
+    "preview": "vite preview --port 5173",
+    "comment:build:wasm": "The prebuilt engine WASM is committed under ui/pkg (built from the pinned strudel-rs main rev). Only rerun build:wasm to bump the engine; it needs a strudel-rs checkout at that rev + nightly. Then commit ui/pkg.",
+    "build:wasm": "cd ../../strudel-rs/crates/strudel-audio-wasm && wasm-pack build . --target web --out-dir ../../../cycletron/ui/pkg -- -Z build-std=std,panic_abort"
+  },
+  "dependencies": {
+    "@codemirror/lang-javascript": "^6.2.1",
+    "@codemirror/lint": "^6.0.0",
+    "@lezer/highlight": "^1.2.0",
+    "@lezer/javascript": "^1.5.4",
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-global-shortcut": "^2.3.1",
+    "@tauri-apps/plugin-notification": "^2.3.3",
+    "@tauri-apps/plugin-opener": "^2.5.4",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-store": "^2.4.3",
+    "@tauri-apps/plugin-updater": "^2.10.1",
+    "codemirror": "^6.0.1",
+    "coi-serviceworker": "^0.1.7",
+    "marked": "^15.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "unplugin-inline-enum": "^0.6.4",
+    "vite": "^6.4.1",
+    "vite-plugin-tsc": "^0.1.1"
+  }
+}

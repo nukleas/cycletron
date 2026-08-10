@@ -1,0 +1,13 @@
+// Karplus-flavoured pluck: short envelope + heavy delay + light room.
+// The delay feedback carries the note tail and turns single hits into arpeggios.
+setbpm(96);
+
+note("a3 e4 a4 c5")
+  .s("triangle")
+  .attack(0.005)
+  .release(0.18)
+  .delay(0.6)
+  .delaytime(0.375)
+  .delayfeedback(0.55)
+  .room(0.3)
+  .gain(0.45)
