@@ -274,6 +274,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::send_message,
             commands::validate_pattern,
+            commands::updater_install_kind,
             commands::inspect_pattern,
             commands::analyze_arrangement,
             commands::critique_pattern,

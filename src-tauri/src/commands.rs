@@ -1105,3 +1105,27 @@ pub fn handle_second_instance(app: &tauri::AppHandle, args: Vec<String>) {
         let _ = app.emit("open-files", paths);
     }
 }
+
+/// How this install can receive updates. The Tauri updater can only truly
+/// self-update native bundles (macOS/Windows) and Linux AppImages; deb/rpm/
+/// pacman installs are owned by the system package manager, and the plugin's
+/// dpkg/rpm paths fail silently on other distros (issue #5).
+///
+/// - "native": macOS / Windows — self-update works.
+/// - "appimage": Linux, actually running as an AppImage — self-update works.
+/// - "package": any other Linux install — notify-only.
+#[tauri::command]
+pub fn updater_install_kind() -> &'static str {
+    #[cfg(not(target_os = "linux"))]
+    {
+        "native"
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("APPIMAGE").is_some() {
+            "appimage"
+        } else {
+            "package"
+        }
+    }
+}

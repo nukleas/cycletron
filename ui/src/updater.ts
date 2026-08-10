@@ -10,7 +10,11 @@
  */
 
 import {confirmDialog, infoDialog} from './dialog.js';
-import {isTauri} from './tauri.js';
+import {openExternal} from './external-link.js';
+import {notify} from './notifications.js';
+import {invoke, isTauri} from './tauri.js';
+
+const RELEASES_URL = 'https://github.com/nukleas/cycletron/releases/latest';
 
 let inFlight = false;
 
@@ -95,6 +99,32 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
         }
         if (!update) {
             if (manual) await infoDialog("You're up to date.");
+            return;
+        }
+        // deb/rpm/pacman installs are owned by the system package manager —
+        // the plugin's self-update path can't work there (and fails silently
+        // on distros without dpkg/rpm). Notify instead of pretending.
+        let installKind = 'native';
+        try {
+            installKind = await invoke<string>('updater_install_kind');
+        } catch {
+            // Older backend without the command — assume self-update works.
+        }
+        if (installKind === 'package') {
+            if (manual) {
+                const open = await confirmDialog(
+                    `Cycletron ${update.version} is available.\n\n` +
+                    'This install is managed by your system package manager, ' +
+                    "so the app can't update itself. Open the releases page?",
+                    {title: 'Update available', kind: 'info'},
+                );
+                if (open) await openExternal(RELEASES_URL);
+            } else {
+                void notify(
+                    `Cycletron ${update.version} available`,
+                    'Update via your package manager.',
+                );
+            }
             return;
         }
         const accept = await confirmDialog(
