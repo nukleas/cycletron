@@ -188,3 +188,49 @@ jobs:
           xcrun stapler staple "$DMG"
           spctl -a -t open --context context:primary-signature -vvv "$DMG"
           gh release upload "$GITHUB_REF_NAME" "$DMG" --clobber --repo "$GITHUB_REPOSITORY"
+
+  # The ubuntu-22.04 runner's linuxdeploy bundles libwayland-client.so.0 into
+  # the AppImage; at runtime it shadows the host copy and breaks Mesa EGL on
+  # rolling distros — EGL_BAD_ALLOC even for the surfaceless platform (#6).
+  # The bundled wayland libs are dead weight anyway: the AppRun hook forces
+  # GDK_BACKEND=x11, so only host Mesa ever dlopens libwayland-client — and it
+  # needs its own. Strip them, repack, re-sign, and fix the updater signatures.
+  # Runs after the whole build matrix so every job's latest.json merge is done
+  # (patching from inside the linux job would race the other uploads).
+  fix-appimage:
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+    steps:
+      - name: Strip bundled wayland libs, re-sign, patch latest.json
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.AppImage' --pattern latest.json
+          APPIMAGE=$(ls ./*.AppImage)
+          chmod +x "$APPIMAGE"
+          "$APPIMAGE" --appimage-extract >/dev/null
+          rm -v squashfs-root/usr/lib/libwayland-*.so*
+          wget -qO appimagetool \
+            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool
+          ./appimagetool --appimage-extract-and-run squashfs-root "$APPIMAGE"
+          npx -y @tauri-apps/cli@2 signer sign \
+            -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
+            "$APPIMAGE"
+          SIG=$(cat "$APPIMAGE.sig")
+          python3 - "$SIG" <<'EOF'
+          import json, sys
+          sig = sys.argv[1]
+          j = json.load(open('latest.json'))
+          for entry in j['platforms'].values():
+              if entry.get('url', '').endswith('.AppImage'):
+                  entry['signature'] = sig
+          json.dump(j, open('latest.json', 'w'), indent=2)
+          EOF
+          gh release upload "$GITHUB_REF_NAME" "$APPIMAGE" "$APPIMAGE.sig" latest.json \
+            --clobber --repo "$GITHUB_REPOSITORY"
