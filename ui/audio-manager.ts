@@ -157,13 +157,16 @@ export class StrudelAudioManager {
     private stagingBaseIdx: number = 0;
 
     static hasSharedArrayBufferSupport(): { ok: boolean; details: Record<string, unknown> } {
-        const hasGlobal = typeof SharedArrayBuffer !== 'undefined' && typeof Atomics !== 'undefined';
+        const hasSab = typeof SharedArrayBuffer !== 'undefined';
+        const hasAtomics = typeof Atomics !== 'undefined';
+        const hasGlobal = hasSab && hasAtomics;
         const crossOriginIsolated = (globalThis as any).crossOriginIsolated === true;
         let constructionError: string | null = null;
 
         const details: Record<string, unknown> = {
             crossOriginIsolated,
-            hasSharedArrayBufferGlobal: hasGlobal,
+            hasSharedArrayBufferGlobal: hasSab,
+            hasAtomicsGlobal: hasAtomics,
             userAgent: navigator.userAgent,
             protocol: location.protocol,
             origin: location.origin,
@@ -173,7 +176,9 @@ export class StrudelAudioManager {
 
         try {
             if (!hasGlobal) {
-                constructionError = 'SharedArrayBuffer or Atomics globals are missing';
+                constructionError = !hasSab
+                    ? 'SharedArrayBuffer global is missing'
+                    : 'Atomics global is missing';
                 details.constructionError = constructionError;
                 return { ok: false, details };
             }
@@ -206,6 +211,7 @@ export class StrudelAudioManager {
 
             <h3 style="color:#ffaaaa; margin-top:32px;">What this usually means in Tauri</h3>
             <ul style="line-height:1.6;">
+                <li><b>Linux (WebKitGTK):</b> COOP/COEP alone never enables SharedArrayBuffer — JavaScriptCore gates it behind <code>JSC_useSharedArrayBuffer=1</code>. The app sets this automatically at startup; if you still see this screen, launch as <code>JSC_useSharedArrayBuffer=1 cycletron-app</code> and please file a bug. Header debugging is a dead end here: <code>crossOriginIsolated</code> can be true while the constructor is missing.</li>
                 <li>The COOP/COEP headers from <code>tauri.conf.json → app.security.headers</code> are not being applied to the main document in the production bundle.</li>
                 <li>In <code>cargo tauri dev</code> it works because Vite injects the headers.</li>
                 <li>In the built .app the asset protocol responses may not be getting the headers, or WKWebView is not entering a cross-origin isolated state.</li>
