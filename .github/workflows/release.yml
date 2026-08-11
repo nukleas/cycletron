@@ -215,6 +215,13 @@ jobs:
           chmod +x "$APPIMAGE"
           "$APPIMAGE" --appimage-extract >/dev/null
           rm -v squashfs-root/usr/lib/libwayland-*.so*
+          # bundleMediaFramework ships a GStreamer stack for the bundled
+          # WebKit's audio output — list what landed so licensing stays
+          # reviewable (the "ugly" plugin set must never appear here).
+          echo "--- bundled gstreamer plugins ---"
+          ls squashfs-root/usr/lib/gstreamer-1.0/ 2>/dev/null || echo "(none)"
+          echo "--- bundled usr/lib after strip ---"
+          ls squashfs-root/usr/lib/
           wget -qO appimagetool \
             "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x appimagetool

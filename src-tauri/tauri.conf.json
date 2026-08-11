@@ -81,6 +81,9 @@
       "entitlements": "Entitlements.plist"
     },
     "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
       "deb": {
         "depends": [
           "libwebkit2gtk-4.1-0",
