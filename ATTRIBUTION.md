@@ -88,6 +88,16 @@ Only FluidR3_GM and GeneralUser GS variants are referenced by
 `ui/soundfont-tables.ts`; both permit redistribution and end-user commercial
 music.
 
+## Linux AppImage: bundled GStreamer
+
+The Linux AppImage bundles the GStreamer runtime and plugin set from Ubuntu
+22.04 (via Tauri's `bundleMediaFramework`) so WebKitGTK can output audio on
+any distro. These are unmodified LGPL/GPL binaries; their source is available
+from the corresponding Ubuntu packages (packages.ubuntu.com). The plugin list
+for each release is printed in the release workflow's `fix-appimage` job; the
+GPL-incompatible "ugly" plugin set is excluded. The `.deb`/`.rpm` packages
+bundle no GStreamer — they use the host's.
+
 ## Trademarks
 
 Roland, TR-808, TR-909, TR-707, and Boss DR-55 are trademarks of Roland

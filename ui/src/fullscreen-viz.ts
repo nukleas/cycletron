@@ -18,6 +18,7 @@
  */
 
 import artRaw from './assets/art.txt?raw';
+import {pauseWhileHidden} from './viz-visibility.js';
 
 export enum FullscreenVizMode {
     NeonCircuit = 0,
@@ -35,6 +36,8 @@ export enum FullscreenVizMode {
 }
 
 export const MODE_COUNT = 12;
+// Frame budget for the always-on ambient render (see draw()).
+const MAX_FPS = 30;
 const TAU = Math.PI * 2;
 
 /** Glyph pool for MatrixRain — katakana + digits + latin, drawn per cell. */
@@ -316,6 +319,21 @@ export class FullscreenVisualizer {
             });
         });
         this.resizeObserver.observe(this.container);
+
+        pauseWhileHidden({
+            pause: () => {
+                if (this.animationId !== null) {
+                    cancelAnimationFrame(this.animationId);
+                    this.animationId = null;
+                }
+            },
+            resume: () => {
+                if (this.running && this.animationId === null) {
+                    this.lastFrame = performance.now();
+                    this.animationId = requestAnimationFrame(this.draw);
+                }
+            },
+        });
         // NOTE: initial geometry seeding still happens in start() — the
         // container is `hidden` until then, so getBoundingClientRect() = 0×0.
     }
@@ -734,6 +752,15 @@ export class FullscreenVisualizer {
 
     private readonly draw = (now: number): void => {
         if (!this.running) return;
+
+        // 30fps budget: this canvas is ambient background art behind the
+        // console, and halving the frame rate halves the paint cost — which
+        // lands on CPU tile rasterizers on some Linux stacks (#8). The -1ms
+        // tolerance keeps rAF timing jitter from skipping to ~20fps.
+        if (now - this.lastFrame < 1000 / MAX_FPS - 1) {
+            this.animationId = requestAnimationFrame(this.draw);
+            return;
+        }
 
         const dt = Math.min((now - this.lastFrame) / 1000, 0.1);
         this.lastFrame = now;

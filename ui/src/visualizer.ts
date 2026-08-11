@@ -10,6 +10,7 @@
 import type {PatternHandle} from '../pkg';
 import type {PatternScheduler} from '../scheduler.js';
 import {VizMode} from './types/visualizer.js';
+import {pauseWhileHidden} from './viz-visibility.js';
 import {measure} from '../query-profiler.js';
 
 export {VizMode};
@@ -162,6 +163,21 @@ export class PatternVisualizer {
 
         this._themeQuery = null;
         this._themeHandler = null;
+
+        pauseWhileHidden({
+            pause: () => {
+                if (this.animationId !== null) {
+                    cancelAnimationFrame(this.animationId);
+                    this.animationId = null;
+                }
+            },
+            resume: () => {
+                if (this.shouldAnimate && this.mode === VizMode.Waveform
+                    && this.animationId === null) {
+                    this.animate();
+                }
+            },
+        });
 
         this.resizeObserver = new ResizeObserver(this._onResize);
 
@@ -828,6 +844,21 @@ export class ScopeVisualizer {
         this.canvas.style.cssText = 'display:block; width:100%; height:60px;';
         this.container.appendChild(this.canvas);
         this.ctx = this.canvas.getContext('2d', {alpha: true})!;
+
+        pauseWhileHidden({
+            pause: () => {
+                if (this.animationId !== null) {
+                    cancelAnimationFrame(this.animationId);
+                    this.animationId = null;
+                }
+            },
+            resume: () => {
+                if (this.running && this.animationId === null) {
+                    this.lastFrameMs = 0;
+                    this.animationId = requestAnimationFrame(this.draw);
+                }
+            },
+        });
         this.animationId = null;
 
         this.width = 0;
