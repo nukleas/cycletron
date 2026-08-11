@@ -193,6 +193,36 @@ export class StrudelAudioManager {
         }
     }
 
+    private static showAudioInitError(phase: string, err: unknown) {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #1a0000; color: #ffaaaa; font-family: monospace; z-index: 999999;
+            padding: 40px; overflow: auto; box-sizing: border-box;
+        `;
+        const msg = String((err as any)?.message ?? err);
+        overlay.innerHTML = `
+            <h1 style="color:#ff5555; margin-top:0;">AUDIO ENGINE FAILED TO START</h1>
+            <p style="font-size:18px; color:#ffcccc;">
+                Initialization ${phase === 'worklet-handshake' ? 'failed' : 'stopped'} at phase
+                <code>${phase}</code>: ${msg}
+            </p>
+            <h3 style="color:#ffaaaa; margin-top:32px;">What to check</h3>
+            <ul style="line-height:1.6;">
+                <li><b>Linux:</b> WebKitGTK plays all audio through GStreamer. If elements are
+                    missing (<code>appsink</code>, <code>appsrc</code>, <code>autoaudiosink</code>),
+                    setup hangs with no error in the UI — launch from a terminal and look for
+                    "GStreamer element … not found" lines. The AppImage bundles its own GStreamer;
+                    if you see this on an official build, please file a bug.</li>
+                <li>Confirm the system audio server (PipeWire / PulseAudio / CoreAudio) is running
+                    and an output device is selected (Preferences → Audio).</li>
+                <li>Restart the app; if it persists, Help → Show Logs → copy the diagnostic dump
+                    into a bug report.</li>
+            </ul>
+        `;
+        document.body.appendChild(overlay);
+    }
+
     private static showSharedArrayBufferError(details: Record<string, unknown>) {
         const overlay = document.createElement('div');
         overlay.style.cssText = `
@@ -241,6 +271,37 @@ export class StrudelAudioManager {
             throw new Error('SharedArrayBuffer unavailable. See on-screen diagnostic for details.');
         }
 
+        // WebKitGTK routes WebAudio through GStreamer; with a broken element
+        // set (e.g. a mispackaged AppImage) AudioContext/worklet setup hangs
+        // forever without ever rejecting — the app sat at "Loading WASM…"
+        // indefinitely (#7). Run the whole init under a watchdog that names
+        // the stalled phase, and surface any init failure as a full error
+        // screen: a dead audio engine is fatal to the entire instrument.
+        let phase = 'wasm-compile';
+        let watchdog: ReturnType<typeof setTimeout> | undefined;
+        try {
+            return await Promise.race([
+                this.initInner(wasmInit, MainThreadProcessorCtor, (p) => { phase = p; }),
+                new Promise<never>((_, reject) => {
+                    watchdog = setTimeout(
+                        () => reject(new Error(`stalled during "${phase}" (no progress after 20s)`)),
+                        20_000,
+                    );
+                }),
+            ]);
+        } catch (err) {
+            StrudelAudioManager.showAudioInitError(phase, err);
+            throw err;
+        } finally {
+            clearTimeout(watchdog);
+        }
+    }
+
+    private async initInner(
+        wasmInit: WasmInitFn,
+        MainThreadProcessorCtor: MainThreadProcessorCtor,
+        setPhase: (phase: string) => void,
+    ): Promise<number> {
         const wasmModule = await WebAssembly.compileStreaming(fetch(wasmUrl));
 
         // Single shared memory - both threads use this same object.
@@ -251,8 +312,10 @@ export class StrudelAudioManager {
         });
         this.sharedMem = sharedMemory;
 
+        setPhase('wasm-init');
         await wasmInit({module_or_path: wasmModule, memory: sharedMemory});
 
+        setPhase('audio-context');
         this.audioContext = new AudioContext();
         this.processor = new MainThreadProcessorCtor();
 
@@ -289,8 +352,10 @@ export class StrudelAudioManager {
         this.gainNode.connect(this.analyserNode);
         this.analyserNode.connect(this.audioContext.destination);
 
+        setPhase('worklet-module');
         await this.audioContext.audioWorklet.addModule(workletUrl);
 
+        setPhase('worklet-node');
         this.workletNode = new AudioWorkletNode(
             this.audioContext, 'strudel-processor',
             {
@@ -311,6 +376,7 @@ export class StrudelAudioManager {
         };
         this.workletNode.connect(this.gainNode);
 
+        setPhase('worklet-handshake');
         await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(
                 () => reject(new Error('Worklet init timed out')), 10_000,
