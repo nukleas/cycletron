@@ -60,6 +60,9 @@ logs/
 scratch/
 .scratch/
 tmp/
+/*.wav
+/*.strudel
+corpus/test_ingest*/
 
 # Agent / tooling dev state (local-only)
 .grok/
