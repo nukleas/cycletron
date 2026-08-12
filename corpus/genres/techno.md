@@ -4,8 +4,8 @@ aliases: [detroit techno, minimal techno, peak time techno]
 bpm: [125, 140]
 swing: 0.0
 scales: [phrygian, minor]
-key_sounds: [bd, cp, hh, mt, sawtooth, white]
-signature: Mechanical four-on-the-floor at ~128–135 BPM — relentless kick, offbeat hats, sparse claps, driving filtered bass, and hypnotic toms/euclid motion rather than house-style soulful 7th stabs. (Detroit → Berlin continuum.)
+key_sounds: [bd, cp, hh, sawtooth, white]
+signature: Mechanical four-on-the-floor at ~128–135 BPM — relentless kick, ticking hats, sparse claps, driving filtered bass, and slow timbral motion rather than house-style soulful 7th stabs. (Detroit → Berlin continuum.)
 artists: [Juan Atkins, Derrick May, Kevin Saunderson, Jeff Mills, Richie Hawtin, Robert Hood]
 sources:
   - "https://en.wikipedia.org/wiki/Techno"
@@ -21,8 +21,8 @@ opening the bass filter and adding hat density — not by swinging the groove.
 
 ## Four-on-the-floor core
 
-Relentless kick, clap on the backbeat, offbeat closed hats. No open-hat "jack"
-lift — this should feel industrial, not disco.
+Relentless kick, clap on the backbeat, offbeat closed hats. Keep the groove taut
+and machine-like, with less open-hat lift than a disco-forward pattern.
 
 ```strudel
 setbpm(130);
@@ -45,16 +45,17 @@ note("c2 c2 c2 c2").s("sawtooth")
   .gain(0.4)
 ```
 
-## Euclid tom motion
+## Optional low-gain tom accent
 
-Hypnotic mid percussion — the "machine breathing" layer. Keep it sparse so the
-kick still owns the floor.
+A sparse tom can add a little asymmetry, but it is an accent rather than the
+genre's signature. Keep it quiet, or omit it and let the hats and filter sweep
+carry the hypnosis.
 
 ```strudel
 setbpm(130);
 stack(
   s("bd*4").gain(0.9),
-  s("mt(3,8)").gain(0.35)
+  s("mt(3,8)").gain(0.14)
 )
 ```
 
@@ -71,8 +72,9 @@ note("<c3 ~ g2 ~>").s("sawtooth")
 
 ## Full skeleton
 
-Kick grid + driving bass + euclid toms + optional stab. Strip toms and close the
-bass filter for a breakdown; open the LPF and double hats for the peak.
+Kick grid + driving bass + a sparse stab. Add the low-gain tom accent above only
+when the hats and filter sweep need more motion; close the LPF for a breakdown
+and double the hats for the peak.
 
 ```strudel
 setbpm(130);
@@ -80,7 +82,6 @@ stack(
   s("bd*4").gain(0.95),
   s("~ cp ~ cp").gain(0.4),
   s("hh*8").gain(0.26),
-  s("mt(3,8)").gain(0.3),
   note("c2 c2 c2 c2").s("sawtooth").lpf(sine.range(220, 1000).slow(4)).resonance(10).gain(0.38),
   note("<c3 ~ g2 ~>").s("sawtooth").lpf(1600).decay(0.12).sustain(0).gain(0.25).room(0.12)
 )

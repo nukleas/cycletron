@@ -4,7 +4,7 @@ aliases: [lo-fi, lofi, lo-fi hip-hop, boom bap, chillhop, trip-hop]
 bpm: [82, 92]
 swing: 0.15
 scales: [minor, dorian, minor pentatonic, major]
-key_sounds: [bd, sd, hh, oh, rim, gm_epiano1, piano, gm_acoustic_bass]
+key_sounds: [bd, sd, hh, oh, rs, gm_epiano1, piano, gm_acoustic_bass]
 signature: Laid-back boom-bap at ~85 BPM — a punchy syncopated kick, snare on the backbeat, ticking hats, warm jazzy 7th chords on a Rhodes, and a walking upright bass. Dusty and mellow. (J Dilla, Nujabes, Madlib.)
 artists: [J Dilla, Nujabes, Madlib, DJ Premier, MF DOOM]
 sources:

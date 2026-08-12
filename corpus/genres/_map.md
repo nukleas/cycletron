@@ -19,7 +19,7 @@ a researched `corpus/genres/<g>.md` exists; blank = sketch awaiting Phase 2.
 | genre | bpm | mood | swing | drums | bass | spec | recipe |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Detroit techno | 126–130 | soulful | — | four-on-floor + backbeat-clap + closed-hats(2,1) | rolling-16th | ✓ |  |
-| minimal techno | 126–130 | hypnotic | — | four-on-floor + closed-hats(2,1) + euclid-tom(3,16) | rolling-16th | ✓ |  |
+| minimal techno | 126–130 | hypnotic | — | four-on-floor + closed-hats(2,1) | rolling-16th | ✓ |  |
 | dub techno | 118–122 | deep | — | four-on-floor + closed-hats(2,1) | sub-wobble | ✓ |  |
 | hard techno | 138–145 | dark | — | four-on-floor + backbeat-clap + closed-hats(1,0) | rolling-16th | ✓ |  |
 | acid techno | 128–132 | squelchy | — | four-on-floor + backbeat-clap + closed-hats(2,1) | acid-303 | ✓ | ✓ |
@@ -139,7 +139,7 @@ a researched `corpus/genres/<g>.md` exists; blank = sketch awaiting Phase 2.
 
 | genre | bpm | mood | swing | drums | bass | spec | recipe |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| folktronica | 105–115 | organic | — | boom-bap + euclid-tom(3,16) | walking | ✓ |  |
+| folktronica | 105–115 | organic | — | boom-bap | walking | ✓ |  |
 | nu-jazz | 105–115 | jazzy | 0.30 | boom-bap + closed-hats(2,1) | walking | ✓ |  |
 | Berlin school | 100–120 | cosmic | — | — | rolling-16th | ✓ |  |
 
@@ -157,7 +157,7 @@ a researched `corpus/genres/<g>.md` exists; blank = sketch awaiting Phase 2.
 | genre | bpm | mood | swing | drums | bass | spec | recipe |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | amapiano | 110–115 | smooth | — | log-drum + closed-hats(2,0) + backbeat-clap | sub-808 | ✓ |  |
-| afro house | 118–122 | percussive | — | four-on-floor + euclid-tom(5,16) + closed-hats(2,1) | offbeat-root | ✓ |  |
+| afro house | 118–122 | percussive | — | four-on-floor + backbeat-clap + offbeat-open-hat + closed-hats(2,1) | offbeat-root | ✓ |  |
 | gqom | 122–128 | raw | — | half-time + euclid-tom(3,8) | sub-808 | ✓ |  |
 
 ## Footwork / Juke

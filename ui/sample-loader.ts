@@ -114,11 +114,10 @@ export const MACHINE_KITS: Array<[string, string, Array<[string, string]>]> = [
  * Percussion & texture "color" banks — CC0 recordings from the Versilian
  * Community Sample Library (VCSL, https://github.com/sgossner/VCSL) bundled in
  * `ui/public/samples/` (see ATTRIBUTION.md for the per-bank source mapping).
- * These break the agent out of the 12-drum default kit: instead of reaching
- * for `rs(3,16).hpf()` as the only dry/metallic percussion, it gets real perc,
- * industrial, hand, and ethnic voices plus a bass, a pluck, and an atmosphere.
- * One representative sample per bank (index 0); use `s("perc:2")` for variety
- * once more indices are bundled. Each entry is [bankName, relativePath].
+ * Each bank is a single raw fortissimo one-shot (index 0 only — `:n` replays
+ * the same sample). Agent guidance scopes them to sparse genre-appropriate
+ * accents, tamed with gain/filtering — they are not default percussion.
+ * Each entry is [bankName, relativePath].
  */
 export const PERCUSSION_COLORS: Array<[string, string]> = [
     ['perc',       'perc/Cajon_hit1_fff_rr1.wav'],

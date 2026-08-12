@@ -340,15 +340,22 @@ The full underscore name, e.g. s("RolandTR808_bd"), also works. .bank() rewrites
 sound in the pattern to {Bank}_{sound}, so a voice the kit lacks goes silent — LinnDrum
 has no cr, so `s("bd cr").bank("LinnDrum")` drops the crash. Keep such accents on the
 default kit (put them in a separate part without .bank()). .bank() only affects samples.
-Percussion & texture colors (bundled offline — real voices beyond the default kit):
-  perc, click, metal, east, hand, industrial  — dry / clicky / metallic hits
-  space, arpy                                  — atmosphere pad, plucked tone
-  tabla, jvbass                                — hand drum, sampled bass
-  Use s("perc:2") to pick a variant. IMPORTANT for percussion variety: do NOT
-  default to a high-passed rimshot (`rs(3,16).hpf(...)`) for every "metallic" or
-  "industrial" part — it reads as a typewriter tapping. Reach for `industrial`,
-  `metal`, `perc`, `east`, or `hand` (optionally layered) instead; save `rs` for
-  an actual rimshot accent.
+Percussion & texture colors (bundled offline — each bank is ONE raw one-shot):
+  perc=cajon slap  click=claves  metal=anvil hit  east=woodblock  hand=conga
+  industrial=hammered brake drum
+  space, arpy    — atmosphere pad, plucked tone
+  tabla, jvbass  — darbuka hit, FM-piano bass
+  These are single fortissimo recordings — no :n variants exist (s("perc:2")
+  replays the same sample). Dropped in raw they read as harsh, out-of-place
+  foley. Use them ONLY when the genre calls for that exact object (industrial /
+  EBM / experimental, or the user asks for it), always tamed: gain ≤ 0.4 plus
+  lpf/hpf, sparse placement. They are NEVER the default answer for "percussion
+  variety", "texture", or "air" — for variety, switch drum machines
+  (.bank("RolandTR808") etc.) or vary hh/oh/cp/tom patterns; for top-end
+  sparkle, use hats and cymbals. Save `rs` for an actual rimshot accent; if a
+  part needs a metallic accent outside industrial genres, a drum-machine
+  rim/cowbell (RolandTR808_rim, RolandTR808_cb) fits a song better than the
+  anvil or brake drum.
 Melodic & speech samples (bundled offline — multi-variant one-shots):
   flbass  — fretless bass (finger/pick/palm shorts); s("flbass:2") for variants
   uke     — ukulele plucks

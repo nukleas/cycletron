@@ -7,7 +7,7 @@
     ]},
     { "name": "techno", "display": "Techno", "genres": [
       { "name": "detroit-techno", "display": "Detroit techno", "bpm": [126, 130], "mood": "soulful", "swing": 0, "drums": ["four-on-floor", "backbeat-clap", "closed-hats(2,1)"], "bass": "rolling-16th", "spec": true, "recipe": "detroit-techno.md" },
-      { "name": "minimal-techno", "display": "minimal techno", "bpm": [126, 130], "mood": "hypnotic", "swing": 0, "drums": ["four-on-floor", "closed-hats(2,1)", "euclid-tom(3,16)"], "bass": "rolling-16th", "spec": true, "recipe": "minimal-techno.md" },
+      { "name": "minimal-techno", "display": "minimal techno", "bpm": [126, 130], "mood": "hypnotic", "swing": 0, "drums": ["four-on-floor", "closed-hats(2,1)"], "bass": "rolling-16th", "spec": true, "recipe": "minimal-techno.md" },
       { "name": "dub-techno", "display": "dub techno", "bpm": [118, 122], "mood": "deep", "swing": 0, "drums": ["four-on-floor", "closed-hats(2,1)"], "bass": "sub-wobble", "spec": true, "recipe": "dub-techno.md" },
       { "name": "hard-techno", "display": "hard techno", "bpm": [138, 145], "mood": "dark", "swing": 0, "drums": ["four-on-floor", "backbeat-clap", "closed-hats(1,0)"], "bass": "rolling-16th", "spec": true, "recipe": "hard-techno.md" },
       { "name": "acid-techno", "display": "acid techno", "bpm": [128, 132], "mood": "squelchy", "swing": 0, "drums": ["four-on-floor", "backbeat-clap", "closed-hats(2,1)"], "bass": "acid-303", "spec": true, "recipe": "acid-techno.md" }
@@ -82,7 +82,7 @@
       { "name": "vaporwave", "display": "vaporwave", "bpm": [65, 75], "mood": "hazy", "swing": 0, "drums": ["boom-bap"], "bass": "walking", "spec": true, "recipe": "vaporwave.md" }
     ]},
     { "name": "electronica", "display": "Electronica", "genres": [
-      { "name": "folktronica", "display": "folktronica", "bpm": [105, 115], "mood": "organic", "swing": 0, "drums": ["boom-bap", "euclid-tom(3,16)"], "bass": "walking", "spec": true, "recipe": "folktronica.md" },
+      { "name": "folktronica", "display": "folktronica", "bpm": [105, 115], "mood": "organic", "swing": 0, "drums": ["boom-bap"], "bass": "walking", "spec": true, "recipe": "folktronica.md" },
       { "name": "nu-jazz", "display": "nu-jazz", "bpm": [105, 115], "mood": "jazzy", "swing": 0.3, "drums": ["boom-bap", "closed-hats(2,1)"], "bass": "walking", "spec": true, "recipe": "nu-jazz.md" },
       { "name": "berlin-school", "display": "Berlin school", "bpm": [100, 120], "mood": "cosmic", "swing": 0, "drums": [], "bass": "rolling-16th", "spec": true, "recipe": "berlin-school.md" }
     ]},
@@ -94,7 +94,7 @@
     ]},
     { "name": "afro", "display": "Afro / Regional", "genres": [
       { "name": "amapiano", "display": "amapiano", "bpm": [110, 115], "mood": "smooth", "swing": 0, "drums": ["log-drum", "closed-hats(2,0)", "backbeat-clap"], "bass": "sub-808", "spec": true, "recipe": "amapiano.md" },
-      { "name": "afro-house", "display": "afro house", "bpm": [118, 122], "mood": "percussive", "swing": 0, "drums": ["four-on-floor", "euclid-tom(5,16)", "closed-hats(2,1)"], "bass": "offbeat-root", "spec": true, "recipe": "afro-house.md" },
+      { "name": "afro-house", "display": "afro house", "bpm": [118, 122], "mood": "percussive", "swing": 0, "drums": ["four-on-floor", "backbeat-clap", "offbeat-open-hat", "closed-hats(2,1)"], "bass": "offbeat-root", "spec": true, "recipe": "afro-house.md" },
       { "name": "gqom", "display": "gqom", "bpm": [122, 128], "mood": "raw", "swing": 0, "drums": ["half-time", "euclid-tom(3,8)"], "bass": "sub-808", "spec": true, "recipe": "gqom.md" }
     ]},
     { "name": "footwork", "display": "Footwork / Juke", "genres": [

@@ -168,9 +168,9 @@ pub fn extras() -> Vec<GenreSpec> {
     }
     {
         let mut s = g("minimal-techno", "minimal techno", "techno", (126, 130), "c phrygian", "hypnotic",
-            "stripped four-on-floor, euclid tom, two-chord hypnosis");
-        s.drums = vec![FourOnFloor, hats(2, 1), EuclidTom { k: 3, n: 16 }];
-        s.bass = bass(Rolling16th, 2, "sawtooth", ".lpf(800).resonance(8).gain(0.5)");
+            "stripped four-on-floor, ticking hats, slow filter hypnosis");
+        s.drums = vec![FourOnFloor, hats(2, 1)];
+        s.bass = bass(Rolling16th, 2, "sawtooth", ".lpf(sine.range(450, 950).slow(8)).resonance(8).gain(0.5)");
         s.harmony = sevenths(&[0, 1], 3, "~~~1", "sawtooth", ".release(0.16).lpf(1300).gain(0.28).room(0.2)");
         v.push(s);
     }
@@ -516,7 +516,7 @@ pub fn extras() -> Vec<GenreSpec> {
     }
     {
         let mut s = g("industrial-techno", "industrial techno", "industrial", (132, 138), "c phrygian", "harsh",
-            "grinding four-on-floor, euclid metal, distorted bass engine");
+            "grinding four-on-floor, euclid toms, distorted bass engine");
         s.drums = vec![FourOnFloor, hats(1, 0), EuclidTom { k: 5, n: 16 }];
         s.drum_fx = ".gain(0.92).dist(0.3)".into();
         s.bass = bass(Rolling16th, 2, "sawtooth", ".lpf(850).resonance(9).gain(0.5).dist(0.15)");
@@ -588,8 +588,8 @@ pub fn extras() -> Vec<GenreSpec> {
     // ---- Electronica ----------------------------------------------------------------
     {
         let mut s = g("folktronica", "folktronica", "electronica", (105, 115), "g major", "organic",
-            "soft boom-bap with euclid texture, upright bass, kalimba line");
-        s.drums = vec![BoomBap, EuclidTom { k: 3, n: 16 }];
+            "soft boom-bap, upright bass, kalimba line");
+        s.drums = vec![BoomBap];
         s.drum_fx = ".gain(0.8)".into();
         s.bass = bass(Walking, 2, "gm_acoustic_bass", ".gain(0.56)");
         s.harmony = sevenths(&[0, 4, 5, 3], 3, "", "wt_piano", ".release(0.5).gain(0.38).room(0.4)");
@@ -668,8 +668,8 @@ pub fn extras() -> Vec<GenreSpec> {
     }
     {
         let mut s = g("afro-house", "afro house", "afro", (118, 122), "a dorian", "percussive",
-            "four-on-floor with euclid percussion web, kalimba call");
-        s.drums = vec![FourOnFloor, EuclidTom { k: 5, n: 16 }, hats(2, 1)];
+            "four-on-floor with a soft clap-and-hat percussion web, kalimba call");
+        s.drums = vec![FourOnFloor, BackbeatClap, OffbeatOpenHat, hats(2, 1)];
         s.bass = bass(OffbeatRoot, 2, "sawtooth", ".lpf(700).resonance(6).gain(0.5)");
         s.harmony = sevenths(&[0, 3], 3, "~1~~", "gm_epiano1", ".release(0.3).gain(0.36).room(0.35)");
         s.melody = walk(7, 4, 11, 2, 4, "gm_kalimba", ".delay(0.25).room(0.35).gain(0.32)");

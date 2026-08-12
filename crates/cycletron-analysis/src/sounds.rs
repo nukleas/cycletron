@@ -25,10 +25,10 @@ pub const DEFAULT_DRUMS: &[&str] = &[
 
 /// Percussion & texture "color" banks — CC0 recordings (VCSL) bundled in
 /// `ui/public/samples/` and loaded in the background at startup (see
-/// `PERCUSSION_COLORS` in `ui/sample-loader.ts`, which must stay in sync). These
-/// exist so the agent has real percussion/texture voices beyond the 12 default
-/// drums instead of reaching for `rs(3,16).hpf()` as its only dry/metallic hit.
-/// One representative sample per bank (index 0); `s("perc:2")` selects variants.
+/// `PERCUSSION_COLORS` in `ui/sample-loader.ts`, which must stay in sync).
+/// Each bank is a single raw fortissimo one-shot (anvil, brake drum, claves…)
+/// with no `:n` variants; agent guidance treats them as sparse
+/// genre-appropriate accents, not default percussion.
 pub const PERCUSSION: &[&str] = &[
     "perc", "click", "metal", "east", "hand", "industrial",
     "space", "arpy", "tabla", "jvbass",

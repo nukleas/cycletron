@@ -254,7 +254,7 @@ pub fn sound_catalog(state: &AppState) -> serde_json::Value {
         "wavetables": WAVETABLES,
         "drums": DEFAULT_DRUMS,
         "percussion": PERCUSSION,
-        "percussion_note": "Percussion & texture color banks (perc/click/metal/east/hand/industrial for dry & metallic hits; space/arpy atmosphere & pluck; tabla/jvbass tonal). Prefer these over stacking hpf'd rimshots. Use s(\"perc:2\") for variants.",
+        "percussion_note": "Single one-shot color banks: perc=cajon, click=claves, metal=anvil, east=woodblock, hand=conga, industrial=brake drum — raw fortissimo foley with no :n variants. Sparse genre-appropriate accents only (industrial/EBM/experimental), tamed with low gain + filtering; never default texture or percussion variety. space/arpy = atmosphere & pluck; tabla/jvbass = tonal.",
         "instruments": INSTRUMENTS,
         "instruments_note": "Melodic/speech expansion banks (CC0 Clean-Samples slices). flbass=fretless bass, uke=ukulele, cpluck=cello pluck, cbow=cello bow short, speech=synth speech chops. Multi-variant: s(\"flbass:2\"). Unpitched one-shots — for in-tune melodies prefer gm_* / wt_*.",
         "drum_machines": machines,
