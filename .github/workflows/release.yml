@@ -98,6 +98,39 @@ jobs:
           # "Package alsa was not found in the pkg-config search path".
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libudev-dev xdg-utils
 
+      # tauri-bundler downloads NSIS at bundle time with an HTTP client that
+      # intermittently dies on GitHub's release-assets CDN ("io: Peer
+      # disconnected") — after the full 14-minute Rust build. Seed its cache
+      # up front with a retrying downloader instead; with all required files
+      # present and hash-matched the bundler skips its own downloads entirely.
+      # The pinned NSIS/plugin versions + SHA1 track tauri-bundler's constants
+      # (crates/tauri-bundler/src/bundle/windows/nsis/mod.rs); if a CLI bump
+      # changes them the bundler just falls back to downloading as before.
+      - name: Pre-seed NSIS for tauri-bundler (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          $tools = Join-Path $env:LOCALAPPDATA 'tauri'
+          New-Item -ItemType Directory -Force -Path $tools | Out-Null
+          Invoke-WebRequest -MaximumRetryCount 5 -RetryIntervalSec 10 `
+            -Uri 'https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip' `
+            -OutFile "$tools\nsis-3.11.zip"
+          Expand-Archive -Path "$tools\nsis-3.11.zip" -DestinationPath $tools -Force
+          Rename-Item -Path "$tools\nsis-3.11" -NewName 'NSIS'
+          $additional = "$tools\NSIS\Plugins\x86-unicode\additional"
+          New-Item -ItemType Directory -Force -Path $additional | Out-Null
+          Invoke-WebRequest -MaximumRetryCount 5 -RetryIntervalSec 10 `
+            -Uri 'https://github.com/tauri-apps/nsis-tauri-utils/releases/download/nsis_tauri_utils-v0.5.3/nsis_tauri_utils.dll' `
+            -OutFile "$additional\nsis_tauri_utils.dll"
+          $sha1 = (Get-FileHash -Algorithm SHA1 "$additional\nsis_tauri_utils.dll").Hash
+          if ($sha1 -ne '75197FEE3C6A814FE035788D1C34EAD39349B860') {
+            throw "nsis_tauri_utils.dll SHA1 mismatch: $sha1"
+          }
+          foreach ($f in 'makensis.exe', 'Stubs\lzma-x86-unicode', 'Stubs\lzma_solid-x86-unicode') {
+            if (-not (Test-Path "$tools\NSIS\$f")) { throw "NSIS cache is missing $f" }
+          }
+
       # ── macOS only: import the Developer ID cert into a temp keychain and
       #    auto-detect the identity. ──────────────────────────────────────────
       - name: Import Apple Developer ID certificate
