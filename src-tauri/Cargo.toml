@@ -57,5 +57,7 @@ hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
 tauri-build = { version = "2", features = [] }
 
 [lib]
-name = "cycletron_app"
+# The _lib suffix keeps the lib's artifacts (.pdb/.lib) from colliding with the
+# cycletron-app bin target on Windows MSVC, which flattens both to cycletron_app.*
+name = "cycletron_app_lib"
 crate-type = ["lib", "staticlib", "cdylib"]

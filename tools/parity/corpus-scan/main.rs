@@ -1,7 +1,7 @@
 //! Scan the strudel corpus against strudel-rs's DSL/mini evaluators.
 //!
 //! Walks a corpus directory, runs each pattern through the same
-//! validation pipeline `cycletron_app::strudel::validate_code` uses,
+//! validation pipeline `cycletron_app_lib::strudel::validate_code` uses,
 //! classifies failures, and emits:
 //!   - parity-report.jsonl  — one row per file
 //!   - parity-summary.md    — top error categories

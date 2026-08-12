@@ -34,5 +34,5 @@ fn main() {
         }
     };
 
-    cycletron_app::run()
+    cycletron_app_lib::run()
 }
