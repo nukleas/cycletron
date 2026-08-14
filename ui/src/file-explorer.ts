@@ -178,7 +178,7 @@ export class FileExplorer {
         header.className = 'file-tree-row file-tree-recent-header';
         if (!this.recentsCollapsed) header.classList.add('expanded');
         header.setAttribute('role', 'treeitem');
-        header.title = 'Recently opened files';
+        header.setAttribute('data-tooltip', 'Recently opened files');
         header.style.paddingLeft = '8px';
 
         const chevron = document.createElement('span');
@@ -211,7 +211,7 @@ export class FileExplorer {
             row.className = 'file-tree-row is-file file-tree-recent-row';
             row.dataset.path = path;
             row.style.paddingLeft = '28px';
-            row.title = path;
+            row.setAttribute('data-tooltip', path);
             row.setAttribute('role', 'treeitem');
             if (this.activePath === path) {
                 row.classList.add('active');
@@ -258,7 +258,7 @@ export class FileExplorer {
         row.dataset.path = entry.path;
         row.dataset.isDir = entry.is_dir ? '1' : '0';
         row.style.paddingLeft = `${8 + depth * 12}px`;
-        row.title = entry.path;
+        row.setAttribute('data-tooltip', entry.path);
         row.setAttribute('role', 'treeitem');
         if (entry.is_dir && this.expanded.has(entry.path)) row.classList.add('expanded');
         if (!entry.is_dir && this.activePath === entry.path) {
@@ -586,7 +586,7 @@ export class FileExplorer {
     private setRootLabel(path: string): void {
         if (!this.rootLabel) return;
         this.rootLabel.textContent = path;
-        this.rootLabel.title = path;
+        this.rootLabel.setAttribute('data-tooltip', path);
     }
 
     private isUnderRoot(path: string): boolean {

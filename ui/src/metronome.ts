@@ -100,7 +100,7 @@ class Metronome {
     private updateUi(): void {
         if (!this.btn) return;
         this.btn.classList.toggle('is-on', this.enabled);
-        this.btn.title = this.enabled ? 'Metronome on' : 'Metronome off';
+        this.btn.setAttribute('data-tooltip', this.enabled ? 'Metronome on' : 'Metronome off');
     }
 }
 

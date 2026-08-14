@@ -20,6 +20,7 @@ import {ExamplesBrowser} from './examples.js';
 import {notify} from './notifications.js';
 import {invoke, isTauri} from './tauri.js';
 import {openPathDialog} from './dialog.js';
+import {initTooltips} from './tooltip.js';
 
 /** How many cycles the ⏮/⏭ transport buttons jump. */
 const SKIP_CYCLES = 5;
@@ -204,6 +205,10 @@ export class StrudelApp {
 
     private updateActiveNotes(cycle: number): void {
         if (!this.scheduler?.pattern || !this.editor || !this._wasmMemory) return;
+        // Full-buffer replace (file open / examples) until the new code
+        // actually evaluates — otherwise old-pattern byte spans light up
+        // the wrong tokens in the new document.
+        if (this.editor.replaced) return;
 
         // queryActiveLocations(now, lookahead) — the 2nd arg is a RELATIVE
         // duration (Rust queries [now, now + lookahead]), not an absolute end.
@@ -980,6 +985,7 @@ export class StrudelApp {
             this.visualizer?.resetCache();
             this.updateVisualization();
             this.hideError();
+            if (this.editor) this.editor.replaced = false;
         } catch (e) {
             const msg = (e as Error).message || String(e);
             this.showError(msg);
@@ -1022,6 +1028,7 @@ export class StrudelApp {
         }
 
         this.hideError();
+        if (this.editor) this.editor.replaced = false;
         void this.updateInspect(code);
     }
 
@@ -1306,6 +1313,8 @@ export class StrudelApp {
         this.elements.error.textContent = message;
         this.elements.error.classList.add('error--visible');
         this.editor?.clearInspect();
+        this.editor?.clearActiveNotes();
+        if (this.editor) this.editor.replaced = true;
 
         if (decorate && this.editor) {
             const doc = this.editor.view.state.doc;
@@ -1477,6 +1486,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = new StrudelApp();
     window.strudelApp = app;
     app.init();
+    initTooltips();
 
     // Enable transport button after the first frame
     // Prevents race conditions if user clicks too early

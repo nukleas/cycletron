@@ -39,6 +39,10 @@
     --sidebar-width: 300px;
     --editor-font-size: 14px;
 
+    --sb-thumb: var(--bg-lighter);
+    --sb-track: var(--bg);
+    --sb-size-medium: 10px;
+
     --surface-glass: rgba(11, 15, 24, 0.94);
     --panel-shadow: inset 0 0 0 1px rgba(71, 246, 255, 0.04), 0 0 24px rgba(71, 246, 255, 0.07);
 
@@ -153,6 +157,51 @@ select:focus-visible {
     outline: 1px solid var(--neon);
     outline-offset: 1px;
     box-shadow: 0 0 8px var(--neon-glow);
+}
+
+/* Tooltips (JS-driven — avoids clipping inside overflow:auto containers) */
+.js-tooltip {
+    position: fixed;
+    z-index: 10050;
+    padding: 5px 9px;
+    background-color: #121212;
+    color: #e0e0e0;
+    border: 1px solid #333;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    white-space: normal;
+    width: max-content;
+    max-width: min(220px, 85vw);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+    transform: translateY(-4px);
+}
+
+.js-tooltip--visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.js-tooltip__arrow {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: 4px solid transparent;
+}
+
+.js-tooltip--below .js-tooltip__arrow {
+    top: -8px;
+    border-bottom-color: #121212;
+}
+
+.js-tooltip--above .js-tooltip__arrow {
+    bottom: -8px;
+    border-top-color: #121212;
 }
 
 
@@ -1207,7 +1256,7 @@ button.danger:hover:not(:disabled) {
 
 /* Visualization */
 #visualizer {
-    min-height: 120px;
+    height: 120px;
     background:
         linear-gradient(90deg, rgba(71, 246, 255, 0.08) 1px, transparent 1px),
         linear-gradient(0deg, rgba(255, 43, 214, 0.045) 1px, transparent 1px),
@@ -1216,7 +1265,7 @@ button.danger:hover:not(:disabled) {
     border-radius: 0;
     border: 1px solid rgba(71, 246, 255, 0.26);
     overflow: hidden;
-    transition: height 0.2s ease-out;
+    transition: none;
     box-shadow: inset 0 0 0 1px rgba(255, 43, 214, 0.06), 0 0 18px rgba(71, 246, 255, 0.08);
 }
 
@@ -1255,6 +1304,13 @@ button.danger:hover:not(:disabled) {
     border-radius: 0;
     border: 1px solid rgba(71, 246, 255, 0.20);
     overflow: hidden;
+}
+
+#visualizer canvas,
+#scope canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 /* Stats */
@@ -1595,10 +1651,6 @@ button.danger:hover:not(:disabled) {
     gap: 2px;
 }
 
-.ex-grid::-webkit-scrollbar { width: 4px; }
-.ex-grid::-webkit-scrollbar-track { background: transparent; }
-.ex-grid::-webkit-scrollbar-thumb { background: var(--neon-subtle); border-radius: 2px; }
-
 .ex-card {
     display: flex;
     align-items: center;
@@ -1937,34 +1989,7 @@ body.is-drop-target::after {
     }
 }
 
-/* Custom scrollbar */
-.sidebar::-webkit-scrollbar,
-#editor .cm-scroller::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
 
-.sidebar::-webkit-scrollbar-track,
-#editor .cm-scroller::-webkit-scrollbar-track {
-    background: var(--bg);
-}
-
-.sidebar::-webkit-scrollbar-thumb,
-#editor .cm-scroller::-webkit-scrollbar-thumb {
-    background: var(--bg-lighter);
-    border-radius: 10px;
-    border: 3px solid var(--bg);
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover,
-#editor .cm-scroller::-webkit-scrollbar-thumb:hover {
-    background: var(--border);
-}
-
-.sidebar, #editor .cm-scroller {
-    scrollbar-width: thin;
-    scrollbar-color: var(--bg-lighter) var(--bg);
-}
 
 
 /* =========================================================
@@ -2209,11 +2234,6 @@ body.is-drop-target::after {
     display: flex; flex-direction: column; gap: 8px;
     position: relative; z-index: 2;
 }
-.ai-messages::-webkit-scrollbar { width: 4px; }
-.ai-messages::-webkit-scrollbar-track { background: transparent; }
-.ai-messages::-webkit-scrollbar-thumb { background: var(--ai-neon-subtle); border-radius: 2px; }
-.ai-messages::-webkit-scrollbar-thumb:hover { background: var(--ai-neon-glow); }
-
 .ai-msg {
     padding: 6px 8px; border-radius: 0;
     font-size: 11px; line-height: 1.5;
@@ -2522,11 +2542,6 @@ body.is-drop-target::after {
     position: relative;
     z-index: 2;
 }
-.file-tree::-webkit-scrollbar { width: 4px; }
-.file-tree::-webkit-scrollbar-track { background: transparent; }
-.file-tree::-webkit-scrollbar-thumb { background: var(--neon-subtle); border-radius: 2px; }
-.file-tree::-webkit-scrollbar-thumb:hover { background: var(--neon-glow); }
-
 .file-tree-empty {
     padding: 18px 14px;
     color: var(--text-muted);
@@ -2946,9 +2961,6 @@ body.is-drop-target::after {
     white-space: pre;
     margin: 0;
 }
-#midiLabPreview::-webkit-scrollbar { width: 4px; height: 4px; }
-#midiLabPreview::-webkit-scrollbar-thumb { background: var(--neon-subtle); }
-
 .midi-lab-actions {
     display: flex;
     align-items: center;
@@ -3452,8 +3464,6 @@ body.is-drop-target::after {
     overflow: auto;
     padding: 4px 0;
 }
-.cmd-palette-list::-webkit-scrollbar { width: 4px; }
-.cmd-palette-list::-webkit-scrollbar-thumb { background: var(--neon-subtle); }
 .cmd-palette-empty {
     padding: 16px 18px;
     color: var(--text-muted);
@@ -4570,4 +4580,90 @@ body.immersive-viz-active #editor .cm-gutters {
     font-size: 12px;
     color: var(--text-dim, #9aa);
     line-height: 1.45;
+}
+
+/* =========================================================
+   SCROLLBARS
+   ========================================================= */
+
+.sidebar,
+#editor .cm-scroller,
+.dropdown-menu,
+.file-menu-popover {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-thumb) var(--sb-track);
+}
+
+.sidebar::-webkit-scrollbar,
+#editor .cm-scroller::-webkit-scrollbar,
+.dropdown-menu::-webkit-scrollbar,
+.file-menu-popover::-webkit-scrollbar {
+    width: var(--sb-size-medium);
+    height: var(--sb-size-medium);
+}
+
+.sidebar::-webkit-scrollbar-track,
+#editor .cm-scroller::-webkit-scrollbar-track,
+.dropdown-menu::-webkit-scrollbar-track,
+.file-menu-popover::-webkit-scrollbar-track {
+    background: var(--sb-track);
+}
+
+.sidebar::-webkit-scrollbar-thumb,
+#editor .cm-scroller::-webkit-scrollbar-thumb,
+.dropdown-menu::-webkit-scrollbar-thumb,
+.file-menu-popover::-webkit-scrollbar-thumb {
+    background: var(--sb-thumb);
+    border-radius: 10px;
+    border: 3px solid var(--sb-track);
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover,
+#editor .cm-scroller::-webkit-scrollbar-thumb:hover,
+.dropdown-menu::-webkit-scrollbar-thumb:hover,
+.file-menu-popover::-webkit-scrollbar-thumb:hover {
+    background: var(--border);
+}
+
+.file-tree,
+.ex-grid,
+.cmd-palette-list,
+.ai-messages,
+#midiLabPreview {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-thumb) transparent;
+}
+
+.file-tree::-webkit-scrollbar,
+.ex-grid::-webkit-scrollbar,
+.cmd-palette-list::-webkit-scrollbar,
+.ai-messages::-webkit-scrollbar,
+#midiLabPreview::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+.file-tree::-webkit-scrollbar-track,
+.ex-grid::-webkit-scrollbar-track,
+.cmd-palette-list::-webkit-scrollbar-track,
+.ai-messages::-webkit-scrollbar-track,
+#midiLabPreview::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.file-tree::-webkit-scrollbar-thumb,
+.ex-grid::-webkit-scrollbar-thumb,
+.cmd-palette-list::-webkit-scrollbar-thumb,
+.ai-messages::-webkit-scrollbar-thumb,
+#midiLabPreview::-webkit-scrollbar-thumb {
+    background: var(--sb-thumb);
+    border-radius: 2px;
+}
+
+.file-tree::-webkit-scrollbar-thumb:hover,
+.ex-grid::-webkit-scrollbar-thumb:hover,
+.cmd-palette-list::-webkit-scrollbar-thumb:hover,
+.ai-messages::-webkit-scrollbar-thumb:hover,
+#midiLabPreview::-webkit-scrollbar-thumb:hover {
+    background: var(--border);
 }

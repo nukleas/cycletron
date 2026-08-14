@@ -101,7 +101,7 @@ export class SoundsBrowser {
         const chips = names
             .map(n =>
                 `<button class="sound-chip" data-name="${escapeHtml(n)}" data-kind="${kind}" ` +
-                `title="Insert ${escapeHtml(n)}">${escapeHtml(n)}</button>`,
+                `data-tooltip="Insert ${escapeHtml(n)}">${escapeHtml(n)}</button>`,
             )
             .join('');
         const hintHtml = hint ? `<span class="sound-hint">${escapeHtml(hint)}</span>` : '';
