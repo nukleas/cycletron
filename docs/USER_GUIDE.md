@@ -53,7 +53,7 @@ The curated corpus is no longer a panel — the AI searches it directly
 
 BPM and gain live in the top bar, along with a **metronome** toggle and
 **skip ±5 cycles** buttons. Three fixed global shortcuts work while another
-app is focused: **⌘⇧Space** play/pause, **⌘⇧.** stop, **⌘⇧R** focus the
+app is focused: **⌘⇧Space** play/pause, **⌘⇧.** stop, **⌘⇧,** focus the
 window.
 
 The command palette is also a file finder — it searches your recents and
