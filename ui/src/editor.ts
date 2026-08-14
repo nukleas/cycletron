@@ -205,6 +205,9 @@ export class StrudelEditor {
 
     private _flashTimer: ReturnType<typeof setTimeout> | null;
 
+    /** True after a full-document setCode until evaluate succeeds. */
+    replaced = false;
+
     view: EditorView;
 
     /**
@@ -388,8 +391,10 @@ export class StrudelEditor {
                 from: 0,
                 to: this.view.state.doc.length,
                 insert: code
-            }
+            },
+            effects: clearActiveNotes.of(null),
         });
+        this.replaced = true;
     }
 
     /** Insert text at the cursor (replacing any selection), then focus. */

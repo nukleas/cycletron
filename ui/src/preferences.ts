@@ -629,7 +629,7 @@ export class PreferencesModal {
             const label = document.createElement('span');
             label.className = 'prefs-pad-label';
             label.textContent = action.label;
-            label.title = action.hint;
+            label.setAttribute('data-tooltip', action.hint);
 
             const binding = document.createElement('span');
             binding.className = 'prefs-pad-binding';
@@ -648,7 +648,7 @@ export class PreferencesModal {
             clear.className = 'prefs-inline-btn';
             clear.type = 'button';
             clear.textContent = '✕';
-            clear.title = 'Remove binding';
+            clear.setAttribute('data-tooltip', 'Remove binding');
             clear.addEventListener('click', () => {
                 midiPads.setAssignments(midiPads.getAssignments().filter((a) => a.action !== action.id));
                 this.renderPads();

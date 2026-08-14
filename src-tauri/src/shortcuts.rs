@@ -12,7 +12,9 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 pub fn register_defaults<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let play_pause: Shortcut = "CmdOrCtrl+Shift+Space".parse().map_err(to_tauri_err)?;
     let stop: Shortcut = "CmdOrCtrl+Shift+Period".parse().map_err(to_tauri_err)?;
-    let focus: Shortcut = "CmdOrCtrl+Shift+R".parse().map_err(to_tauri_err)?;
+    // Comma, not R: Cmd+Shift+R is hard-refresh in every browser, and a
+    // global shortcut would steal it system-wide while Cycletron runs.
+    let focus: Shortcut = "CmdOrCtrl+Shift+Comma".parse().map_err(to_tauri_err)?;
 
     let handle = app.clone();
     let gs = app.global_shortcut();

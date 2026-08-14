@@ -139,7 +139,7 @@ export class ExamplesBrowser {
             : ex.title;
 
         return `
-            <button class="ex-card" type="button" data-idx="${idx}" title="${this.esc(ex.blurb ?? ex.title)}">
+            <button class="ex-card" type="button" data-idx="${idx}" data-tooltip="${this.esc(ex.blurb ?? ex.title)}">
                 ${lessonBadge}
                 <span class="ex-card-title">${this.esc(title)}</span>
                 <span class="ex-complexity">${this.esc(ex.complexity)}</span>
