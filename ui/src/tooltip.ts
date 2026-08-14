@@ -22,6 +22,7 @@ function ensureTooltipEl(): HTMLDivElement {
     if (tooltipEl) return tooltipEl;
     tooltipEl = document.createElement('div');
     tooltipEl.className = 'js-tooltip';
+    tooltipEl.id = 'js-tooltip';
     tooltipEl.setAttribute('role', 'tooltip');
     arrowEl = document.createElement('div');
     arrowEl.className = 'js-tooltip__arrow';
@@ -62,6 +63,12 @@ function position(target: HTMLElement): void {
 
 function show(target: HTMLElement): void {
     currentTarget = target;
+    // Fill the text and link it immediately (not after the delay) so
+    // assistive tech announces the description on focus; aria-describedby
+    // resolves hidden elements, so visibility doesn't matter here.
+    ensureTooltipEl();
+    textEl!.textContent = target.getAttribute('data-tooltip');
+    target.setAttribute('aria-describedby', 'js-tooltip');
     if (showTimer) clearTimeout(showTimer);
     showTimer = setTimeout(() => {
         if (currentTarget === target) position(target);
@@ -69,6 +76,7 @@ function show(target: HTMLElement): void {
 }
 
 function hide(): void {
+    currentTarget?.removeAttribute('aria-describedby');
     currentTarget = null;
     if (showTimer) {
         clearTimeout(showTimer);
@@ -79,6 +87,9 @@ function hide(): void {
 
 export function initTooltips(): void {
     const onPointerOver = (e: PointerEvent) => {
+        // A re-render can detach the hovered node, in which case its
+        // pointerout never fires; catch it on the next pointer movement.
+        if (currentTarget && !currentTarget.isConnected) hide();
         const target = (e.target as HTMLElement)?.closest<HTMLElement>('[data-tooltip]');
         if (!target || target === currentTarget || !target.getAttribute('data-tooltip')) return;
         show(target);
@@ -96,8 +107,14 @@ export function initTooltips(): void {
     };
 
     const onFocusOut = (e: FocusEvent) => {
-        if ((e.target as HTMLElement)?.closest('[data-tooltip]')) hide();
+        // Only dismiss if the blurred element owns the tooltip — focus can
+        // rest on a different tooltip target than the one being hovered.
+        if ((e.target as HTMLElement)?.closest('[data-tooltip]') === currentTarget) hide();
     };
+
+    // Activating a control (opening a modal, toggling a state) shouldn't
+    // leave the pre-click hint painted on top of whatever comes next.
+    const onPointerDown = () => hide();
 
     const onScroll = () => {
         if (currentTarget || showTimer) {
@@ -111,6 +128,7 @@ export function initTooltips(): void {
 
     document.addEventListener('pointerover', onPointerOver);
     document.addEventListener('pointerout', onPointerOut);
+    document.addEventListener('pointerdown', onPointerDown, true);
     document.addEventListener('focusin', onFocusIn);
     document.addEventListener('focusout', onFocusOut);
     document.addEventListener('scroll', onScroll, true);

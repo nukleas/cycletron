@@ -31,10 +31,10 @@
                 <div id="visualsMenu" class="dropdown-menu" role="menu" aria-labelledby="visualsMenuBtn" hidden></div>
             </div>
             <div class="transport-group">
-                <button id="skipBackBtn" class="skip-btn" disabled data-tooltip="Back 5 cycles" aria-label="Skip back 5 cycles">⏮ 5</button>
+                <span data-tooltip="Back 5 cycles"><button id="skipBackBtn" class="skip-btn" disabled aria-label="Skip back 5 cycles">⏮ 5</button></span>
                 <button id="transportBtn" class="primary" disabled>▶ Play</button>
                 <button id="stopBtn" class="danger" disabled>■ Stop</button>
-                <button id="skipFwdBtn" class="skip-btn" disabled data-tooltip="Forward 5 cycles" aria-label="Skip forward 5 cycles">5 ⏭</button>
+                <span data-tooltip="Forward 5 cycles"><button id="skipFwdBtn" class="skip-btn" disabled aria-label="Skip forward 5 cycles">5 ⏭</button></span>
                 <button id="metronomeBtn" class="metronome-btn" data-tooltip="Metronome off" aria-label="Metronome">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 22h14"/>
@@ -78,7 +78,7 @@
                 <span>AI Operator</span>
                 <div class="ai-panel-actions">
                     <button id="aiClear" class="ai-action-btn" data-tooltip="New song / clear chat">New</button>
-                    <button id="aiToggle" class="ai-toggle" data-tooltip="Toggle AI panel">&#9664;</button>
+                    <button id="aiToggle" class="ai-toggle" data-tooltip="Toggle AI panel" aria-label="Toggle AI panel">&#9664;</button>
                 </div>
             </div>
             <div id="aiEnableCta" class="ai-enable-cta">
@@ -185,9 +185,9 @@
                         <span class="btn-text">Copy</span>
                     </button>
                     <div class="editor-zoom">
-                        <button id="editorZoomOut" data-tooltip="Decrease font size (Ctrl+-)">−</button>
+                        <button id="editorZoomOut" data-tooltip="Decrease font size (Ctrl+-)" aria-label="Decrease font size">−</button>
                         <span id="editorZoomValue"></span>
-                        <button id="editorZoomIn"  data-tooltip="Increase font size (Ctrl+=)">+</button>
+                        <button id="editorZoomIn"  data-tooltip="Increase font size (Ctrl+=)" aria-label="Increase font size">+</button>
                     </div>
                 </div>
             </div>
@@ -291,8 +291,8 @@
             <span class="hud-unit">BPM</span>
         </div>
         <div class="hud-center">
-            <button id="fsVizPrev" class="hud-btn" data-tooltip="Previous visualization ( [ )">◀</button>
-            <button id="fsVizNext" class="hud-btn" data-tooltip="Next visualization ( ] )">▶</button>
+            <button id="fsVizPrev" class="hud-btn" data-tooltip="Previous visualization ( [ )" aria-label="Previous visualization">◀</button>
+            <button id="fsVizNext" class="hud-btn" data-tooltip="Next visualization ( ] )" aria-label="Next visualization">▶</button>
             <button id="fsVizAuto" class="hud-btn" data-tooltip="Auto-cycle visualizations every 16 cycles">AUTO</button>
         </div>
         <div class="hud-right">

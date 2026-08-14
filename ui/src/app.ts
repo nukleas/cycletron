@@ -1069,6 +1069,9 @@ export class StrudelApp {
     async replaceCodeAndPlay(code: string): Promise<void> {
         if (!this.editor) return;
 
+        // A keystroke evaluation still pending from before the swap would
+        // re-apply the old pattern on top of the new document.
+        this.debouncedEvaluate.cancel();
         this._suppressNextCodeChange = true;
         this.editor.setCode(code);
         await this.evaluate(code);
