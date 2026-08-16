@@ -41,10 +41,11 @@ Album key is **C# minor**; fragments below sit in C#/A minor.
 
 ## Drum core
 
-Straight, distorted four-on-the-floor with a dense 16th hat grid and a euclidean
-tom driving the industrial "machine" feel. `dist` + `shape` give the kit its
-overdriven edge; `mt(5,16)` scatters a metallic tom across the bar so the groove
-never sits still.
+Straight, distorted four-on-the-floor with a dense 16th hat grid and a driving
+tom figure locked to that grid — the industrial "machine" feel. `dist` + `shape`
+give the kit its overdriven edge; the 3-3-3-3-4 tom (16th slots 0/3/6/9/12,
+body intact at hpf 300) pushes against the kick without ever floating free of
+the downbeat.
 
 ```strudel
 setbpm(135);
@@ -52,7 +53,7 @@ stack(
   s("bd*4").gain(0.95).dist(0.4).shape(0.3).lpf(3200),
   s("hh*16").gain(0.3).hpf(6500),
   s("~ ~ oh ~").gain(0.35).hpf(4000),
-  s("mt(5,16)").gain(0.42).dist(0.3).hpf(300).pan(0.4)
+  s("mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ ~").gain(0.42).dist(0.3).hpf(300).pan(0.4)
 )
 ```
 
@@ -85,17 +86,20 @@ stack(
 
 ## Metallic percussion
 
-The industrial texture: clanging, resonant metal hits on euclidean rhythms,
-bit-crushed for machine grit. Layer a distorted rimshot, a crushed high tom on an
-offset euclid, and a `wt_bell` clang so the percussion reads as struck metal
-rather than a drum kit (Serge-modular-style noise/feedback percussion is the
-studio reference — [Ancient Methods](https://xlr8r.com/podcasts/podcast-539-ancient-methods/)).
+The industrial texture: clanging metal hits locked to the grid, bit-crushed for
+machine grit. Layer a tresillo (3-3-2) rimshot with its body intact, a crushed
+tom pickup answering every other bar, and a `wt_bell` clang so the percussion
+reads as struck metal rather than a drum kit (Serge-modular-style noise/feedback
+percussion is the studio reference — [Ancient Methods](https://xlr8r.com/podcasts/podcast-539-ancient-methods/)).
+Keep the rim's low-mids (hpf ≤ ~2000) and seat it with a touch of room —
+high-passing a rimshot to 4 kHz leaves a naked click that floats free of the
+groove instead of driving it.
 
 ```strudel
 setbpm(135);
 stack(
-  s("rs(5,16)").gain(0.34).hpf(4000).dist(0.2).pan(0.35),
-  s("ht(3,16,2)").gain(0.38).crush(6).hpf(600).pan(0.62),
+  s("RolandTR808_rim ~ ~ RolandTR808_rim ~ ~ RolandTR808_rim ~").gain(0.34).hpf(1800).dist(0.2).room(0.12).pan(0.35),
+  s("<[~ ~ ~ [~ mt]] [~ ~ ~ [ht mt]]>").gain(0.38).crush(6).hpf(600).pan(0.62),
   note("c#5(3,8)").s("wt_bell").gain(0.3).dist(0.25).lpf(5000).room(0.4).delay(0.15)
 )
 ```
@@ -175,7 +179,7 @@ setbpm(135);
     s("bd*4").gain(0.95).dist(0.45).shape(0.35).lpf(3000),
     note("c#1*4").s("sine").attack(0.001).decay(0.32).sustain(0).release(0.4)
       .lpf(220).dist(0.5).room(0.55).roomsize(0.85).gain(0.55),
-    s("mt(5,16)").gain(0.42).dist(0.3).hpf(300),
+    s("mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ ~").gain(0.42).dist(0.3).hpf(300),
     s("hh*16").gain(0.28).hpf(6500),
     note("c#2 c#2 c#3 c#2 c#2 c#2 c#3 c#2 c#2 d2 c#3 c#2 e2 c#2 c#3 c#2")
       .s("sawtooth").lpf(1100).resonance(8).dist(0.28).decay(0.09).sustain(0).gain("0.7 0.5")
@@ -183,7 +187,7 @@ setbpm(135);
   break: stack(
     note("<[c#3,e3,g#3,b3] [a2,c#3,e3,g#3]>").s("supersaw")
       .attack(1.2).release(3.5).lpf(1000).gain(0.3).room(0.7),
-    s("rs(3,8)").gain(0.26).hpf(4000).dist(0.2)
+    s("~ ~ ~ [~ rs]").gain(0.24).hpf(2200).room(0.2)
   )
 })
 ```
@@ -214,9 +218,12 @@ stack(
   track root so kick and rumble read "as one".
 - **Distortion**: `dist(amount)` is the workhorse; stack `shape` for extra
   harmonic drive and `crush(bits)` for digital/metal grit on percussion.
-- **Metallic hits**: `wt_bell` for struck-metal tone, `rs`/`ht` toms on euclids
-  (`(k,n)` / `(k,n,rot)` — rotation must be a static number) for the machine
-  clatter.
+- **Metallic hits**: `wt_bell` for struck-metal tone; for machine clatter, write
+  rim/tom patterns on the grid — a tresillo (`rim ~ ~ rim ~ ~ rim ~`), tom
+  pickups into bar ends — with the sample's body intact (hpf ≤ ~2000, a touch of
+  `room`). Hpf'd-to-click euclid layers (`rs(5,16).hpf(4000)`) read as
+  arrhythmic ticking, not groove. Euclids stay fine on pitched, bodied voices
+  (`note("c#5(3,8)").s("wt_bell")`) when unrotated so they anchor the downbeat.
 - **Bassline groove**: put velocity accents in a `.gain("...")` pattern rather
   than per-note; short `decay` + `sustain(0)` = the plucky step-sequencer feel.
 - **Phrygian bite**: the ♭2 (D against a C# root, or B♭ against A) is the single

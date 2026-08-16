@@ -356,6 +356,15 @@ Percussion & texture colors (bundled offline — each bank is ONE raw one-shot):
   part needs a metallic accent outside industrial genres, a drum-machine
   rim/cowbell (RolandTR808_rim, RolandTR808_cb) fits a song better than the
   anvil or brake drum.
+Never write hpf'd-to-click euclid percussion layers (`s("rs(5,16)").hpf(4000)`,
+  `ht(3,16,2)` and friends): stripping a hit's body and floating it on a rotated
+  cross-rhythm lands as arrhythmic ticking in every genre. Write percussion on
+  the grid explicitly — a tresillo rim (`RolandTR808_rim ~ ~ RolandTR808_rim ~ ~
+  RolandTR808_rim ~`), tom pickups into bar ends (`<[~ ~ ~ ~] [~ ~ ~ [ht mt]]>`),
+  an and-of-4 ghost (`~ ~ ~ [~ rs]`) — and keep the voice's body intact
+  (hpf ≤ ~2000 on rims, a touch of `room` to seat it). Euclid rhythms stay fine
+  on pitched, bodied voices (`note("c5(3,8)").s("wt_bell")`) when unrotated so
+  they anchor the downbeat.
 Melodic & speech samples (bundled offline — multi-variant one-shots):
   flbass  — fretless bass (finger/pick/palm shorts); s("flbass:2") for variants
   uke     — ukulele plucks

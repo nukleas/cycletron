@@ -1,5 +1,5 @@
 // AGENCY OST — 05 · Zero Day
-// The duel. Industrial techno: Berghain rumble kick, struck-metal euclids,
+// The duel. Industrial techno: Berghain rumble kick, struck-metal clatter,
 // a locomotive phrygian bass. In the overload the Agency motif comes back
 // HAMMERED — the badge-in theme as a weapon.
 //
@@ -28,8 +28,8 @@ setbpm(135);
     note("c#1*4").s("sine").attack(0.001).decay(0.32).sustain(0).release(0.4)
       .lpf(220).dist(0.5).room(0.55).roomsize(0.85).gain(0.55),
     s("hh*16").gain(0.28).hpf(6500),
-    s("rs(5,16)").gain(0.28).hpf(4000).dist(0.2).pan(0.35),
-    s("ht(3,16,2)").gain(0.3).crush(6).hpf(600).pan(0.62),
+    s("RolandTR808_rim ~ ~ RolandTR808_rim ~ ~ RolandTR808_rim ~").gain(0.28).hpf(1800).dist(0.2).room(0.12).pan(0.35),
+    s("<[~ ~ ~ ~] [~ ~ ~ [ht mt]]>").gain(0.3).crush(6).hpf(600).pan(0.62),
     note("<[c#2 c#2 c#3 c#2 c#2 c#3 c#2 c#2 d2 c#2 c#3 c#2 e2 d2 c#3 c#2] [c#2 c#2 c#3 c#2 c#2 c#3 c#2 c#2 d2 c#2 c#3 c#2 e2 d2 c#3 c#2] [c#2 c#2 c#3 c#2 d2 c#2 c#3 c#2 e2 c#2 c#3 c#2 f#2 e2 d2 c#2] [g#1 g#1 g#2 g#1 a1 a1 a2 a1 d2 d2 d3 d2 c#2 c#2 c#3 c#2] [c#2 c#2 c#3 c#2 c#2 c#3 c#2 c#2 d2 c#2 c#3 c#2 e2 d2 c#3 c#2] [c#2 c#2 c#3 c#2 c#2 c#3 c#2 c#2 d2 c#2 c#3 c#2 e2 d2 c#3 c#2] [e2 e2 e3 e2 d2 d2 d3 d2 c#2 c#2 c#3 c#2 b1 b1 b2 b1] [c#2 c#2 c#3 c#2 d2 c#2 c#3 c#2 c#2 c#2 c#3 c#2 c#2 ~ c#2 ~]>")
       .s("sawtooth").lpf(1100).resonance(8).dist(0.28)
       .decay(0.09).sustain(0).gain("0.62 0.45")
@@ -39,7 +39,7 @@ setbpm(135);
     note("c#1*4").s("sine").attack(0.001).decay(0.32).sustain(0).release(0.4)
       .lpf(220).dist(0.5).room(0.55).roomsize(0.85).gain(0.55),
     s("hh*16").gain(0.26).hpf(6500),
-    s("ht(3,16,2)").gain(0.32).crush(6).hpf(600).pan(0.62),
+    s("<[~ ~ ~ [~ mt]] [~ ~ ~ [ht mt]]>").gain(0.32).crush(6).hpf(600).pan(0.62),
     note("<[c#2 c#2 c#3 c#2 c#2 c#3 c#2 c#2 d2 c#2 c#3 c#2 e2 d2 c#3 c#2] [c#2 c#2 c#3 c#2 c#2 c#3 c#2 c#2 d2 c#2 c#3 c#2 e2 d2 c#3 c#2] [c#2 c#2 c#3 c#2 d2 c#2 c#3 c#2 e2 c#2 c#3 c#2 f#2 e2 d2 c#2] [g#1 g#1 g#2 g#1 a1 a1 a2 a1 d2 d2 d3 d2 c#2 c#2 c#3 c#2] [c#2 c#2 c#3 c#2 c#2 c#3 c#2 c#2 d2 c#2 c#3 c#2 e2 d2 c#3 c#2] [c#2 c#2 c#3 c#2 c#2 c#3 c#2 c#2 d2 c#2 c#3 c#2 e2 d2 c#3 c#2] [e2 e2 e3 e2 d2 d2 d3 d2 c#2 c#2 c#3 c#2 b1 b1 b2 b1] [c#2 c#2 c#3 c#2 d2 c#2 c#3 c#2 c#2 c#2 c#3 c#2 c#2 ~ c#2 ~]>")
       .s("sawtooth").lpf(1100).resonance(8).dist(0.28)
       .decay(0.09).sustain(0).gain("0.7 0.5"),
@@ -54,7 +54,7 @@ setbpm(135);
   vent: stack(
     note("<[c#3, e3, g#3, b3] [a2, c#3, e3, g#3]>").s("supersaw")
       .attack(1.2).release(3.5).lpf(900).gain(0.3).room(0.7).roomsize(0.85),
-    s("rs(3,8)").gain(0.26).hpf(4000).dist(0.2).pan(0.4),
+    s("<[~ ~ [~ metal] ~] [~ ~ ~ [~ rs]]>").gain(0.24).hpf(1500).lpf(6000).room(0.3).pan(0.4),
     note("<[c#5 ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ g#4 ~ ~ ~] [c#5 ~ ~ ~ ~ ~ ~ ~] [~ ~ e5 ~ ~ ~ ~ ~]>")
       .s("wt_bell").dist(0.2).lpf(4500)
       .delay(0.35).delaytime(0.375).delayfeedback(0.4)
@@ -67,7 +67,7 @@ setbpm(135);
       .lpf(220).dist(0.5).room(0.55).roomsize(0.85).gain(0.55),
     s("hh*16").gain(0.26).hpf(6500),
     s("~ ~ oh ~").gain(0.26).hpf(4000),
-    s("ht(3,16,2)").gain(0.3).crush(6).hpf(600).pan(0.62),
+    s("<[~ ~ ~ [~ mt]] [~ ~ ~ [ht mt]]>").gain(0.3).crush(6).hpf(600).pan(0.62),
     note("<[c#2 c#2 c#3 c#2 c#2 c#3 c#2 c#2 d2 c#2 c#3 c#2 e2 d2 c#3 c#2] [c#2 c#2 c#3 c#2 c#2 c#3 c#2 c#2 d2 c#2 c#3 c#2 e2 d2 c#3 c#2] [c#2 c#2 c#3 c#2 d2 c#2 c#3 c#2 e2 c#2 c#3 c#2 f#2 e2 d2 c#2] [g#1 g#1 g#2 g#1 a1 a1 a2 a1 d2 d2 d3 d2 c#2 c#2 c#3 c#2]>")
       .s("sawtooth").lpf(1250).resonance(8).dist(0.3)
       .decay(0.09).sustain(0).gain("0.7 0.5"),

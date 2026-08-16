@@ -55,7 +55,7 @@ carry the hypnosis.
 setbpm(130);
 stack(
   s("bd*4").gain(0.9),
-  s("mt(3,8)").gain(0.14)
+  s("mt ~ ~ mt ~ ~ mt ~").gain(0.14)
 )
 ```
 
