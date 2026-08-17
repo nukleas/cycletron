@@ -31,6 +31,7 @@
     "allow-validate-pattern",
     "allow-inspect-pattern",
     "allow-analyze-arrangement",
+    "allow-detect-pattern-length",
     "allow-critique-pattern",
     "allow-critique-form",
     "allow-genre-recipe",

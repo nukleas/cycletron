@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-detect-pattern-length"
+description = "Enables the detect_pattern_length command without any pre-configured scope."
+commands.allow = ["detect_pattern_length"]
+
+[[permission]]
+identifier = "deny-detect-pattern-length"
+description = "Denies the detect_pattern_length command without any pre-configured scope."
+commands.deny = ["detect_pattern_length"]
