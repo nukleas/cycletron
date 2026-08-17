@@ -10,6 +10,7 @@ cycletron-agent = { workspace = true }
 cycletron-corpus = { workspace = true }
 cycletron-gen = { workspace = true }
 cycletron-analysis = { workspace = true }
+cycletron-doc = { workspace = true }
 midi-to-strudel = { workspace = true }
 strudel-dsl = { workspace = true }
 strudel-mini = { workspace = true }

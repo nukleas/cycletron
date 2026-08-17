@@ -3,6 +3,7 @@ members = [
     "crates/cycletron-core",
     "crates/cycletron-agent",
     "crates/cycletron-corpus",
+    "crates/cycletron-doc",
     "crates/cycletron-gen",
     "crates/cycletron-analysis",
     "src-tauri",
@@ -29,6 +30,7 @@ repository = "https://github.com/nukleas/cycletron"
 cycletron-core = { path = "crates/cycletron-core" }
 cycletron-agent = { path = "crates/cycletron-agent" }
 cycletron-corpus = { path = "crates/cycletron-corpus" }
+cycletron-doc = { path = "crates/cycletron-doc" }
 cycletron-gen = { path = "crates/cycletron-gen" }
 cycletron-analysis = { path = "crates/cycletron-analysis" }
 # strudel-rs engine crates — pinned to public Codeberg main so the app builds

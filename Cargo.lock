@@ -1194,6 +1194,7 @@ dependencies = [
  "cycletron-analysis",
  "cycletron-core",
  "cycletron-corpus",
+ "cycletron-doc",
  "cycletron-gen",
  "hound",
  "http-body-util",
@@ -1254,6 +1255,13 @@ dependencies = [
  "serde_json",
  "tracing",
  "walkdir",
+]
+
+[[package]]
+name = "cycletron-doc"
+version = "0.1.0"
+dependencies = [
+ "strudel-dsl",
 ]
 
 [[package]]

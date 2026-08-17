@@ -1184,7 +1184,7 @@ fn tool_play_pattern(
         && current_document(state).map(|d| d.len() > 200).unwrap_or(false)
     {
         state.stamp_write_kind("full_blocked");
-        let secs = crate::sections::list_sections(
+        let secs = cycletron_doc::sections::list_sections(
             &current_document(state).unwrap_or_default(),
         );
         let hint = if secs.is_empty() {
@@ -1378,7 +1378,7 @@ fn current_document(state: &AppState) -> Result<String, String> {
 fn tool_list_parts(state: &AppState) -> Result<String, String> {
     state.mark_listed_structure();
     let code = current_document(state)?;
-    let parts = crate::tracks::list_tracks(&code);
+    let parts = cycletron_doc::tracks::list_tracks(&code);
     if parts.is_empty() {
         return Ok("The current document has no tracks yet.".to_string());
     }
@@ -1402,7 +1402,7 @@ fn tool_list_parts(state: &AppState) -> Result<String, String> {
 fn tool_list_sections(state: &AppState) -> Result<String, String> {
     state.mark_listed_structure();
     let code = current_document(state)?;
-    let secs = crate::sections::list_sections(&code);
+    let secs = cycletron_doc::sections::list_sections(&code);
     if secs.is_empty() {
         return Ok(
             "No section object found (const sections = {…} or pickRestart/arrange). \
@@ -1439,7 +1439,7 @@ fn tool_upsert_track(
     let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
     let expr = input["code"].as_str().ok_or("missing 'code' parameter")?;
     let code = current_document(state)?;
-    let (new_code, wrote) = crate::tracks::upsert_track(&code, id, expr)?;
+    let (new_code, wrote) = cycletron_doc::tracks::upsert_track(&code, id, expr)?;
     state.stamp_write_kind("track");
     apply_document(
         state,
@@ -1457,7 +1457,7 @@ fn tool_upsert_tracks(
 ) -> Result<String, String> {
     let patches = parse_id_code_patches(input)?;
     let code = current_document(state).unwrap_or_default();
-    let (new_code, wrote) = crate::tracks::upsert_tracks(&code, &patches)?;
+    let (new_code, wrote) = cycletron_doc::tracks::upsert_tracks(&code, &patches)?;
     state.stamp_write_kind("track");
     apply_document(
         state,
@@ -1480,7 +1480,7 @@ fn tool_upsert_section(
     let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
     let expr = input["code"].as_str().ok_or("missing 'code' parameter")?;
     let code = current_document(state)?;
-    let (new_code, wrote) = crate::sections::upsert_section(&code, id, expr)?;
+    let (new_code, wrote) = cycletron_doc::sections::upsert_section(&code, id, expr)?;
     state.stamp_write_kind("section");
     apply_document(
         state,
@@ -1498,7 +1498,7 @@ fn tool_upsert_sections(
 ) -> Result<String, String> {
     let patches = parse_id_code_patches(input)?;
     let code = current_document(state)?;
-    let (new_code, wrote) = crate::sections::upsert_sections(&code, &patches)?;
+    let (new_code, wrote) = cycletron_doc::sections::upsert_sections(&code, &patches)?;
     state.stamp_write_kind("section");
     apply_document(
         state,
@@ -1522,7 +1522,7 @@ fn tool_upsert_binding(
     let name = input["name"].as_str().ok_or("missing 'name' parameter")?;
     let expr = input["code"].as_str().ok_or("missing 'code' parameter")?;
     let code = current_document(state)?;
-    let (new_code, wrote) = crate::structure::upsert_binding(&code, name, expr)?;
+    let (new_code, wrote) = cycletron_doc::structure::upsert_binding(&code, name, expr)?;
     state.stamp_write_kind("binding");
     apply_document(
         state,
@@ -1567,7 +1567,7 @@ fn tool_mute_track(
 ) -> Result<String, String> {
     let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
     let code = current_document(state)?;
-    let new_code = crate::tracks::mute_track(&code, id)?;
+    let new_code = cycletron_doc::tracks::mute_track(&code, id)?;
     apply_document(state, event_tx, &new_code, &format!("Track '{id}' muted."))
 }
 
@@ -1579,7 +1579,7 @@ fn tool_unmute_track(
 ) -> Result<String, String> {
     let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
     let code = current_document(state)?;
-    let new_code = crate::tracks::unmute_track(&code, id)?;
+    let new_code = cycletron_doc::tracks::unmute_track(&code, id)?;
     apply_document(state, event_tx, &new_code, &format!("Track '{id}' unmuted."))
 }
 
@@ -1797,7 +1797,7 @@ mod write_path_tests {
 "#
                 .into()
             });
-        let secs = crate::sections::list_sections(&song);
+        let secs = cycletron_doc::sections::list_sections(&song);
         assert!(
             !secs.is_empty(),
             "bench song should parse as pickRestart sections"
@@ -1931,7 +1931,7 @@ $: lead.slow(2)
         let song = std::fs::read_to_string("/tmp/cycletron-bench-song.strudel")
             .expect("export session song to /tmp/cycletron-bench-song.strudel first");
         let s = AppState::new();
-        let secs = crate::sections::list_sections(&song);
+        let secs = cycletron_doc::sections::list_sections(&song);
         eprintln!("=== write-path bench ===");
         eprintln!("song: {} chars, {} lines, {} sections", song.len(), song.lines().count(), secs.len());
 
@@ -1941,13 +1941,13 @@ $: lead.slow(2)
         eprintln!("review_code (8 cyc): {review_ms} ms  verdict={}", report.lines().last().unwrap_or(""));
 
         let t1 = Instant::now();
-        let _ = crate::sections::list_sections(&song);
+        let _ = cycletron_doc::sections::list_sections(&song);
         eprintln!("list_sections: {} µs", t1.elapsed().as_micros());
 
         if let Some(drop) = secs.iter().find(|x| x.id == "drop1") {
             let body = &song[drop.expr_start..drop.expr_end];
             let t2 = Instant::now();
-            let (new_doc, _) = crate::sections::upsert_section(&song, "drop1", body).unwrap();
+            let (new_doc, _) = cycletron_doc::sections::upsert_section(&song, "drop1", body).unwrap();
             eprintln!(
                 "upsert_section(drop1) same body: {} µs  (emit proxy: section={} vs full×2={})",
                 t2.elapsed().as_micros(),
