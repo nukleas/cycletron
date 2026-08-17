@@ -91,12 +91,16 @@ struct ToolAgg {
 }
 
 fn main() -> ExitCode {
-    let path = std::env::args().nth(1).unwrap_or_else(|| "agent-telemetry.jsonl".to_string());
+    let path = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "agent-telemetry.jsonl".to_string());
     let text = match std::fs::read_to_string(&path) {
         Ok(t) => t,
         Err(e) => {
             eprintln!("agent-stats: cannot read {path}: {e}");
-            eprintln!("  (the app writes it to its data dir, e.g. ~/Library/Application Support/<bundle-id>/agent-telemetry.jsonl)");
+            eprintln!(
+                "  (the app writes it to its data dir, e.g. ~/Library/Application Support/<bundle-id>/agent-telemetry.jsonl)"
+            );
             return ExitCode::from(2);
         }
     };
@@ -133,8 +137,16 @@ fn main() -> ExitCode {
         }
     }
 
-    let runs = events.iter().map(|e| e.run).collect::<std::collections::BTreeSet<_>>().len();
-    println!("agent-stats: {} tool calls across {} run(s)\n", events.len(), runs);
+    let runs = events
+        .iter()
+        .map(|e| e.run)
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    println!(
+        "agent-stats: {} tool calls across {} run(s)\n",
+        events.len(),
+        runs
+    );
 
     // Write-path cost proxy: code chars the model emitted into tools, and kinds.
     let mut total_code_chars: usize = 0;
@@ -174,11 +186,16 @@ fn main() -> ExitCode {
     tools.sort_by(|a, b| {
         let ra = a.1.fails as f64 / a.1.calls as f64;
         let rb = b.1.fails as f64 / b.1.calls as f64;
-        rb.partial_cmp(&ra).unwrap_or(std::cmp::Ordering::Equal).then(b.1.calls.cmp(&a.1.calls))
+        rb.partial_cmp(&ra)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(b.1.calls.cmp(&a.1.calls))
     });
     for (tool, agg) in tools {
         let rate = 100.0 * agg.fails as f64 / agg.calls as f64;
-        println!("  {tool:<22} {:>5} {:>6} {:>6.0}%", agg.calls, agg.fails, rate);
+        println!(
+            "  {tool:<22} {:>5} {:>6} {:>6.0}%",
+            agg.calls, agg.fails, rate
+        );
     }
 
     if !error_buckets.is_empty() {
@@ -203,7 +220,7 @@ fn main() -> ExitCode {
     if !loops.is_empty() {
         println!("\nStruggle loops (a tool failing repeatedly within one request):");
         let mut loops = loops;
-        loops.sort_by(|a, b| b.2.cmp(&a.2));
+        loops.sort_by_key(|&(_, _, n)| std::cmp::Reverse(n));
         for (run, tool, n) in loops.into_iter().take(15) {
             println!("  run {run}: {tool} failed {n}× in one request");
         }

@@ -90,11 +90,7 @@ pub fn methods_listing(kind_filter: Option<&str>, category: Option<&str>) -> Str
 /// A blank `info` (symbols the doc didn't file under a heading) reads better as
 /// "misc" than as an empty heading.
 fn section_label(info: &str) -> &str {
-    if info.trim().is_empty() {
-        "misc"
-    } else {
-        info
-    }
+    if info.trim().is_empty() { "misc" } else { info }
 }
 
 #[cfg(test)]
@@ -104,7 +100,11 @@ mod tests {
     #[test]
     fn surface_parses_and_is_nonempty() {
         let syms = dsl_symbols();
-        assert!(syms.len() > 100, "expected the full surface, got {}", syms.len());
+        assert!(
+            syms.len() > 100,
+            "expected the full surface, got {}",
+            syms.len()
+        );
     }
 
     #[test]

@@ -1,12 +1,12 @@
 use crate::agent_loop;
 use crate::files::{self, FileDoc, Recents};
 use crate::library::{self, DirEntry};
-use crate::midi;
 use crate::logs::{self, LogEntry};
 use crate::settings::UserSettings;
 use crate::snapshots::{self, Snapshot};
 use crate::state::AppState;
-use crate::strudel;
+use cycletron_analysis as strudel;
+use cycletron_midi as midi;
 use midi_to_strudel::{InstrumentMode, SectionNamingStrategy, drums::DrumBank};
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -23,7 +23,7 @@ pub async fn send_message(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         if let Some(code) = &editor_code {
             session.current_pattern = Some(code.clone());
         }
@@ -33,24 +33,21 @@ pub async fn send_message(
     // Refresh subscription OAuth before building the client so the bearer is not
     // stale. `crate::oauth` owns which providers this applies to.
     {
-        let active = state.user_settings.lock().unwrap().llm.active.clone();
+        let active = state.user_settings.lock().llm.active.clone();
         if crate::oauth::refresh_if_stale(&active).await {
             state.rebuild_agent_client();
         }
     }
 
-    let client = match state.agent_client.lock().unwrap().clone() {
-        Some(c) => c,
-        None => {
-            let msg = "AI is off. Turn it on with “Enable AI” in the AI panel, then pick a provider in Preferences → AI (or sign in with SuperGrok / add an API key).";
-            let mut session = state.session.lock().unwrap();
-            session.add_assistant_message(msg.to_string());
-            return Ok(msg.to_string());
-        }
+    let Some(client) = state.agent_client.lock().clone() else {
+        let msg = "AI is off. Turn it on with “Enable AI” in the AI panel, then pick a provider in Preferences → AI (or sign in with SuperGrok / add an API key).";
+        let mut session = state.session.lock();
+        session.add_assistant_message(msg.to_string());
+        return Ok(msg.to_string());
     };
 
     let messages = {
-        let session = state.session.lock().unwrap();
+        let session = state.session.lock();
         session.messages.clone()
     };
 
@@ -68,13 +65,13 @@ pub async fn send_message(
 
     match result {
         Ok((response, tools)) => {
-            let mut session = state.session.lock().unwrap();
+            let mut session = state.session.lock();
             session.add_assistant_message_with_tools(response.clone(), tools);
             Ok(response)
         }
         Err(e) => {
             let error_msg = format!("Agent error: {e}");
-            let mut session = state.session.lock().unwrap();
+            let mut session = state.session.lock();
             session.add_assistant_message(error_msg.clone());
             Ok(error_msg)
         }
@@ -97,8 +94,11 @@ pub fn validate_pattern(code: String) -> Result<String, String> {
 /// actually emits (events per cycle, sounds, pitch range, loop length, silent
 /// cycles). Lets the editor "see" a pattern, mirroring the agent's tool.
 #[tauri::command]
-pub fn inspect_pattern(code: String, cycles: Option<usize>) -> Result<strudel::PatternDigest, String> {
-    strudel::inspect_code(&code, cycles.unwrap_or(8))
+pub fn inspect_pattern(
+    code: String,
+    cycles: Option<usize>,
+) -> Result<strudel::PatternDigest, String> {
+    strudel::Evaluated::new(&code, cycles.unwrap_or(8)).map(strudel::Evaluated::into_digest)
 }
 
 /// Analyze a pattern's arrangement: detect the loop period and segment it into
@@ -109,7 +109,7 @@ pub fn analyze_arrangement(
     code: String,
     max_cycles: Option<usize>,
 ) -> Result<strudel::ArrangementAnalysis, String> {
-    strudel::analyze_code(&code, max_cycles.unwrap_or(32))
+    strudel::Evaluated::new(&code, max_cycles.unwrap_or(32)).map(|ev| strudel::analyze(&ev))
 }
 
 /// Critique a pattern: heuristic musical lint (clipping, silent cycles, mono
@@ -117,7 +117,7 @@ pub fn analyze_arrangement(
 /// that's validate_pattern — but whether it's likely to sound good.
 #[tauri::command]
 pub fn critique_pattern(code: String, cycles: Option<usize>) -> Result<strudel::Critique, String> {
-    strudel::critique_code(&code, cycles.unwrap_or(16))
+    strudel::Evaluated::new(&code, cycles.unwrap_or(16).max(4)).map(|ev| strudel::critique(&ev))
 }
 
 /// Critique a pattern's FORM: section-length grid, energy contrast/build,
@@ -125,7 +125,8 @@ pub fn critique_pattern(code: String, cycles: Option<usize>) -> Result<strudel::
 /// name-vs-density sanity. Reuses the `Critique` shape as `critique_pattern`.
 #[tauri::command]
 pub fn critique_form(code: String, cycles: Option<usize>) -> Result<strudel::Critique, String> {
-    strudel::critique_form_code(&code, cycles.unwrap_or(32))
+    strudel::Evaluated::new(&code, cycles.unwrap_or(32).clamp(8, 64))
+        .map(|ev| strudel::critique_form(&ev))
 }
 
 /// Genre recipes. With no `genre`, returns every loaded recipe (for a picker);
@@ -135,7 +136,7 @@ pub fn genre_recipe(
     genre: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<cycletron_corpus::Recipe>, String> {
-    let recipes = state.recipes.lock().unwrap();
+    let recipes = state.recipes.lock();
     match genre {
         Some(q) if !q.trim().is_empty() => {
             Ok(recipes.iter().filter(|r| r.matches(&q)).cloned().collect())
@@ -158,23 +159,23 @@ pub fn reload_corpus(state: State<'_, AppState>) -> Result<usize, String> {
 pub fn get_pattern_history(
     state: State<'_, AppState>,
 ) -> Vec<cycletron_core::session::PatternEntry> {
-    let session = state.session.lock().unwrap();
+    let session = state.session.lock();
     session.pattern_history.clone()
 }
 
 /// Get current config.
 #[tauri::command]
 pub fn get_config(state: State<'_, AppState>) -> cycletron_core::config::AppConfig {
-    state.config.lock().unwrap().clone()
+    state.config.lock().clone()
 }
 
 /// Clear the session — reset chat history and pattern state for a new composition.
 #[tauri::command]
 pub fn clear_session(state: State<'_, AppState>) -> Result<(), String> {
-    let config = state.config.lock().unwrap();
+    let config = state.config.lock();
     let tempo = config.audio.default_tempo;
     drop(config);
-    let mut session = state.session.lock().unwrap();
+    let mut session = state.session.lock();
     *session = cycletron_core::session::Session::new(tempo);
     Ok(())
 }
@@ -194,7 +195,7 @@ pub fn open_file(
     let doc = files::read_file(&pb).map_err(|e| format!("read {}: {e}", pb.display()))?;
 
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         session.load_code(doc.code.clone(), Some(pb.clone()));
         if let Some(fm) = &doc.frontmatter
             && let Some(bpm) = fm.bpm
@@ -217,7 +218,7 @@ pub fn save_current(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let path = {
-        let session = state.session.lock().unwrap();
+        let session = state.session.lock();
         session
             .file_path
             .clone()
@@ -230,7 +231,7 @@ pub fn save_current(
     }
 
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         session.mark_saved(path.clone(), code);
         if let Some(b) = bpm {
             session.tempo = b;
@@ -257,7 +258,7 @@ pub fn save_as(
     }
 
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         session.mark_saved(pb.clone(), code);
         if let Some(b) = bpm {
             session.tempo = b;
@@ -272,7 +273,7 @@ pub fn save_as(
 /// Clear the current file reference and editor buffer.
 #[tauri::command]
 pub fn new_file(state: State<'_, AppState>) -> Result<(), String> {
-    let mut session = state.session.lock().unwrap();
+    let mut session = state.session.lock();
     session.new_file();
     Ok(())
 }
@@ -280,7 +281,7 @@ pub fn new_file(state: State<'_, AppState>) -> Result<(), String> {
 /// Check whether `code` differs from the last-saved snapshot.
 #[tauri::command]
 pub fn is_dirty(code: String, state: State<'_, AppState>) -> bool {
-    let session = state.session.lock().unwrap();
+    let session = state.session.lock();
     session.is_dirty(&code)
 }
 
@@ -294,7 +295,7 @@ pub struct CurrentFile {
 
 #[tauri::command]
 pub fn get_current_file(code: String, state: State<'_, AppState>) -> CurrentFile {
-    let session = state.session.lock().unwrap();
+    let session = state.session.lock();
     let path = session.file_path.clone();
     CurrentFile {
         dirty: session.is_dirty(&code),
@@ -310,7 +311,6 @@ pub fn get_recents(state: State<'_, AppState>) -> Vec<String> {
     state
         .recents
         .lock()
-        .unwrap()
         .entries
         .iter()
         .map(|p| p.to_string_lossy().into_owned())
@@ -322,19 +322,19 @@ pub fn clear_recents(state: State<'_, AppState>) -> Result<(), String> {
     let dir = state
         .app_data_dir()
         .ok_or_else(|| "app data dir not initialized".to_string())?;
-    let mut r = state.recents.lock().unwrap();
+    let mut r = state.recents.lock();
     *r = Recents::new();
     r.save(&dir).map_err(|e| e.to_string())
 }
 
 fn push_recent(state: &State<'_, AppState>, path: PathBuf) {
     {
-        let mut recents = state.recents.lock().unwrap();
+        let mut recents = state.recents.lock();
         recents.push(path);
-        if let Some(dir) = state.app_data_dir() {
-            if let Err(e) = recents.save(&dir) {
-                tracing::warn!("failed to persist recents: {e}");
-            }
+        if let Some(dir) = state.app_data_dir()
+            && let Err(e) = recents.save(&dir)
+        {
+            tracing::warn!("failed to persist recents: {e}");
         }
     }
 }
@@ -407,12 +407,11 @@ fn build_import_options(input: Option<ImportMidiOptions>) -> Result<midi::Import
         opts.detect_drum_names = b;
     }
     if let Some(s) = input.instrument_mode.as_deref() {
-        opts.instrument_mode = InstrumentMode::parse(s)
-            .ok_or_else(|| format!("unknown instrument_mode: {s}"))?;
+        opts.instrument_mode =
+            InstrumentMode::parse(s).ok_or_else(|| format!("unknown instrument_mode: {s}"))?;
     }
     if let Some(s) = input.drum_bank.as_deref() {
-        opts.drum_bank =
-            DrumBank::parse(s).ok_or_else(|| format!("unknown drum_bank: {s}"))?;
+        opts.drum_bank = DrumBank::parse(s).ok_or_else(|| format!("unknown drum_bank: {s}"))?;
     }
     if let Some(chs) = input.included_channels {
         opts.included_channels = Some(chs);
@@ -424,10 +423,7 @@ fn build_import_options(input: Option<ImportMidiOptions>) -> Result<midi::Import
 /// session's current file — the UI treats the result as an unsaved buffer
 /// derived from MIDI.
 #[tauri::command]
-pub fn import_midi(
-    path: String,
-    options: Option<ImportMidiOptions>,
-) -> Result<MidiImport, String> {
+pub fn import_midi(path: String, options: Option<ImportMidiOptions>) -> Result<MidiImport, String> {
     let pb = PathBuf::from(&path);
     let opts = build_import_options(options)?;
     let result = midi::convert_file(&pb, &opts).map_err(|e| format!("midi import: {e:#}"))?;
@@ -478,9 +474,9 @@ pub fn save_midi_to_library(
 
     let base = file_name
         .as_deref()
-        .map(|s| s.trim())
+        .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .unwrap_or_else(|| {
             pb.file_stem()
                 .map(|s| s.to_string_lossy().into_owned())
@@ -523,14 +519,14 @@ pub fn save_midi_to_library(
 
 #[tauri::command]
 pub fn session_undo(state: State<'_, AppState>) -> Option<String> {
-    let mut session = state.session.lock().unwrap();
-    session.undo().map(|s| s.to_string())
+    let mut session = state.session.lock();
+    session.undo().map(std::string::ToString::to_string)
 }
 
 #[tauri::command]
 pub fn session_redo(state: State<'_, AppState>) -> Option<String> {
-    let mut session = state.session.lock().unwrap();
-    session.redo().map(|s| s.to_string())
+    let mut session = state.session.lock();
+    session.redo().map(std::string::ToString::to_string)
 }
 
 // ---------------------------------------------------------------------------
@@ -554,12 +550,12 @@ pub fn set_library_root(
     let pb = PathBuf::from(&path);
     library::prepare_root(&pb)?;
     {
-        let mut lib = state.library.lock().unwrap();
+        let mut lib = state.library.lock();
         lib.root = pb.clone();
-        if let Some(dir) = state.app_data_dir() {
-            if let Err(e) = lib.save(&dir) {
-                tracing::warn!("persist library settings: {e}");
-            }
+        if let Some(dir) = state.app_data_dir()
+            && let Err(e) = lib.save(&dir)
+        {
+            tracing::warn!("persist library settings: {e}");
         }
     }
     let _ = app_handle.emit("library-changed", &path);
@@ -581,10 +577,7 @@ pub fn list_library(
         _ => root.clone(),
     };
     if !library::within(&root, &target) {
-        return Err(format!(
-            "{} is outside the library",
-            target.display()
-        ));
+        return Err(format!("{} is outside the library", target.display()));
     }
     library::list_dir(&target).map_err(|e| format!("list {}: {e}", target.display()))
 }
@@ -633,7 +626,7 @@ pub fn delete_library_path(
     library::delete_path(&target).map_err(|e| format!("delete {}: {e}", target.display()))?;
     // If the deleted path was the current session file, clear the session.
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         if session.file_path.as_deref() == Some(target.as_path()) {
             session.new_file();
         }
@@ -654,7 +647,7 @@ pub fn rename_library_path(
     library::rename_path(&src, &dst).map_err(|e| format!("rename: {e}"))?;
     // Update session if the renamed path was the current file.
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         if session.file_path.as_deref() == Some(src.as_path()) {
             session.file_path = Some(dst.clone());
         }
@@ -685,27 +678,24 @@ fn guard_path(state: &State<'_, AppState>, path: &str) -> Result<PathBuf, String
 
 #[tauri::command]
 pub fn get_user_settings(state: State<'_, AppState>) -> UserSettings {
-    state.user_settings.lock().unwrap().clone()
+    state.user_settings.lock().clone()
 }
 
 /// Persist `settings` and rebuild dependent state (e.g. the AI client).
 /// API keys are NOT part of `settings` — they go through `set_provider_key`
 /// into the OS keychain.
 #[tauri::command]
-pub fn set_user_settings(
-    settings: UserSettings,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub fn set_user_settings(settings: UserSettings, state: State<'_, AppState>) -> Result<(), String> {
     // Apply to the in-memory config so the rest of the app sees the change.
     {
-        let mut config = state.config.lock().unwrap();
+        let mut config = state.config.lock();
         settings.apply_to(&mut config);
     }
 
     // Persist to disk and swap in the new settings before rebuilding, so the
     // rebuild reads the just-selected provider profile.
     {
-        let mut current = state.user_settings.lock().unwrap();
+        let mut current = state.user_settings.lock();
         *current = settings;
         if let Some(dir) = state.app_data_dir() {
             current.save(&dir).map_err(|e| e.to_string())?;
@@ -748,7 +738,9 @@ pub fn xai_oauth_status() -> crate::xai_oauth::OAuthStatus {
 
 /// Copy a Grok Build / Grok CLI session from `~/.grok/auth.json` into Cycletron.
 #[tauri::command]
-pub fn xai_oauth_import_grok_build(state: State<'_, AppState>) -> Result<crate::xai_oauth::OAuthStatus, String> {
+pub fn xai_oauth_import_grok_build(
+    state: State<'_, AppState>,
+) -> Result<crate::xai_oauth::OAuthStatus, String> {
     let status = crate::xai_oauth::import_from_grok_build()?;
     state.rebuild_agent_client();
     Ok(status)
@@ -781,7 +773,7 @@ pub async fn xai_oauth_poll_login(
     let status = crate::xai_oauth::poll_device_login(&device_code, interval, expires_in).await?;
     // Prefer Grok as the active provider after a successful OAuth login.
     {
-        let mut us = state.user_settings.lock().unwrap();
+        let mut us = state.user_settings.lock();
         if us.llm.active != "grok" {
             us.llm.active = "grok".into();
             if let Some(dir) = state.app_data_dir() {
@@ -811,11 +803,13 @@ pub fn codex_oauth_status() -> crate::codex_oauth::CodexOAuthStatus {
 
 /// Copy a Codex CLI session from `~/.codex/auth.json` into Cycletron.
 #[tauri::command]
-pub fn codex_oauth_import_cli(state: State<'_, AppState>) -> Result<crate::codex_oauth::CodexOAuthStatus, String> {
+pub fn codex_oauth_import_cli(
+    state: State<'_, AppState>,
+) -> Result<crate::codex_oauth::CodexOAuthStatus, String> {
     let status = crate::codex_oauth::import_from_codex_cli()?;
     // Prefer Codex as active after import.
     {
-        let mut us = state.user_settings.lock().unwrap();
+        let mut us = state.user_settings.lock();
         us.llm.active = "codex".into();
         if let Some(dir) = state.app_data_dir() {
             let _ = us.save(&dir);
@@ -827,10 +821,12 @@ pub fn codex_oauth_import_cli(state: State<'_, AppState>) -> Result<crate::codex
 
 /// Browser PKCE login (same client as `codex login`). Binds localhost:1455.
 #[tauri::command]
-pub async fn codex_oauth_login(state: State<'_, AppState>) -> Result<crate::codex_oauth::CodexOAuthStatus, String> {
+pub async fn codex_oauth_login(
+    state: State<'_, AppState>,
+) -> Result<crate::codex_oauth::CodexOAuthStatus, String> {
     let status = crate::codex_oauth::login_with_browser().await?;
     {
-        let mut us = state.user_settings.lock().unwrap();
+        let mut us = state.user_settings.lock();
         us.llm.active = "codex".into();
         if let Some(dir) = state.app_data_dir() {
             let _ = us.save(&dir);
@@ -899,7 +895,8 @@ pub fn read_snapshot(
 pub fn set_dock_badge(count: u32, app_handle: tauri::AppHandle) -> Result<(), String> {
     let target = if count == 0 { None } else { Some(count) };
     if let Some(window) = app_handle.get_webview_window("main") {
-        window.set_badge_count(target.map(|n| n as i64))
+        window
+            .set_badge_count(target.map(|n| n as i64))
             .map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -922,7 +919,11 @@ pub fn clear_logs() {
 /// console isn't visible.
 #[tauri::command]
 pub fn log_diagnostic(level: String, target: String, message: String) {
-    let tgt = if target.is_empty() { "cycletron::frontend".to_string() } else { target };
+    let tgt = if target.is_empty() {
+        "cycletron::frontend".to_string()
+    } else {
+        target
+    };
     match level.as_str() {
         "error" => tracing::error!(target: "cycletron::frontend", source = %tgt, "{}", message),
         "warn" => tracing::warn!(target: "cycletron::frontend", source = %tgt, "{}", message),
@@ -939,10 +940,17 @@ pub fn diagnostic_dump(app_handle: tauri::AppHandle) -> String {
     let identifier = app_handle.config().identifier.clone();
     let mut out = String::new();
     out.push_str("=== Cycletron diagnostic dump ===\n");
-    out.push_str(&format!("App      : {} {}\n", package.name, package.version));
+    out.push_str(&format!(
+        "App      : {} {}\n",
+        package.name, package.version
+    ));
     out.push_str(&format!("Bundle   : {}\n", identifier));
     out.push_str(&format!("Tauri    : {}\n", tauri::VERSION));
-    out.push_str(&format!("OS       : {} {}\n", std::env::consts::OS, std::env::consts::ARCH));
+    out.push_str(&format!(
+        "OS       : {} {}\n",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    ));
     out.push_str(&format!("Time     : {}\n", chrono::Utc::now().to_rfc3339()));
     out.push_str("\n=== Recent logs ===\n");
     for entry in logs::snapshot() {
@@ -1049,7 +1057,7 @@ pub fn spawn_external_change_watcher(app_handle: tauri::AppHandle) {
             std::thread::sleep(std::time::Duration::from_millis(1500));
             let state: tauri::State<'_, AppState> = app_handle.state::<AppState>();
             let current_path: Option<PathBuf> = {
-                let session = state.session.lock().unwrap();
+                let session = state.session.lock();
                 session.file_path.clone()
             };
             // Reset the baseline when the user opens a different file.
@@ -1062,8 +1070,12 @@ pub fn spawn_external_change_watcher(app_handle: tauri::AppHandle) {
                 continue;
             }
             let Some(path) = current_path else { continue };
-            let Ok(meta) = std::fs::metadata(&path) else { continue };
-            let Ok(modified) = meta.modified() else { continue };
+            let Ok(meta) = std::fs::metadata(&path) else {
+                continue;
+            };
+            let Ok(modified) = meta.modified() else {
+                continue;
+            };
             // First sighting just records the baseline.
             let Some(prev) = last_mtime else {
                 last_mtime = Some(modified);

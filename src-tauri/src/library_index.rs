@@ -26,8 +26,17 @@ const MAX_SONG_BYTES: u64 = 256 * 1024;
 /// that happens to be a code checkout doesn't drown the index in engine sources,
 /// vendored samples, and build output. (Dotdirs like `.git` are skipped anyway.)
 const SKIP_DIRS: &[&str] = &[
-    "node_modules", "target", "dist", "pkg", "build", "coverage",
-    "_reference", "dirt-samples", "samples", "soundfonts", "webaudiofontdata",
+    "node_modules",
+    "target",
+    "dist",
+    "pkg",
+    "build",
+    "coverage",
+    "_reference",
+    "dirt-samples",
+    "samples",
+    "soundfonts",
+    "webaudiofontdata",
 ];
 
 /// Backstop on total files indexed, so a pathological tree can't hang a call.
@@ -45,13 +54,18 @@ pub const MAX_READ_BYTES_PER_TURN: usize = 256 * 1024;
 /// and off the wire. `.strudel` is a deliberate extension and is trusted.
 fn looks_like_pattern(code: &str) -> bool {
     let head = &code[..code.len().min(4096)];
-    ["s(", "note(", "n(", "stack(", "setbpm", "setcpm", "$:", "sound(", ".s(", "chord("]
-        .iter()
-        .any(|m| head.contains(m))
+    [
+        "s(", "note(", "n(", "stack(", "setbpm", "setcpm", "$:", "sound(", ".s(", "chord(",
+    ]
+    .iter()
+    .any(|m| head.contains(m))
 }
 
 fn is_js(path: &Path) -> bool {
-    path.extension().and_then(|s| s.to_str()).map(|s| s.eq_ignore_ascii_case("js")).unwrap_or(false)
+    path.extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.eq_ignore_ascii_case("js"))
+        .unwrap_or(false)
 }
 
 /// If the library root looks like a code project or an over-broad directory,
@@ -67,14 +81,14 @@ pub fn root_warning(root: &Path) -> Option<String> {
             ));
         }
     }
-    if let Some(home) = std::env::var_os("HOME") {
-        if root == Path::new(&home) {
-            return Some(
-                "⚠ Your library root is your home directory — that's very broad. Point it at a \
+    if let Some(home) = std::env::var_os("HOME")
+        && root == Path::new(&home)
+    {
+        return Some(
+            "⚠ Your library root is your home directory — that's very broad. Point it at a \
                  songs folder so the agent only sees your music."
-                    .to_string(),
-            );
-        }
+                .to_string(),
+        );
     }
     None
 }
@@ -120,7 +134,7 @@ impl LibraryIndex {
         if root.is_dir() {
             walk(root, root, 0, &mut songs);
         }
-        songs.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
+        songs.sort_by_key(|s| std::cmp::Reverse(s.modified_ms));
         LibraryIndex { songs }
     }
 
@@ -134,9 +148,9 @@ impl LibraryIndex {
             .iter()
             .filter(|s| {
                 kw.as_ref().is_none_or(|k| song_matches_keyword(s, k))
-                    && tag.as_ref().is_none_or(|t| {
-                        s.tags.iter().any(|x| x.to_ascii_lowercase().contains(t))
-                    })
+                    && tag
+                        .as_ref()
+                        .is_none_or(|t| s.tags.iter().any(|x| x.to_ascii_lowercase().contains(t)))
                     && snd.as_ref().is_none_or(|sn| {
                         s.sounds.iter().any(|x| x.to_ascii_lowercase().contains(sn))
                     })
@@ -180,17 +194,21 @@ fn walk(root: &Path, dir: &Path, depth: usize, out: &mut Vec<LibrarySong>) {
                 continue;
             }
             walk(root, &path, depth + 1, out);
-        } else if is_song(&path) && meta.len() <= MAX_SONG_BYTES {
-            if let Some(song) = read_song_meta(root, &path, &meta) {
-                out.push(song);
-            }
+        } else if is_song(&path)
+            && meta.len() <= MAX_SONG_BYTES
+            && let Some(song) = read_song_meta(root, &path, &meta)
+        {
+            out.push(song);
         }
     }
 }
 
 fn is_song(path: &Path) -> bool {
     matches!(
-        path.extension().and_then(|s| s.to_str()).map(|s| s.to_ascii_lowercase()).as_deref(),
+        path.extension()
+            .and_then(|s| s.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref(),
         Some("strudel") | Some("js")
     )
 }
@@ -203,8 +221,15 @@ fn read_song_meta(root: &Path, path: &Path, meta: &std::fs::Metadata) -> Option<
         return None;
     }
     let fm = doc.frontmatter.unwrap_or_default();
-    let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    let rel_path = path.strip_prefix(root).unwrap_or(path).to_string_lossy().into_owned();
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let rel_path = path
+        .strip_prefix(root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .into_owned();
     let modified_ms = meta
         .modified()
         .ok()
@@ -237,19 +262,7 @@ fn first_code_line(code: &str) -> String {
 }
 
 /// Best-effort tempo from `setbpm(N)` / `setcpm(N)` when frontmatter has none.
-fn scan_bpm(code: &str) -> Option<f64> {
-    for key in ["setbpm(", "setcpm("] {
-        if let Some(i) = code.find(key) {
-            let rest = &code[i + key.len()..];
-            let end = rest.find(')')?;
-            if let Ok(v) = rest[..end].trim().parse::<f64>() {
-                // setcpm is cycles/min; ×4 ≈ BPM in 4/4. setbpm is already BPM.
-                return Some(if key.starts_with("setcpm") { v * 4.0 } else { v });
-            }
-        }
-    }
-    None
-}
+use cycletron_core::text::tempo::scan_bpm;
 
 /// Distinct sound names used, from `s("…")` / `.s("…")` / `.sound("…")`. Strips
 /// mini-notation ornaments (`*4`, `:2`, `(3,8)`, `~`) down to bare names.
@@ -287,7 +300,11 @@ fn scan_sounds(code: &str) -> Vec<String> {
 pub fn read_song(root: &Path, requested: &str) -> Result<files::FileDoc, String> {
     let candidate = {
         let p = Path::new(requested);
-        if p.is_absolute() { p.to_path_buf() } else { root.join(p) }
+        if p.is_absolute() {
+            p.to_path_buf()
+        } else {
+            root.join(p)
+        }
     };
     if !crate::library::within(root, &candidate) {
         return Err(format!(
@@ -299,19 +316,21 @@ pub fn read_song(root: &Path, requested: &str) -> Result<files::FileDoc, String>
     }
     // Refuse oversized files: a real song is small; anything this large is a data
     // blob (a soundfont, a bundle) and would blow the agent's context if returned.
-    if let Ok(meta) = std::fs::metadata(&candidate) {
-        if meta.len() > MAX_SONG_BYTES {
-            return Err(format!(
-                "'{requested}' is {} KB — too large to be a song (limit {} KB). Skipping.",
-                meta.len() / 1024,
-                MAX_SONG_BYTES / 1024
-            ));
-        }
+    if let Ok(meta) = std::fs::metadata(&candidate)
+        && meta.len() > MAX_SONG_BYTES
+    {
+        return Err(format!(
+            "'{requested}' is {} KB — too large to be a song (limit {} KB). Skipping.",
+            meta.len() / 1024,
+            MAX_SONG_BYTES / 1024
+        ));
     }
-    let doc = files::read_file(&candidate)
-        .map_err(|e| format!("could not read '{requested}': {e}"))?;
+    let doc =
+        files::read_file(&candidate).map_err(|e| format!("could not read '{requested}': {e}"))?;
     if is_js(&candidate) && !looks_like_pattern(&doc.code) {
-        return Err(format!("'{requested}' is a .js file but doesn't look like a strudel pattern — skipping."));
+        return Err(format!(
+            "'{requested}' is a .js file but doesn't look like a strudel pattern — skipping."
+        ));
     }
     Ok(doc)
 }
@@ -329,33 +348,28 @@ fn resolve_in_root(root: &Path, requested: &str) -> Result<std::path::PathBuf, S
         return Err("empty path".to_string());
     }
     let p = Path::new(requested);
-    let candidate = if p.is_absolute() { p.to_path_buf() } else { root.join(p) };
+    let candidate = if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        root.join(p)
+    };
     if !crate::library::within(root, &candidate) {
-        return Err(format!("'{requested}' is outside your library — writes stay inside it."));
+        return Err(format!(
+            "'{requested}' is outside your library — writes stay inside it."
+        ));
     }
     Ok(candidate)
 }
 
 fn rel_of(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root).unwrap_or(path).to_string_lossy().into_owned()
+    path.strip_prefix(root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// Filename-safe slug: lowercase, non-alphanumerics collapsed to `-`, trimmed.
-fn slugify(name: &str) -> String {
-    let mut out = String::new();
-    let mut dash = false;
-    for c in name.trim().chars() {
-        if c.is_ascii_alphanumeric() {
-            out.push(c.to_ascii_lowercase());
-            dash = false;
-        } else if !dash && !out.is_empty() {
-            out.push('-');
-            dash = true;
-        }
-    }
-    let s = out.trim_matches('-').to_string();
-    if s.is_empty() { "untitled".to_string() } else { s }
-}
+use cycletron_core::text::slug::slugify;
 
 /// Frontmatter for a named save (created today), preserving a detected tempo.
 fn with_frontmatter(name: &str, code: &str) -> String {
@@ -363,10 +377,14 @@ fn with_frontmatter(name: &str, code: &str) -> String {
     if code.trim_start().starts_with("---") {
         return code.to_string();
     }
-    let bpm_line = scan_bpm(code).map(|b| format!("bpm: {b:.0}\n")).unwrap_or_default();
+    let bpm_line = scan_bpm(code)
+        .map(|b| format!("bpm: {b:.0}\n"))
+        .unwrap_or_default();
     let date = chrono::Utc::now().format("%Y-%m-%d");
-    format!("---\nname: \"{}\"\n{bpm_line}created: {date}\ntags: [cycletron]\n---\n{code}",
-        name.replace('"', "'"))
+    format!(
+        "---\nname: \"{}\"\n{bpm_line}created: {date}\ntags: [cycletron]\n---\n{code}",
+        name.replace('"', "'")
+    )
 }
 
 /// Save `code` as a named song in the library (optionally in `folder`). Overwrite
@@ -413,7 +431,10 @@ pub fn rename_song(root: &Path, from: &str, new_name: &str) -> Result<String, St
         return Err("destination escapes the library".to_string());
     }
     if dst.exists() {
-        return Err(format!("'{}' already exists — pick another name", rel_of(root, &dst)));
+        return Err(format!(
+            "'{}' already exists — pick another name",
+            rel_of(root, &dst)
+        ));
     }
     crate::library::rename_path(&src, &dst).map_err(|e| format!("rename: {e}"))?;
     Ok(rel_of(root, &dst))
@@ -452,7 +473,8 @@ mod tests {
 
     #[test]
     fn scans_sounds_and_bpm() {
-        let code = "setbpm(128)\nstack(\n  s(\"bd*4 hh*8\").gain(0.9),\n  note(\"a2\").s(\"sawtooth\")\n)";
+        let code =
+            "setbpm(128)\nstack(\n  s(\"bd*4 hh*8\").gain(0.9),\n  note(\"a2\").s(\"sawtooth\")\n)";
         assert_eq!(scan_bpm(code), Some(128.0));
         let s = scan_sounds(code);
         assert!(s.contains(&"bd".to_string()) && s.contains(&"hh".to_string()));
@@ -469,21 +491,37 @@ mod tests {
         let idx = LibraryIndex {
             songs: vec![
                 LibrarySong {
-                    rel_path: "acid.strudel".into(), name: "Acid Trip".into(),
-                    bpm: Some(130.0), tags: vec!["acid".into()], created: None,
-                    sounds: vec!["303".into()], preview: String::new(), modified_ms: Some(2),
+                    rel_path: "acid.strudel".into(),
+                    name: "Acid Trip".into(),
+                    bpm: Some(130.0),
+                    tags: vec!["acid".into()],
+                    created: None,
+                    sounds: vec!["303".into()],
+                    preview: String::new(),
+                    modified_ms: Some(2),
                 },
                 LibrarySong {
-                    rel_path: "dub.strudel".into(), name: "Deep Dub".into(),
-                    bpm: Some(70.0), tags: vec!["dub".into()], created: None,
-                    sounds: vec!["bd".into()], preview: String::new(), modified_ms: Some(1),
+                    rel_path: "dub.strudel".into(),
+                    name: "Deep Dub".into(),
+                    bpm: Some(70.0),
+                    tags: vec!["dub".into()],
+                    created: None,
+                    sounds: vec!["bd".into()],
+                    preview: String::new(),
+                    modified_ms: Some(1),
                 },
             ],
         };
-        let fast = idx.search(&LibraryQuery { bpm_min: Some(120.0), ..Default::default() });
+        let fast = idx.search(&LibraryQuery {
+            bpm_min: Some(120.0),
+            ..Default::default()
+        });
         assert_eq!(fast.len(), 1);
         assert_eq!(fast[0].name, "Acid Trip");
-        let kw = idx.search(&LibraryQuery { keyword: Some("dub".into()), ..Default::default() });
+        let kw = idx.search(&LibraryQuery {
+            keyword: Some("dub".into()),
+            ..Default::default()
+        });
         assert_eq!(kw.len(), 1);
         assert_eq!(kw[0].name, "Deep Dub");
     }
@@ -494,10 +532,16 @@ mod tests {
         let root = std::env::temp_dir().join("cycletron-libidx-test");
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("Demos")).unwrap();
-        std::fs::write(root.join("acid.strudel"),
-            "---\nname: \"Acid\"\nbpm: 130\ntags: [acid]\n---\ns(\"bd*4\").gain(0.9)").unwrap();
-        std::fs::write(root.join("Demos/dub.strudel"),
-            "setbpm(70)\nnote(\"c2\").s(\"sine\")").unwrap();
+        std::fs::write(
+            root.join("acid.strudel"),
+            "---\nname: \"Acid\"\nbpm: 130\ntags: [acid]\n---\ns(\"bd*4\").gain(0.9)",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("Demos/dub.strudel"),
+            "setbpm(70)\nnote(\"c2\").s(\"sine\")",
+        )
+        .unwrap();
 
         let idx = LibraryIndex::build(&root);
         assert_eq!(idx.songs.len(), 2, "should find songs in root and subdir");
@@ -524,7 +568,11 @@ mod tests {
         std::fs::write(root.join("songs/real.strudel"), "s(\"bd*4\")").unwrap();
         std::fs::write(root.join("_reference/sound/font.js"), "export const x = 1").unwrap();
         std::fs::write(root.join("node_modules/lib.js"), "module.exports={}").unwrap();
-        std::fs::write(root.join("huge.strudel"), "x".repeat((MAX_SONG_BYTES + 1) as usize)).unwrap();
+        std::fs::write(
+            root.join("huge.strudel"),
+            "x".repeat((MAX_SONG_BYTES + 1) as usize),
+        )
+        .unwrap();
 
         let idx = LibraryIndex::build(&root);
         let paths: Vec<&str> = idx.songs.iter().map(|s| s.rel_path.as_str()).collect();
@@ -543,13 +591,23 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join("groove.js"), "stack(s(\"bd*4\"), note(\"c2\"))").unwrap();
-        std::fs::write(root.join("config.js"), "export default { apiKey: 'secret' }").unwrap();
+        std::fs::write(
+            root.join("config.js"),
+            "export default { apiKey: 'secret' }",
+        )
+        .unwrap();
         std::fs::write(root.join("real.strudel"), "s(\"hh*8\")").unwrap();
 
         let idx = LibraryIndex::build(&root);
         let paths: Vec<&str> = idx.songs.iter().map(|s| s.rel_path.as_str()).collect();
-        assert!(paths.contains(&"groove.js"), "pattern-like .js is a song: {paths:?}");
-        assert!(!paths.contains(&"config.js"), "arbitrary .js is NOT a song: {paths:?}");
+        assert!(
+            paths.contains(&"groove.js"),
+            "pattern-like .js is a song: {paths:?}"
+        );
+        assert!(
+            !paths.contains(&"config.js"),
+            "arbitrary .js is NOT a song: {paths:?}"
+        );
         assert!(paths.contains(&"real.strudel"));
         // read_song refuses the non-pattern .js even if addressed directly.
         assert!(read_song(&root, "config.js").is_err());
@@ -571,10 +629,20 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
 
         // save round-trips with a slugified filename + frontmatter name.
-        let rel = save_song(&root, None, "Midnight Dub!", "setbpm(70)\ns(\"bd*4\")", None).unwrap();
+        let rel = save_song(
+            &root,
+            None,
+            "Midnight Dub!",
+            "setbpm(70)\ns(\"bd*4\")",
+            None,
+        )
+        .unwrap();
         assert_eq!(rel, "midnight-dub.strudel");
         let doc = read_song(&root, &rel).unwrap();
-        assert_eq!(doc.frontmatter.unwrap().name.as_deref(), Some("Midnight Dub!"));
+        assert_eq!(
+            doc.frontmatter.unwrap().name.as_deref(),
+            Some("Midnight Dub!")
+        );
         assert!(doc.code.contains("bd*4"));
 
         // save into a folder.

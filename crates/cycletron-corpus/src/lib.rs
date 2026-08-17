@@ -1,4 +1,5 @@
 pub mod index;
+pub mod layout;
 pub mod loader;
 pub mod recipes;
 

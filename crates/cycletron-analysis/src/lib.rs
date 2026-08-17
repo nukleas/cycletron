@@ -10,21 +10,25 @@
 pub mod arrangement;
 pub mod critique;
 pub mod engine_contract;
+pub mod evaluated;
 pub mod execute;
 pub mod form;
 pub mod inspect;
 pub mod methods;
 pub mod repair;
+pub mod review;
 pub mod sounds;
 pub mod spectral;
 
 pub use arrangement::*;
 pub use critique::*;
+pub use evaluated::{Evaluated, validate_emits};
 pub use execute::execute;
 pub use form::*;
 pub use inspect::*;
-pub use methods::{dsl_symbols, methods_listing, DslSymbol};
-pub use repair::{remap_sounds, sanitize_source, sanitize_source_with_catalog, Sanitized};
+pub use methods::{DslSymbol, dsl_symbols, methods_listing};
+pub use repair::{Sanitized, remap_sounds, sanitize_source, sanitize_source_with_catalog};
+pub use review::{ReviewOutcome, review_report};
 
 #[cfg(test)]
 mod tests {
@@ -34,11 +38,26 @@ mod tests {
     use crate::form::{label_energy, parse_pickrestart_labels};
     use crate::inspect::{midi_to_name, note_name_to_midi};
 
-    fn known() -> std::collections::HashSet<String> {
-        ["bd", "hh", "sd", "sawtooth", "sine", "supersaw", "wt_pluck"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect()
+    fn known() -> sounds::SoundSet {
+        sounds::SoundSet::builtin_only()
+    }
+
+    // Evaluate-then-analyze in one step, with each analysis's historical
+    // window policy, so the assertions below stay focused on behavior.
+    fn inspect_code(code: &str, cycles: usize) -> Result<PatternDigest, String> {
+        Evaluated::new(code, cycles).map(Evaluated::into_digest)
+    }
+
+    fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
+        Evaluated::new(code, cycles.max(4)).map(|ev| critique(&ev))
+    }
+
+    fn analyze_code(code: &str, cycles: usize) -> Result<ArrangementAnalysis, String> {
+        Evaluated::new(code, cycles).map(|ev| analyze(&ev))
+    }
+
+    fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String> {
+        Evaluated::new(code, cycles.clamp(8, 64)).map(|ev| critique_form(&ev))
     }
 
     #[test]
@@ -46,7 +65,8 @@ mod tests {
         let d = inspect_code("s(\"bd kicck bd kicck\")", 2).unwrap();
         let f = lint_digest(&d, &known());
         assert!(
-            f.iter().any(|f| f.code == "unknown-sound" && f.severity == "warn"),
+            f.iter()
+                .any(|f| f.code == "unknown-sound" && f.severity == "warn"),
             "got: {f:?}"
         );
     }
@@ -64,14 +84,19 @@ mod tests {
         let d = inspect_code("s(\"bd*4\").pan(-0.3)", 2).unwrap();
         let f = lint_digest(&d, &known());
         assert!(
-            f.iter().any(|f| f.code == "pan-range" && f.message.contains("NaN")),
+            f.iter()
+                .any(|f| f.code == "pan-range" && f.message.contains("NaN")),
             "got: {f:?}"
         );
     }
 
     #[test]
     fn lint_accepts_clean_patterns_and_gm_names() {
-        let d = inspect_code("stack(s(\"bd*4\"), note(\"c3\").s(\"gm_epiano1\")).pan(0.4)", 2).unwrap();
+        let d = inspect_code(
+            "stack(s(\"bd*4\"), note(\"c3\").s(\"gm_epiano1\")).pan(0.4)",
+            2,
+        )
+        .unwrap();
         let f = lint_digest(&d, &known());
         assert!(
             f.iter().all(|f| f.severity != "warn"),
@@ -158,7 +183,10 @@ mod tests {
         let a = analyze_code(r#"stack(s("bd*4"), s("hh*8"))"#, 16).unwrap();
         assert_eq!(a.period_cycles, Some(1));
         assert_eq!(a.sections.len(), 1);
-        assert_eq!(a.sections[0].instruments, vec!["bd".to_string(), "hh".to_string()]);
+        assert_eq!(
+            a.sections[0].instruments,
+            vec!["bd".to_string(), "hh".to_string()]
+        );
         assert_eq!(a.form, "A");
     }
 
@@ -273,7 +301,8 @@ mod tests {
         // Trap (b) from the tool-test report — sailed through as "safe".
         let f = lint_source(r#"chord("<Cm7 FM7>").s("supersaw").gain(0.6)"#);
         assert!(
-            f.iter().any(|f| f.code == "unvoiced-chord" && f.severity == "warn"),
+            f.iter()
+                .any(|f| f.code == "unvoiced-chord" && f.severity == "warn"),
             "got: {f:?}"
         );
         // Voiced chord: clean.
@@ -295,7 +324,8 @@ mod tests {
     fn lint_source_notes_a_melodic_layer_with_no_instrument() {
         let f = lint_source(r#"note("c4 e4 g4")"#);
         assert!(
-            f.iter().any(|f| f.code == "default-synth" && f.severity == "note"),
+            f.iter()
+                .any(|f| f.code == "default-synth" && f.severity == "note"),
             "got: {f:?}"
         );
         // With an instrument assigned: no nudge.
@@ -355,7 +385,11 @@ $: "<intro build drop drop break drop2 drop2 outro>".slow(8).pickRestart({
     outro: s("hh ~ ~ ~")
 })"#;
         let c = critique_form_code(code, 64).unwrap();
-        assert!(!has_code(&c, "off-grid"), "phantom sections: {:?}", c.findings);
+        assert!(
+            !has_code(&c, "off-grid"),
+            "phantom sections: {:?}",
+            c.findings
+        );
         assert!(!has_code(&c, "missing-slow"), "{:?}", c.findings);
         assert!(c.ok, "expected clean form, got {:?}", c.findings);
     }
@@ -393,15 +427,21 @@ $: "<intro drop>".slow(3).pickRestart({
     #[test]
     #[ignore = "depends on strudel-rs with_structure hap-context preservation"]
     fn struct_keeps_pre_applied_sound_in_digest() {
-        let d = inspect_code(r#"note("[a3,c4,e4]").s("supersaw").struct("~ 1 ~ 1").gain(0.5)"#, 1)
-            .unwrap();
+        let d = inspect_code(
+            r#"note("[a3,c4,e4]").s("supersaw").struct("~ 1 ~ 1").gain(0.5)"#,
+            1,
+        )
+        .unwrap();
         assert!(
             d.sounds.iter().any(|s| s == "supersaw"),
             "struct dropped the sound: {:?}",
             d.sounds
         );
         assert!(
-            d.cycles[0].events.iter().all(|e| e.sound.as_deref() == Some("supersaw")),
+            d.cycles[0]
+                .events
+                .iter()
+                .all(|e| e.sound.as_deref() == Some("supersaw")),
             "chord events lost sound: {:?}",
             d.cycles[0].events
         );
@@ -414,7 +454,9 @@ $: "<intro drop>".slow(3).pickRestart({
     #[test]
     fn generated_pieces_pass_their_own_clipping_gate() {
         for genre in ["amapiano", "gabber", "uplifting-trance", "house"] {
-            let code = cycletron_gen::compose::by_name(genre, 7).unwrap().to_strudel();
+            let code = cycletron_gen::compose::by_name(genre, 7)
+                .unwrap()
+                .to_strudel();
             let c = critique_code(&code, 8).unwrap();
             assert!(
                 !has_code(&c, "clipping"),
@@ -456,7 +498,11 @@ $: "<intro drop drop outro>".slow(8).pickRestart({
     outro: s("bd ~ ~ ~")
 })"#;
         let a = analyze_code(code, 64).unwrap();
-        assert_eq!(a.period_cycles, Some(32), "pickRestart total should drive length");
+        assert_eq!(
+            a.period_cycles,
+            Some(32),
+            "pickRestart total should drive length"
+        );
         assert!(a.repeats);
         // 120 BPM → cps 0.5 → 2s/cycle → 32 × 2 = 64s.
         let secs = a.total_seconds.expect("total_seconds");
@@ -508,7 +554,10 @@ $: "<intro drop drop outro>".slow(8).pickRestart({
             ])
         );
         // Numeric note selectors are not section labels.
-        assert_eq!(parse_pickrestart_labels(r#""<0 2 4>".pickRestart({})"#), None);
+        assert_eq!(
+            parse_pickrestart_labels(r#""<0 2 4>".pickRestart({})"#),
+            None
+        );
         // Not a pickRestart at all.
         assert_eq!(parse_pickrestart_labels(r#"note("c e g")"#), None);
     }

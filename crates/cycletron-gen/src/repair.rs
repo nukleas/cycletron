@@ -210,9 +210,14 @@ impl Grammar {
     ) -> std::collections::BTreeMap<usize, String> {
         let usage = self.usage();
         let mut names = std::collections::BTreeMap::new();
+        #[expect(
+            clippy::needless_range_loop,
+            reason = "i indexes usage, sym_len, and the name map together"
+        )]
         for i in 0..self.rules.len() {
             // Don't name pure-rest phrases — they inline compactly as `<-!n>`.
-            if usage[i] >= 2 && self.sym_len(Sym::N(i)) >= min_span && !self.is_all_rest(Sym::N(i)) {
+            if usage[i] >= 2 && self.sym_len(Sym::N(i)) >= min_span && !self.is_all_rest(Sym::N(i))
+            {
                 let k = names.len();
                 names.insert(i, format!("{prefix}{k}"));
             }
@@ -358,13 +363,16 @@ mod tests {
     #[test]
     fn grammar_reproduces_input() {
         // groove "a b c" recurs between fills — non-consecutive repetition.
-        let seq = bars(&[
-            "a", "b", "c", "x", "a", "b", "c", "y", "a", "b", "c", "z",
-        ]);
+        let seq = bars(&["a", "b", "c", "x", "a", "b", "c", "y", "a", "b", "c", "z"]);
         let g = repair(&seq);
         assert_eq!(g.expand(), seq, "grammar must reproduce the bars");
         // it found the recurring "a b c" phrase and shrank the sequence
-        assert!(g.size() < seq.len(), "grammar {} !< {}", g.size(), seq.len());
+        assert!(
+            g.size() < seq.len(),
+            "grammar {} !< {}",
+            g.size(),
+            seq.len()
+        );
     }
 
     #[test]
@@ -385,7 +393,20 @@ mod tests {
         let g0 = "[bd sd bd cp]";
         let g1 = "[hh oh hh oh bd]";
         let seq = bars(&[
-            g0, g1, g0, g1, "[cr rim]", g0, g1, g0, g1, "[lt mt ht]", g0, g1, g0, g1,
+            g0,
+            g1,
+            g0,
+            g1,
+            "[cr rim]",
+            g0,
+            g1,
+            g0,
+            g1,
+            "[lt mt ht]",
+            g0,
+            g1,
+            g0,
+            g1,
         ]);
         let g = repair(&seq);
         let wrap = |s: &str| format!("s(\"{s}\")");
@@ -397,7 +418,12 @@ mod tests {
             crate::verify::docs_equivalent(&cdoc, &ndoc, seq.len()).unwrap(),
             "nested arrange must play identically:\n{expr}"
         );
-        assert!(expr.len() < naive.len(), "{} !< {}", expr.len(), naive.len());
+        assert!(
+            expr.len() < naive.len(),
+            "{} !< {}",
+            expr.len(),
+            naive.len()
+        );
     }
 
     #[test]

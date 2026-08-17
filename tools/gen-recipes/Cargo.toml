@@ -3,9 +3,13 @@ name = "gen-recipes"
 version = "0.1.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "gen-recipes"
 path = "main.rs"
 
 [dependencies]
+cycletron-corpus = { workspace = true }
 cycletron-gen = { workspace = true }

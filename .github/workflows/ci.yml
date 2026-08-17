@@ -71,16 +71,19 @@ jobs:
         if: runner.environment == 'github-hosted'
         uses: Swatinem/rust-cache@v2
 
+      - name: cargo fmt (check)
+        run: cargo fmt --all --check
+
+      - name: cargo clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
       - name: cargo check (workspace)
         run: cargo check --workspace --locked
 
-      - name: cargo test (lib crates, no Tauri GUI)
-        run: |
-          cargo test -p cycletron-core --locked
-          cargo test -p cycletron-agent --locked
-          cargo test -p cycletron-corpus --locked
-          cargo test -p cycletron-analysis --locked
-          cargo test -p cycletron-gen --locked
+      # Self-maintaining: new crates are tested without touching this file.
+      # Includes cycletron-app's lib tests (pure logic; no GUI needed).
+      - name: cargo test (workspace)
+        run: cargo test --workspace --locked
 
       - name: corpus-check (curated patterns)
         run: cargo run -p corpus-check --locked

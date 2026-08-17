@@ -13,10 +13,10 @@
 //! provider’s environment variable (`ANTHROPIC_API_KEY`, `XAI_API_KEY`,
 //! `OPENAI_API_KEY`).
 
+use parking_lot::Mutex;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use keyring::Entry;
 
@@ -28,9 +28,7 @@ static DEV_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
 /// Call once at app startup with the resolved app-data directory.
 /// Required for debug file storage; harmless in release.
 pub fn init(app_data_dir: &Path) {
-    if let Ok(mut guard) = DEV_DIR.lock() {
-        *guard = Some(app_data_dir.to_path_buf());
-    }
+    *DEV_DIR.lock() = Some(app_data_dir.to_path_buf());
     if cfg!(debug_assertions) {
         tracing::info!(
             target: "cycletron::secrets",
@@ -68,13 +66,7 @@ pub fn set_key(provider_id: &str, key: &str) -> Result<(), String> {
 /// For Grok this also returns true when an xAI SuperGrok OAuth session is stored.
 /// For Codex this also returns true when a ChatGPT OAuth session is stored.
 pub fn has_key(provider_id: &str) -> bool {
-    if provider_id == "grok" && crate::xai_oauth::has_session() {
-        return true;
-    }
-    if provider_id == "codex" && crate::codex_oauth::has_session() {
-        return true;
-    }
-    get_key(provider_id).is_some()
+    crate::oauth::has_subscription_session(provider_id) || get_key(provider_id).is_some()
 }
 
 fn env_var_for(provider_id: &str) -> Option<&'static str> {
@@ -91,7 +83,6 @@ fn env_var_for(provider_id: &str) -> Option<&'static str> {
 fn file_path() -> Result<PathBuf, String> {
     DEV_DIR
         .lock()
-        .map_err(|e| e.to_string())?
         .clone()
         .map(|d| d.join(DEV_KEYS_FILE))
         .ok_or_else(|| "secrets store not initialized (call secrets::init first)".into())

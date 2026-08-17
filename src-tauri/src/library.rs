@@ -21,7 +21,7 @@ impl LibrarySettings {
         let path = app_data_dir.join(LIBRARY_SETTINGS_FILE);
         if let Ok(s) = fs::read_to_string(&path)
             && let Ok(parsed) = serde_json::from_str::<Self>(&s)
-            && parsed.root.as_os_str().len() > 0
+            && !parsed.root.as_os_str().is_empty()
         {
             return parsed;
         }
@@ -77,9 +77,8 @@ pub fn list_dir(path: &Path) -> std::io::Result<Vec<DirEntry>> {
         if name.starts_with('.') {
             continue;
         }
-        let meta = match entry.metadata() {
-            Ok(m) => m,
-            Err(_) => continue,
+        let Ok(meta) = entry.metadata() else {
+            continue;
         };
         let is_dir = meta.is_dir();
         if !is_dir {
@@ -88,7 +87,7 @@ pub fn list_dir(path: &Path) -> std::io::Result<Vec<DirEntry>> {
                 .path()
                 .extension()
                 .and_then(|s| s.to_str())
-                .map(|s| s.to_ascii_lowercase());
+                .map(str::to_ascii_lowercase);
             if !matches!(ext.as_deref(), Some("strudel") | Some("js") | Some("txt")) {
                 continue;
             }
@@ -173,7 +172,9 @@ pub fn within(root: &Path, candidate: &Path) -> bool {
 /// Tauri commands.
 pub fn reveal_in_os(path: &Path) -> Result<(), String> {
     let target = if path.is_file() {
-        path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| path.to_path_buf())
+        path.parent()
+            .map(std::path::Path::to_path_buf)
+            .unwrap_or_else(|| path.to_path_buf())
     } else {
         path.to_path_buf()
     };

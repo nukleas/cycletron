@@ -5,14 +5,17 @@ edition.workspace = true
 license.workspace = true
 publish = false
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "midi-ingest"
 path = "main.rs"
 
 [dependencies]
-midi-to-strudel = { workspace = true }
-strudel-dsl = { workspace = true }
-strudel-core = { workspace = true }
+cycletron-analysis = { workspace = true }
+cycletron-core = { workspace = true }
+cycletron-midi = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 walkdir = "2"

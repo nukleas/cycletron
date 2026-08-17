@@ -13,29 +13,10 @@
 //!
 //! Default --index: ../strudel-training/ingested (the ingested store).
 
-use serde::{Deserialize, Serialize};
+use cycletron_midi::index::Index;
+use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-
-#[derive(Deserialize)]
-struct Index {
-    #[serde(default)]
-    dataset: String,
-    entries: Vec<Entry>,
-}
-
-#[derive(Deserialize)]
-struct Entry {
-    stem: String,
-    #[serde(default)]
-    artist: Option<String>,
-    #[serde(default)]
-    bpm: f64,
-    #[serde(default)]
-    valid: bool,
-    #[serde(default)]
-    strudel: Option<String>,
-}
 
 #[derive(Serialize)]
 struct Hit {
@@ -62,14 +43,19 @@ fn main() -> ExitCode {
         Ok(a) => a,
         Err(e) => {
             eprintln!("strudel-search: {e}");
-            eprintln!("usage: strudel-search [--index <path|dir>] [--artist <q>] [--bpm-min N] [--bpm-max N] [--sound <name>] [--keyword <q>] [--limit N] [--json]");
+            eprintln!(
+                "usage: strudel-search [--index <path|dir>] [--artist <q>] [--bpm-min N] [--bpm-max N] [--sound <name>] [--keyword <q>] [--limit N] [--json]"
+            );
             return ExitCode::from(2);
         }
     };
 
     let index_files = collect_indexes(&args.index);
     if index_files.is_empty() {
-        eprintln!("strudel-search: no *.index.json found at {}", args.index.display());
+        eprintln!(
+            "strudel-search: no *.index.json found at {}",
+            args.index.display()
+        );
         return ExitCode::from(2);
     }
 
@@ -79,9 +65,14 @@ fn main() -> ExitCode {
 
     'outer: for idx_path in &index_files {
         let base = idx_path.parent().unwrap_or(Path::new("."));
-        let Ok(text) = std::fs::read_to_string(idx_path) else { continue };
+        let Ok(text) = std::fs::read_to_string(idx_path) else {
+            continue;
+        };
         let Ok(index) = serde_json::from_str::<Index>(&text) else {
-            eprintln!("strudel-search: skipping unreadable index {}", idx_path.display());
+            eprintln!(
+                "strudel-search: skipping unreadable index {}",
+                idx_path.display()
+            );
             continue;
         };
 
@@ -90,20 +81,24 @@ fn main() -> ExitCode {
                 continue;
             }
             scanned += 1;
-            if let Some(q) = &args.artist {
-                if !e.artist.as_deref().map(|a| contains_ci(a, q)).unwrap_or(false) {
-                    continue;
-                }
+            if let Some(q) = &args.artist
+                && !e
+                    .artist
+                    .as_deref()
+                    .map(|a| contains_ci(a, q))
+                    .unwrap_or(false)
+            {
+                continue;
             }
-            if let Some(lo) = args.bpm_min {
-                if e.bpm < lo {
-                    continue;
-                }
+            if let Some(lo) = args.bpm_min
+                && e.bpm < lo
+            {
+                continue;
             }
-            if let Some(hi) = args.bpm_max {
-                if e.bpm > hi {
-                    continue;
-                }
+            if let Some(hi) = args.bpm_max
+                && e.bpm > hi
+            {
+                continue;
             }
 
             // Resolve the converted file once if any content filter is active.
@@ -112,15 +107,16 @@ fn main() -> ExitCode {
                 let Some(code) = abs.as_ref().and_then(|p| std::fs::read_to_string(p).ok()) else {
                     continue;
                 };
-                if let Some(snd) = &args.sound {
-                    if !uses_sound(&code, snd) {
-                        continue;
-                    }
+                if let Some(snd) = &args.sound
+                    && !uses_sound(&code, snd)
+                {
+                    continue;
                 }
-                if let Some(kw) = &args.keyword {
-                    if !contains_ci(&code, kw) && !contains_ci(&e.stem, kw) {
-                        continue;
-                    }
+                if let Some(kw) = &args.keyword
+                    && !contains_ci(&code, kw)
+                    && !contains_ci(&e.stem, kw)
+                {
+                    continue;
                 }
             }
 
@@ -138,7 +134,10 @@ fn main() -> ExitCode {
     }
 
     if args.json {
-        println!("{}", serde_json::to_string_pretty(&hits).unwrap_or_else(|_| "[]".into()));
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&hits).unwrap_or_else(|_| "[]".into())
+        );
     } else {
         for h in &hits {
             let artist = h.artist.as_deref().unwrap_or("?");
@@ -160,7 +159,9 @@ fn uses_sound(code: &str, sound: &str) -> bool {
     let s = sound.to_lowercase();
     let lower = code.to_lowercase();
     // Match the sound name as a quoted token; cheap and avoids most false hits.
-    lower.contains(&format!("\"{s}\"")) || lower.contains(&format!("\"{s}:")) || lower.contains(&format!("\"{s} "))
+    lower.contains(&format!("\"{s}\""))
+        || lower.contains(&format!("\"{s}:"))
+        || lower.contains(&format!("\"{s} "))
 }
 
 fn collect_indexes(path: &Path) -> Vec<PathBuf> {
@@ -173,7 +174,11 @@ fn collect_indexes(path: &Path) -> Vec<PathBuf> {
         .flatten()
         .filter(|e| e.file_type().is_file())
         .map(|e| e.path().to_path_buf())
-        .filter(|p| p.to_str().map(|s| s.ends_with(".index.json")).unwrap_or(false))
+        .filter(|p| {
+            p.to_str()
+                .map(|s| s.ends_with(".index.json"))
+                .unwrap_or(false)
+        })
         .collect();
     out.sort();
     out
@@ -196,8 +201,12 @@ fn parse_args() -> Result<Args, String> {
         match arg.as_str() {
             "--index" => a.index = PathBuf::from(val()?),
             "--artist" => a.artist = Some(val()?),
-            "--bpm-min" => a.bpm_min = Some(val()?.parse().map_err(|_| "--bpm-min must be a number")?),
-            "--bpm-max" => a.bpm_max = Some(val()?.parse().map_err(|_| "--bpm-max must be a number")?),
+            "--bpm-min" => {
+                a.bpm_min = Some(val()?.parse().map_err(|_| "--bpm-min must be a number")?)
+            }
+            "--bpm-max" => {
+                a.bpm_max = Some(val()?.parse().map_err(|_| "--bpm-max must be a number")?)
+            }
             "--sound" => a.sound = Some(val()?),
             "--keyword" => a.keyword = Some(val()?),
             "--limit" => a.limit = val()?.parse().map_err(|_| "--limit must be a number")?,

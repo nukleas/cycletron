@@ -1,11 +1,9 @@
 use crate::state::AppState;
-use crate::strudel;
 use cycletron_agent::LlmProvider;
+use cycletron_agent::ToolName;
 use cycletron_agent::types::*;
-use cycletron_core::traits::CorpusIndex;
-use cycletron_core::types::{
-    ChatMessage, ChatRole, CorpusQuery, MusicalRole, PlaybackState, ToolTrace,
-};
+use cycletron_analysis as strudel;
+use cycletron_core::types::{ChatMessage, ChatRole, CorpusQuery, PlaybackState, ToolTrace};
 use std::sync::LazyLock;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
@@ -48,7 +46,7 @@ pub async fn run_agent_loop(
 
     // Build the system prompt with current editor code injected
     let current_code = {
-        let session = state.session.lock().unwrap();
+        let session = state.session.lock();
         session.current_pattern.clone()
     };
     let system_prompt = if let Some(code) = &current_code {
@@ -56,7 +54,7 @@ pub async fn run_agent_loop(
             "{}\n\n## Current editor code (what the user hears right now)\n\n```\n{}\n```\n\n\
              When the user asks to modify, add to, or expand the song, work from this code. \
              Do not ask them to paste it — you already have it.",
-            &*SYSTEM_PROMPT, code
+            *SYSTEM_PROMPT, code
         )
     } else {
         SYSTEM_PROMPT.clone()
@@ -85,7 +83,7 @@ pub async fn run_agent_loop(
         debug!("agent loop iteration {iteration}");
 
         let mut response = client
-            .stream_message(&system_prompt, &api_messages, &tool_defs, &event_tx)
+            .stream_message(&system_prompt, &api_messages, tool_defs, &event_tx)
             .await
             .map_err(|e| format!("AI provider error: {e}"))?;
 
@@ -93,7 +91,7 @@ pub async fn run_agent_loop(
         // arguments}```) instead of a native tool_call. Recover those into real
         // ToolUse blocks so the same models that pick the right tool but can't
         // format it still work. No-op when a native call is already present.
-        recover_text_tool_calls(&mut response.content, &tool_defs);
+        recover_text_tool_calls(&mut response.content, tool_defs);
 
         let mut response_text = String::new();
         let mut tool_calls: Vec<(String, String, serde_json::Value)> = Vec::new();
@@ -124,12 +122,12 @@ pub async fn run_agent_loop(
         // `{}`. Executing it just yields "missing 'code' parameter", which the
         // model can't act on — it retries, truncates again, and loops. Detect
         // it here and feed back an honest, actionable error instead.
-        let truncated = response.stop_reason.as_deref() == Some("max_tokens")
-            || response.incomplete_tool_input;
+        let truncated =
+            response.stop_reason.as_deref() == Some("max_tokens") || response.incomplete_tool_input;
 
         let mut tool_results = Vec::new();
         for (id, name, input) in &tool_calls {
-            let input_empty = input.as_object().is_none_or(|o| o.is_empty());
+            let input_empty = input.as_object().is_none_or(serde_json::Map::is_empty);
             let mut write_kind: Option<String> = None;
             let (content, is_error) = if truncated && input_empty {
                 warn!("tool '{name}' arguments truncated at token limit; not executing");
@@ -230,41 +228,56 @@ async fn execute_tool(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    match name {
-        "search_corpus" => tool_search_corpus(input, state),
-        "get_example" => tool_get_example(input, state),
-        "list_library" => tool_list_library(input, state),
-        "search_library" => tool_search_library(input, state),
-        "read_song" => tool_read_song(input, state),
-        "save_song" => tool_save_song(input, state, event_tx),
-        "save_current_as" => tool_save_current_as(input, state, event_tx),
-        "rename_song" => tool_rename_song(input, state, event_tx),
-        "move_song" => tool_move_song(input, state, event_tx),
-        "new_folder" => tool_new_folder(input, state, event_tx),
-        "list_sounds" => tool_list_sounds(state),
-        "list_methods" => tool_list_methods(input),
-        "generate_pattern" => tool_generate_pattern(input),
-        "validate_pattern" => tool_validate_pattern(input, state),
-        "review_pattern" => tool_review_pattern(input, state),
-        "inspect_pattern" => tool_inspect_pattern(input),
-        "analyze_arrangement" => tool_analyze_arrangement(input),
-        "critique_pattern" => tool_critique_pattern(input),
-        "critique_form" => tool_critique_form(input),
-        "genre_recipe" => tool_genre_recipe(input, state),
-        "play_pattern" => tool_play_pattern(input, state, event_tx),
-        "list_parts" => tool_list_parts(state),
-        "list_sections" => tool_list_sections(state),
-        "upsert_track" => tool_upsert_track(input, state, event_tx),
-        "upsert_tracks" => tool_upsert_tracks(input, state, event_tx),
-        "upsert_section" => tool_upsert_section(input, state, event_tx),
-        "upsert_sections" => tool_upsert_sections(input, state, event_tx),
-        "upsert_binding" => tool_upsert_binding(input, state, event_tx),
-        "mute_track" => tool_mute_track(input, state, event_tx),
-        "unmute_track" => tool_unmute_track(input, state, event_tx),
-        "stop" => tool_stop(state, event_tx),
-        "set_tempo" => tool_set_tempo(input, state, event_tx),
-        _ => Err(format!("unknown tool: {name}")),
+    // Exhaustive over ToolName (no wildcard): a tool defined in
+    // cycletron-agent without a dispatch arm here is a compile error.
+    let Some(tool) = ToolName::parse(name) else {
+        return Err(format!("unknown tool: {name}"));
+    };
+    match tool {
+        ToolName::SearchCorpus => tool_search_corpus(input, state),
+        ToolName::GetExample => tool_get_example(input, state),
+        ToolName::ListLibrary => tool_list_library(input, state),
+        ToolName::SearchLibrary => tool_search_library(input, state),
+        ToolName::ReadSong => tool_read_song(input, state),
+        ToolName::SaveSong => tool_save_song(input, state, event_tx),
+        ToolName::SaveCurrentAs => tool_save_current_as(input, state, event_tx),
+        ToolName::RenameSong => tool_rename_song(input, state, event_tx),
+        ToolName::MoveSong => tool_move_song(input, state, event_tx),
+        ToolName::NewFolder => tool_new_folder(input, state, event_tx),
+        ToolName::ListSounds => tool_list_sounds(state),
+        ToolName::ListMethods => tool_list_methods(input),
+        ToolName::GeneratePattern => tool_generate_pattern(input),
+        ToolName::ValidatePattern => tool_validate_pattern(input, state),
+        ToolName::ReviewPattern => tool_review_pattern(input, state),
+        ToolName::InspectPattern => tool_inspect_pattern(input),
+        ToolName::AnalyzeArrangement => tool_analyze_arrangement(input),
+        ToolName::CritiquePattern => tool_critique_pattern(input),
+        ToolName::CritiqueForm => tool_critique_form(input),
+        ToolName::GenreRecipe => tool_genre_recipe(input, state),
+        ToolName::PlayPattern => tool_play_pattern(input, state, event_tx),
+        ToolName::ListParts => tool_list_parts(state),
+        ToolName::ListSections => tool_list_sections(state),
+        ToolName::UpsertTrack => tool_upsert_track(input, state, event_tx),
+        ToolName::UpsertTracks => tool_upsert_tracks(input, state, event_tx),
+        ToolName::UpsertSection => tool_upsert_section(input, state, event_tx),
+        ToolName::UpsertSections => tool_upsert_sections(input, state, event_tx),
+        ToolName::UpsertBinding => tool_upsert_binding(input, state, event_tx),
+        ToolName::MuteTrack => tool_mute_track(input, state, event_tx),
+        ToolName::UnmuteTrack => tool_unmute_track(input, state, event_tx),
+        ToolName::Stop => tool_stop(state, event_tx),
+        ToolName::SetTempo => tool_set_tempo(input, state, event_tx),
     }
+}
+
+/// Required string argument: uniform "missing 'key' parameter" error.
+fn req_str<'a>(input: &'a serde_json::Value, key: &str) -> Result<&'a str, String> {
+    input[key]
+        .as_str()
+        .ok_or_else(|| format!("missing '{key}' parameter"))
+}
+
+fn opt_usize(input: &serde_json::Value, key: &str, default: usize) -> usize {
+    input[key].as_u64().map_or(default, |n| n as usize)
 }
 
 fn tool_search_corpus(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
@@ -277,9 +290,6 @@ fn tool_search_corpus(input: &serde_json::Value, state: &AppState) -> Result<Str
                     .collect()
             })
             .unwrap_or_default(),
-        role: input["role"].as_str().and_then(|r| {
-            serde_json::from_value::<MusicalRole>(serde_json::Value::String(r.to_string())).ok()
-        }),
         tempo_min: input["tempo_min"].as_f64(),
         tempo_max: input["tempo_max"].as_f64(),
         complexity: input["complexity"].as_str().map(String::from),
@@ -295,7 +305,7 @@ fn tool_search_corpus(input: &serde_json::Value, state: &AppState) -> Result<Str
         limit: input["limit"].as_u64().map(|n| n as usize),
     };
 
-    let corpus = state.corpus.lock().unwrap();
+    let corpus = state.corpus.lock();
     match &*corpus {
         Some(index) => {
             let results = index.search(&query);
@@ -306,8 +316,8 @@ fn tool_search_corpus(input: &serde_json::Value, state: &AppState) -> Result<Str
 }
 
 fn tool_get_example(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
-    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
-    let corpus = state.corpus.lock().unwrap();
+    let id = req_str(input, "id")?;
+    let corpus = state.corpus.lock();
     match &*corpus {
         Some(index) => index.get_source(id).map_err(|e| e.to_string()),
         None => Err("corpus not loaded".to_string()),
@@ -320,14 +330,32 @@ fn tool_get_example(input: &serde_json::Value, state: &AppState) -> Result<Strin
 
 /// One line per song for the agent: name, tempo, tags, sounds, path, preview.
 fn format_song_line(s: &crate::library_index::LibrarySong) -> String {
-    let bpm = s.bpm.map(|b| format!("{b:.0} BPM")).unwrap_or_else(|| "—".into());
-    let tags = if s.tags.is_empty() { String::new() } else { format!(" · #{}", s.tags.join(" #")) };
+    let bpm = s
+        .bpm
+        .map(|b| format!("{b:.0} BPM"))
+        .unwrap_or_else(|| "—".into());
+    let tags = if s.tags.is_empty() {
+        String::new()
+    } else {
+        format!(" · #{}", s.tags.join(" #"))
+    };
     let sounds = if s.sounds.is_empty() {
         String::new()
     } else {
-        format!(" · sounds: {}", s.sounds.iter().take(6).cloned().collect::<Vec<_>>().join(", "))
+        format!(
+            " · sounds: {}",
+            s.sounds
+                .iter()
+                .take(6)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
     };
-    format!("• {} [{bpm}]{tags}  @{}{sounds}\n    {}", s.name, s.rel_path, s.preview)
+    format!(
+        "• {} [{bpm}]{tags}  @{}{sounds}\n    {}",
+        s.name, s.rel_path, s.preview
+    )
 }
 
 /// List the user's saved songs (newest first). Optional `limit` (default 30).
@@ -342,8 +370,15 @@ fn tool_list_library(input: &serde_json::Value, state: &AppState) -> Result<Stri
     }
     let limit = input["limit"].as_u64().map(|n| n as usize).unwrap_or(30);
     let shown = idx.songs.len().min(limit);
-    let mut out = format!("{warn}Your library: {} song(s){}\n", idx.songs.len(),
-        if shown < idx.songs.len() { format!(" (showing newest {shown})") } else { String::new() });
+    let mut out = format!(
+        "{warn}Your library: {} song(s){}\n",
+        idx.songs.len(),
+        if shown < idx.songs.len() {
+            format!(" (showing newest {shown})")
+        } else {
+            String::new()
+        }
+    );
     for s in idx.songs.iter().take(limit) {
         out.push_str(&format_song_line(s));
         out.push('\n');
@@ -369,7 +404,9 @@ fn tool_search_library(input: &serde_json::Value, state: &AppState) -> Result<St
     let idx = crate::library_index::LibraryIndex::build(&root);
     let hits = idx.search(&q);
     if hits.is_empty() {
-        return Ok(format!("{warn}No songs in your library match that. Try list_library to see everything."));
+        return Ok(format!(
+            "{warn}No songs in your library match that. Try list_library to see everything."
+        ));
     }
     let mut out = format!("{warn}{} matching song(s):\n", hits.len());
     for s in hits {
@@ -395,8 +432,14 @@ fn tool_read_song(input: &serde_json::Value, state: &AppState) -> Result<String,
     let header = format!(
         "// {} — {}{}\n",
         fm.name.unwrap_or_else(|| path.to_string()),
-        fm.bpm.map(|b| format!("{b:.0} BPM")).unwrap_or_else(|| "tempo unset".into()),
-        if fm.tags.is_empty() { String::new() } else { format!(" · #{}", fm.tags.join(" #")) },
+        fm.bpm
+            .map(|b| format!("{b:.0} BPM"))
+            .unwrap_or_else(|| "tempo unset".into()),
+        if fm.tags.is_empty() {
+            String::new()
+        } else {
+            format!(" · #{}", fm.tags.join(" #"))
+        },
     );
     Ok(format!("{header}{}", doc.code))
 }
@@ -418,13 +461,21 @@ fn tool_save_song(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let name = input["name"].as_str().ok_or("missing 'name'")?;
-    let code = input["code"].as_str().ok_or("missing 'code'")?;
+    let name = req_str(input, "name")?;
+    let code = req_str(input, "code")?;
     let folder = input["folder"].as_str();
     let root = state.library_root();
-    let rel = crate::library_index::save_song(&root, state.app_data_dir().as_deref(), name, code, folder)?;
+    let rel = crate::library_index::save_song(
+        &root,
+        state.app_data_dir().as_deref(),
+        name,
+        code,
+        folder,
+    )?;
     emit_library_changed(event_tx, &rel);
-    Ok(format!("Saved '{name}' to your library at @{rel} (prior version snapshotted; undo from the file's history)."))
+    Ok(format!(
+        "Saved '{name}' to your library at @{rel} (prior version snapshotted; undo from the file's history)."
+    ))
 }
 
 /// Save the CURRENT editor buffer as a named song.
@@ -433,11 +484,17 @@ fn tool_save_current_as(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let name = input["name"].as_str().ok_or("missing 'name'")?;
+    let name = req_str(input, "name")?;
     let folder = input["folder"].as_str();
     let code = current_document(state)?;
     let root = state.library_root();
-    let rel = crate::library_index::save_song(&root, state.app_data_dir().as_deref(), name, &code, folder)?;
+    let rel = crate::library_index::save_song(
+        &root,
+        state.app_data_dir().as_deref(),
+        name,
+        &code,
+        folder,
+    )?;
     emit_library_changed(event_tx, &rel);
     Ok(format!("Saved the current song as '{name}' at @{rel}."))
 }
@@ -447,8 +504,8 @@ fn tool_rename_song(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let path = input["path"].as_str().ok_or("missing 'path'")?;
-    let new_name = input["new_name"].as_str().ok_or("missing 'new_name'")?;
+    let path = req_str(input, "path")?;
+    let new_name = req_str(input, "new_name")?;
     let root = state.library_root();
     let rel = crate::library_index::rename_song(&root, path, new_name)?;
     emit_library_changed(event_tx, &rel);
@@ -460,8 +517,8 @@ fn tool_move_song(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let path = input["path"].as_str().ok_or("missing 'path'")?;
-    let folder = input["folder"].as_str().ok_or("missing 'folder'")?;
+    let path = req_str(input, "path")?;
+    let folder = req_str(input, "folder")?;
     let root = state.library_root();
     let rel = crate::library_index::move_song(&root, path, folder)?;
     emit_library_changed(event_tx, &rel);
@@ -473,7 +530,7 @@ fn tool_new_folder(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let path = input["path"].as_str().ok_or("missing 'path'")?;
+    let path = req_str(input, "path")?;
     let root = state.library_root();
     let rel = crate::library_index::create_folder(&root, path)?;
     emit_library_changed(event_tx, &rel);
@@ -505,7 +562,10 @@ fn tool_list_methods(input: &serde_json::Value) -> Result<String, String> {
 /// block instead. This rescues those. No-op if a native `ToolUse` is present or
 /// no recognisable tool call is in the text.
 fn recover_text_tool_calls(content: &mut Vec<ContentBlock>, tool_defs: &[ToolDefinition]) {
-    if content.iter().any(|b| matches!(b, ContentBlock::ToolUse { .. })) {
+    if content
+        .iter()
+        .any(|b| matches!(b, ContentBlock::ToolUse { .. }))
+    {
         return;
     }
     let known: std::collections::HashSet<&str> =
@@ -687,7 +747,7 @@ fn tool_generate_pattern(input: &serde_json::Value) -> Result<String, String> {
             })
         }
         "infinity" => {
-            let count = input["count"].as_u64().unwrap_or(16) as usize;
+            let count = opt_usize(input, "count", 16);
             let root = input["root"].as_i64().unwrap_or(60) as i32;
             Ok(cycletron_gen::infinity(count, root))
         }
@@ -706,8 +766,8 @@ fn tool_generate_pattern(input: &serde_json::Value) -> Result<String, String> {
         }
         "automaton" => {
             let rule = input["rule"].as_u64().unwrap_or(90).min(255) as u8;
-            let width = input["width"].as_u64().unwrap_or(8) as usize;
-            let gens = input["gens"].as_u64().unwrap_or(4) as usize;
+            let width = opt_usize(input, "width", 8);
+            let gens = opt_usize(input, "gens", 4);
             cycletron_gen::automaton(rule, width, gens)
         }
         other => Err(format!(
@@ -727,7 +787,11 @@ fn code_hash(code: &str) -> u64 {
 
 /// Resolve optional `code` for review/validate: explicit arg → current editor.
 fn resolve_code_or_editor(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
-    if let Some(c) = input["code"].as_str().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(c) = input["code"]
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         return Ok(c.to_string());
     }
     current_document(state).map_err(|_| {
@@ -763,17 +827,19 @@ fn infer_write_kind(name: &str, input: &serde_json::Value) -> Option<String> {
 fn tool_validate_pattern(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
     let code = resolve_code_or_editor(input, state)?;
 
-    match strudel::validate_code(&code) {
-        Ok(_) => {
+    if code.trim().is_empty() {
+        return Ok("valid — safe to play".to_string());
+    }
+    match strudel::Evaluated::new(&code, 4) {
+        Ok(ev) => {
             // Syntax is fine — now hunt the silent-failure class: events that
             // evaluate but will never sound (unknown sounds, unvoiced chords,
             // NaN pan). Lint over a short window; failures here never block.
             let mut lint = strudel::lint_source(&code);
-            lint.extend(
-                strudel::inspect_code(&code, 4)
-                    .map(|d| strudel::lint_digest(&d, &crate::sounds::known_sound_set(state)))
-                    .unwrap_or_default(),
-            );
+            lint.extend(strudel::lint_digest(
+                ev.digest(),
+                &crate::sounds::known_sound_set(state),
+            ));
             if lint.is_empty() {
                 Ok("valid — safe to play".to_string())
             } else {
@@ -798,13 +864,21 @@ fn error_context(code: &str, err: &str) -> String {
     let Some(pos) = err
         .rsplit_once(" at ")
         .and_then(|(_, span)| span.split("..").next())
-        .and_then(|s| s.trim().trim_end_matches(|c: char| !c.is_ascii_digit()).parse::<usize>().ok())
+        .and_then(|s| {
+            s.trim()
+                .trim_end_matches(|c: char| !c.is_ascii_digit())
+                .parse::<usize>()
+                .ok()
+        })
     else {
         return String::new();
     };
     let pos = pos.min(code.len());
     let line_start = code[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let line_end = code[pos..].find('\n').map(|i| pos + i).unwrap_or(code.len());
+    let line_end = code[pos..]
+        .find('\n')
+        .map(|i| pos + i)
+        .unwrap_or(code.len());
     let line_no = code[..line_start].matches('\n').count() + 1;
     let col = code[line_start..pos].chars().count();
     let line = &code[line_start..line_end];
@@ -828,9 +902,9 @@ fn error_context(code: &str, err: &str) -> String {
 /// the tell-tale of `s("bd*4".fast(2))` (method chained on the string literal).
 fn quote_then_method(line: &str) -> bool {
     let b = line.as_bytes();
-    b.windows(2)
-        .enumerate()
-        .any(|(i, w)| w[0] == b'"' && w[1] == b'.' && b.get(i + 2).is_some_and(u8::is_ascii_alphabetic))
+    b.windows(2).enumerate().any(|(i, w)| {
+        w[0] == b'"' && w[1] == b'.' && b.get(i + 2).is_some_and(u8::is_ascii_alphabetic)
+    })
 }
 
 /// The combined quality gate: validate + silence lint + mix critique + (for
@@ -850,16 +924,14 @@ fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> Result<St
     // Cache hit / budget check. Do not call stamp_write_kind while holding the
     // agent_write lock — it re-locks the same mutex (non-reentrant → deadlock).
     let cache_or_budget: Option<Result<String, String>> = {
-        let w = state.agent_write.lock().unwrap();
+        let w = state.agent_write.lock();
         if w.last_review_hash == Some(hash) {
-            if let Some(cached) = &w.last_review_result {
-                Some(Ok(format!(
+            w.last_review_result.as_ref().map(|cached| {
+                Ok(format!(
                     "{cached}\n\n(cached — identical code to previous review; \
                      call play_pattern with no code to play it, or edit then re-review.)"
-                )))
-            } else {
-                None
-            }
+                ))
+            })
         } else if w.review_calls >= crate::state::MAX_REVIEWS_PER_RUN {
             Some(Ok(format!(
                 "Review budget used ({}/{} this request). Fix from the prior review's \
@@ -893,7 +965,7 @@ fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> Result<St
     // (parseable) reviews so play_pattern can reuse the buffer without a second
     // full-document generation from the model.
     {
-        let mut w = state.agent_write.lock().unwrap();
+        let mut w = state.agent_write.lock();
         w.review_calls += 1;
         w.last_review_hash = Some(hash);
         w.last_review_result = Some(result.clone());
@@ -907,92 +979,29 @@ fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> Result<St
 /// Core review pipeline — pure-ish (needs state only for the sound catalog).
 /// Shared by `review_pattern` and (later) play-with-review.
 pub(crate) fn review_code(code: &str, cycles: usize, state: &AppState) -> String {
-    if let Err(e) = strudel::validate_code(code) {
-        return format!(
+    match strudel::review_report(code, cycles, &crate::sounds::known_sound_set(state)) {
+        strudel::ReviewOutcome::Invalid(e) => format!(
             "INVALID: {e}{}\n\nFix the error and review again.",
-            error_context(code, &e.to_string())
-        );
-    }
-    let digest = match strudel::inspect_code(code, cycles) {
-        Ok(d) => d,
-        Err(e) => return format!("Could not inspect — the code did not evaluate: {e}"),
-    };
-
-    let mut out = String::from("REVIEW\n== digest ==\n");
-    out.push_str(&format!(
-        "  bpm {}  ·  {} events / {} cycles  ·  period {}  ·  max {} voices  ·  sounds: {}\n",
-        digest.bpm.map(|b| b.to_string()).unwrap_or_else(|| "unset".into()),
-        digest.total_events,
-        digest.cycles_queried,
-        digest
-            .period_cycles
-            .map(|p| format!("{p} cycle(s)"))
-            .unwrap_or_else(|| "none detected".into()),
-        digest.max_voices,
-        digest.sounds.join(", "),
-    ));
-
-    let mut warns = 0usize;
-    let section = |title: &str, findings: &[strudel::Finding], out: &mut String| {
-        out.push_str(&format!("== {title} ==\n"));
-        if findings.is_empty() {
-            out.push_str("  clean\n");
-        }
-        for f in findings {
-            out.push_str(&format!("  [{}] {}: {}\n", f.severity, f.code, f.message));
-        }
-    };
-
-    let mut lint = strudel::lint_source(code);
-    lint.extend(strudel::lint_digest(&digest, &crate::sounds::known_sound_set(state)));
-    warns += lint.iter().filter(|f| f.severity == "warn").count();
-    section("silence lint", &lint, &mut out);
-
-    if let Ok(c) = strudel::critique_code(code, cycles) {
-        warns += c.findings.iter().filter(|f| f.severity == "warn").count();
-        section("mix critique", &c.findings, &mut out);
-    }
-
-    if code.contains("pickRestart") || code.contains("arrange") {
-        // Section→label map so the form is visible without a separate
-        // analyze_arrangement call (labels come from the pickRestart selector).
-        if let Ok(a) = strudel::analyze_code(code, cycles) {
-            out.push_str("== form map ==\n");
-            for s in &a.sections {
-                out.push_str(&format!(
-                    "  {:<10} cyc {:>2}–{:<3} {:>5.1} ev/cyc  {}\n",
-                    s.label,
-                    s.start_cycle,
-                    s.end_cycle,
-                    s.avg_events_per_cycle,
-                    s.instruments.join(", ")
-                ));
-            }
-        }
-        match strudel::critique_form_code(code, cycles) {
-            Ok(c) => {
-                warns += c.findings.iter().filter(|f| f.severity == "warn").count();
-                section("form critique", &c.findings, &mut out);
-            }
-            Err(e) => out.push_str(&format!("== form critique ==\n  (unavailable: {e})\n")),
+            error_context(code, &e)
+        ),
+        strudel::ReviewOutcome::Report { mut text, warns } => {
+            text.push_str(&if warns == 0 {
+                "\nVERDICT: ready to play. Call play_pattern with no code to play this buffer."
+                    .to_string()
+            } else {
+                format!(
+                    "\nVERDICT: {warns} warning(s) — fix the warns, then play \
+                     (play_pattern with no code reuses this buffer after a clean re-review)."
+                )
+            });
+            text
         }
     }
-
-    out.push_str(&if warns == 0 {
-        "\nVERDICT: ready to play. Call play_pattern with no code to play this buffer."
-            .to_string()
-    } else {
-        format!(
-            "\nVERDICT: {warns} warning(s) — fix the warns, then play \
-             (play_pattern with no code reuses this buffer after a clean re-review)."
-        )
-    });
-    out
 }
 
 fn tool_inspect_pattern(input: &serde_json::Value) -> Result<String, String> {
-    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
-    let cycles = input["cycles"].as_u64().unwrap_or(8) as usize;
+    let code = req_str(input, "code")?;
+    let cycles = opt_usize(input, "cycles", 8);
     // "auto": full event log for short windows, summary for long forms (a
     // 64-cycle dump is thousands of lines nobody can scan).
     let verbosity = input["verbosity"].as_str().unwrap_or("auto");
@@ -1002,9 +1011,9 @@ fn tool_inspect_pattern(input: &serde_json::Value) -> Result<String, String> {
         _ => cycles <= 4,
     };
 
-    match strudel::inspect_code(code, cycles) {
-        Ok(digest) if !want_events => Ok(strudel::digest_to_summary(&digest)),
-        Ok(digest) => Ok(strudel::digest_to_text(&digest)),
+    match strudel::Evaluated::new(code, cycles) {
+        Ok(ev) if !want_events => Ok(strudel::digest_to_summary(ev.digest())),
+        Ok(ev) => Ok(strudel::digest_to_text(ev.digest())),
         Err(e) => Ok(format!(
             "Could not inspect — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and inspect again."
         )),
@@ -1012,11 +1021,11 @@ fn tool_inspect_pattern(input: &serde_json::Value) -> Result<String, String> {
 }
 
 fn tool_analyze_arrangement(input: &serde_json::Value) -> Result<String, String> {
-    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
-    let max_cycles = input["max_cycles"].as_u64().unwrap_or(32) as usize;
+    let code = req_str(input, "code")?;
+    let max_cycles = opt_usize(input, "max_cycles", 32);
 
-    match strudel::analyze_code(code, max_cycles) {
-        Ok(analysis) => Ok(strudel::analyze_to_text(&analysis)),
+    match strudel::Evaluated::new(code, max_cycles) {
+        Ok(ev) => Ok(strudel::analyze_to_text(&strudel::analyze(&ev))),
         Err(e) => Ok(format!(
             "Could not analyze — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and analyze again."
         )),
@@ -1024,11 +1033,11 @@ fn tool_analyze_arrangement(input: &serde_json::Value) -> Result<String, String>
 }
 
 fn tool_critique_pattern(input: &serde_json::Value) -> Result<String, String> {
-    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
-    let cycles = input["cycles"].as_u64().unwrap_or(16) as usize;
+    let code = req_str(input, "code")?;
+    let cycles = opt_usize(input, "cycles", 16);
 
-    match strudel::critique_code(code, cycles) {
-        Ok(critique) => Ok(strudel::critique_to_text(&critique)),
+    match strudel::Evaluated::new(code, cycles.max(4)) {
+        Ok(ev) => Ok(strudel::critique_to_text(&strudel::critique(&ev))),
         Err(e) => Ok(format!(
             "Could not critique — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and critique again."
         )),
@@ -1036,11 +1045,11 @@ fn tool_critique_pattern(input: &serde_json::Value) -> Result<String, String> {
 }
 
 fn tool_critique_form(input: &serde_json::Value) -> Result<String, String> {
-    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
-    let cycles = input["cycles"].as_u64().unwrap_or(32) as usize;
+    let code = req_str(input, "code")?;
+    let cycles = opt_usize(input, "cycles", 32);
 
-    match strudel::critique_form_code(code, cycles) {
-        Ok(critique) => Ok(strudel::form_critique_to_text(&critique)),
+    match strudel::Evaluated::new(code, cycles.clamp(8, 64)) {
+        Ok(ev) => Ok(strudel::form_critique_to_text(&strudel::critique_form(&ev))),
         Err(e) => Ok(format!(
             "Could not critique the form — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and try again."
         )),
@@ -1048,7 +1057,7 @@ fn tool_critique_form(input: &serde_json::Value) -> Result<String, String> {
 }
 
 fn tool_genre_recipe(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
-    let recipes = state.recipes.lock().unwrap();
+    let recipes = state.recipes.lock();
     if recipes.is_empty() {
         return Ok("No genre recipes are loaded yet (corpus/genres/ is empty).".to_string());
     }
@@ -1181,18 +1190,19 @@ fn tool_play_pattern(
     // always wrong — use upsert_section / upsert_track. Escape: force: true.
     let force = input
         .get("force")
-        .and_then(|v| v.as_bool())
+        .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
     if !reused
         && !force
         && state.listed_structure()
         && raw.len() >= crate::state::FULL_REWRITE_GUARD_CHARS
-        && current_document(state).map(|d| d.len() > 200).unwrap_or(false)
+        && current_document(state)
+            .map(|d| d.len() > 200)
+            .unwrap_or(false)
     {
         state.stamp_write_kind("full_blocked");
-        let secs = crate::sections::list_sections(
-            &current_document(state).unwrap_or_default(),
-        );
+        let secs =
+            cycletron_doc::sections::list_sections(&current_document(state).unwrap_or_default());
         let hint = if secs.is_empty() {
             "upsert_track / upsert_tracks (or list_parts first)".to_string()
         } else {
@@ -1235,9 +1245,8 @@ fn tool_play_pattern(
         let cycles = input["cycles"].as_u64().unwrap_or(8).min(64) as usize;
         let report = review_code(&raw, cycles, state);
         if report.starts_with("INVALID") || report.starts_with("Could not inspect") {
-            let mut msg = format!(
-                "NOT PLAYED — built-in review failed, so nothing changed.\n{report}"
-            );
+            let mut msg =
+                format!("NOT PLAYED — built-in review failed, so nothing changed.\n{report}");
             if report.contains("Arrow functions") || raw.contains("=>") {
                 msg.push_str(
                     "\n\nHint: free-standing `const f = x => …` helpers are not valid \
@@ -1251,7 +1260,7 @@ fn tool_play_pattern(
         }
         // Stash as last-reviewed so a later play_pattern() reuses it.
         {
-            let mut w = state.agent_write.lock().unwrap();
+            let mut w = state.agent_write.lock();
             w.last_review_hash = Some(code_hash(&raw));
             w.last_review_result = Some(report.clone());
             w.last_reviewed_code = Some(raw.clone());
@@ -1323,27 +1332,26 @@ fn apply_document(
 
     // 2. Re-validate through the REAL evaluator. Fail closed: never inject code
     //    the engine can't parse — that is silence with no feedback loop.
-    if let Err(e) = strudel::validate_code(&code) {
-        return Ok(format!(
-            "NOT APPLIED — the resulting pattern does not evaluate, so nothing changed.\n\
-             INVALID: {e}{}{repair_summary}\n\nFix the error and try again.",
-            error_context(&code, &e.to_string()),
-        ));
-    }
+    let evaluated = match strudel::Evaluated::new(&code, 4) {
+        Ok(ev) => ev,
+        Err(e) => {
+            return Ok(format!(
+                "NOT APPLIED — the resulting pattern does not evaluate, so nothing changed.\n\
+                 INVALID: {e}{}{repair_summary}\n\nFix the error and try again.",
+                error_context(&code, &e),
+            ));
+        }
+    };
 
     // 3. Silence lint (advisory): valid syntax, but audibly-dead layers —
     //    invented sounds, unvoiced chords, out-of-range pan. Surface, don't block.
     let mut lint = strudel::lint_source(&code);
-    lint.extend(
-        strudel::inspect_code(&code, 4)
-            .map(|d| strudel::lint_digest(&d, &known))
-            .unwrap_or_default(),
-    );
+    lint.extend(strudel::lint_digest(evaluated.digest(), &known));
     let warns: Vec<_> = lint.iter().filter(|f| f.severity == "warn").collect();
 
     // 4. Commit the repaired code: store it and inject into the WASM REPL.
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         session.set_pattern(code.clone());
         session.playback = PlaybackState::Playing;
     }
@@ -1367,24 +1375,18 @@ fn apply_document(
 /// The document currently in the editor/session, or a friendly error when there
 /// is nothing to edit yet.
 fn current_document(state: &AppState) -> Result<String, String> {
-    state
-        .session
-        .lock()
-        .unwrap()
-        .current_pattern
-        .clone()
-        .ok_or_else(|| {
-            "There's no song in the editor yet. Use play_pattern to start one, then edit its \
+    state.session.lock().current_pattern.clone().ok_or_else(|| {
+        "There's no song in the editor yet. Use play_pattern to start one, then edit its \
              tracks with upsert_track / mute_track."
-                .to_string()
-        })
+            .to_string()
+    })
 }
 
 /// List the addressable tracks of the current song (read-only; no playback).
 fn tool_list_parts(state: &AppState) -> Result<String, String> {
     state.mark_listed_structure();
     let code = current_document(state)?;
-    let parts = crate::tracks::list_tracks(&code);
+    let parts = cycletron_doc::tracks::list_tracks(&code);
     if parts.is_empty() {
         return Ok("The current document has no tracks yet.".to_string());
     }
@@ -1395,7 +1397,10 @@ fn tool_list_parts(state: &AppState) -> Result<String, String> {
             None => format!("#{} (no id — address by index)", p.index),
         };
         let muted = if p.muted { " [MUTED]" } else { "" };
-        out.push_str(&format!("  {}. {}{}  —  {}\n", p.index, handle, muted, p.preview));
+        out.push_str(&format!(
+            "  {}. {}{}  —  {}\n",
+            p.index, handle, muted, p.preview
+        ));
     }
     out.push_str(
         "\nEdit one with upsert_track {id, code}; batch with upsert_tracks; \
@@ -1408,7 +1413,7 @@ fn tool_list_parts(state: &AppState) -> Result<String, String> {
 fn tool_list_sections(state: &AppState) -> Result<String, String> {
     state.mark_listed_structure();
     let code = current_document(state)?;
-    let secs = crate::sections::list_sections(&code);
+    let secs = cycletron_doc::sections::list_sections(&code);
     if secs.is_empty() {
         return Ok(
             "No section object found (const sections = {…} or pickRestart/arrange). \
@@ -1442,10 +1447,10 @@ fn tool_upsert_track(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
-    let expr = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let id = req_str(input, "id")?;
+    let expr = req_str(input, "code")?;
     let code = current_document(state)?;
-    let (new_code, wrote) = crate::tracks::upsert_track(&code, id, expr)?;
+    let (new_code, wrote) = cycletron_doc::tracks::upsert_track(&code, id, expr)?;
     state.stamp_write_kind("track");
     apply_document(
         state,
@@ -1463,7 +1468,7 @@ fn tool_upsert_tracks(
 ) -> Result<String, String> {
     let patches = parse_id_code_patches(input)?;
     let code = current_document(state).unwrap_or_default();
-    let (new_code, wrote) = crate::tracks::upsert_tracks(&code, &patches)?;
+    let (new_code, wrote) = cycletron_doc::tracks::upsert_tracks(&code, &patches)?;
     state.stamp_write_kind("track");
     apply_document(
         state,
@@ -1472,7 +1477,11 @@ fn tool_upsert_tracks(
         &format!(
             "{} track(s) updated: {}.",
             wrote.len(),
-            wrote.iter().map(|id| format!("@{id}")).collect::<Vec<_>>().join(", ")
+            wrote
+                .iter()
+                .map(|id| format!("@{id}"))
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     )
 }
@@ -1483,10 +1492,10 @@ fn tool_upsert_section(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
-    let expr = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let id = req_str(input, "id")?;
+    let expr = req_str(input, "code")?;
     let code = current_document(state)?;
-    let (new_code, wrote) = crate::sections::upsert_section(&code, id, expr)?;
+    let (new_code, wrote) = cycletron_doc::sections::upsert_section(&code, id, expr)?;
     state.stamp_write_kind("section");
     apply_document(
         state,
@@ -1504,7 +1513,7 @@ fn tool_upsert_sections(
 ) -> Result<String, String> {
     let patches = parse_id_code_patches(input)?;
     let code = current_document(state)?;
-    let (new_code, wrote) = crate::sections::upsert_sections(&code, &patches)?;
+    let (new_code, wrote) = cycletron_doc::sections::upsert_sections(&code, &patches)?;
     state.stamp_write_kind("section");
     apply_document(
         state,
@@ -1513,7 +1522,11 @@ fn tool_upsert_sections(
         &format!(
             "{} section(s) updated: {}.",
             wrote.len(),
-            wrote.iter().map(|id| format!("@{id}")).collect::<Vec<_>>().join(", ")
+            wrote
+                .iter()
+                .map(|id| format!("@{id}"))
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     )
 }
@@ -1525,10 +1538,10 @@ fn tool_upsert_binding(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let name = input["name"].as_str().ok_or("missing 'name' parameter")?;
-    let expr = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let name = req_str(input, "name")?;
+    let expr = req_str(input, "code")?;
     let code = current_document(state)?;
-    let (new_code, wrote) = crate::structure::upsert_binding(&code, name, expr)?;
+    let (new_code, wrote) = cycletron_doc::structure::upsert_binding(&code, name, expr)?;
     state.stamp_write_kind("binding");
     apply_document(
         state,
@@ -1571,9 +1584,9 @@ fn tool_mute_track(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
+    let id = req_str(input, "id")?;
     let code = current_document(state)?;
-    let new_code = crate::tracks::mute_track(&code, id)?;
+    let new_code = cycletron_doc::tracks::mute_track(&code, id)?;
     apply_document(state, event_tx, &new_code, &format!("Track '{id}' muted."))
 }
 
@@ -1583,10 +1596,15 @@ fn tool_unmute_track(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
+    let id = req_str(input, "id")?;
     let code = current_document(state)?;
-    let new_code = crate::tracks::unmute_track(&code, id)?;
-    apply_document(state, event_tx, &new_code, &format!("Track '{id}' unmuted."))
+    let new_code = cycletron_doc::tracks::unmute_track(&code, id)?;
+    apply_document(
+        state,
+        event_tx,
+        &new_code,
+        &format!("Track '{id}' unmuted."),
+    )
 }
 
 fn tool_stop(
@@ -1594,7 +1612,7 @@ fn tool_stop(
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         session.playback = PlaybackState::Stopped;
     }
 
@@ -1613,7 +1631,7 @@ fn tool_set_tempo(
     let bpm = input["bpm"].as_f64().ok_or("missing 'bpm' parameter")?;
 
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         session.tempo = bpm;
     }
 
@@ -1694,7 +1712,7 @@ mod write_path_tests {
 
     fn state_with_code(code: &str) -> AppState {
         let s = AppState::new();
-        s.session.lock().unwrap().set_pattern(code.to_string());
+        s.session.lock().set_pattern(code.to_string());
         s.reset_agent_write_run();
         s
     }
@@ -1721,9 +1739,12 @@ mod write_path_tests {
         let a = tool_review_pattern(&json!({"code": r#"s("bd*4")"#}), &s).unwrap();
         assert!(!a.contains("(cached"));
         let b = tool_review_pattern(&json!({"code": r#"s("bd*4")"#}), &s).unwrap();
-        assert!(b.contains("(cached"), "second identical review should cache: {b}");
+        assert!(
+            b.contains("(cached"),
+            "second identical review should cache: {b}"
+        );
         // Cache hits must not burn the review budget.
-        assert_eq!(s.agent_write.lock().unwrap().review_calls, 1);
+        assert_eq!(s.agent_write.lock().review_calls, 1);
     }
 
     #[test]
@@ -1745,7 +1766,7 @@ mod write_path_tests {
                 );
             }
         }
-        assert_eq!(s.agent_write.lock().unwrap().review_calls, 2);
+        assert_eq!(s.agent_write.lock().review_calls, 2);
     }
 
     #[test]
@@ -1761,18 +1782,14 @@ mod write_path_tests {
             out.contains("reused") || out.contains("playback"),
             "play with no code should reuse: {out}"
         );
-        assert_eq!(
-            s.session.lock().unwrap().current_pattern.as_deref(),
-            Some(code)
-        );
+        assert_eq!(s.session.lock().current_pattern.as_deref(), Some(code));
         assert_eq!(s.take_write_kind().as_deref(), Some("reuse"));
     }
 
     #[test]
     fn play_with_code_stamps_full() {
         let s = AppState::new();
-        let out =
-            tool_play_pattern(&json!({"code": r#"s("sd*2")"#}), &s, &sink()).unwrap();
+        let out = tool_play_pattern(&json!({"code": r#"s("sd*2")"#}), &s, &sink()).unwrap();
         assert!(out.contains("playback"), "{out}");
         // stamp may already be taken by a caller; stamp_write_kind sets pending
         // — tool_play_pattern stamps "full" for explicit code.
@@ -1793,8 +1810,8 @@ mod write_path_tests {
 
     #[test]
     fn section_upsert_beats_full_rewrite_on_chars() {
-        let song = std::fs::read_to_string("/tmp/cycletron-bench-song.strudel")
-            .unwrap_or_else(|_| {
+        let song =
+            std::fs::read_to_string("/tmp/cycletron-bench-song.strudel").unwrap_or_else(|_| {
                 r#"
 "<intro@1 drop1@2>".slow(4).pickRestart({
   intro: stack(s("bd*4")),
@@ -1803,7 +1820,7 @@ mod write_path_tests {
 "#
                 .into()
             });
-        let secs = crate::sections::list_sections(&song);
+        let secs = cycletron_doc::sections::list_sections(&song);
         assert!(
             !secs.is_empty(),
             "bench song should parse as pickRestart sections"
@@ -1837,7 +1854,7 @@ mod write_path_tests {
             out.contains("NOT PLAYED") || out.contains("NOT APPLIED") || out.contains("INVALID"),
             "invalid code must not play: {out}"
         );
-        assert!(s.session.lock().unwrap().current_pattern.is_none());
+        assert!(s.session.lock().current_pattern.is_none());
     }
 
     #[test]
@@ -1857,11 +1874,15 @@ $: "<intro@1 drop1@2 outro@1>".slow(4).pickRestart({
         let s = state_with_code(&song);
         let listed = tool_list_sections(&s).unwrap();
         assert!(listed.contains("@drop1"), "{listed}");
-        assert!(listed.contains("stack") || listed.contains("bd"), "fat preview: {listed}");
+        assert!(
+            listed.contains("stack") || listed.contains("bd"),
+            "fat preview: {listed}"
+        );
 
         let big = format!("{song}\n// rewrite attempt\n");
         assert!(big.len() >= crate::state::FULL_REWRITE_GUARD_CHARS);
-        let blocked = tool_play_pattern(&json!({"code": big, "review": false}), &s, &sink()).unwrap();
+        let blocked =
+            tool_play_pattern(&json!({"code": big, "review": false}), &s, &sink()).unwrap();
         assert!(
             blocked.contains("NOT PLAYED") && blocked.contains("blocked"),
             "expected full rewrite block, got: {blocked}"
@@ -1901,7 +1922,7 @@ setbpm(120);
         )
         .unwrap();
         assert!(out.contains("Section @b"), "{out}");
-        let doc = s.session.lock().unwrap().current_pattern.clone().unwrap();
+        let doc = s.session.lock().current_pattern.clone().unwrap();
         assert!(doc.contains(r#"b: s("hh*8").gain(0.5)"#));
         assert!(doc.contains(r#"a: s("bd*4")"#));
     }
@@ -1920,9 +1941,12 @@ $: lead.slow(2)
         )
         .unwrap();
         assert!(out.contains("Binding `lead`"), "{out}");
-        let doc = s.session.lock().unwrap().current_pattern.clone().unwrap();
+        let doc = s.session.lock().current_pattern.clone().unwrap();
         // Only the binding body changed; the track and directive are intact.
-        assert!(doc.contains(r#"const lead = note("a c e").s("square");"#), "{doc}");
+        assert!(
+            doc.contains(r#"const lead = note("a c e").s("square");"#),
+            "{doc}"
+        );
         assert!(doc.contains("$: lead.slow(2)"));
         assert!(doc.contains("setbpm(120);"));
         assert!(!doc.contains("sawtooth"));
@@ -1937,23 +1961,32 @@ $: lead.slow(2)
         let song = std::fs::read_to_string("/tmp/cycletron-bench-song.strudel")
             .expect("export session song to /tmp/cycletron-bench-song.strudel first");
         let s = AppState::new();
-        let secs = crate::sections::list_sections(&song);
+        let secs = cycletron_doc::sections::list_sections(&song);
         eprintln!("=== write-path bench ===");
-        eprintln!("song: {} chars, {} lines, {} sections", song.len(), song.lines().count(), secs.len());
+        eprintln!(
+            "song: {} chars, {} lines, {} sections",
+            song.len(),
+            song.lines().count(),
+            secs.len()
+        );
 
         let t0 = Instant::now();
         let report = review_code(&song, 8, &s);
         let review_ms = t0.elapsed().as_millis();
-        eprintln!("review_code (8 cyc): {review_ms} ms  verdict={}", report.lines().last().unwrap_or(""));
+        eprintln!(
+            "review_code (8 cyc): {review_ms} ms  verdict={}",
+            report.lines().last().unwrap_or("")
+        );
 
         let t1 = Instant::now();
-        let _ = crate::sections::list_sections(&song);
+        let _ = cycletron_doc::sections::list_sections(&song);
         eprintln!("list_sections: {} µs", t1.elapsed().as_micros());
 
         if let Some(drop) = secs.iter().find(|x| x.id == "drop1") {
             let body = &song[drop.expr_start..drop.expr_end];
             let t2 = Instant::now();
-            let (new_doc, _) = crate::sections::upsert_section(&song, "drop1", body).unwrap();
+            let (new_doc, _) =
+                cycletron_doc::sections::upsert_section(&song, "drop1", body).unwrap();
             eprintln!(
                 "upsert_section(drop1) same body: {} µs  (emit proxy: section={} vs full×2={})",
                 t2.elapsed().as_micros(),
@@ -1973,7 +2006,10 @@ $: lead.slow(2)
             .unwrap_or(500);
         eprintln!("emit-size proxy (chars the model must stream):");
         eprintln!("  legacy review+play:     {legacy_edit}");
-        eprintln!("  review + play reuse:    {reuse_edit}  (−{}%)", 100 - 100 * reuse_edit / legacy_edit);
+        eprintln!(
+            "  review + play reuse:    {reuse_edit}  (−{}%)",
+            100 - 100 * reuse_edit / legacy_edit
+        );
         eprintln!(
             "  upsert_section(drop1):  {section_edit}  (−{}%)",
             100 - 100 * section_edit / legacy_edit
@@ -1985,7 +2021,7 @@ $: lead.slow(2)
 mod recovery_tests {
     use super::*;
 
-    fn defs() -> Vec<ToolDefinition> {
+    fn defs() -> &'static [ToolDefinition] {
         cycletron_agent::tools::music_tool_definitions()
     }
 
@@ -1995,8 +2031,10 @@ mod recovery_tests {
         // of a native tool_use block — the case recover_text_tool_calls exists for.
         let text = "Sure, let's play it:\n```json\n{\n  \"name\": \"play_pattern\",\n  \
                     \"arguments\": { \"code\": \"s(\\\"bd*4\\\")\" }\n}\n```";
-        let mut content = vec![ContentBlock::Text { text: text.to_string() }];
-        recover_text_tool_calls(&mut content, &defs());
+        let mut content = vec![ContentBlock::Text {
+            text: text.to_string(),
+        }];
+        recover_text_tool_calls(&mut content, defs());
         let call = content.iter().find_map(|b| match b {
             ContentBlock::ToolUse { name, input, .. } => Some((name.clone(), input.clone())),
             _ => None,
@@ -2008,26 +2046,41 @@ mod recovery_tests {
 
     #[test]
     fn recovers_function_wrapped_and_stringified_args() {
-        let text = r#"{"function": {"name": "save_current_as", "arguments": "{\"name\": \"dub\"}"}}"#;
-        let mut content = vec![ContentBlock::Text { text: text.to_string() }];
-        recover_text_tool_calls(&mut content, &defs());
-        let ok = content.iter().any(|b| matches!(b, ContentBlock::ToolUse { name, input, .. }
-            if name == "save_current_as" && input["name"] == "dub"));
+        let text =
+            r#"{"function": {"name": "save_current_as", "arguments": "{\"name\": \"dub\"}"}}"#;
+        let mut content = vec![ContentBlock::Text {
+            text: text.to_string(),
+        }];
+        recover_text_tool_calls(&mut content, defs());
+        let ok = content.iter().any(|b| {
+            matches!(b, ContentBlock::ToolUse { name, input, .. }
+            if name == "save_current_as" && input["name"] == "dub")
+        });
         assert!(ok, "got: {content:?}");
     }
 
     #[test]
     fn leaves_prose_and_native_calls_alone() {
         // Plain prose → no tool call invented.
-        let mut prose = vec![ContentBlock::Text { text: "Here's a nice house groove!".into() }];
-        recover_text_tool_calls(&mut prose, &defs());
-        assert!(!prose.iter().any(|b| matches!(b, ContentBlock::ToolUse { .. })));
+        let mut prose = vec![ContentBlock::Text {
+            text: "Here's a nice house groove!".into(),
+        }];
+        recover_text_tool_calls(&mut prose, defs());
+        assert!(
+            !prose
+                .iter()
+                .any(|b| matches!(b, ContentBlock::ToolUse { .. }))
+        );
         // Unknown tool name in text → ignored.
         let mut bogus = vec![ContentBlock::Text {
             text: r#"{"name": "delete_everything", "arguments": {}}"#.into(),
         }];
-        recover_text_tool_calls(&mut bogus, &defs());
-        assert!(!bogus.iter().any(|b| matches!(b, ContentBlock::ToolUse { .. })));
+        recover_text_tool_calls(&mut bogus, defs());
+        assert!(
+            !bogus
+                .iter()
+                .any(|b| matches!(b, ContentBlock::ToolUse { .. }))
+        );
     }
 }
 
@@ -2094,9 +2147,7 @@ mod session_history_tests {
         assert_eq!(api.len(), 4);
 
         assert_eq!(api[1].role, "assistant");
-        assert!(
-            matches!(&api[1].content[0], ContentBlock::Text { text } if text == "Here you go")
-        );
+        assert!(matches!(&api[1].content[0], ContentBlock::Text { text } if text == "Here you go"));
         match &api[1].content[1] {
             ContentBlock::ToolUse { id, name, input } => {
                 assert_eq!(id, "call_1");

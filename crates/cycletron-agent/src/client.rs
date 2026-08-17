@@ -39,7 +39,6 @@ impl ClaudeClient {
             max_tokens,
         }
     }
-
 }
 
 #[async_trait::async_trait]
@@ -54,11 +53,11 @@ impl crate::provider::LlmProvider for ClaudeClient {
         event_tx: &mpsc::UnboundedSender<AgentEvent>,
     ) -> Result<MessagesResponse, AgentError> {
         let request = MessagesRequest {
-            model: self.model.clone(),
+            model: &self.model,
             max_tokens: self.max_tokens,
-            system: system.to_string(),
-            messages: messages.to_vec(),
-            tools: tools.to_vec(),
+            system,
+            messages,
+            tools,
             stream: true,
         };
 

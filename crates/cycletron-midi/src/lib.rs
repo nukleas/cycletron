@@ -3,6 +3,9 @@
 //! The upstream crate is CLI-shaped: its `run()` function takes parsed
 //! `ConversionArgs` and writes to disk. We mirror the conversion pipeline
 //! directly so we can take a byte slice and return a `String`, no files.
+//! Used by the app's MIDI Lab commands and the `midi-ingest` tool.
+
+pub mod index;
 
 use midi_to_strudel::{
     InstrumentMode, MidiData, OutputFormatter, SectionNamingStrategy, TrackBuilder,
@@ -105,7 +108,7 @@ pub fn convert_bytes(data: &[u8], opts: &ImportOptions) -> anyhow::Result<Import
             .track_info
             .into_vec()
             .into_iter()
-            .filter(|t| t.channel.map_or(true, |c| allowed.contains(&c)))
+            .filter(|t| t.channel.is_none_or(|c| allowed.contains(&c)))
             .collect(),
         _ => midi.track_info,
     };
@@ -175,11 +178,8 @@ pub fn inspect_bytes(data: &[u8]) -> anyhow::Result<MidiMetadata> {
         .map(|(index, t)| {
             let channel = t.channel;
             let name = t.name.clone();
-            let is_drum = channel == Some(9)
-                || name
-                    .as_deref()
-                    .map(is_drum_track_name)
-                    .unwrap_or(false);
+            let is_drum =
+                channel == Some(9) || name.as_deref().map(is_drum_track_name).unwrap_or(false);
             PublicTrackInfo {
                 index,
                 channel,
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn converts_real_midi() {
         let candidate = std::path::Path::new(
-            "../../strudel-corpus/normalized/midi/toms-diner-suzanne-vega__d88c1f79.mid",
+            "../../../strudel-corpus/normalized/midi/toms-diner-suzanne-vega__d88c1f79.mid",
         );
         if !candidate.exists() {
             eprintln!("skipping MIDI smoke test: fixture not found");
@@ -226,7 +226,7 @@ mod tests {
 
     fn fixture() -> Option<&'static std::path::Path> {
         let p = std::path::Path::new(
-            "../../strudel-corpus/normalized/midi/toms-diner-suzanne-vega__d88c1f79.mid",
+            "../../../strudel-corpus/normalized/midi/toms-diner-suzanne-vega__d88c1f79.mid",
         );
         p.exists().then_some(p)
     }
@@ -255,7 +255,7 @@ mod tests {
             "composed output should not embed setcpm, got:\n{}",
             result.code
         );
-        crate::strudel::validate_code(&result.code)
+        cycletron_analysis::validate_code(&result.code)
             .unwrap_or_else(|e| panic!("composed output should validate: {e}\n{}", result.code));
     }
 
@@ -273,7 +273,7 @@ mod tests {
             ..Default::default()
         };
         let result = convert_file(path, &opts).expect("should convert");
-        crate::strudel::validate_code(&result.code)
+        cycletron_analysis::validate_code(&result.code)
             .unwrap_or_else(|e| panic!("compose+compact should validate: {e}\n{}", result.code));
     }
 

@@ -31,8 +31,7 @@ use crate::oauth_store::{self, TokenStore};
 const CLIENT_ID: &str = "b1a00492-073a-47ea-816f-4c329264a828";
 const DEVICE_CODE_URL: &str = "https://auth.x.ai/oauth2/device/code";
 const TOKEN_URL: &str = "https://auth.x.ai/oauth2/token";
-const SCOPE: &str =
-    "openid profile email offline_access grok-cli:access api:access conversations:read conversations:write";
+const SCOPE: &str = "openid profile email offline_access grok-cli:access api:access conversations:read conversations:write";
 const TOKEN_FILE: &str = "xai-oauth.json";
 /// Refresh this many seconds before JWT/expiry.
 const EXPIRY_SKEW_SECS: i64 = 120;
@@ -77,28 +76,14 @@ pub struct DeviceStart {
     pub device_code: String,
 }
 
-// ── Storage ───────────────────────────────────────────────────────────────
-
-fn load_tokens() -> Option<OAuthTokens> {
-    STORE.load()
-}
-
-fn save_tokens(tokens: &OAuthTokens) -> Result<(), String> {
-    STORE.save(tokens)
-}
-
-fn clear_tokens() -> Result<(), String> {
-    STORE.clear()
-}
-
-fn access_token_still_valid(tokens: &OAuthTokens) -> bool {
-    tokens.expires_at - EXPIRY_SKEW_SECS > oauth_store::now_unix() && !tokens.access_token.is_empty()
+fn still_valid(tokens: &OAuthTokens) -> bool {
+    oauth_store::still_valid(tokens.expires_at, EXPIRY_SKEW_SECS, &tokens.access_token)
 }
 
 // ── Public status / credential resolution ─────────────────────────────────
 
 pub fn status() -> OAuthStatus {
-    let tokens = load_tokens();
+    let tokens: Option<OAuthTokens> = STORE.load();
     OAuthStatus {
         signed_in: tokens
             .as_ref()
@@ -112,14 +97,16 @@ pub fn status() -> OAuthStatus {
 
 /// True when we have a usable OAuth session (valid access token, or refreshable).
 pub fn has_session() -> bool {
-    load_tokens().is_some_and(|t| !t.access_token.is_empty() || !t.refresh_token.is_empty())
+    STORE
+        .load::<OAuthTokens>()
+        .is_some_and(|t| !t.access_token.is_empty() || !t.refresh_token.is_empty())
 }
 
 /// Return a non-expired access token without network I/O. Prefer calling
 /// [`ensure_fresh`] first from an async context so the token is refreshed.
 pub fn peek_access_token() -> Option<String> {
-    let t = load_tokens()?;
-    if access_token_still_valid(&t) {
+    let t: OAuthTokens = STORE.load()?;
+    if still_valid(&t) {
         Some(t.access_token)
     } else {
         // Stale but present — still return it so a just-started request can
@@ -134,22 +121,24 @@ pub fn peek_access_token() -> Option<String> {
 
 /// Refresh if needed and return a valid access token.
 pub async fn ensure_fresh() -> Result<String, String> {
-    let Some(tokens) = load_tokens() else {
-        return Err("Not signed in with xAI. Open Preferences → Grok → Sign in with SuperGrok.".into());
+    let Some(tokens) = STORE.load::<OAuthTokens>() else {
+        return Err(
+            "Not signed in with xAI. Open Preferences → Grok → Sign in with SuperGrok.".into(),
+        );
     };
-    if access_token_still_valid(&tokens) {
+    if still_valid(&tokens) {
         return Ok(tokens.access_token);
     }
     if tokens.refresh_token.is_empty() {
         return Err("xAI session expired and no refresh token is stored. Sign in again.".into());
     }
     let refreshed = refresh_token(&tokens.refresh_token).await?;
-    save_tokens(&refreshed)?;
+    STORE.save(&refreshed)?;
     Ok(refreshed.access_token)
 }
 
 pub fn logout() -> Result<(), String> {
-    clear_tokens()
+    STORE.clear()
 }
 
 // ── Import from Grok Build (`~/.grok/auth.json`) ──────────────────────────
@@ -171,9 +160,7 @@ fn grok_build_session() -> Option<OAuthTokens> {
     let map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&raw).ok()?;
     // Prefer the Grok CLI client entry; otherwise first entry with tokens.
     let preferred_key = format!("https://auth.x.ai::{CLIENT_ID}");
-    let entry_val = map
-        .get(&preferred_key)
-        .or_else(|| map.values().next())?;
+    let entry_val = map.get(&preferred_key).or_else(|| map.values().next())?;
     let entry: GrokBuildEntry = serde_json::from_value(entry_val.clone()).ok()?;
     let access = entry.key.filter(|s| !s.is_empty())?;
     let refresh = entry.refresh_token.unwrap_or_default();
@@ -204,15 +191,14 @@ fn parse_rfc3339(s: &str) -> Option<i64> {
 
 /// Copy the Grok Build session into Cycletron's store (then we own refresh).
 pub fn import_from_grok_build() -> Result<OAuthStatus, String> {
-    let mut tokens = grok_build_session()
-        .ok_or_else(|| {
-            format!(
-                "No Grok Build session at {}. Run `grok login` first, or use Sign in with SuperGrok.",
-                grok_auth_path().display()
-            )
-        })?;
+    let mut tokens = grok_build_session().ok_or_else(|| {
+        format!(
+            "No Grok Build session at {}. Run `grok login` first, or use Sign in with SuperGrok.",
+            grok_auth_path().display()
+        )
+    })?;
     tokens.source = Some("grok-build-import".into());
-    save_tokens(&tokens)?;
+    STORE.save(&tokens)?;
     tracing::info!(
         target: "cycletron::xai_oauth",
         email = ?tokens.email,
@@ -235,16 +221,7 @@ struct DeviceCodeResponse {
     interval: Option<u64>,
 }
 
-#[derive(Debug, Deserialize)]
-struct TokenResponse {
-    access_token: Option<String>,
-    refresh_token: Option<String>,
-    expires_in: Option<i64>,
-    error: Option<String>,
-    error_description: Option<String>,
-    #[serde(default)]
-    id_token: Option<String>,
-}
+use crate::oauth_store::TokenResponse;
 
 /// Start device authorization; open `verification_uri_complete` in a browser.
 pub async fn start_device_login() -> Result<DeviceStart, String> {
@@ -276,7 +253,11 @@ pub async fn start_device_login() -> Result<DeviceStart, String> {
 }
 
 /// Poll until the user approves the device code (or timeout / deny).
-pub async fn poll_device_login(device_code: &str, interval_secs: u64, expires_in: u64) -> Result<OAuthStatus, String> {
+pub async fn poll_device_login(
+    device_code: &str,
+    interval_secs: u64,
+    expires_in: u64,
+) -> Result<OAuthStatus, String> {
     let client = reqwest::Client::new();
     let deadline = oauth_store::now_unix() + expires_in as i64;
     let mut interval = Duration::from_secs(interval_secs.max(1));
@@ -330,7 +311,9 @@ pub async fn poll_device_login(device_code: &str, interval_secs: u64, expires_in
             .ok_or_else(|| "token response missing access_token".to_string())?;
         let refresh = body.refresh_token.unwrap_or_default();
         if refresh.is_empty() {
-            return Err("token response missing refresh_token (offline_access scope required)".into());
+            return Err(
+                "token response missing refresh_token (offline_access scope required)".into(),
+            );
         }
         let expires_in = body.expires_in.unwrap_or(3600);
         let email = body
@@ -344,7 +327,7 @@ pub async fn poll_device_login(device_code: &str, interval_secs: u64, expires_in
             email,
             source: Some("device-code".into()),
         };
-        save_tokens(&tokens)?;
+        STORE.save(&tokens)?;
         tracing::info!(
             target: "cycletron::xai_oauth",
             email = ?tokens.email,
@@ -355,62 +338,30 @@ pub async fn poll_device_login(device_code: &str, interval_secs: u64, expires_in
 }
 
 async fn refresh_token(refresh: &str) -> Result<OAuthTokens, String> {
-    let client = reqwest::Client::new();
-    let resp = client
-        .post(TOKEN_URL)
-        .header("Accept", "application/json")
-        .form(&[
-            ("grant_type", "refresh_token"),
-            ("client_id", CLIENT_ID),
-            ("refresh_token", refresh),
-        ])
-        .send()
+    use crate::oauth_store::RefreshError;
+    let grant = oauth_store::refresh_grant(TOKEN_URL, CLIENT_ID, refresh, "xAI")
         .await
-        .map_err(|e| format!("token refresh failed: {e}"))?;
-
-    let status = resp.status();
-    let body: TokenResponse = resp
-        .json()
-        .await
-        .map_err(|e| format!("token refresh parse failed: {e}"))?;
-
-    if !status.is_success() || body.error.is_some() {
-        let err = body.error.unwrap_or_else(|| status.to_string());
-        let desc = body.error_description.unwrap_or_default();
-        // 403 often means the grant is valid but the account is not entitled
-        // to API access on this surface — re-login will not help.
-        if status.as_u16() == 403 {
-            return Err(format!(
+        .map_err(|e| match e {
+            // 403 often means the grant is valid but the account is not
+            // entitled to API access on this surface — re-login will not help.
+            RefreshError::Forbidden { desc } => format!(
                 "xAI OAuth refresh forbidden (HTTP 403): {desc}. \
                  Your subscription may not include API access via OAuth. \
                  Use an API key from console.x.ai, or upgrade SuperHeavy entitlement."
-            ));
-        }
-        // Invalid grant → clear local tokens so we stop retrying a dead refresh.
-        if err == "invalid_grant" || status.as_u16() == 400 || status.as_u16() == 401 {
-            let _ = clear_tokens();
-            return Err(format!(
-                "xAI session revoked or expired ({err} {desc}). Sign in again."
-            ));
-        }
-        return Err(format!("xAI refresh failed: {err} {desc}"));
-    }
+            ),
+            // Invalid grant → clear local tokens so we stop retrying a dead refresh.
+            RefreshError::InvalidGrant { err, desc } => {
+                let _ = STORE.clear();
+                format!("xAI session revoked or expired ({err} {desc}). Sign in again.")
+            }
+            RefreshError::Other(msg) => msg,
+        })?;
 
-    let access = body
-        .access_token
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| "refresh response missing access_token".to_string())?;
-    // Refresh tokens rotate — must persist the new one.
-    let new_refresh = body
-        .refresh_token
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| refresh.to_string());
-    let expires_in = body.expires_in.unwrap_or(3600);
-    let prev = load_tokens();
+    let prev: Option<OAuthTokens> = STORE.load();
     Ok(OAuthTokens {
-        access_token: access,
-        refresh_token: new_refresh,
-        expires_at: oauth_store::now_unix() + expires_in,
+        access_token: grant.access_token,
+        refresh_token: grant.refresh_token,
+        expires_at: oauth_store::now_unix() + grant.expires_in.unwrap_or(3600),
         email: prev.as_ref().and_then(|p| p.email.clone()),
         source: prev
             .as_ref()
@@ -418,4 +369,3 @@ async fn refresh_token(refresh: &str) -> Result<OAuthTokens, String> {
             .or(Some("refresh".into())),
     })
 }
-

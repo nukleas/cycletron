@@ -63,11 +63,7 @@ impl Mini {
                 .map(Mini::emit_slot)
                 .collect::<Vec<_>>()
                 .join(" "),
-            Mini::Stack(items) => items
-                .iter()
-                .map(Mini::emit)
-                .collect::<Vec<_>>()
-                .join(", "),
+            Mini::Stack(items) => items.iter().map(Mini::emit).collect::<Vec<_>>().join(", "),
             Mini::Alt(items) => {
                 let inner = items
                     .iter()

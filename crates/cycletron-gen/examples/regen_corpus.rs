@@ -2,8 +2,8 @@
 //! from the verified composers. Every file is validated before it is written.
 //! Run: `cargo run -p cycletron-gen --example regen_corpus`.
 
-use std::path::PathBuf;
 use cycletron_gen::compose;
+use std::path::PathBuf;
 
 fn main() {
     // crates/cycletron-gen → repo root → corpus/genres

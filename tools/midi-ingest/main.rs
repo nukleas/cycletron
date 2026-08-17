@@ -17,44 +17,10 @@
 //! Defaults: --out corpus/ingested, --bars 4 (short, idiom-sized snippets),
 //! --limit 0 (no cap).
 
-use midi_to_strudel::{
-    InstrumentMode, MidiData, OutputFormatter, TrackBuilder, drums::DrumBank,
-    midi::suggest_notes_per_bar, track::ChannelMask,
-};
-use serde::Serialize;
+use cycletron_midi::index::{Entry, Index};
+use cycletron_midi::{ImportOptions, convert_bytes};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-
-#[derive(Serialize)]
-struct Entry {
-    source: String,
-    stem: String,
-    /// Parent folder name — for artist-organized sets (clean_midi) this is the
-    /// artist; useful metadata + disambiguates same-titled songs.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    artist: Option<String>,
-    bpm: f64,
-    valid: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-    /// Length of the converted strudel code in bytes.
-    code_len: usize,
-    /// Relative path (under <out>) to the converted `.strudel`, if valid.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    strudel: Option<String>,
-}
-
-#[derive(Serialize)]
-struct Index {
-    dataset: String,
-    source_dir: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    genre: Option<String>,
-    bars: usize,
-    total: usize,
-    valid: usize,
-    entries: Vec<Entry>,
-}
 
 struct Args {
     dir: PathBuf,
@@ -69,7 +35,9 @@ fn main() -> ExitCode {
         Ok(a) => a,
         Err(e) => {
             eprintln!("midi-ingest: {e}");
-            eprintln!("usage: midi-ingest <midi-dir> [--genre <tag>] [--out <dir>] [--limit <n>] [--bars <n>]");
+            eprintln!(
+                "usage: midi-ingest <midi-dir> [--genre <tag>] [--out <dir>] [--limit <n>] [--bars <n>]"
+            );
             return ExitCode::from(2);
         }
     };
@@ -93,7 +61,10 @@ fn main() -> ExitCode {
         midis.truncate(args.limit);
     }
     if midis.is_empty() {
-        eprintln!("midi-ingest: no .mid/.midi files under {}", args.dir.display());
+        eprintln!(
+            "midi-ingest: no .mid/.midi files under {}",
+            args.dir.display()
+        );
         return ExitCode::from(2);
     }
 
@@ -101,7 +72,11 @@ fn main() -> ExitCode {
     let mut valid_count = 0usize;
 
     for path in &midis {
-        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("midi").to_string();
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("midi")
+            .to_string();
         let artist = path
             .parent()
             .and_then(|p| p.file_name())
@@ -130,7 +105,10 @@ fn main() -> ExitCode {
                         let header = format!(
                             "// ingested: {}\n// dataset: {dataset}{}  bpm: {bpm:.1}\n",
                             path.display(),
-                            args.genre.as_deref().map(|g| format!("  genre: {g}")).unwrap_or_default(),
+                            args.genre
+                                .as_deref()
+                                .map(|g| format!("  genre: {g}"))
+                                .unwrap_or_default(),
                         );
                         if let Err(e) = write_file(&file, &format!("{header}\n{code}")) {
                             error = Some(format!("write: {e}"));
@@ -193,29 +171,17 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Mirror of `src-tauri/src/midi.rs::convert_bytes` (which lives in the binary
-/// crate and can't be a dependency). Uses auto-resolution and a bar cap.
+/// Ingest conversion: the app's `convert_bytes` with auto-resolution, a bar
+/// cap, and a 16-notes/bar fallback (denser default than the app's 64 — short
+/// idiom-sized snippets, not full songs).
 fn convert(data: &[u8], bar_limit: usize) -> anyhow::Result<(String, f64)> {
-    let midi = MidiData::from_bytes(data)?;
-    let bpm = midi.bpm;
-    let notes_per_bar =
-        suggest_notes_per_bar(&midi.track_info, midi.cycle_ticks, midi.cycle_len).unwrap_or(16);
-    let builder = TrackBuilder::new(
-        midi.cycle_len,
-        midi.cycle_ticks,
+    let opts = ImportOptions {
         bar_limit,
-        notes_per_bar,
-        true,
-        ChannelMask::default(),
-        DrumBank::Simple,
-    );
-    let mut tracks: Vec<_> = builder.build_tracks(midi.track_info).collect();
-    if tracks.is_empty() {
-        anyhow::bail!("no convertible tracks");
-    }
-    let formatter = OutputFormatter::new(2, false, InstrumentMode::Hybrid);
-    let code = formatter.build_output(&mut tracks, midi.cycle_len);
-    Ok((code, bpm))
+        notes_per_bar: 16,
+        ..ImportOptions::default()
+    };
+    let result = convert_bytes(data, &opts)?;
+    Ok((result.code, result.bpm))
 }
 
 /// Like the `corpus-check` gate (parse + emit), but scans the first `window`
@@ -224,20 +190,7 @@ fn convert(data: &[u8], bar_limit: usize) -> anyhow::Result<(String, f64)> {
 /// loop. (Promotion into the curated corpus still faces the strict cycle-0
 /// gate, plus human cleanup.)
 fn validate(code: &str, window: usize) -> Result<(), String> {
-    if code.trim().is_empty() {
-        return Err("empty conversion".to_string());
-    }
-    let out = strudel_dsl::execute(code).map_err(|e| e.to_string())?;
-    require_haps(&out.pattern, window)
-}
-
-fn require_haps(pattern: &strudel_core::Pattern, window: usize) -> Result<(), String> {
-    let window = window.max(1) as i32;
-    if (0..window).any(|c| !pattern.query_arc(c, c + 1).is_empty()) {
-        Ok(())
-    } else {
-        Err(format!("emits no events in first {window} cycle(s)"))
-    }
+    cycletron_analysis::validate_emits(code, window.max(1))
 }
 
 fn collect_midis(root: &Path) -> Vec<PathBuf> {
@@ -248,7 +201,10 @@ fn collect_midis(root: &Path) -> Vec<PathBuf> {
         .map(|e| e.path().to_path_buf())
         .filter(|p| {
             matches!(
-                p.extension().and_then(|s| s.to_str()).map(|s| s.to_ascii_lowercase()).as_deref(),
+                p.extension()
+                    .and_then(|s| s.to_str())
+                    .map(str::to_ascii_lowercase)
+                    .as_deref(),
                 Some("mid") | Some("midi")
             )
         })
@@ -265,15 +221,7 @@ fn write_file(path: &Path, contents: &str) -> std::io::Result<()> {
 /// Make a filesystem-safe stem (the source names have spaces, parens, etc.),
 /// capped so `artist__title` stays well under the 255-byte filename limit.
 fn sanitize(stem: &str) -> String {
-    let s: String = stem
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
-        .collect();
-    let mut trimmed = s.trim_matches('-').to_string();
-    if trimmed.len() > 100 {
-        trimmed.truncate(100);
-    }
-    if trimmed.is_empty() { "midi".to_string() } else { trimmed }
+    cycletron_core::text::slug::filename(stem, "midi", Some(100))
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -289,10 +237,18 @@ fn parse_args() -> Result<Args, String> {
             "--genre" => genre = Some(it.next().ok_or("--genre needs a value")?),
             "--out" => out = PathBuf::from(it.next().ok_or("--out needs a value")?),
             "--limit" => {
-                limit = it.next().ok_or("--limit needs a value")?.parse().map_err(|_| "--limit must be a number")?
+                limit = it
+                    .next()
+                    .ok_or("--limit needs a value")?
+                    .parse()
+                    .map_err(|_| "--limit must be a number")?
             }
             "--bars" => {
-                bars = it.next().ok_or("--bars needs a value")?.parse().map_err(|_| "--bars must be a number")?
+                bars = it
+                    .next()
+                    .ok_or("--bars needs a value")?
+                    .parse()
+                    .map_err(|_| "--bars must be a number")?
             }
             other if other.starts_with("--") => return Err(format!("unknown flag {other}")),
             other => {

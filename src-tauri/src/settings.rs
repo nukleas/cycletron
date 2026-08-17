@@ -128,10 +128,18 @@ pub struct PadTrigger {
     pub value: u8,
 }
 
-fn default_cc_gain() -> u8 { 7 }
-fn default_cc_bpm() -> u8 { 74 }
-fn default_monitor_instrument() -> String { "sawtooth".to_string() }
-fn default_monitor_gain() -> f32 { 0.8 }
+fn default_cc_gain() -> u8 {
+    7
+}
+fn default_cc_bpm() -> u8 {
+    74
+}
+fn default_monitor_instrument() -> String {
+    "sawtooth".to_string()
+}
+fn default_monitor_gain() -> f32 {
+    0.8
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotificationSettings {
@@ -238,7 +246,7 @@ impl LlmSettings {
 pub fn builtin_profile(id: &str) -> Option<ProviderProfile> {
     let p = |codec: &str, base: Option<&str>, model: &str, max_tokens: u32| ProviderProfile {
         codec: codec.to_string(),
-        base_url: base.map(|s| s.to_string()),
+        base_url: base.map(std::string::ToString::to_string),
         model: model.to_string(),
         max_tokens,
     };
@@ -252,8 +260,18 @@ pub fn builtin_profile(id: &str) -> Option<ProviderProfile> {
             "gpt-5.6-sol",
             32000,
         ),
-        "openai" => p("openai", Some("https://api.openai.com/v1"), "gpt-4.1", 16000),
-        "local" => p("openai", Some("http://localhost:11434/v1"), "llama3.1", 8192),
+        "openai" => p(
+            "openai",
+            Some("https://api.openai.com/v1"),
+            "gpt-4.1",
+            16000,
+        ),
+        "local" => p(
+            "openai",
+            Some("http://localhost:11434/v1"),
+            "llama3.1",
+            8192,
+        ),
         "custom" => p("openai", None, "", 8192),
         _ => return None,
     })

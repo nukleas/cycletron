@@ -5,11 +5,15 @@ edition.workspace = true
 license.workspace = true
 publish = false
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "strudel-search"
 path = "main.rs"
 
 [dependencies]
+cycletron-midi = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 walkdir = "2"

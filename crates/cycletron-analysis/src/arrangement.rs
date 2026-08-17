@@ -4,7 +4,6 @@
 
 use serde::Serialize;
 
-use crate::execute::execute;
 use crate::form::{parse_pickrestart_labels, parse_pickrestart_slow};
 use crate::inspect::*;
 
@@ -50,14 +49,12 @@ pub struct Section {
 /// events, period, voices, sounds, pitch range) plus per-cycle event counts
 /// compressed into runs. The answer to "does the drop enter at cycle 16?"
 /// without scrolling through every onset.
-/// Analyze a pattern's arrangement: scan up to `max_cycles` (clamped 1..=64),
-/// detect the loop period, and segment it into sections by active instrument.
-pub fn analyze_code(code: &str, max_cycles: usize) -> Result<ArrangementAnalysis, String> {
-    let window = max_cycles.clamp(1, 64);
-    let out = execute(code)?;
-    let pattern = out.pattern;
-    let bpm = out.tempo.map(|t| t.to_bpm());
-    let spc = out.tempo.map(|t| 1.0 / t.cps);
+/// Analyze a pattern's arrangement over its evaluated window: detect the loop
+/// period and segment it into sections by active instrument.
+pub fn analyze(ev: &crate::Evaluated) -> ArrangementAnalysis {
+    let window = ev.window();
+    let bpm = ev.bpm();
+    let spc = ev.seconds_per_cycle();
 
     // Per cycle: the set of active instruments (including notes sustained from
     // earlier cycles), the onset count, and a content signature for period
@@ -66,13 +63,12 @@ pub fn analyze_code(code: &str, max_cycles: usize) -> Result<ArrangementAnalysis
     let mut onset_counts: Vec<usize> = Vec::with_capacity(window);
     let mut sigs: Vec<String> = Vec::with_capacity(window);
 
-    for c in 0..window {
-        let haps = pattern.query_arc(c as i32, c as i32 + 1);
+    for (c, haps) in ev.cycle_haps().iter().enumerate() {
         let mut set: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
         let mut onsets = 0usize;
         let mut sig_parts: Vec<String> = Vec::new();
 
-        for hap in &haps {
+        for hap in haps {
             // Skip continuous signals (LFOs etc.) — only discrete voices count
             // toward instrumentation.
             if hap.whole.is_none() {
@@ -112,8 +108,12 @@ pub fn analyze_code(code: &str, max_cycles: usize) -> Result<ArrangementAnalysis
     // token spans `.slow(n)` cycles (no .slow → 1), consecutive repeats merge.
     // Density flicker inside a labelled section (an intentional 2-on/2-off
     // pad) can no longer shred one section into micro-fragments.
-    let labeled = parse_pickrestart_labels(code)
-        .map(|labels| (labels, parse_pickrestart_slow(code).unwrap_or(1) as usize));
+    let labeled = parse_pickrestart_labels(ev.code()).map(|labels| {
+        (
+            labels,
+            parse_pickrestart_slow(ev.code()).unwrap_or(1) as usize,
+        )
+    });
 
     // A pickRestart selector defines the song's loop explicitly: total length =
     // (expanded token count) × the per-token `.slow(n)` factor. This is the
@@ -134,8 +134,8 @@ pub fn analyze_code(code: &str, max_cycles: usize) -> Result<ArrangementAnalysis
             let end = start + cycles - 1;
             let last = end.min(window - 1);
             let mut set: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-            for c in start..=last {
-                set.extend(active[c].iter().cloned());
+            for cyc in &active[start..=last] {
+                set.extend(cyc.iter().cloned());
             }
             let span = last - start + 1;
             let avg = onset_counts[start..=last].iter().sum::<usize>() as f64 / span as f64;
@@ -196,7 +196,7 @@ pub fn analyze_code(code: &str, max_cycles: usize) -> Result<ArrangementAnalysis
     let period_cycles = pick_total.or(period);
     let total_seconds = period_cycles.and_then(|p| spc.map(|s| s * p as f64));
 
-    Ok(ArrangementAnalysis {
+    ArrangementAnalysis {
         bpm,
         seconds_per_cycle: spc,
         window_cycles: window,
@@ -205,7 +205,7 @@ pub fn analyze_code(code: &str, max_cycles: usize) -> Result<ArrangementAnalysis
         total_seconds,
         form,
         sections,
-    })
+    }
 }
 
 /// Map a section index to a form letter: A..Z, then S26, S27, … as a fallback.
@@ -224,7 +224,10 @@ pub fn analyze_to_text(a: &ArrangementAnalysis) -> String {
 
     let len = match a.period_cycles {
         Some(p) => format!("{p}-cycle loop"),
-        None => format!("no repeat within {} cycles (evolving or longer form)", a.window_cycles),
+        None => format!(
+            "no repeat within {} cycles (evolving or longer form)",
+            a.window_cycles
+        ),
     };
     let _ = write!(s, "Arrangement: {len}");
     if let Some(secs) = a.total_seconds {
@@ -238,7 +241,10 @@ pub fn analyze_to_text(a: &ArrangementAnalysis) -> String {
         let _ = writeln!(s, "Form: {}", a.form);
     }
 
-    let _ = writeln!(s, "\nSections (label · cycles · time · instruments · density):");
+    let _ = writeln!(
+        s,
+        "\nSections (label · cycles · time · instruments · density):"
+    );
     for sec in &a.sections {
         let span = if sec.cycles == 1 {
             format!("cyc {}", sec.start_cycle)

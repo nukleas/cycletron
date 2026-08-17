@@ -3,7 +3,9 @@ members = [
     "crates/cycletron-core",
     "crates/cycletron-agent",
     "crates/cycletron-corpus",
+    "crates/cycletron-doc",
     "crates/cycletron-gen",
+    "crates/cycletron-midi",
     "crates/cycletron-analysis",
     "src-tauri",
     "tools/parity/dsl-eval",
@@ -24,12 +26,36 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/nukleas/cycletron"
 
+# Moderate lint policy (mirrors the spirit of strudel-rs's, minus its
+# DSP-specific type/method bans): perf + a few idiom lints at warn, gated to
+# deny in CI via `cargo clippy -- -D warnings`.
+[workspace.lints.clippy]
+perf = { level = "warn", priority = -1 }
+dbg_macro = "deny"
+todo = "warn"
+inefficient_to_string = "warn"
+cloned_instead_of_copied = "warn"
+flat_map_option = "warn"
+manual_let_else = "warn"
+manual_string_new = "warn"
+redundant_closure_for_method_calls = "warn"
+
+# Thin LTO: most of fat LTO's win without multiplying the full-Tauri link
+# time. Shipping builds can bump to lto = true / codegen-units = 1 later
+# without code changes.
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+
 [workspace.dependencies]
 # Internal crates
 cycletron-core = { path = "crates/cycletron-core" }
 cycletron-agent = { path = "crates/cycletron-agent" }
 cycletron-corpus = { path = "crates/cycletron-corpus" }
+cycletron-doc = { path = "crates/cycletron-doc" }
 cycletron-gen = { path = "crates/cycletron-gen" }
+cycletron-midi = { path = "crates/cycletron-midi" }
 cycletron-analysis = { path = "crates/cycletron-analysis" }
 # strudel-rs engine crates — pinned to public Codeberg main so the app builds
 # from a clean clone (no sibling checkout needed). Bump `rev` to move the engine.
@@ -55,3 +81,4 @@ uuid = { version = "1", features = ["v4"] }
 midly = "0.5"
 hound = "3.5"
 rustc-hash = "2"
+criterion = { version = "0.8.2", features = ["html_reports"] }

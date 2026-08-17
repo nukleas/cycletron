@@ -30,20 +30,7 @@ pub fn onsets(mini_str: &str) -> Result<Vec<f64>, String> {
 /// one event in cycle 0 (a silent pattern is a generation bug). This lets a
 /// composer confirm its output plays before it is ever written to disk.
 pub fn validate_doc(code: &str) -> Result<(), String> {
-    if code.trim().is_empty() {
-        return Err("empty document".to_string());
-    }
-    // Structural file → standalone DSL → mini-notation (strudel-rs cascade).
-    let out = strudel_dsl::execute(code).map_err(|e| e.to_string())?;
-    require_haps(&out.pattern)
-}
-
-fn require_haps(pattern: &strudel_core::Pattern) -> Result<(), String> {
-    if pattern.query_arc(0i32, 1i32).is_empty() {
-        Err("document emits no events in cycle 0 — silent".to_string())
-    } else {
-        Ok(())
-    }
+    cycletron_analysis::validate_emits(code, 1)
 }
 
 /// Note tokens of a mini-notation string, in time order, as the strudel-rs
@@ -80,7 +67,13 @@ fn pat_cycle_sig(pat: &strudel_core::Pattern, cycle: i32) -> Vec<String> {
         .collect();
     haps.sort_by(|a, b| a.part.begin.partial_cmp(&b.part.begin).unwrap());
     haps.iter()
-        .map(|h| format!("{}@{:.4}", h.value, h.part.begin.to_f64() - f64::from(cycle)))
+        .map(|h| {
+            format!(
+                "{}@{:.4}",
+                h.value,
+                h.part.begin.to_f64() - f64::from(cycle)
+            )
+        })
         .collect()
 }
 
@@ -107,7 +100,13 @@ pub fn cycle_sig(mini_str: &str, cycle: i32) -> Result<Vec<String>, String> {
     haps.sort_by(|a, b| a.part.begin.partial_cmp(&b.part.begin).unwrap());
     Ok(haps
         .iter()
-        .map(|h| format!("{}@{:.4}", h.value, h.part.begin.to_f64() - f64::from(cycle)))
+        .map(|h| {
+            format!(
+                "{}@{:.4}",
+                h.value,
+                h.part.begin.to_f64() - f64::from(cycle)
+            )
+        })
         .collect())
 }
 
@@ -130,7 +129,9 @@ pub fn reproduces(bars: &[crate::mini::Mini], compressed: &crate::mini::Mini) ->
 pub fn verify_notes(expected: &[String], mini_str: &str) -> Result<(), String> {
     let got = note_tokens(mini_str)?;
     if got != expected {
-        return Err(format!("note sequence drifted: intended {expected:?}, evaluator gave {got:?}"));
+        return Err(format!(
+            "note sequence drifted: intended {expected:?}, evaluator gave {got:?}"
+        ));
     }
     Ok(())
 }
@@ -152,10 +153,7 @@ pub fn verify_grid(grid: &Grid) -> Result<usize, String> {
         let lane_str = Grid::lane_to_mini(lane).emit();
         let got = onsets(&lane_str)?;
         if got.len() != expected.len()
-            || got
-                .iter()
-                .zip(&expected)
-                .any(|(a, b)| (a - b).abs() > 1e-6)
+            || got.iter().zip(&expected).any(|(a, b)| (a - b).abs() > 1e-6)
         {
             return Err(format!(
                 "lane {li} ({}) drifted: intended {expected:?}, evaluator gave {got:?}",
@@ -192,6 +190,11 @@ mod tests {
         // And the whole grid is a legal, non-silent pattern.
         assert!(g.has_onsets());
         let ast = strudel_mini::parse(&g.to_string()).expect("stack parses");
-        assert!(!strudel_mini::evaluate(&ast).unwrap().query_arc(0i32, 1i32).is_empty());
+        assert!(
+            !strudel_mini::evaluate(&ast)
+                .unwrap()
+                .query_arc(0i32, 1i32)
+                .is_empty()
+        );
     }
 }

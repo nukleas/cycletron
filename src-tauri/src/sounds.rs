@@ -40,7 +40,7 @@ pub struct SampleFolder {
 fn is_audio(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase())
+        .map(str::to_ascii_lowercase)
         .is_some_and(|e| AUDIO_EXTS.contains(&e.as_str()))
 }
 
@@ -125,7 +125,10 @@ pub fn scan_folder_banks(root: &Path) -> Result<Vec<ScannedBank>, String> {
             }
             banks.push(ScannedBank { name, files });
         } else if entry.is_file() && is_audio(entry) {
-            let raw = entry.file_stem().and_then(|n| n.to_str()).unwrap_or_default();
+            let raw = entry
+                .file_stem()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default();
             let name = unique_name(sanitize_bank_name(raw), &mut used_names);
             if name.is_empty() {
                 continue;
@@ -211,7 +214,7 @@ pub fn read_audio_file(path: String) -> Result<tauri::ipc::Response, String> {
 /// can report them. Idempotent; de-dupes.
 #[tauri::command]
 pub fn register_sound_banks(names: Vec<String>, state: State<'_, AppState>) -> Result<(), String> {
-    let mut banks = state.loaded_sample_banks.lock().unwrap();
+    let mut banks = state.loaded_sample_banks.lock();
     for n in names {
         if !n.is_empty() && !banks.contains(&n) {
             banks.push(n);
@@ -224,8 +227,8 @@ pub fn register_sound_banks(names: Vec<String>, state: State<'_, AppState>) -> R
 // Built-in sound catalog lives in the shared analysis crate so CLI tools use
 // the same known-sound set; user-loaded banks are layered on here.
 pub use cycletron_analysis::sounds::{
-    builtin_sound_set, DEFAULT_DRUMS, DRUM_MACHINE_NOTE, GM_INSTRUMENTS, INSTRUMENTS, MACHINE_KITS,
-    PERCUSSION, SYNTHS, WAVETABLES,
+    DEFAULT_DRUMS, DRUM_MACHINE_NOTE, GM_INSTRUMENTS, INSTRUMENTS, MACHINE_KITS, PERCUSSION,
+    SYNTHS, WAVETABLES,
 };
 
 /// Everything currently playable, for the UI and the agent's `list_sounds` tool.
@@ -233,22 +236,23 @@ pub use cycletron_analysis::sounds::{
 /// user-loaded banks. `gm_*` names are NOT enumerated here (any GM name streams
 /// on demand) — callers should treat the `gm_` prefix as known. Used by the
 /// silence linter.
-pub fn known_sound_set(state: &AppState) -> std::collections::HashSet<String> {
-    let mut set = builtin_sound_set();
-    set.extend(state.loaded_sample_banks.lock().unwrap().iter().cloned());
-    set
+pub fn known_sound_set(state: &AppState) -> cycletron_analysis::sounds::SoundSet {
+    cycletron_analysis::sounds::SoundSet::with_user_banks(state.loaded_sample_banks.lock().clone())
 }
 
 pub fn sound_catalog(state: &AppState) -> serde_json::Value {
-    let user_banks = state.loaded_sample_banks.lock().unwrap().clone();
-    let machines: Vec<serde_json::Value> = MACHINE_KITS.iter().map(|(machine, display, voices)| {
-        let banks: Vec<String> = voices.iter().map(|v| format!("{machine}_{v}")).collect();
-        serde_json::json!({
-            "machine": machine,
-            "display": display,
-            "banks": banks,
+    let user_banks = state.loaded_sample_banks.lock().clone();
+    let machines: Vec<serde_json::Value> = MACHINE_KITS
+        .iter()
+        .map(|(machine, display, voices)| {
+            let banks: Vec<String> = voices.iter().map(|v| format!("{machine}_{v}")).collect();
+            serde_json::json!({
+                "machine": machine,
+                "display": display,
+                "banks": banks,
+            })
         })
-    }).collect();
+        .collect();
     serde_json::json!({
         "synths": SYNTHS,
         "wavetables": WAVETABLES,

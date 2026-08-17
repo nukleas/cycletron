@@ -63,11 +63,7 @@ impl Grid {
     /// wide) — the escape hatch the spec composer uses after swing-splitting
     /// an archetype lane.
     pub fn lane(mut self, sound: &str, counts: Vec<u8>) -> Self {
-        assert_eq!(
-            counts.len(),
-            self.steps,
-            "lane width must equal grid steps"
-        );
+        assert_eq!(counts.len(), self.steps, "lane width must equal grid steps");
         self.lanes.push(Lane {
             sound: sound.to_string(),
             hits: counts,
@@ -97,8 +93,9 @@ impl Grid {
     /// offbeat open hats).
     pub fn every(mut self, sound: &str, interval: usize, offset: usize) -> Self {
         assert!(interval > 0, "interval must be > 0");
-        let hits: Vec<u8> =
-            (0..self.steps).map(|i| u8::from(i >= offset && (i - offset) % interval == 0)).collect();
+        let hits: Vec<u8> = (0..self.steps)
+            .map(|i| u8::from(i >= offset && (i - offset).is_multiple_of(interval)))
+            .collect();
         self.lanes.push(Lane {
             sound: sound.to_string(),
             hits,
@@ -111,7 +108,7 @@ impl Grid {
     /// columns (keeping the lane aligned with the rest).
     pub fn euclid(mut self, sound: &str, k: usize, n: usize) -> Self {
         assert!(
-            n > 0 && self.steps % n == 0,
+            n > 0 && self.steps.is_multiple_of(n),
             "euclid n ({n}) must divide grid steps ({})",
             self.steps
         );
@@ -156,10 +153,12 @@ impl Grid {
     pub fn to_mini(&self) -> Mini {
         Mini::Stack(self.lanes.iter().map(Self::lane_to_mini).collect())
     }
+}
 
-    /// The mini-notation string for use inside `s("…")`.
-    pub fn to_string(&self) -> String {
-        self.to_mini().emit()
+/// The mini-notation string for use inside `s("…")`.
+impl std::fmt::Display for Grid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.to_mini().emit())
     }
 }
 
@@ -183,7 +182,8 @@ pub fn bjorklund(k: usize, n: usize) -> Vec<bool> {
     while b > 1 {
         let m = a.min(b);
         // Append one tail group onto each of the first `m` head groups.
-        let tail: Vec<Vec<bool>> = groups.split_off(groups.len() - (if a >= b { b } else { a }).min(m));
+        let tail: Vec<Vec<bool>> =
+            groups.split_off(groups.len() - (if a >= b { b } else { a }).min(m));
         for (i, t) in tail.into_iter().enumerate() {
             groups[i].extend(t);
         }
@@ -218,7 +218,9 @@ mod tests {
 
     #[test]
     fn ratchet_lanes_subdivide_slots() {
-        let g = Grid::new(16).every("hh", 2, 0).ratchet("hh", &[(7, 3), (15, 4)]);
+        let g = Grid::new(16)
+            .every("hh", 2, 0)
+            .ratchet("hh", &[(7, 3), (15, 4)]);
         let s = g.to_string();
         assert!(s.contains("hh*3"), "got: {s}");
         assert!(s.contains("hh*4"), "got: {s}");

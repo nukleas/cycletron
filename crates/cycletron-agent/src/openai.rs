@@ -39,10 +39,10 @@ impl OpenAiClient {
     pub fn new(api_key: &str, base_url: &str, model: &str, max_tokens: u32) -> Self {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        if !api_key.is_empty() {
-            if let Ok(v) = HeaderValue::from_str(&format!("Bearer {api_key}")) {
-                headers.insert(AUTHORIZATION, v);
-            }
+        if !api_key.is_empty()
+            && let Ok(v) = HeaderValue::from_str(&format!("Bearer {api_key}"))
+        {
+            headers.insert(AUTHORIZATION, v);
         }
 
         let http = reqwest::Client::builder()
@@ -287,7 +287,6 @@ impl Accumulator {
             self.finish_reason = Some(reason.clone());
         }
     }
-
 }
 
 impl StreamDecoder for Accumulator {

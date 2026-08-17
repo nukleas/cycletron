@@ -73,7 +73,9 @@ pub fn upsert_section(code: &str, handle: &str, expr: &str) -> Result<(String, S
         );
     }
     let key = clean_id(handle);
-    let Some(sec) = sections.iter().find(|s| clean_id(&s.id) == key || s.index.to_string() == handle.trim())
+    let Some(sec) = sections
+        .iter()
+        .find(|s| clean_id(&s.id) == key || s.index.to_string() == handle.trim())
     else {
         let names: Vec<_> = sections.iter().map(|s| s.id.as_str()).collect();
         return Err(format!(
@@ -92,7 +94,10 @@ pub fn upsert_section(code: &str, handle: &str, expr: &str) -> Result<(String, S
 
 /// Apply several section replacements left-to-right on byte offsets that are
 /// re-resolved each time (safe when earlier patches change length).
-pub fn upsert_sections(code: &str, patches: &[(String, String)]) -> Result<(String, Vec<String>), String> {
+pub fn upsert_sections(
+    code: &str,
+    patches: &[(String, String)],
+) -> Result<(String, Vec<String>), String> {
     let mut doc = code.to_string();
     let mut wrote = Vec::with_capacity(patches.len());
     for (id, expr) in patches {
@@ -120,7 +125,10 @@ fn clean_id(id: &str) -> String {
 }
 
 fn byte_to_line(code: &str, byte: usize) -> usize {
-    code[..byte.min(code.len())].bytes().filter(|&b| b == b'\n').count()
+    code[..byte.min(code.len())]
+        .bytes()
+        .filter(|&b| b == b'\n')
+        .count()
 }
 
 fn one_line_preview(s: &str, max: usize) -> String {
@@ -217,10 +225,10 @@ fn infer_sections_binding_name(code: &str, form: &[Section]) -> Option<String> {
 /// formatting); falls back to a hand-rolled `const NAME = {` scan when the
 /// document doesn't parse or the binding isn't an object literal.
 fn find_binding_object(code: &str, name: &str) -> Option<(usize, usize)> {
-    if let Some(b) = crate::structure::find_binding(code, name) {
-        if let Some(range) = object_interior(code, b.expr_start, b.expr_end) {
-            return Some(range);
-        }
+    if let Some(b) = crate::structure::find_binding(code, name)
+        && let Some(range) = object_interior(code, b.expr_start, b.expr_end)
+    {
+        return Some(range);
     }
     find_binding_object_scan(code, name)
 }
@@ -432,7 +440,12 @@ fn scan_expr_end(code: &str, start: usize, limit: usize) -> usize {
                 brace -= 1;
             }
             b',' if paren == 0 && bracket == 0 && brace == 0 => return i,
-            b'/' if i + 1 < limit && bytes[i + 1] == b'/' && paren == 0 && bracket == 0 && brace == 0 => {
+            b'/' if i + 1 < limit
+                && bytes[i + 1] == b'/'
+                && paren == 0
+                && bracket == 0
+                && brace == 0 =>
+            {
                 // Line comment at top level of expr (rare) — skip to EOL.
                 while i < limit && bytes[i] != b'\n' {
                     i += 1;
@@ -460,6 +473,10 @@ fn find_matching(code: &str, open_idx: usize, open: u8, close: u8) -> Option<usi
     let mut depth = 0i32;
     let mut in_str: Option<u8> = None;
     let mut escape = false;
+    #[expect(
+        clippy::needless_range_loop,
+        reason = "i is also the returned span position, not just an index"
+    )]
     for i in open_idx..bytes.len() {
         let b = bytes[i];
         if let Some(q) = in_str {
@@ -601,7 +618,12 @@ $: "<intro@1 drop1@2 outro@1>".slow(4).pickRestart({
     #[test]
     fn midi_dump_lists_fat_const_sections_not_aliases() {
         let secs = list_sections(MIDI_DUMP_SHAPE);
-        assert_eq!(secs.len(), 3, "previews: {:?}", secs.iter().map(|s| &s.preview).collect::<Vec<_>>());
+        assert_eq!(
+            secs.len(),
+            3,
+            "previews: {:?}",
+            secs.iter().map(|s| &s.preview).collect::<Vec<_>>()
+        );
         assert_eq!(secs[0].id, "intro");
         // Must show the stack body, not `sections.intro`.
         assert!(
@@ -643,11 +665,18 @@ $: "<intro build>".slow(2).pickRestart({
     fn resolves_non_hardcoded_binding_name() {
         let secs = list_sections(NON_STANDARD_BINDING);
         assert_eq!(secs.len(), 2);
-        assert!(!secs[0].preview.starts_with("arrangement."), "got: {}", secs[0].preview);
-        assert!(secs[1].preview.contains("hh*16"), "got: {}", secs[1].preview);
+        assert!(
+            !secs[0].preview.starts_with("arrangement."),
+            "got: {}",
+            secs[0].preview
+        );
+        assert!(
+            secs[1].preview.contains("hh*16"),
+            "got: {}",
+            secs[1].preview
+        );
 
-        let (new_code, id) =
-            upsert_section(NON_STANDARD_BINDING, "build", r#"s("cp*4")"#).unwrap();
+        let (new_code, id) = upsert_section(NON_STANDARD_BINDING, "build", r#"s("cp*4")"#).unwrap();
         assert_eq!(id, "build");
         assert!(new_code.contains(r#"build: s("cp*4")"#));
         assert!(new_code.contains("build: arrangement.build")); // alias untouched

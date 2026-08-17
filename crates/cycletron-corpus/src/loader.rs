@@ -1,4 +1,4 @@
-use cycletron_core::types::{CorpusEntry, CorpusPart, MusicalRole};
+use cycletron_core::types::CorpusEntry;
 use serde::Deserialize;
 use std::io::BufRead;
 use std::path::Path;
@@ -63,11 +63,7 @@ impl RawMetadataRow {
             .unwrap_or(&self.normalized_path)
             .to_string();
         // Use the filename stem (before __hash) as id
-        let id = filename
-            .rsplit('/')
-            .next()
-            .unwrap_or(&filename)
-            .to_string();
+        let id = filename.rsplit('/').next().unwrap_or(&filename).to_string();
         Some(CorpusEntry {
             id,
             filename,
@@ -114,90 +110,6 @@ pub fn load_metadata(path: &Path) -> anyhow::Result<Vec<CorpusEntry>> {
         entries.len()
     );
     Ok(entries)
-}
-
-/// Load part excerpts from agent-part-excerpts.tsv.
-///
-/// The TSV has this shape (produced by the corpus build tooling):
-///
-/// `normalized_path  derived_path  title  author  file_type  part_role  …`
-///
-/// `derived_path` points at the extracted-part file on disk (e.g.
-/// `derived/agent-parts/bassline/song--bass__hash.js`). We read that file
-/// lazily when populating each `CorpusPart::code`. `corpus_path` is the
-/// corpus root so we can resolve the relative `derived_path`.
-pub fn load_parts(path: &Path, corpus_path: &Path) -> anyhow::Result<Vec<CorpusPart>> {
-    let content = std::fs::read_to_string(path)?;
-    let mut parts = Vec::new();
-    let mut lines = content.lines();
-
-    let header = lines.next().unwrap_or_default();
-    let columns: Vec<&str> = header.split('\t').collect();
-
-    let find = |names: &[&str]| -> Option<usize> {
-        columns.iter().position(|c| names.contains(c))
-    };
-
-    let source_col = find(&["normalized_path", "source_id", "source_path", "file"]);
-    let derived_col = find(&["derived_path", "part_path"]);
-    let role_col = find(&["part_role", "role", "agent_role"]);
-    let code_col = find(&["code", "excerpt"]);
-    let label_col = find(&["label"]);
-
-    for line in lines {
-        let fields: Vec<&str> = line.split('\t').collect();
-        let source_id = source_col
-            .and_then(|i| fields.get(i))
-            .unwrap_or(&"")
-            .to_string();
-        let role_str = role_col.and_then(|i| fields.get(i)).unwrap_or(&"");
-        let label = label_col
-            .and_then(|i| fields.get(i))
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string());
-
-        let role = match *role_str {
-            "drum-groove" | "drums" => MusicalRole::DrumGroove,
-            "bassline" | "bass" => MusicalRole::Bassline,
-            "melodic-hook" | "melody" => MusicalRole::MelodicHook,
-            "harmony-loop" | "harmony" => MusicalRole::HarmonyLoop,
-            "texture-bed" | "texture" => MusicalRole::TextureBed,
-            "transition-seed" | "transition" => MusicalRole::TransitionSeed,
-            "arrangement-seed" | "arrangement" => MusicalRole::ArrangementSeed,
-            "remix-seed" | "remix" => MusicalRole::RemixSeed,
-            _ => continue,
-        };
-
-        // Prefer an inline `code` column if present; otherwise resolve
-        // `derived_path` against the corpus root and read the file.
-        let code = if let Some(i) = code_col
-            && let Some(v) = fields.get(i)
-            && !v.is_empty()
-        {
-            (*v).to_string()
-        } else if let Some(i) = derived_col
-            && let Some(rel) = fields.get(i).filter(|s| !s.is_empty())
-        {
-            match std::fs::read_to_string(corpus_path.join(rel)) {
-                Ok(s) => s,
-                Err(_) => continue, // referenced file missing — skip silently
-            }
-        } else {
-            continue;
-        };
-
-        if !code.trim().is_empty() {
-            parts.push(CorpusPart {
-                source_id,
-                role,
-                code,
-                label,
-            });
-        }
-    }
-
-    debug!("loaded {} corpus parts", parts.len());
-    Ok(parts)
 }
 
 /// Load the source code for a corpus entry from the normalized/ directory.
@@ -248,10 +160,8 @@ pub fn load_curated_dir(curated_root: &Path) -> anyhow::Result<Vec<CorpusEntry>>
 
         let id = rel.display().to_string();
         let title = first_comment_line(&code);
-        let tempo = first_tempo_directive(&code);
-        let sounds = extract_sounds(&code);
-        let effects = extract_effects(&code);
-        let features = extract_features(&code);
+        let tempo = cycletron_core::text::tempo::scan_bpm(&code);
+        let (sounds, effects, features) = extract_labels(&code);
         let mut tags = vec![category, "curated".to_string()];
         tags.extend(filename_genre_tags(&id));
 
@@ -273,7 +183,11 @@ pub fn load_curated_dir(curated_root: &Path) -> anyhow::Result<Vec<CorpusEntry>>
     }
 
     entries.sort_by(|a, b| a.id.cmp(&b.id));
-    debug!("loaded {} curated entries from {}", entries.len(), curated_root.display());
+    debug!(
+        "loaded {} curated entries from {}",
+        entries.len(),
+        curated_root.display()
+    );
     Ok(entries)
 }
 
@@ -296,157 +210,134 @@ fn first_comment_line(code: &str) -> Option<String> {
     None
 }
 
-/// Extract tempo (BPM) from the first `setbpm(N)` / `setcpm(N)` / `setcps(N)`
-/// directive. Returns `None` if none of those appear. Conversion mirrors
-/// strudel-rs: setbpm → N, setcpm → N*4, setcps → N*240.
-fn first_tempo_directive(code: &str) -> Option<f64> {
-    for line in code.lines() {
-        let trimmed = line.trim();
-        if let Some(n) = parse_tempo(trimmed, "setbpm") {
-            return Some(n);
-        }
-        if let Some(n) = parse_tempo(trimmed, "setcpm") {
-            return Some(n * 4.0);
-        }
-        if let Some(n) = parse_tempo(trimmed, "setcps") {
-            return Some(n * 240.0);
-        }
-    }
-    None
+#[derive(Clone, Copy, PartialEq)]
+enum LabelCat {
+    Sound,
+    Effect,
+    Feature,
 }
 
-fn parse_tempo(line: &str, prefix: &str) -> Option<f64> {
-    let rest = line.strip_prefix(prefix)?.trim_start();
-    let rest = rest.strip_prefix('(')?;
-    let end = rest.find(')')?;
-    rest[..end].trim().parse().ok()
-}
+/// Every needle the curated-metadata extractor looks for, with its category
+/// and canonical label. Order within a category is the output order.
+const LABEL_NEEDLES: &[(&str, LabelCat, &str)] = &[
+    // Sounds: drum-machine family prefixes (presence anywhere in the file).
+    ("RolandTR808_", LabelCat::Sound, "tr808"),
+    ("RolandTR909_", LabelCat::Sound, "tr909"),
+    ("RolandTR707_", LabelCat::Sound, "tr707"),
+    ("LinnDrum_", LabelCat::Sound, "linndrum"),
+    ("BossDR55_", LabelCat::Sound, "dr55"),
+    ("gm_", LabelCat::Sound, "gm"),
+    ("wt_", LabelCat::Sound, "wavetable"),
+    // Sounds: named synth voices as quoted string arguments.
+    ("\"sawtooth\"", LabelCat::Sound, "sawtooth"),
+    ("\"supersaw\"", LabelCat::Sound, "supersaw"),
+    ("\"supersquare\"", LabelCat::Sound, "supersquare"),
+    ("\"superpwm\"", LabelCat::Sound, "superpwm"),
+    ("\"sine\"", LabelCat::Sound, "sine"),
+    ("\"triangle\"", LabelCat::Sound, "triangle"),
+    ("\"square\"", LabelCat::Sound, "square"),
+    ("\"fm\"", LabelCat::Sound, "fm"),
+    ("\"pulse\"", LabelCat::Sound, "pulse"),
+    ("\"white\"", LabelCat::Sound, "noise"),
+    ("\"pink\"", LabelCat::Sound, "noise"),
+    ("\"brown\"", LabelCat::Sound, "noise"),
+    ("\"crackle\"", LabelCat::Sound, "crackle"),
+    ("\"sbd\"", LabelCat::Sound, "sbd"),
+    // Sounds: standard Dirt-Samples drum names -> one "drums" label.
+    ("\"bd", LabelCat::Sound, "drums"),
+    ("\"sd", LabelCat::Sound, "drums"),
+    ("\"sn", LabelCat::Sound, "drums"),
+    ("\"hh", LabelCat::Sound, "drums"),
+    ("\"oh", LabelCat::Sound, "drums"),
+    ("\"cp", LabelCat::Sound, "drums"),
+    ("\"rs\"", LabelCat::Sound, "drums"),
+    ("\"cr", LabelCat::Sound, "drums"),
+    ("\"lt", LabelCat::Sound, "drums"),
+    ("\"mt", LabelCat::Sound, "drums"),
+    ("\"ht", LabelCat::Sound, "drums"),
+    ("\"cb", LabelCat::Sound, "drums"),
+    // Effects.
+    (".room(", LabelCat::Effect, "reverb"),
+    (".roomsize(", LabelCat::Effect, "reverb"),
+    (".delay(", LabelCat::Effect, "delay"),
+    (".delayfeedback(", LabelCat::Effect, "delay"),
+    (".dist(", LabelCat::Effect, "distortion"),
+    (".distort(", LabelCat::Effect, "distortion"),
+    (".crush(", LabelCat::Effect, "bitcrush"),
+    (".shape(", LabelCat::Effect, "waveshaper"),
+    (".coarse(", LabelCat::Effect, "decimator"),
+    (".chorus(", LabelCat::Effect, "chorus"),
+    (".vowel(", LabelCat::Effect, "vowel"),
+    (".grainsize(", LabelCat::Effect, "granular"),
+    (".ir(", LabelCat::Effect, "convolution"),
+    (".cutoff(", LabelCat::Effect, "filter"),
+    (".lpf(", LabelCat::Effect, "filter"),
+    (".hpf(", LabelCat::Effect, "filter"),
+    (".bpf(", LabelCat::Effect, "filter"),
+    (".resonance(", LabelCat::Effect, "resonance"),
+    // DSL features.
+    ("chord(", LabelCat::Feature, "chord"),
+    (".voicing(", LabelCat::Feature, "voicing"),
+    ("pickRestart", LabelCat::Feature, "pickRestart"),
+    ("pickmod", LabelCat::Feature, "pick"),
+    (".scale(", LabelCat::Feature, "scale"),
+    (".every(", LabelCat::Feature, "every"),
+    ("euclid(", LabelCat::Feature, "euclid"),
+    (".mask(", LabelCat::Feature, "mask"),
+    ("slowcat(", LabelCat::Feature, "slowcat"),
+    ("fastcat(", LabelCat::Feature, "fastcat"),
+    (".superimpose(", LabelCat::Feature, "superimpose"),
+    (".jux(", LabelCat::Feature, "jux"),
+    (".off(", LabelCat::Feature, "off"),
+    (".fmindex(", LabelCat::Feature, "fm-synthesis"),
+    (".fmratio(", LabelCat::Feature, "fm-synthesis"),
+    ("stack(", LabelCat::Feature, "stack"),
+    (".slow(", LabelCat::Feature, "slow"),
+    (".fast(", LabelCat::Feature, "fast"),
+    (".rev", LabelCat::Feature, "reverse"),
+    (".stut(", LabelCat::Feature, "stutter"),
+    (".echo(", LabelCat::Feature, "echo"),
+    (".degrade", LabelCat::Feature, "degrade"),
+    ("sine.range(", LabelCat::Feature, "lfo"),
+    ("sine.slow(", LabelCat::Feature, "lfo"),
+    ("saw.range(", LabelCat::Feature, "lfo"),
+    ("tri.range(", LabelCat::Feature, "lfo"),
+    (".attack(", LabelCat::Feature, "envelope"),
+    (".release(", LabelCat::Feature, "envelope"),
+];
 
-/// Extract sound family / synth labels from curated source code.
-/// Checks for known sound prefixes and quoted synth names; returns short
-/// canonical labels suitable for tag-matching (e.g. "tr808", "gm", "fm").
-fn extract_sounds(code: &str) -> Vec<String> {
-    let mut out: Vec<&str> = Vec::new();
+/// Extract sound / effect / feature labels for curated metadata in ONE pass
+/// over the file (previously ~79 independent `contains` scans per file, on
+/// every app start and corpus reload). Output order matches the table.
+fn extract_labels(code: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
+    use std::sync::LazyLock;
+    static AC: LazyLock<aho_corasick::AhoCorasick> = LazyLock::new(|| {
+        aho_corasick::AhoCorasick::new(LABEL_NEEDLES.iter().map(|(n, _, _)| n))
+            .expect("static needle table builds")
+    });
 
-    // Drum-machine family prefixes — just check presence in the whole file
-    let families: &[(&str, &str)] = &[
-        ("RolandTR808_", "tr808"),
-        ("RolandTR909_", "tr909"),
-        ("RolandTR707_", "tr707"),
-        ("LinnDrum_", "linndrum"),
-        ("BossDR55_", "dr55"),
-        ("gm_", "gm"),
-        ("wt_", "wavetable"),
-    ];
-    for (prefix, label) in families {
-        if code.contains(prefix) {
-            out.push(label);
+    let mut hit = vec![false; LABEL_NEEDLES.len()];
+    for m in AC.find_overlapping_iter(code) {
+        hit[m.pattern().as_usize()] = true;
+    }
+
+    let mut sounds: Vec<String> = Vec::new();
+    let mut effects: Vec<String> = Vec::new();
+    let mut features: Vec<String> = Vec::new();
+    for (i, (_, cat, label)) in LABEL_NEEDLES.iter().enumerate() {
+        if !hit[i] {
+            continue;
+        }
+        let dst = match cat {
+            LabelCat::Sound => &mut sounds,
+            LabelCat::Effect => &mut effects,
+            LabelCat::Feature => &mut features,
+        };
+        if !dst.iter().any(|s| s == label) {
+            dst.push((*label).to_string());
         }
     }
-
-    // Named synth voices — look for them as quoted string arguments
-    let synths: &[(&str, &str)] = &[
-        ("\"sawtooth\"", "sawtooth"),
-        ("\"supersaw\"", "supersaw"),
-        ("\"supersquare\"", "supersquare"),
-        ("\"superpwm\"", "superpwm"),
-        ("\"sine\"", "sine"),
-        ("\"triangle\"", "triangle"),
-        ("\"square\"", "square"),
-        ("\"fm\"", "fm"),
-        ("\"pulse\"", "pulse"),
-        ("\"white\"", "noise"),
-        ("\"pink\"", "noise"),
-        ("\"brown\"", "noise"),
-        ("\"crackle\"", "crackle"),
-        ("\"sbd\"", "sbd"),
-    ];
-    for (pattern, label) in synths {
-        if code.contains(pattern) && !out.contains(label) {
-            out.push(label);
-        }
-    }
-
-    // Standard Dirt-Samples drum names — flag as "drums" if any appear
-    let drum_names = ["\"bd", "\"sd", "\"sn", "\"hh", "\"oh", "\"cp",
-                       "\"rs\"", "\"cr", "\"lt", "\"mt", "\"ht", "\"cb"];
-    if drum_names.iter().any(|d| code.contains(d)) && !out.contains(&"drums") {
-        out.push("drums");
-    }
-
-    out.iter().map(|s| s.to_string()).collect()
-}
-
-/// Extract effect labels from curated source code.
-fn extract_effects(code: &str) -> Vec<String> {
-    let checks: &[(&str, &str)] = &[
-        (".room(", "reverb"),
-        (".roomsize(", "reverb"),
-        (".delay(", "delay"),
-        (".delayfeedback(", "delay"),
-        (".dist(", "distortion"),
-        (".distort(", "distortion"),
-        (".crush(", "bitcrush"),
-        (".shape(", "waveshaper"),
-        (".coarse(", "decimator"),
-        (".chorus(", "chorus"),
-        (".vowel(", "vowel"),
-        (".grainsize(", "granular"),
-        (".ir(", "convolution"),
-        (".cutoff(", "filter"),
-        (".lpf(", "filter"),
-        (".hpf(", "filter"),
-        (".bpf(", "filter"),
-        (".resonance(", "resonance"),
-    ];
-    let mut out: Vec<&str> = Vec::new();
-    for (pattern, label) in checks {
-        if code.contains(pattern) && !out.contains(label) {
-            out.push(label);
-        }
-    }
-    out.iter().map(|s| s.to_string()).collect()
-}
-
-/// Extract DSL feature labels from curated source code.
-fn extract_features(code: &str) -> Vec<String> {
-    let checks: &[(&str, &str)] = &[
-        ("chord(", "chord"),
-        (".voicing(", "voicing"),
-        ("pickRestart", "pickRestart"),
-        ("pickmod", "pick"),
-        (".scale(", "scale"),
-        (".every(", "every"),
-        ("euclid(", "euclid"),
-        (".mask(", "mask"),
-        ("slowcat(", "slowcat"),
-        ("fastcat(", "fastcat"),
-        (".superimpose(", "superimpose"),
-        (".jux(", "jux"),
-        (".off(", "off"),
-        (".fmindex(", "fm-synthesis"),
-        (".fmratio(", "fm-synthesis"),
-        ("stack(", "stack"),
-        (".slow(", "slow"),
-        (".fast(", "fast"),
-        (".rev", "reverse"),
-        (".stut(", "stutter"),
-        (".echo(", "echo"),
-        (".degrade", "degrade"),
-        ("sine.range(", "lfo"),
-        ("sine.slow(", "lfo"),
-        ("saw.range(", "lfo"),
-        ("tri.range(", "lfo"),
-        (".attack(", "envelope"),
-        (".release(", "envelope"),
-    ];
-    let mut out: Vec<&str> = Vec::new();
-    for (pattern, label) in checks {
-        if code.contains(pattern) && !out.contains(label) {
-            out.push(label);
-        }
-    }
-    out.iter().map(|s| s.to_string()).collect()
+    (sounds, effects, features)
 }
 
 /// Extract genre/technique keywords from a curated entry id like
@@ -460,7 +351,7 @@ fn filename_genre_tags(id: &str) -> Vec<String> {
         .unwrap_or("");
     stem.split('-')
         .filter(|t| t.len() > 1 && !skip.contains(t))
-        .map(|t| t.to_lowercase())
+        .map(str::to_lowercase)
         .collect()
 }
 
@@ -487,23 +378,6 @@ mod tests {
     fn first_comment_line_stops_at_non_comment() {
         let code = "setbpm(120);\n// comment after code\n";
         assert_eq!(first_comment_line(code), None);
-    }
-
-    #[test]
-    fn first_tempo_directive_reads_setbpm() {
-        assert_eq!(first_tempo_directive("setbpm(124);\nrest"), Some(124.0));
-    }
-
-    #[test]
-    fn first_tempo_directive_converts_setcpm() {
-        // 30 cpm = 120 bpm at 4 beats/cycle.
-        assert_eq!(first_tempo_directive("setcpm(30);"), Some(120.0));
-    }
-
-    #[test]
-    fn first_tempo_directive_converts_setcps() {
-        // 0.5 cps = 30 cpm = 120 bpm.
-        assert_eq!(first_tempo_directive("setcps(0.5);"), Some(120.0));
     }
 
     #[test]

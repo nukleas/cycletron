@@ -65,8 +65,8 @@ impl Song {
                 .map(|s| s.body.len())
                 .unwrap_or(0)
         };
-        let expanded: usize = self.timeline.iter().map(|l| body_of(l)).sum::<usize>()
-            + self.timeline.len() * 6; // rough per-slot separator overhead
+        let expanded: usize =
+            self.timeline.iter().map(|l| body_of(l)).sum::<usize>() + self.timeline.len() * 6; // rough per-slot separator overhead
         (expanded, compressed)
     }
 }
@@ -117,16 +117,26 @@ mod tests {
     fn demo_song() -> Song {
         // Realistic bodies (multi-voice stacks) reused across a long form — the
         // case where section reuse actually pays for the pickRestart wrapper.
-        let verse = "stack(s(\"bd ~ ~ bd ~ ~ bd ~\"), note(\"c2 ~ g2 ~\").s(\"sawtooth\").lpf(600))";
+        let verse =
+            "stack(s(\"bd ~ ~ bd ~ ~ bd ~\"), note(\"c2 ~ g2 ~\").s(\"sawtooth\").lpf(600))";
         let chorus = "stack(s(\"bd*4, ~ cp ~ cp, hh*8\"), note(\"<c3 g3 a3 f3>\").s(\"sawtooth\").lpf(1200))";
         Song {
             title: "test form".into(),
             bpm: 120,
             section_cycles: 4,
             sections: vec![
-                Section { label: "i".into(), body: "s(\"bd*4\")".into() },
-                Section { label: "a".into(), body: verse.into() },
-                Section { label: "b".into(), body: chorus.into() },
+                Section {
+                    label: "i".into(),
+                    body: "s(\"bd*4\")".into(),
+                },
+                Section {
+                    label: "a".into(),
+                    body: verse.into(),
+                },
+                Section {
+                    label: "b".into(),
+                    body: chorus.into(),
+                },
             ],
             // intro, then verse/chorus repeated many times → heavy reuse.
             timeline: ["i", "a", "a", "b", "a", "a", "b", "a", "a", "b"]
@@ -140,7 +150,10 @@ mod tests {
         let s = demo_song();
         // i a a b a a b → period 3 after the intro? factor finds the loop.
         let tl = s.timeline_mini().emit();
-        assert!(tl.contains('!'), "expected run-length compression, got {tl}");
+        assert!(
+            tl.contains('!'),
+            "expected run-length compression, got {tl}"
+        );
         // and it reproduces the original label sequence
         let bars: Vec<Mini> = s.timeline.iter().map(Mini::atom).collect();
         assert!(crate::verify::reproduces(&bars, &s.timeline_mini()));
@@ -149,8 +162,7 @@ mod tests {
     #[test]
     fn document_validates_and_saves_space() {
         let s = demo_song();
-        crate::verify::validate_doc(&s.to_strudel())
-            .expect("pickRestart document should play");
+        crate::verify::validate_doc(&s.to_strudel()).expect("pickRestart document should play");
         let (expanded, compressed) = s.ratio();
         assert!(compressed < expanded, "{compressed} !< {expanded}");
     }

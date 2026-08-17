@@ -5,8 +5,9 @@ use cycletron_agent::{ClaudeClient, CodexClient, LlmProvider, OpenAiClient};
 use cycletron_core::config::AppConfig;
 use cycletron_core::session::Session;
 use cycletron_corpus::{InMemoryCorpusIndex, Recipe};
+use parking_lot::Mutex;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// Shared application state managed by Tauri.
 /// Audio is handled by the WASM REPL in the frontend — the backend
@@ -105,40 +106,40 @@ impl AppState {
 
     /// Start a fresh per-turn library read budget.
     pub fn reset_read_budget(&self) {
-        *self.read_budget.lock().unwrap() = (0, 0);
+        *self.read_budget.lock() = (0, 0);
     }
 
     /// Start a fresh per-user-message review budget. Keeps the last-reviewed
     /// buffer so a clean review can be played without re-emitting code.
     pub fn reset_agent_write_run(&self) {
-        let mut w = self.agent_write.lock().unwrap();
+        let mut w = self.agent_write.lock();
         w.review_calls = 0;
         w.listed_structure = false;
         w.force_full_play = false;
     }
 
     pub fn mark_listed_structure(&self) {
-        self.agent_write.lock().unwrap().listed_structure = true;
+        self.agent_write.lock().listed_structure = true;
     }
 
     pub fn listed_structure(&self) -> bool {
-        self.agent_write.lock().unwrap().listed_structure
+        self.agent_write.lock().listed_structure
     }
 
     /// Snapshot of the last successfully reviewed code, if any.
     pub fn last_reviewed_code(&self) -> Option<String> {
-        self.agent_write.lock().unwrap().last_reviewed_code.clone()
+        self.agent_write.lock().last_reviewed_code.clone()
     }
 
     /// Stamp a write-kind label the agent loop will attach to the next telemetry
     /// event for this tool call (e.g. `review_cache`, `reuse`).
     pub fn stamp_write_kind(&self, kind: &str) {
-        self.agent_write.lock().unwrap().pending_write_kind = Some(kind.to_string());
+        self.agent_write.lock().pending_write_kind = Some(kind.to_string());
     }
 
     /// Take and clear any pending write-kind stamp.
     pub fn take_write_kind(&self) -> Option<String> {
-        self.agent_write.lock().unwrap().pending_write_kind.take()
+        self.agent_write.lock().pending_write_kind.take()
     }
 
     /// Account one `read_song` against this turn's egress budget. Returns an
@@ -146,7 +147,7 @@ impl AppState {
     /// per-turn file-count or byte ceiling — the caller then refuses the read so
     /// the content never leaves the machine.
     pub fn account_read(&self, bytes: usize) -> Result<(), String> {
-        let mut b = self.read_budget.lock().unwrap();
+        let mut b = self.read_budget.lock();
         if b.0 >= crate::library_index::MAX_READ_FILES_PER_TURN {
             return Err(format!(
                 "Read limit reached: {} songs already opened this turn. Be selective about which \
@@ -169,7 +170,7 @@ impl AppState {
     /// Initialize corpus, Claude client, and load persisted state from disk.
     /// `data_dir` is the Tauri-resolved per-app data directory.
     pub fn initialize(&self, data_dir: PathBuf) -> anyhow::Result<()> {
-        *self.app_data_dir.lock().unwrap() = Some(data_dir.clone());
+        *self.app_data_dir.lock() = Some(data_dir.clone());
         // Debug: keys go to `{data_dir}/provider-keys.json` (no keychain prompts).
         // Release: OS keychain. Must run before any get_key/set_key.
         crate::secrets::init(&data_dir);
@@ -194,12 +195,12 @@ impl AppState {
         }
 
         {
-            let mut config = self.config.lock().unwrap();
+            let mut config = self.config.lock();
             user.apply_to(&mut config);
             // Session tempo follows config.audio.default_tempo.
-            self.session.lock().unwrap().tempo = config.audio.default_tempo;
+            self.session.lock().tempo = config.audio.default_tempo;
         }
-        *self.user_settings.lock().unwrap() = user;
+        *self.user_settings.lock() = user;
 
         // Corpus + genre recipes — the agent's knowledge base.
         self.load_knowledge();
@@ -209,12 +210,12 @@ impl AppState {
         if client.is_none() {
             tracing::warn!("no AI provider configured — AI features disabled");
         }
-        *self.agent_client.lock().unwrap() = client;
+        *self.agent_client.lock() = client;
 
         // Recents
         let mut recents = Recents::load(&data_dir);
         recents.prune_missing();
-        *self.recents.lock().unwrap() = recents;
+        *self.recents.lock() = recents;
 
         // Library: load settings or fall back to {app_data_dir}/library,
         // then prepare (mkdir + seed Demos/). Same path as set_library_root.
@@ -225,7 +226,7 @@ impl AppState {
                 settings.root.display()
             );
         }
-        *self.library.lock().unwrap() = settings;
+        *self.library.lock() = settings;
 
         Ok(())
     }
@@ -236,7 +237,7 @@ impl AppState {
     /// (recipes are otherwise read exactly once at startup). Returns the recipe
     /// count for the caller to report.
     pub fn load_knowledge(&self) -> usize {
-        let config = self.config.lock().unwrap();
+        let config = self.config.lock();
         // The config path may be relative — anchor it against the workspace root
         // (one level up from this crate's manifest dir) so `cargo tauri dev` works
         // regardless of the process cwd.
@@ -267,7 +268,7 @@ impl AppState {
         });
 
         match InMemoryCorpusIndex::load_with_curated(&corpus_path, curated_path.as_deref()) {
-            Ok(corpus) => *self.corpus.lock().unwrap() = Some(corpus),
+            Ok(corpus) => *self.corpus.lock() = Some(corpus),
             Err(e) => tracing::warn!("corpus failed to load: {e}"),
         }
 
@@ -279,19 +280,19 @@ impl AppState {
         let recipes = cycletron_corpus::recipes::load_recipes(&genres_dir);
         let n = recipes.len();
         tracing::info!("loaded {n} genre recipe(s) from {}", genres_dir.display());
-        *self.recipes.lock().unwrap() = recipes;
+        *self.recipes.lock() = recipes;
         n
     }
 
     pub fn library_root(&self) -> PathBuf {
-        self.library.lock().unwrap().root.clone()
+        self.library.lock().root.clone()
     }
 
     /// Rebuild the AI client from the active provider profile + keychain key.
     /// Called after the user changes provider / model / key via Preferences.
     pub fn rebuild_agent_client(&self) {
         let new_client = self.build_agent_client();
-        *self.agent_client.lock().unwrap() = new_client;
+        *self.agent_client.lock() = new_client;
     }
 
     /// Construct the client for the active provider, pulling its key from the
@@ -300,7 +301,7 @@ impl AppState {
     /// provider with no base URL.
     fn build_agent_client(&self) -> Option<Arc<dyn LlmProvider>> {
         let (active, profile) = {
-            let us = self.user_settings.lock().unwrap();
+            let us = self.user_settings.lock();
             // AI is opt-in: without explicit consent the client is never built,
             // so no provider is contacted regardless of configured keys.
             if !us.ai_consent {
@@ -357,7 +358,7 @@ impl AppState {
     }
 
     pub fn app_data_dir(&self) -> Option<PathBuf> {
-        self.app_data_dir.lock().unwrap().clone()
+        self.app_data_dir.lock().clone()
     }
 }
 
@@ -367,8 +368,7 @@ impl AppState {
 /// `build_agent_client` reads its full credential directly — this returns only
 /// the bearer, used for generic key resolution.
 pub(crate) fn resolve_provider_credential(provider_id: &str) -> Option<String> {
-    crate::oauth::peek_access_token(provider_id)
-        .or_else(|| crate::secrets::get_key(provider_id))
+    crate::oauth::peek_access_token(provider_id).or_else(|| crate::secrets::get_key(provider_id))
 }
 
 /// Turn a relative corpus path into an absolute one, anchored at the
@@ -382,7 +382,7 @@ fn resolve_corpus_path(path: &std::path::Path) -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let workspace_root = manifest_dir
         .parent()
-        .map(|p| p.to_path_buf())
+        .map(std::path::Path::to_path_buf)
         .unwrap_or(manifest_dir);
     workspace_root.join(path)
 }

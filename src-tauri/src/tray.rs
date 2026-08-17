@@ -103,7 +103,7 @@ pub fn tray_set_playback(
         _ => "Cycletron — stopped",
     };
 
-    if let Some(item) = tray_state.play_pause.lock().unwrap().as_ref() {
+    if let Some(item) = tray_state.play_pause.lock().as_ref() {
         let _ = item.set_text(label);
     }
     if let Some(tray) = app.tray_by_id("cycletron-tray") {
@@ -114,13 +114,13 @@ pub fn tray_set_playback(
 
 /// Holds references to tray menu items that need to be mutated at runtime.
 pub struct TrayStateHolder {
-    pub play_pause: std::sync::Mutex<Option<MenuItem<tauri::Wry>>>,
+    pub play_pause: parking_lot::Mutex<Option<MenuItem<tauri::Wry>>>,
 }
 
 impl TrayStateHolder {
     pub fn new() -> Self {
         Self {
-            play_pause: std::sync::Mutex::new(None),
+            play_pause: parking_lot::Mutex::new(None),
         }
     }
 }

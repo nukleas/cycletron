@@ -25,10 +25,10 @@ pub struct Finding {
     pub message: String,
 }
 
-/// Critique a pattern: evaluate it, then run heuristic checks over the first
-/// loop (or `cycles` if it doesn't repeat). `cycles` clamps to 1..=64.
-pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
-    let d = inspect_code(code, cycles.max(4))?;
+/// Critique a pattern over its evaluated window: heuristic checks over the
+/// first loop (or the whole window if it doesn't repeat).
+pub fn critique(ev: &crate::Evaluated) -> Critique {
+    let d = ev.digest();
     let mut findings: Vec<Finding> = Vec::new();
     let warn = |c: &str, m: String| Finding {
         severity: "warn".to_string(),
@@ -42,7 +42,10 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
     };
 
     // Critique over the loop period when known, else the whole window.
-    let span = d.period_cycles.unwrap_or(d.cycles_queried).min(d.cycles.len());
+    let span = d
+        .period_cycles
+        .unwrap_or(d.cycles_queried)
+        .min(d.cycles.len());
 
     // --- Fully silent ------------------------------------------------------
     if d.total_events == 0 {
@@ -50,7 +53,10 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
             "silent",
             "Pattern emits no events — nothing will sound.".to_string(),
         ));
-        return Ok(Critique { ok: false, findings });
+        return Critique {
+            ok: false,
+            findings,
+        };
     }
 
     // --- Silent cycles within the loop ------------------------------------
@@ -65,7 +71,11 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
             "silent-cycles",
             format!(
                 "Cycle(s) {} are silent — intentional rest, or a gap in the loop?",
-                silent.iter().map(usize::to_string).collect::<Vec<_>>().join(", ")
+                silent
+                    .iter()
+                    .map(usize::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ),
         ));
     }
@@ -192,7 +202,11 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
     let low_pitch = d.note_low.as_ref().is_some_and(|n| n.midi < 48); // below C3
     let low_drum = d.sounds.iter().any(|s| {
         let s = s.to_lowercase();
-        s.contains("bd") || s.contains("sub") || s.contains("bass") || s == "sbd" || s.contains("808")
+        s.contains("bd")
+            || s.contains("sub")
+            || s.contains("bass")
+            || s == "sbd"
+            || s.contains("808")
     });
     if has_pitched && !low_pitch && !low_drum {
         findings.push(note(
@@ -204,13 +218,17 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
     }
 
     // --- Static single-pitch melody ---------------------------------------
-    if let (Some(lo), Some(hi)) = (&d.note_low, &d.note_high) {
-        if lo.midi == hi.midi && d.total_events > 2 {
-            findings.push(note(
-                "static-pitch",
-                format!("Every pitched note is {} — the line never moves melodically.", lo.name),
-            ));
-        }
+    if let (Some(lo), Some(hi)) = (&d.note_low, &d.note_high)
+        && lo.midi == hi.midi
+        && d.total_events > 2
+    {
+        findings.push(note(
+            "static-pitch",
+            format!(
+                "Every pitched note is {} — the line never moves melodically.",
+                lo.name
+            ),
+        ));
     }
 
     // --- Spectral masking / balance ---------------------------------------
@@ -218,17 +236,19 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
     // fails — a voice buried in a band another voice owns (the vocal-under-
     // strings case). Estimated symbolically from each voice's sound, register,
     // and filters; advisory notes only, so the gate still passes.
-    findings.extend(crate::spectral::spectral_findings(code, span.max(1)));
+    findings.extend(crate::spectral::spectral_findings(ev, span.max(1)));
 
     let ok = !findings.iter().any(|f| f.severity == "warn");
-    Ok(Critique { ok, findings })
+    Critique { ok, findings }
 }
 
 /// Is this sound a drum/percussion voice (a short transient, not sustained
 /// energy)? Matches the default drum names and drum-machine voices like
 /// `RolandTR808_bd` (the voice is the suffix after the last `_`).
 fn is_percussive(sound: &str) -> bool {
-    const DRUMS: [&str; 12] = ["bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs"];
+    const DRUMS: [&str; 12] = [
+        "bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs",
+    ];
     let voice = sound.rsplit('_').next().unwrap_or(sound);
     DRUMS.contains(&voice)
 }
@@ -238,7 +258,9 @@ fn is_percussive(sound: &str) -> bool {
 /// as a sound name and plays nothing.
 fn looks_like_chord_symbol(s: &str) -> bool {
     let mut chars = s.chars();
-    let Some(first) = chars.next() else { return false };
+    let Some(first) = chars.next() else {
+        return false;
+    };
     if !('A'..='G').contains(&first) {
         return false;
     }
@@ -314,7 +336,7 @@ pub fn lint_source(code: &str) -> Vec<Finding> {
 /// in the panner), and gm_* streaming making cycle 0 empty. `known` is the
 /// resolvable sound set (see `sounds::known_sound_set`); any `gm_*` name is
 /// accepted since GM instruments stream on demand.
-pub fn lint_digest(d: &PatternDigest, known: &std::collections::HashSet<String>) -> Vec<Finding> {
+pub fn lint_digest(d: &PatternDigest, known: &crate::sounds::SoundSet) -> Vec<Finding> {
     let mut findings = Vec::new();
     let warn = |c: &str, m: String| Finding {
         severity: "warn".to_string(),
@@ -343,9 +365,9 @@ pub fn lint_digest(d: &PatternDigest, known: &std::collections::HashSet<String>)
             continue;
         }
         let prefix: String = s.chars().take(3).collect();
-        let mut suggestions: Vec<&String> = known
+        let mut suggestions: Vec<&str> = known
             .iter()
-            .filter(|k| k.starts_with(&prefix) || k.contains(s.as_str()) || s.contains(k.as_str()))
+            .filter(|k| k.starts_with(&prefix) || k.contains(s.as_str()) || s.contains(*k))
             .collect();
         suggestions.sort();
         suggestions.truncate(3);
@@ -354,7 +376,11 @@ pub fn lint_digest(d: &PatternDigest, known: &std::collections::HashSet<String>)
         } else {
             format!(
                 "Did you mean {}?",
-                suggestions.iter().map(|s| format!("'{s}'")).collect::<Vec<_>>().join(" / ")
+                suggestions
+                    .iter()
+                    .map(|s| format!("'{s}'"))
+                    .collect::<Vec<_>>()
+                    .join(" / ")
             )
         };
         findings.push(warn(
@@ -367,10 +393,10 @@ pub fn lint_digest(d: &PatternDigest, known: &std::collections::HashSet<String>)
     let mut bad_pan: Option<f64> = None;
     for cd in &d.cycles {
         for e in &cd.events {
-            if let Some(p) = e.pan {
-                if !(0.0..=1.0).contains(&p) {
-                    bad_pan = Some(p);
-                }
+            if let Some(p) = e.pan
+                && !(0.0..=1.0).contains(&p)
+            {
+                bad_pan = Some(p);
             }
         }
     }

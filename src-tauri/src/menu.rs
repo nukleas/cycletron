@@ -2,7 +2,9 @@
 //! which translates them into file-manager / editor / examples calls.
 
 use std::path::Path;
-use tauri::menu::{Menu, MenuBuilder, MenuEvent, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+use tauri::menu::{
+    Menu, MenuBuilder, MenuEvent, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder,
+};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 pub fn build_app_menu<R: Runtime>(
@@ -34,15 +36,12 @@ pub fn build_app_menu<R: Runtime>(
                     .build(app)?,
             )
             .separator()
-            .item(
-                &MenuItemBuilder::with_id("file.recent_open", "Open File…").build(app)?,
-            );
+            .item(&MenuItemBuilder::with_id("file.recent_open", "Open File…").build(app)?);
     } else {
         for (idx, p) in recents.iter().take(10).enumerate() {
             let label = display_recent(p);
-            open_recent = open_recent.item(
-                &MenuItemBuilder::with_id(format!("file.recent.{idx}"), label).build(app)?,
-            );
+            open_recent = open_recent
+                .item(&MenuItemBuilder::with_id(format!("file.recent.{idx}"), label).build(app)?);
         }
         open_recent = open_recent
             .separator()
@@ -107,9 +106,7 @@ pub fn build_app_menu<R: Runtime>(
         .item(&PredefinedMenuItem::paste(app, None)?)
         .item(&PredefinedMenuItem::select_all(app, None)?)
         .separator()
-        .item(
-            &MenuItemBuilder::with_id("edit.clear_session", "Clear Session").build(app)?,
-        )
+        .item(&MenuItemBuilder::with_id("edit.clear_session", "Clear Session").build(app)?)
         .build()?;
 
     // View
@@ -119,11 +116,10 @@ pub fn build_app_menu<R: Runtime>(
                 .accelerator("CmdOrCtrl+Shift+A")
                 .build(app)?,
         )
+        .item(&MenuItemBuilder::with_id("view.browse_examples", "Browse Examples").build(app)?)
         .item(
-            &MenuItemBuilder::with_id("view.browse_examples", "Browse Examples").build(app)?,
-        )
-        .item(
-            &MenuItemBuilder::with_id("view.reload_corpus", "Reload Corpus & Recipes").build(app)?,
+            &MenuItemBuilder::with_id("view.reload_corpus", "Reload Corpus & Recipes")
+                .build(app)?,
         )
         .separator()
         .item(
@@ -197,7 +193,6 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
                 .state::<crate::state::AppState>()
                 .recents
                 .lock()
-                .unwrap()
                 .entries
                 .get(idx)
                 .cloned();
@@ -212,7 +207,7 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         let state = app.state::<crate::state::AppState>();
         let dir = state.app_data_dir();
         {
-            let mut r = state.recents.lock().unwrap();
+            let mut r = state.recents.lock();
             *r = crate::files::Recents::new();
             if let Some(dir) = dir {
                 let _ = r.save(&dir);
@@ -255,7 +250,9 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     };
     match app.emit(topic, ()) {
         Ok(_) => tracing::info!(target: "cycletron::menu", topic, "emitted menu topic"),
-        Err(e) => tracing::error!(target: "cycletron::menu", topic, error = ?e, "failed to emit menu topic"),
+        Err(e) => {
+            tracing::error!(target: "cycletron::menu", topic, error = ?e, "failed to emit menu topic")
+        }
     }
 }
 
@@ -266,7 +263,6 @@ pub fn rebuild_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .state::<crate::state::AppState>()
         .recents
         .lock()
-        .unwrap()
         .entries
         .clone();
     let menu = build_app_menu(app, &recents)?;

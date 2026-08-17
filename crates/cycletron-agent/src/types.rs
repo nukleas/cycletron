@@ -30,15 +30,17 @@ pub enum ContentBlock {
     },
 }
 
-/// Request body for Claude Messages API.
+/// Request body for Claude Messages API. Borrows everything — it exists only
+/// to be serialized once per request, and the agent loop makes up to 20
+/// requests per user message with the full history and tool schemas each time.
 #[derive(Debug, Serialize)]
-pub struct MessagesRequest {
-    pub model: String,
+pub struct MessagesRequest<'a> {
+    pub model: &'a str,
     pub max_tokens: u32,
-    pub system: String,
-    pub messages: Vec<ApiMessage>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub tools: Vec<ToolDefinition>,
+    pub system: &'a str,
+    pub messages: &'a [ApiMessage],
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    pub tools: &'a [ToolDefinition],
     pub stream: bool,
 }
 

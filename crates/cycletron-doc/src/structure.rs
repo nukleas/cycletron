@@ -139,7 +139,10 @@ $: "<intro drop1>".pickRestart({
     fn find_binding_matches_name() {
         let b = find_binding(DOC, "lead").expect("lead binding");
         assert_eq!(b.name, "lead");
-        assert_eq!(&DOC[b.expr_start..b.expr_end], r#"note("c e g").s("sawtooth").gain(0.6)"#);
+        assert_eq!(
+            &DOC[b.expr_start..b.expr_end],
+            r#"note("c e g").s("sawtooth").gain(0.6)"#
+        );
     }
 
     #[test]
@@ -166,7 +169,12 @@ $: "<intro drop1>".pickRestart({
     #[test]
     fn identity_replace_is_byte_identical() {
         let b = find_binding(DOC, "sections").unwrap();
-        let same = replace_span(DOC, b.expr_start, b.expr_end, &DOC[b.expr_start..b.expr_end]);
+        let same = replace_span(
+            DOC,
+            b.expr_start,
+            b.expr_end,
+            &DOC[b.expr_start..b.expr_end],
+        );
         assert_eq!(same, DOC);
     }
 

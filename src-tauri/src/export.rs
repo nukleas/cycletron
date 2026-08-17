@@ -12,9 +12,9 @@ use midly::{
     Format, Header, MidiMessage, Smf, Timing, Track as MidiTrack, TrackEvent, TrackEventKind,
     num::{u4, u7, u15, u24, u28},
 };
+use rustc_hash::FxHashMap;
 use serde::Serialize;
 use strudel_audio::{OfflineRenderer, default_sources};
-use rustc_hash::FxHashMap;
 use strudel_core::{ContextKey, Hap, Pattern, Value, stack};
 use strudel_dsl::{
     Directive, EvalContext, Expr, Tempo, evaluate_in_context, evaluate_in_context_with_tempo,
@@ -164,10 +164,9 @@ pub fn export_audio(
             ));
 
             for (i, (name, pattern)) in stem_patterns.iter().enumerate() {
-                let safe = sanitize_filename(name);
+                let safe = cycletron_core::text::slug::filename(name, "stem", None);
                 let stem_wav = stem_dir.join(format!("{:02}-{safe}.wav", i + 1));
-                clipped +=
-                    render_pattern_to_wav(pattern, tempo, gain, duration_secs, &stem_wav)?;
+                clipped += render_pattern_to_wav(pattern, tempo, gain, duration_secs, &stem_wav)?;
 
                 match format {
                     AudioFormat::Wav => {
@@ -272,10 +271,9 @@ fn render_pattern_to_wav(
 /// 1. Multiple `$:` tracks (named by id, comment, or index)
 /// 2. Top-level `stack(a, b, …)` arguments
 /// 3. Single layer (full mix)
-fn resolve_patterns(
-    code: &str,
-    want_stems: bool,
-) -> Result<(Vec<(String, Pattern)>, Option<Tempo>), String> {
+type NamedPatterns = (Vec<(String, Pattern)>, Option<Tempo>);
+
+fn resolve_patterns(code: &str, want_stems: bool) -> Result<NamedPatterns, String> {
     // Multi-track file path
     if let Ok(file) = parse_strudel_file(code)
         && !file.is_empty()
@@ -294,11 +292,13 @@ fn resolve_patterns(
         }
         for binding in &file.bindings {
             // Binding parse-error offsets are relative to the binding text.
-            let expr = parse_expr(binding.expr_str).map_err(|e| {
-                format!("Parse error in binding '{}': {e}", binding.name)
-            })?;
+            let expr = parse_expr(binding.expr_str)
+                .map_err(|e| format!("Parse error in binding '{}': {e}", binding.name))?;
             // Mirror evaluate_file: object literals become object bindings.
-            if let Expr::Object { entries, spreads, .. } = &expr {
+            if let Expr::Object {
+                entries, spreads, ..
+            } = &expr
+            {
                 let mut obj = FxHashMap::default();
                 for spread in spreads {
                     if let Expr::Call { name, args, .. } = spread
@@ -310,17 +310,16 @@ fn resolve_patterns(
                             ));
                         };
                         for (key, value) in spread_obj {
-                            obj.insert(key.clone(), value.clone());
+                            obj.insert(*key, value.clone());
                         }
                     } else {
                         return Err("Object spreads must be bare object identifiers".into());
                     }
                 }
                 for (key, value_expr) in entries {
-                    let value_pattern = evaluate_in_context(value_expr, &context).map_err(|e| {
-                        format!("Eval error in object field '{key}': {e}")
-                    })?;
-                    obj.insert(key.clone(), value_pattern);
+                    let value_pattern = evaluate_in_context(value_expr, &context)
+                        .map_err(|e| format!("Eval error in object field '{key}': {e}"))?;
+                    obj.insert(*key, value_pattern);
                 }
                 context.bind_object(binding.name, obj);
             } else {
@@ -346,10 +345,11 @@ fn resolve_patterns(
         }
 
         // Single track: try to peel top-level stack for stem split.
-        if want_stems && stems.len() == 1 {
-            if let Some(split) = try_split_stack_expr(&file.tracks[0].expression, &context) {
-                return Ok((split, tempo));
-            }
+        if want_stems
+            && stems.len() == 1
+            && let Some(split) = try_split_stack_expr(&file.tracks[0].expression, &context)
+        {
+            return Ok((split, tempo));
         }
 
         return Ok((stems, tempo));
@@ -358,12 +358,11 @@ fn resolve_patterns(
     // Single expression / mini
     let evaluated = execute(code).map_err(|e| format!("Could not parse pattern: {e}"))?;
 
-    if want_stems {
-        if let Ok(expr) = parse_expr(code.trim())
-            && let Some(split) = try_split_stack_expr(&expr, &EvalContext::new())
-        {
-            return Ok((split, evaluated.tempo));
-        }
+    if want_stems
+        && let Ok(expr) = parse_expr(code.trim())
+        && let Some(split) = try_split_stack_expr(&expr, &EvalContext::new())
+    {
+        return Ok((split, evaluated.tempo));
     }
 
     Ok((vec![("mix".into(), evaluated.pattern)], evaluated.tempo))
@@ -390,10 +389,7 @@ fn track_stem_name(id: &str, comment: Option<&str>, index: usize) -> String {
 }
 
 /// If `expr` is `stack(a, b, …)`, evaluate each arg as its own stem.
-fn try_split_stack_expr(
-    expr: &Expr,
-    ctx: &EvalContext<'_>,
-) -> Option<Vec<(String, Pattern)>> {
+fn try_split_stack_expr(expr: &Expr, ctx: &EvalContext<'_>) -> Option<Vec<(String, Pattern)>> {
     let Expr::Call { name, args, .. } = expr else {
         return None;
     };
@@ -525,8 +521,7 @@ fn haps_to_midi_events(
         }
 
         let onset_ticks = (hap.part.begin.to_f64() * f64::from(ticks_per_cycle)) as u32;
-        let duration_ticks =
-            (hap.duration().to_f64() * f64::from(ticks_per_cycle)).max(1.0) as u32;
+        let duration_ticks = (hap.duration().to_f64() * f64::from(ticks_per_cycle)).max(1.0) as u32;
 
         let channel = if let Some(s) = hap.value.as_string() {
             if is_drum_sound(s) {
@@ -564,11 +559,7 @@ fn extract_velocity(hap: &Hap<Value>, default: u8) -> u8 {
     default
 }
 
-fn build_midi_file(
-    events: &[MidiNoteEvent],
-    bpm: f64,
-    ppq: u16,
-) -> Result<Smf<'static>, String> {
+fn build_midi_file(events: &[MidiNoteEvent], bpm: f64, ppq: u16) -> Result<Smf<'static>, String> {
     let mut smf = Smf::new(Header {
         format: Format::SingleTrack,
         timing: Timing::Metrical(u15::new(ppq)),
@@ -616,11 +607,13 @@ fn build_midi_file(
     }
 
     timed.sort_by(|a, b| {
-        a.time.cmp(&b.time).then_with(|| match (&a.event_type, &b.event_type) {
-            (EventType::NoteOff, EventType::NoteOn) => Ordering::Less,
-            (EventType::NoteOn, EventType::NoteOff) => Ordering::Greater,
-            _ => Ordering::Equal,
-        })
+        a.time
+            .cmp(&b.time)
+            .then_with(|| match (&a.event_type, &b.event_type) {
+                (EventType::NoteOff, EventType::NoteOn) => Ordering::Less,
+                (EventType::NoteOn, EventType::NoteOff) => Ordering::Greater,
+                _ => Ordering::Equal,
+            })
     });
 
     let mut current_time = 0_u32;
@@ -726,7 +719,10 @@ fn encode_mp3(wav: &Path, mp3: &Path) -> Result<(), String> {
         ));
     }
     if !mp3.is_file() {
-        return Err(format!("ffmpeg reported success but {} is missing", mp3.display()));
+        return Err(format!(
+            "ffmpeg reported success but {} is missing",
+            mp3.display()
+        ));
     }
     Ok(())
 }
@@ -751,14 +747,13 @@ fn find_ffmpeg() -> Option<PathBuf> {
             return Some(path);
         }
         // Bare name — let Command resolve via PATH by checking `command -v`.
-        if c == "ffmpeg" {
-            if let Ok(out) = Command::new("which").arg("ffmpeg").output()
-                && out.status.success()
-            {
-                let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                if !s.is_empty() {
-                    return Some(PathBuf::from(s));
-                }
+        if c == "ffmpeg"
+            && let Ok(out) = Command::new("which").arg("ffmpeg").output()
+            && out.status.success()
+        {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !s.is_empty() {
+                return Some(PathBuf::from(s));
             }
         }
     }
@@ -823,21 +818,6 @@ fn stem_dir_for(mix_wav: &Path) -> PathBuf {
         .parent()
         .unwrap_or_else(|| Path::new("."))
         .join(format!("{stem}-stems"))
-}
-
-fn sanitize_filename(name: &str) -> String {
-    let s: String = name
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .collect();
-    let s = s.trim_matches('-').to_string();
-    if s.is_empty() { "stem".into() } else { s }
 }
 
 fn register_sample_manifests(renderer: &mut OfflineRenderer) {
@@ -950,7 +930,12 @@ $: s("hh*8").gain(0.3)
             true,
         )
         .expect("stems export");
-        assert_eq!(result.stem_paths.len(), 2, "expected 2 stems, got {:?}", result.stem_paths);
+        assert_eq!(
+            result.stem_paths.len(),
+            2,
+            "expected 2 stems, got {:?}",
+            result.stem_paths
+        );
         for p in &result.stem_paths {
             assert!(Path::new(p).is_file(), "missing stem {p}");
             let _ = std::fs::remove_file(p);

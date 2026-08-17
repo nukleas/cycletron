@@ -104,8 +104,16 @@ fn render_recipe(spec: &GenreSpec) -> Result<String, String> {
         title_case(&spec.display),
         one_line(&spec.desc),
         spec.scale,
-        if spec.harmony.is_some() { ", diatonic chords" } else { "" },
-        if matches!(spec.melody, MelodySpec::None) { "" } else { ", a generated lead" },
+        if spec.harmony.is_some() {
+            ", diatonic chords"
+        } else {
+            ""
+        },
+        if matches!(spec.melody, MelodySpec::None) {
+            ""
+        } else {
+            ", a generated lead"
+        },
     ));
     body.push_str("## Full skeleton\n\n");
     body.push_str("```strudel\n");
@@ -183,12 +191,10 @@ fn update_map_ledger(genres_dir: &Path) {
             if p.extension().and_then(|x| x.to_str()) != Some("md") {
                 return None;
             }
-            let stem = p.file_stem()?.to_str()?.to_string();
-            if stem.starts_with('_') || stem.eq_ignore_ascii_case("readme") {
-                None
-            } else {
-                Some(stem)
+            if cycletron_corpus::layout::is_doc_file(&p) {
+                return None;
             }
+            Some(p.file_stem()?.to_str()?.to_string())
         })
         .collect();
 
@@ -197,14 +203,12 @@ fn update_map_ledger(genres_dir: &Path) {
         .lines()
         .map(|line| {
             // Only genre entries carry a `"recipe":` field.
-            if let Some(name) = json_field(line, "name") {
-                if recipes.contains(&name) && line.contains("\"recipe\": null") {
-                    changed += 1;
-                    return line.replace(
-                        "\"recipe\": null",
-                        &format!("\"recipe\": \"{name}.md\""),
-                    );
-                }
+            if let Some(name) = json_field(line, "name")
+                && recipes.contains(&name)
+                && line.contains("\"recipe\": null")
+            {
+                changed += 1;
+                return line.replace("\"recipe\": null", &format!("\"recipe\": \"{name}.md\""));
             }
             line.to_string()
         })
@@ -221,7 +225,10 @@ fn update_map_ledger(genres_dir: &Path) {
 
     if joined != text {
         let _ = fs::write(&map_path, joined);
-        println!("  updated _map.json ({changed} recipe links, total {})", recipes.len());
+        println!(
+            "  updated _map.json ({changed} recipe links, total {})",
+            recipes.len()
+        );
     }
 }
 
@@ -242,7 +249,9 @@ fn replace_totals_recipe(text: &str, n: usize) -> Option<String> {
     let key = "\"recipe\": ";
     let rel = tail.find(key)? + key.len();
     let after = &tail[rel..];
-    let digits_end = after.find(|c: char| !c.is_ascii_digit()).unwrap_or(after.len());
+    let digits_end = after
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(after.len());
     let new_tail = format!("{}{}{}", &tail[..rel], n, &after[digits_end..]);
     Some(format!("{head}{new_tail}"))
 }

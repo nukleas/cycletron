@@ -5,13 +5,13 @@
 //! dir, unverified JWT/base64 decode, the home dir, and the wall clock — live
 //! here so the security-sensitive bits exist exactly once.
 
+use parking_lot::Mutex;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 /// A per-backend on-disk token store: an app-data directory set once at startup
 /// plus a fixed file name. Holds no token state itself — it reads and writes the
@@ -34,15 +34,12 @@ impl TokenStore {
 
     /// Call once at app startup with the resolved app-data directory.
     pub fn init(&self, app_data_dir: &Path) {
-        if let Ok(mut guard) = self.dir.lock() {
-            *guard = Some(app_data_dir.to_path_buf());
-        }
+        *self.dir.lock() = Some(app_data_dir.to_path_buf());
     }
 
     fn path(&self) -> Result<PathBuf, String> {
         self.dir
             .lock()
-            .map_err(|e| e.to_string())?
             .clone()
             .map(|d| d.join(self.file))
             .ok_or_else(|| format!("{} OAuth store not initialized", self.label))
@@ -90,6 +87,111 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
 #[cfg(not(unix))]
 fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
     fs::write(path, bytes).map_err(|e| e.to_string())
+}
+
+/// Is an access token still usable, refreshing `skew` seconds early?
+pub fn still_valid(expires_at: i64, skew: i64, access_token: &str) -> bool {
+    expires_at - skew > now_unix() && !access_token.is_empty()
+}
+
+// ── OAuth token-endpoint refresh (shared wire format + classification) ──────
+
+/// The OAuth token endpoint's response shape — identical for both backends.
+#[derive(Debug, Deserialize)]
+pub struct TokenResponse {
+    pub access_token: Option<String>,
+    pub refresh_token: Option<String>,
+    #[serde(default)]
+    pub id_token: Option<String>,
+    pub expires_in: Option<i64>,
+    pub error: Option<String>,
+    pub error_description: Option<String>,
+}
+
+/// A successful refresh: the new access token, the (possibly rotated) refresh
+/// token, and whatever else the endpoint returned. Backends derive their own
+/// expiry/claims from these.
+#[derive(Debug)]
+pub struct RefreshedGrant {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub id_token: Option<String>,
+    pub expires_in: Option<i64>,
+}
+
+/// Why a refresh failed, classified so each backend can attach its own
+/// user-facing guidance (and clear its store on a dead grant).
+#[derive(Debug)]
+pub enum RefreshError {
+    /// The grant is dead (invalid_grant / 400 / 401) — re-login required.
+    InvalidGrant {
+        err: String,
+        desc: String,
+    },
+    /// HTTP 403 — the grant works but the account isn't entitled; re-login
+    /// will not help.
+    Forbidden {
+        desc: String,
+    },
+    Other(String),
+}
+
+/// POST a `refresh_token` grant and classify the outcome. `label` names the
+/// backend in transport-level error messages.
+pub async fn refresh_grant(
+    token_url: &str,
+    client_id: &str,
+    refresh: &str,
+    label: &str,
+) -> Result<RefreshedGrant, RefreshError> {
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(token_url)
+        .header("Accept", "application/json")
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("client_id", client_id),
+            ("refresh_token", refresh),
+        ])
+        .send()
+        .await
+        .map_err(|e| RefreshError::Other(format!("{label} token refresh failed: {e}")))?;
+
+    let status = resp.status();
+    let body: TokenResponse = resp
+        .json()
+        .await
+        .map_err(|e| RefreshError::Other(format!("{label} refresh parse failed: {e}")))?;
+
+    if !status.is_success() || body.error.is_some() {
+        let err = body.error.unwrap_or_else(|| status.to_string());
+        let desc = body.error_description.unwrap_or_default();
+        if status.as_u16() == 403 {
+            return Err(RefreshError::Forbidden { desc });
+        }
+        if err == "invalid_grant" || status.as_u16() == 400 || status.as_u16() == 401 {
+            return Err(RefreshError::InvalidGrant { err, desc });
+        }
+        return Err(RefreshError::Other(format!(
+            "{label} refresh failed: {err} {desc}"
+        )));
+    }
+
+    let access = body
+        .access_token
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| RefreshError::Other("refresh response missing access_token".to_string()))?;
+    // Refresh tokens rotate — persist the new one, else keep the old.
+    let new_refresh = body
+        .refresh_token
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| refresh.to_string());
+    Ok(RefreshedGrant {
+        access_token: access,
+        refresh_token: new_refresh,
+        id_token: body.id_token,
+        expires_in: body.expires_in,
+    })
 }
 
 /// Wall-clock time in Unix epoch seconds (0 on the impossible pre-epoch error).

@@ -71,97 +71,21 @@ fn format_with_frontmatter(code: &str, bpm: Option<f64>) -> String {
 /// Splits a file body into optional frontmatter + code.
 /// Accepts `---\n...\n---\n` at the very start; otherwise returns (None, raw).
 fn split_frontmatter(raw: &str) -> (Option<Frontmatter>, String) {
-    let trimmed_start = raw.trim_start_matches('\u{feff}');
-    if !trimmed_start.starts_with("---") {
-        return (None, raw.to_string());
-    }
-    // Find the closing `---` on its own line.
-    let after_first = match trimmed_start.find('\n') {
-        Some(i) => &trimmed_start[i + 1..],
-        None => return (None, raw.to_string()),
-    };
-    let end = match find_line(after_first, "---") {
-        Some(i) => i,
-        None => return (None, raw.to_string()),
-    };
-    let yaml = &after_first[..end];
-    let rest = &after_first[end..];
-    // Skip the closing `---` line
-    let code_start = rest.find('\n').map(|i| i + 1).unwrap_or(rest.len());
-    let code = rest[code_start..].to_string();
-
-    (Some(parse_frontmatter(yaml)), code)
-}
-
-fn find_line(s: &str, needle: &str) -> Option<usize> {
-    let mut offset = 0;
-    for line in s.split_inclusive('\n') {
-        let l = line.trim_end_matches('\n').trim_end_matches('\r');
-        if l == needle {
-            return Some(offset);
+    let (yaml, code) = cycletron_core::text::frontmatter::split(raw);
+    match yaml {
+        None => (None, raw.to_string()),
+        Some(yaml) => {
+            let fm = cycletron_core::text::frontmatter::parse(yaml);
+            (
+                Some(Frontmatter {
+                    name: fm.scalar("name"),
+                    bpm: fm.scalar("bpm").and_then(|v| v.parse().ok()),
+                    tags: fm.array("tags").unwrap_or_default(),
+                    created: fm.scalar("created"),
+                }),
+                code.to_string(),
+            )
         }
-        offset += line.len();
-    }
-    None
-}
-
-/// Parses a very small subset of YAML: `key: value` lines. Supports `bpm`
-/// as number, `name` as (optionally quoted) string, and `tags` as either
-/// an inline array `[a, b]` or a block list of `- item` lines.
-fn parse_frontmatter(yaml: &str) -> Frontmatter {
-    let mut fm = Frontmatter::default();
-    let mut lines = yaml.lines().peekable();
-    while let Some(line) = lines.next() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        let Some((k, v)) = trimmed.split_once(':') else {
-            continue;
-        };
-        let key = k.trim();
-        let val = v.trim();
-        match key {
-            "name" => fm.name = Some(strip_quotes(val).to_string()),
-            "created" => fm.created = Some(strip_quotes(val).to_string()),
-            "bpm" => {
-                if let Ok(n) = val.parse::<f64>() {
-                    fm.bpm = Some(n);
-                }
-            }
-            "tags" => {
-                if val.starts_with('[') && val.ends_with(']') {
-                    fm.tags = val[1..val.len() - 1]
-                        .split(',')
-                        .map(|s| strip_quotes(s.trim()).to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-                } else if val.is_empty() {
-                    while let Some(next) = lines.peek() {
-                        let t = next.trim();
-                        if let Some(item) = t.strip_prefix("- ") {
-                            fm.tags.push(strip_quotes(item.trim()).to_string());
-                            lines.next();
-                        } else {
-                            break;
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    fm
-}
-
-fn strip_quotes(s: &str) -> &str {
-    let s = s.trim();
-    if (s.starts_with('"') && s.ends_with('"') && s.len() >= 2)
-        || (s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2)
-    {
-        &s[1..s.len() - 1]
-    } else {
-        s
     }
 }
 

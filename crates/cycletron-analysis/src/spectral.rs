@@ -63,7 +63,11 @@ enum Class {
 /// Map a sound name to a timbre class. Unknown names default to a mid tonal voice.
 fn classify(sound: &str) -> Class {
     // Machine-kit voices carry a `Bank_voice` name; judge by the voice tail.
-    let s = sound.rsplit('_').next().unwrap_or(sound).to_ascii_lowercase();
+    let s = sound
+        .rsplit('_')
+        .next()
+        .unwrap_or(sound)
+        .to_ascii_lowercase();
     match s.as_str() {
         "bd" | "sbd" => Class::Kick,
         "sd" | "sn" | "cp" | "perc" | "hand" | "tabla" | "east" => Class::Snare,
@@ -141,15 +145,17 @@ fn noise_shape(tilt: f64) -> [f64; NB] {
 fn apply_filters(mut b: [f64; NB], cutoff: Option<f64>, hpf: Option<f64>) -> [f64; NB] {
     for (i, slot) in b.iter_mut().enumerate() {
         let c = band_center(i);
-        if let Some(lp) = cutoff {
-            if lp > 0.0 && c > lp {
-                *slot *= (lp / c).powi(2);
-            }
+        if let Some(lp) = cutoff
+            && lp > 0.0
+            && c > lp
+        {
+            *slot *= (lp / c).powi(2);
         }
-        if let Some(hp) = hpf {
-            if hp > 0.0 && c < hp {
-                *slot *= (c / hp).powi(2);
-            }
+        if let Some(hp) = hpf
+            && hp > 0.0
+            && c < hp
+        {
+            *slot *= (c / hp).powi(2);
         }
     }
     b
@@ -214,42 +220,35 @@ fn midi_hz(m: f64) -> f64 {
 /// which lives in the `Note` control or, for a bare `note(...)`, in the hap value
 /// itself (same resolution the digest uses).
 fn hap_fundamental(h: &strudel_core::Hap) -> Option<f64> {
-    if let Some(f) = getf(h, ContextKey::Frequency) {
-        if f > 0.0 {
-            return Some(f);
-        }
+    if let Some(f) = getf(h, ContextKey::Frequency)
+        && f > 0.0
+    {
+        return Some(f);
     }
-    let cand = h
-        .context
-        .get(&ContextKey::Note)
-        .cloned()
-        .unwrap_or_else(|| h.value.clone());
+    let cand = h.context.get(&ContextKey::Note).copied().unwrap_or(h.value);
     let (_, midi) = crate::inspect::resolve_note(&cand);
     midi.map(|m| midi_hz(m as f64))
 }
 
 /// Analyse masking + spectral balance over the loop. Returns findings to fold
 /// into the mix critique (severity "note" — advisory, never blocks the gate).
-pub fn spectral_findings(code: &str, cycles: usize) -> Vec<Finding> {
-    let Ok(out) = strudel_dsl::execute(code) else {
-        return Vec::new();
-    };
-    let cycles = cycles.clamp(1, 16) as i32;
+pub(crate) fn spectral_findings(ev: &crate::Evaluated, cycles: usize) -> Vec<Finding> {
+    let cycles = cycles.clamp(1, 16).min(ev.window());
 
     // Accumulate energy per voice identity across the loop.
     use std::collections::BTreeMap;
     let mut voices: BTreeMap<String, Voice> = BTreeMap::new();
 
-    for cyc in 0..cycles {
-        for h in out.pattern.query_arc(cyc, cyc + 1) {
+    for cycle_haps in &ev.cycle_haps()[..cycles] {
+        for h in cycle_haps {
             if !h.has_onset() {
                 continue;
             }
-            let Some(sound) = hap_sound(&h) else { continue };
-            let cutoff = getf(&h, ContextKey::Cutoff);
-            let hpf = getf(&h, ContextKey::Hpf);
-            let f0 = hap_fundamental(&h);
-            let gain = getf(&h, ContextKey::Gain).unwrap_or(1.0);
+            let Some(sound) = hap_sound(h) else { continue };
+            let cutoff = getf(h, ContextKey::Cutoff);
+            let hpf = getf(h, ContextKey::Hpf);
+            let f0 = hap_fundamental(h);
+            let gain = getf(h, ContextKey::Gain).unwrap_or(1.0);
 
             let e = event_energy(&sound, f0, cutoff, hpf);
             let g2 = gain * gain; // power
@@ -266,8 +265,8 @@ pub fn spectral_findings(code: &str, cycles: usize) -> Vec<Finding> {
                 energy: [0.0; NB],
                 hits: 0,
             });
-            for i in 0..NB {
-                v.energy[i] += e[i] * g2;
+            for (slot, energy) in v.energy.iter_mut().zip(e.iter()) {
+                *slot += energy * g2;
             }
             v.hits += 1;
         }
@@ -289,8 +288,8 @@ pub fn spectral_findings(code: &str, cycles: usize) -> Vec<Finding> {
     }
     let mut band_total = [0.0f64; NB];
     for v in &voices {
-        for i in 0..NB {
-            band_total[i] += v.energy[i];
+        for (total, energy) in band_total.iter_mut().zip(v.energy.iter()) {
+            *total += energy;
         }
     }
     let grand: f64 = band_total.iter().sum();
@@ -338,7 +337,9 @@ fn masking_findings(voices: &[Voice], band_total: &[f64; NB]) -> Vec<Finding> {
         if total < 0.06 * grand {
             continue;
         }
-        let home = (0..NB).max_by(|&a, &b| v.energy[a].total_cmp(&v.energy[b])).unwrap();
+        let home = (0..NB)
+            .max_by(|&a, &b| v.energy[a].total_cmp(&v.energy[b]))
+            .unwrap();
         let mine = v.energy[home];
         let competing = band_total[home] - mine;
         if mine > 0.0 && competing > mine * MASK_RATIO {
@@ -349,8 +350,11 @@ fn masking_findings(voices: &[Voice], band_total: &[f64; NB]) -> Vec<Finding> {
                 .map(|o| (o.energy[home], o.label.as_str()))
                 .collect();
             others.sort_by(|a, b| b.0.total_cmp(&a.0));
-            let names: Vec<String> =
-                others.iter().take(2).map(|(_, n)| (*n).to_string()).collect();
+            let names: Vec<String> = others
+                .iter()
+                .take(2)
+                .map(|(_, n)| (*n).to_string())
+                .collect();
             let ratio = competing / mine;
             hits.push((
                 ratio,
@@ -457,10 +461,14 @@ mod tests {
           note("a4 c5 e5").s("wt_trumpet").gain(0.78),
           note("<e4 g4>").s("wt_choir").lpf(4200).gain(0.5)
         )"#;
-        let fs = spectral_findings(doc, 2);
-        assert!(codes(&fs, "masking") >= 1, "expected a masking note, got: {fs:?}");
+        let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
         assert!(
-            fs.iter().any(|f| f.code == "masking" && f.message.contains("wt_choir")),
+            codes(&fs, "masking") >= 1,
+            "expected a masking note, got: {fs:?}"
+        );
+        assert!(
+            fs.iter()
+                .any(|f| f.code == "masking" && f.message.contains("wt_choir")),
             "the masked voice should be the choir/vocal: {fs:?}"
         );
     }
@@ -475,13 +483,20 @@ mod tests {
           s("hh*8").gain(0.3),
           note("a5 c6 e6 c6").s("triangle").gain(0.4)
         )"#;
-        let fs = spectral_findings(doc, 2);
-        assert_eq!(codes(&fs, "masking"), 0, "clean mix should not flag masking: {fs:?}");
+        let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
+        assert_eq!(
+            codes(&fs, "masking"),
+            0,
+            "clean mix should not flag masking: {fs:?}"
+        );
     }
 
     #[test]
     fn single_voice_has_no_masking() {
-        let fs = spectral_findings(r#"s("bd*4").gain(0.9)"#, 2);
+        let fs = spectral_findings(
+            &crate::Evaluated::new(r#"s("bd*4").gain(0.9)"#, 2).unwrap(),
+            2,
+        );
         assert_eq!(codes(&fs, "masking"), 0);
     }
 
@@ -493,8 +508,12 @@ mod tests {
           note("c2 eb2 g2").s("sawtooth").lpf(500).gain(0.7),
           note("<[c3,eb3,g3]>").s("wt_pad").lpf(600).gain(0.6)
         )"#;
-        let fs = spectral_findings(doc, 2);
-        assert_eq!(codes(&fs, "dull"), 1, "dark hat-less mix should be dull: {fs:?}");
+        let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
+        assert_eq!(
+            codes(&fs, "dull"),
+            1,
+            "dark hat-less mix should be dull: {fs:?}"
+        );
     }
 
     #[test]
@@ -505,7 +524,11 @@ mod tests {
           note("c2 eb2 g2").s("sawtooth").lpf(500).gain(0.7),
           s("hh*8").gain(0.3)
         )"#;
-        let fs = spectral_findings(doc, 2);
-        assert_eq!(codes(&fs, "dull"), 0, "a mix with hats has air, not dull: {fs:?}");
+        let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
+        assert_eq!(
+            codes(&fs, "dull"),
+            0,
+            "a mix with hats has air, not dull: {fs:?}"
+        );
     }
 }

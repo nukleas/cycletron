@@ -86,13 +86,13 @@ fn anchor_id(trimmed: &str) -> Option<(TrackKind, Option<String>)> {
     if seen {
         let after = &t[end..];
         let after_trim = after.trim_start();
-        if let Some(rest) = after_trim.strip_prefix(':') {
-            if !rest.starts_with(':') {
-                let label = t[..end].to_ascii_lowercase();
-                // A `// @id` marker still wins over the label if both are present.
-                let id = marker_id(rest).or(Some(label));
-                return Some((TrackKind::Labeled, id));
-            }
+        if let Some(rest) = after_trim.strip_prefix(':')
+            && !rest.starts_with(':')
+        {
+            let label = t[..end].to_ascii_lowercase();
+            // A `// @id` marker still wins over the label if both are present.
+            let id = marker_id(rest).or(Some(label));
+            return Some((TrackKind::Labeled, id));
         }
     }
     None
@@ -108,11 +108,7 @@ fn marker_id(text: &str) -> Option<String> {
         .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
         .collect::<String>()
         .to_ascii_lowercase();
-    if id.is_empty() {
-        None
-    } else {
-        Some(id)
-    }
+    if id.is_empty() { None } else { Some(id) }
 }
 
 /// Is this a preamble line — a directive, a standalone comment, or blank —
@@ -258,13 +254,12 @@ pub fn list_tracks(code: &str) -> Vec<TrackInfo> {
 fn find<'a>(tracks: &'a [Track], handle: &str) -> Option<&'a Track> {
     let h = handle.trim().trim_start_matches('@');
     let key = clean_id(handle);
-    if !key.is_empty() {
-        if let Some(t) = tracks
+    if !key.is_empty()
+        && let Some(t) = tracks
             .iter()
             .find(|t| t.id.as_deref().map(clean_id).as_deref() == Some(key.as_str()))
-        {
-            return Some(t);
-        }
+    {
+        return Some(t);
     }
     if let Ok(n) = h.parse::<usize>() {
         return tracks.iter().find(|t| t.index == n);
@@ -277,7 +272,13 @@ fn clean_id(id: &str) -> String {
     id.trim()
         .trim_start_matches('@')
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .trim_matches('-')
         .to_string()
@@ -289,9 +290,9 @@ fn splice(code: &str, span: (usize, usize), replacement: &[String]) -> String {
     let lines: Vec<&str> = code.lines().collect();
     let trailing_newline = code.ends_with('\n');
     let mut out: Vec<String> = Vec::with_capacity(lines.len());
-    out.extend(lines[..span.0].iter().map(|s| s.to_string()));
+    out.extend(lines[..span.0].iter().map(std::string::ToString::to_string));
     out.extend(replacement.iter().cloned());
-    out.extend(lines[span.1..].iter().map(|s| s.to_string()));
+    out.extend(lines[span.1..].iter().map(std::string::ToString::to_string));
     let mut joined = out.join("\n");
     if trailing_newline {
         joined.push('\n');
@@ -301,7 +302,10 @@ fn splice(code: &str, span: (usize, usize), replacement: &[String]) -> String {
 
 /// Apply several track upserts sequentially (re-parse each time so later
 /// patches see earlier inserts). Returns the final document and the ids written.
-pub fn upsert_tracks(code: &str, patches: &[(String, String)]) -> Result<(String, Vec<String>), String> {
+pub fn upsert_tracks(
+    code: &str,
+    patches: &[(String, String)],
+) -> Result<(String, Vec<String>), String> {
     let mut doc = code.to_string();
     let mut wrote = Vec::with_capacity(patches.len());
     for (id, expr) in patches {
@@ -322,7 +326,11 @@ pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, Str
     }
     let numeric = is_index_handle(handle);
     // A numeric handle names an index, never a new id.
-    let id = if numeric { String::new() } else { clean_id(handle) };
+    let id = if numeric {
+        String::new()
+    } else {
+        clean_id(handle)
+    };
     let tracks = parse_tracks(code);
 
     if let Some(t) = find(&tracks, handle) {
@@ -363,7 +371,11 @@ pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, Str
              non-empty id (letters/digits) to be addressable later."
         ));
     }
-    let sep = if code.is_empty() || code.ends_with('\n') { "" } else { "\n" };
+    let sep = if code.is_empty() || code.ends_with('\n') {
+        ""
+    } else {
+        "\n"
+    };
     let new_code = format!("{code}{sep}$: {expr} // @{id}\n");
     Ok((new_code, id))
 }
@@ -507,11 +519,19 @@ mod tests {
         assert_eq!(id, "bass-line");
         let (twice, id2) = upsert_track(&once, "bass_line", "note(\"e2\")").unwrap();
         assert_eq!(id2, "bass-line");
-        assert_eq!(twice.matches("@bass-line").count(), 1, "should be one track:\n{twice}");
+        assert_eq!(
+            twice.matches("@bass-line").count(),
+            1,
+            "should be one track:\n{twice}"
+        );
         assert!(twice.contains("note(\"e2\")") && !twice.contains("note(\"c2\")"));
         // The hyphen spelling of the same handle also resolves to it.
         let (thrice, _) = upsert_track(&twice, "bass-line", "note(\"g2\")").unwrap();
-        assert_eq!(thrice.matches("@bass-line").count(), 1, "hyphen alias must match:\n{thrice}");
+        assert_eq!(
+            thrice.matches("@bass-line").count(),
+            1,
+            "hyphen alias must match:\n{thrice}"
+        );
     }
 
     #[test]

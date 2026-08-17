@@ -6,8 +6,8 @@
 //! path as "Load Sample Folder…").
 
 use crate::library;
-use crate::state::AppState;
 use crate::sounds::{DEFAULT_DRUMS, MACHINE_KITS, PERCUSSION};
+use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -178,15 +178,16 @@ fn load_manifest(dir: &Path) -> Result<PackManifest, String> {
     let m: PackManifest =
         serde_json::from_str(&s).map_err(|e| format!("parse {}: {e}", path.display()))?;
     if m.schema != 1 {
-        return Err(format!("unsupported pack schema {} in {}", m.schema, path.display()));
+        return Err(format!(
+            "unsupported pack schema {} in {}",
+            m.schema,
+            path.display()
+        ));
     }
     if !is_valid_pack_id(&m.id) {
         return Err(format!("invalid pack id {:?}", m.id));
     }
-    let dir_name = dir
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+    let dir_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
     if dir_name != m.id {
         return Err(format!(
             "pack id {:?} does not match folder name {:?}",
@@ -204,7 +205,10 @@ fn load_manifest(dir: &Path) -> Result<PackManifest, String> {
     }
     for bank in &m.banks {
         if bank.name.is_empty() || bank.name.len() > 31 {
-            return Err(format!("pack {} has invalid bank name {:?}", m.id, bank.name));
+            return Err(format!(
+                "pack {} has invalid bank name {:?}",
+                m.id, bank.name
+            ));
         }
         if bank.files.is_empty() {
             return Err(format!("pack {} bank {} has no files", m.id, bank.name));
@@ -223,7 +227,10 @@ fn validate_for_enable(dir: &Path, m: &PackManifest) -> Result<(), String> {
     let lic = safe_rel_path(&m.license_file)?;
     let lic_path = dir.join(&lic);
     if !lic_path.is_file() {
-        return Err(format!("pack {} missing license file {}", m.id, m.license_file));
+        return Err(format!(
+            "pack {} missing license file {}",
+            m.id, m.license_file
+        ));
     }
     if !library::within(dir, &lic_path) {
         return Err(format!("pack {} license_file escapes pack dir", m.id));
@@ -512,10 +519,7 @@ pub fn install_pack_from_folder(
         return Err(format!("not a folder: {path}"));
     }
 
-    let folder_label = src
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("pack");
+    let folder_label = src.file_name().and_then(|n| n.to_str()).unwrap_or("pack");
 
     let pack_id = match id {
         Some(raw) if !raw.is_empty() => {
@@ -579,8 +583,7 @@ pub fn install_pack_from_folder(
     let mut copied_files = 0usize;
 
     for bank in scanned {
-        let (bank_name, rename) =
-            bank_name_for_pack(&bank.name, &pack_id, &core, &mut used_names);
+        let (bank_name, rename) = bank_name_for_pack(&bank.name, &pack_id, &core, &mut used_names);
         if let Some(r) = rename {
             renames.push(r);
         }
@@ -633,8 +636,7 @@ pub fn install_pack_from_folder(
          Cycletron does not claim ownership of these samples. Redistribute only\n\
          if you have the right to do so under the samples' original license.\n"
     );
-    fs::write(dest.join("LICENSE"), license_body)
-        .map_err(|e| format!("write LICENSE: {e}"))?;
+    fs::write(dest.join("LICENSE"), license_body).map_err(|e| format!("write LICENSE: {e}"))?;
 
     let manifest = PackManifest {
         schema: 1,
@@ -649,10 +651,8 @@ pub fn install_pack_from_folder(
         tags: vec!["user".into(), "installed".into()],
         banks: manifest_banks,
     };
-    let manifest_json =
-        serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())? + "\n";
-    fs::write(dest.join(MANIFEST), manifest_json)
-        .map_err(|e| format!("write pack.json: {e}"))?;
+    let manifest_json = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())? + "\n";
+    fs::write(dest.join(MANIFEST), manifest_json).map_err(|e| format!("write pack.json: {e}"))?;
 
     let do_enable = enable.unwrap_or(true);
     let load = if do_enable {
@@ -711,10 +711,7 @@ mod tests {
             writeln!(f, "fake-wav-{i}").unwrap();
         }
         fs::write(dir.join("LICENSE"), "CC0\n").unwrap();
-        let file_list: Vec<String> = files
-            .iter()
-            .map(|n| format!("banks/{bank}/{n}"))
-            .collect();
+        let file_list: Vec<String> = files.iter().map(|n| format!("banks/{bank}/{n}")).collect();
         let banks_json = serde_json::json!([{
             "name": bank,
             "files": file_list,
@@ -753,13 +750,16 @@ mod tests {
 
     #[test]
     fn load_and_enable_roundtrip() {
-        let tmp = std::env::temp_dir().join(format!(
-            "cycletron_packs_test_{}",
-            std::process::id()
-        ));
+        let tmp = std::env::temp_dir().join(format!("cycletron_packs_test_{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
-        write_pack(&tmp, "demo-pack", "CC0-1.0", "demo_pluck", &["a.wav", "b.wav"]);
+        write_pack(
+            &tmp,
+            "demo-pack",
+            "CC0-1.0",
+            "demo_pluck",
+            &["a.wav", "b.wav"],
+        );
 
         let m = load_manifest(&tmp.join("demo-pack")).unwrap();
         assert_eq!(m.id, "demo-pack");
@@ -780,10 +780,7 @@ mod tests {
 
     #[test]
     fn skips_core_bank_collision() {
-        let tmp = std::env::temp_dir().join(format!(
-            "cycletron_packs_core_{}",
-            std::process::id()
-        ));
+        let tmp = std::env::temp_dir().join(format!("cycletron_packs_core_{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
         // `bd` is a core drum bank
@@ -796,10 +793,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_license() {
-        let tmp = std::env::temp_dir().join(format!(
-            "cycletron_packs_lic_{}",
-            std::process::id()
-        ));
+        let tmp = std::env::temp_dir().join(format!("cycletron_packs_lic_{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
         write_pack(&tmp, "paid-pack", "Proprietary", "cool_lead", &["x.wav"]);
@@ -811,10 +805,7 @@ mod tests {
 
     #[test]
     fn id_must_match_folder() {
-        let tmp = std::env::temp_dir().join(format!(
-            "cycletron_packs_id_{}",
-            std::process::id()
-        ));
+        let tmp = std::env::temp_dir().join(format!("cycletron_packs_id_{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         let dir = tmp.join("folder-a");
         fs::create_dir_all(&dir).unwrap();
@@ -886,8 +877,7 @@ mod tests {
         let mut manifest_banks = Vec::new();
         let mut renames = Vec::new();
         for bank in scanned {
-            let (bank_name, rename) =
-                bank_name_for_pack(&bank.name, &pack_id, &core, &mut used);
+            let (bank_name, rename) = bank_name_for_pack(&bank.name, &pack_id, &core, &mut used);
             if let Some(r) = rename {
                 renames.push(r);
             }
@@ -902,7 +892,11 @@ mod tests {
                 files: rels,
             });
         }
-        assert!(renames.iter().any(|r| r.from == "bd" && r.to == "bd_my_sounds"));
+        assert!(
+            renames
+                .iter()
+                .any(|r| r.from == "bd" && r.to == "bd_my_sounds")
+        );
         fs::write(dest.join("LICENSE"), "user\n").unwrap();
         let manifest = PackManifest {
             schema: 1,

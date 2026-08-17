@@ -19,6 +19,12 @@ pub struct StreamAccumulator {
     incomplete_tool_input: bool,
 }
 
+impl Default for StreamAccumulator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StreamAccumulator {
     pub fn new() -> Self {
         Self {

@@ -95,7 +95,9 @@ impl Scale {
         Ok(Scale::new(parse_key(root)?, Mode::parse(mode)?))
     }
 
-    /// Notes per octave (the mode's degree count).
+    /// Notes per octave (the mode's degree count). Never zero, so there is
+    /// deliberately no `is_empty`.
+    #[expect(clippy::len_without_is_empty, reason = "a scale always has degrees")]
     pub fn len(&self) -> i32 {
         self.mode.intervals().len() as i32
     }
@@ -123,12 +125,18 @@ impl Scale {
     /// A diatonic triad rooted on `degree`: scale degrees d, d+2, d+4 — so the
     /// chord quality follows the mode automatically (minor i in aeolian, etc.).
     pub fn triad(&self, degree: i32, base_octave: i32) -> Vec<String> {
-        [0, 2, 4].iter().map(|o| self.note(degree + o, base_octave)).collect()
+        [0, 2, 4]
+            .iter()
+            .map(|o| self.note(degree + o, base_octave))
+            .collect()
     }
 
     /// A seventh chord on `degree`: degrees d, d+2, d+4, d+6.
     pub fn seventh(&self, degree: i32, base_octave: i32) -> Vec<String> {
-        [0, 2, 4, 6].iter().map(|o| self.note(degree + o, base_octave)).collect()
+        [0, 2, 4, 6]
+            .iter()
+            .map(|o| self.note(degree + o, base_octave))
+            .collect()
     }
 
     /// Lower a degree sequence to a `note(...)`-ready [`Mini`] sequence.
@@ -181,10 +189,7 @@ mod tests {
         let s = Scale::parse("c minor").unwrap();
         // degrees 0..7 → c d eb f g ab bb c'
         let got = s.notes(&[0, 1, 2, 3, 4, 5, 6, 7], 4);
-        assert_eq!(
-            got,
-            ["c4", "d4", "d#4", "f4", "g4", "g#4", "a#4", "c5"]
-        );
+        assert_eq!(got, ["c4", "d4", "d#4", "f4", "g4", "g#4", "a#4", "c5"]);
     }
 
     #[test]

@@ -3,7 +3,7 @@
 //! arrangement-shape problems. Shares the [`Critique`]/[`Finding`] vocabulary
 //! with the mix critique.
 
-use crate::arrangement::analyze_code;
+use crate::arrangement::analyze;
 use crate::critique::{Critique, Finding};
 use crate::inspect::*;
 
@@ -49,10 +49,10 @@ pub(crate) fn parse_pickrestart_labels(code: &str) -> Option<Vec<String>> {
                 .to_string();
             // `label!3` → 3 restarting slots; `label@3` → one 3-cycle slot;
             // bare `label!` → mini-notation default 2.
-            let reps = match t.find(|c| c == '!' || c == '@') {
+            let reps = match t.find(['!', '@']) {
                 Some(i) => t[i + 1..]
                     .chars()
-                    .take_while(|c| c.is_ascii_digit())
+                    .take_while(char::is_ascii_digit)
                     .collect::<String>()
                     .parse::<usize>()
                     .unwrap_or(if t.as_bytes()[i] == b'!' { 2 } else { 1 }),
@@ -101,9 +101,10 @@ struct FormSection {
 /// (every section lasts one cycle) instead of a wall of off-grid spam.
 /// Without pickRestart, falls back to density segmentation as before.
 /// `cycles` clamps to 8..=64.
-pub fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String> {
-    let window = cycles.clamp(8, 64);
-    let d = inspect_code(code, window)?;
+pub fn critique_form(ev: &crate::Evaluated) -> Critique {
+    let code = ev.code();
+    let d = ev.digest();
+    let window = ev.window();
 
     let mut findings: Vec<Finding> = Vec::new();
     let warn = |c: &str, m: String| Finding {
@@ -151,7 +152,7 @@ pub fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String>
                     ),
                 ));
                 let ok = false;
-                return Ok(Critique { ok, findings });
+                return Critique { ok, findings };
             }
             Some(n) => {
                 labels_known = true;
@@ -200,7 +201,7 @@ pub fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String>
 
     if !labels_known {
         // Fallback: density segmentation (no pickRestart to trust).
-        let a = analyze_code(code, window)?;
+        let a = analyze(ev);
         if a.sections.len() <= 1 && a.window_cycles >= 8 {
             let span = a.period_cycles.unwrap_or(a.window_cycles);
             findings.push(note(
@@ -328,33 +329,35 @@ pub fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String>
             .fold(0.0_f64, f64::max);
         if drop_dens > 0.0 {
             for (s, e) in sections.iter().zip(&energies) {
-                if let Some(dd) = s.density {
-                    if *e <= 1 && dd >= drop_dens {
-                        findings.push(warn(
-                            "energy-inversion",
-                            format!(
-                                "'{}' ({dd:.1} ev/cyc) is as busy as the drop ({drop_dens:.1}) — \
+                if let Some(dd) = s.density
+                    && *e <= 1
+                    && dd >= drop_dens
+                {
+                    findings.push(warn(
+                        "energy-inversion",
+                        format!(
+                            "'{}' ({dd:.1} ev/cyc) is as busy as the drop ({drop_dens:.1}) — \
                                  a low-energy section should be sparser. Thin it out.",
-                                s.label
-                            ),
-                        ));
-                    }
+                            s.label
+                        ),
+                    ));
                 }
             }
         }
         for i in 1..sections.len() {
-            if let (Some(cur), Some(prev)) = (sections[i].density, sections[i - 1].density) {
-                if energies[i] >= 5 && cur <= prev {
-                    findings.push(note(
-                        "no-drop-lift",
-                        format!(
-                            "'{}' isn't denser than '{}' before it — the drop doesn't land. Add \
+            if let (Some(cur), Some(prev)) = (sections[i].density, sections[i - 1].density)
+                && energies[i] >= 5
+                && cur <= prev
+            {
+                findings.push(note(
+                    "no-drop-lift",
+                    format!(
+                        "'{}' isn't denser than '{}' before it — the drop doesn't land. Add \
                              a layer (hook/hats/octave lead) so energy steps up.",
-                            sections[i].label,
-                            sections[i - 1].label
-                        ),
-                    ));
-                }
+                        sections[i].label,
+                        sections[i - 1].label
+                    ),
+                ));
             }
         }
     }
@@ -364,7 +367,7 @@ pub fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String>
     findings.retain(|f| seen.insert((f.code.clone(), f.message.clone())));
 
     let ok = !findings.iter().any(|f| f.severity == "warn");
-    Ok(Critique { ok, findings })
+    Critique { ok, findings }
 }
 
 /// Render a form critique as a compact human/agent-readable report.

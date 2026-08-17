@@ -77,8 +77,8 @@ impl Recipe {
 /// Parse a recipe from markdown text. `name` is the fallback genre (the file
 /// stem). Returns an error only for structurally unusable input.
 pub fn parse_recipe(name: &str, text: &str) -> Result<Recipe, String> {
-    let (frontmatter, body) = split_frontmatter(text);
-    let fm = parse_frontmatter(frontmatter);
+    let (frontmatter, body) = cycletron_core::text::frontmatter::split(text);
+    let fm = cycletron_core::text::frontmatter::parse(frontmatter.unwrap_or(""));
 
     let genre = fm.scalar("genre").unwrap_or_else(|| name.to_string());
     let bpm = fm.array("bpm").and_then(|v| {
@@ -122,15 +122,18 @@ pub fn load_recipes(dir: &Path) -> Vec<Recipe> {
         .flatten()
         .map(|e| e.path())
         .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("md"))
-        .filter(|p| !is_doc_file(p))
+        .filter(|p| !crate::layout::is_doc_file(p))
         .collect();
     paths.sort();
     for path in paths {
-        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("recipe");
-        if let Ok(text) = std::fs::read_to_string(&path) {
-            if let Ok(recipe) = parse_recipe(stem, &text) {
-                out.push(recipe);
-            }
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("recipe");
+        if let Ok(text) = std::fs::read_to_string(&path)
+            && let Ok(recipe) = parse_recipe(stem, &text)
+        {
+            out.push(recipe);
         }
     }
     out
@@ -172,143 +175,6 @@ pub fn extract_strudel_blocks(text: &str) -> Vec<Fragment> {
         }
     }
     out
-}
-
-/// Markdown files that document the directory rather than being recipes
-/// (`README.md`, `_template.md`, …) are skipped by the loader.
-fn is_doc_file(path: &Path) -> bool {
-    path.file_stem()
-        .and_then(|s| s.to_str())
-        .map(|stem| stem.starts_with('_') || stem.eq_ignore_ascii_case("readme"))
-        .unwrap_or(false)
-}
-
-// --- internals ----------------------------------------------------------
-
-/// Split leading `---`-fenced frontmatter from the markdown body.
-fn split_frontmatter(text: &str) -> (&str, &str) {
-    let trimmed = text.trim_start_matches(['\u{feff}', '\n', '\r']);
-    if let Some(rest) = trimmed.strip_prefix("---") {
-        // Find the closing `---` on its own line.
-        if let Some(end) = rest.find("\n---") {
-            let fm = &rest[..end];
-            let body = &rest[end + 4..];
-            return (fm.trim_start_matches(['\n', '\r']), body);
-        }
-    }
-    ("", text)
-}
-
-#[derive(Default)]
-struct Frontmatter {
-    scalars: std::collections::HashMap<String, String>,
-    arrays: std::collections::HashMap<String, Vec<String>>,
-}
-
-impl Frontmatter {
-    fn scalar(&self, key: &str) -> Option<String> {
-        self.scalars.get(key).cloned()
-    }
-    fn array(&self, key: &str) -> Option<Vec<String>> {
-        self.arrays.get(key).cloned()
-    }
-}
-
-/// Parse the controlled YAML subset our recipes use: `key: scalar`,
-/// `key: [a, b, c]`, and block arrays (`key:` then indented `- item` lines).
-fn parse_frontmatter(text: &str) -> Frontmatter {
-    let mut fm = Frontmatter::default();
-    let lines: Vec<&str> = text.lines().collect();
-    let mut i = 0;
-    while i < lines.len() {
-        let line = lines[i];
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            i += 1;
-            continue;
-        }
-        // Block-array continuation handled inside the key branch below.
-        if let Some((key, value)) = trimmed.split_once(':') {
-            let key = key.trim().to_string();
-            let value = value.trim();
-            if value.is_empty() {
-                // Possibly a block array on following indented `- ` lines.
-                let mut items = Vec::new();
-                let mut j = i + 1;
-                while j < lines.len() {
-                    let t = lines[j].trim();
-                    if let Some(item) = t.strip_prefix("- ") {
-                        items.push(unquote(item.trim()));
-                        j += 1;
-                    } else if t.is_empty() {
-                        j += 1;
-                    } else {
-                        break;
-                    }
-                }
-                if items.is_empty() {
-                    fm.scalars.insert(key, String::new());
-                } else {
-                    fm.arrays.insert(key, items);
-                }
-                i = j;
-                continue;
-            } else if value.starts_with('[') && value.ends_with(']') {
-                let inner = &value[1..value.len() - 1];
-                let items = split_inline_array(inner);
-                fm.arrays.insert(key, items);
-            } else {
-                fm.scalars.insert(key, unquote(value));
-            }
-        }
-        i += 1;
-    }
-    fm
-}
-
-/// Split an inline-array body on commas, respecting quoted strings.
-fn split_inline_array(inner: &str) -> Vec<String> {
-    let mut items = Vec::new();
-    let mut buf = String::new();
-    let mut quote: Option<char> = None;
-    for c in inner.chars() {
-        match quote {
-            Some(q) => {
-                if c == q {
-                    quote = None;
-                } else {
-                    buf.push(c);
-                }
-            }
-            None => match c {
-                '"' | '\'' => quote = Some(c),
-                ',' => {
-                    let t = buf.trim().to_string();
-                    if !t.is_empty() {
-                        items.push(t);
-                    }
-                    buf.clear();
-                }
-                _ => buf.push(c),
-            },
-        }
-    }
-    let t = buf.trim().to_string();
-    if !t.is_empty() {
-        items.push(t);
-    }
-    items
-}
-
-fn unquote(s: &str) -> String {
-    let s = s.trim();
-    if (s.starts_with('"') && s.ends_with('"') && s.len() >= 2)
-        || (s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2)
-    {
-        s[1..s.len() - 1].to_string()
-    } else {
-        s.to_string()
-    }
 }
 
 /// Parse the markdown body into sections by `##` headings, pulling ```strudel
@@ -436,14 +302,6 @@ note("c2 c2").s("sawtooth").lpf(400)
         assert!(r.matches("ACID"));
         assert!(r.matches("house")); // substring of "acid house"
         assert!(!r.matches("jazz"));
-    }
-
-    #[test]
-    fn doc_files_are_excluded() {
-        assert!(is_doc_file(Path::new("genres/README.md")));
-        assert!(is_doc_file(Path::new("genres/readme.md")));
-        assert!(is_doc_file(Path::new("genres/_template.md")));
-        assert!(!is_doc_file(Path::new("genres/acid-techno.md")));
     }
 
     #[test]

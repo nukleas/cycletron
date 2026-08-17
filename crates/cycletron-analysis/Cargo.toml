@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -14,3 +17,8 @@ strudel-mini = { workspace = true }
 
 [dev-dependencies]
 cycletron-gen = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "review"
+harness = false

@@ -200,7 +200,7 @@ pub fn parse_key(key: &str) -> Result<i32, String> {
 fn numeral_to_degree(token: &str) -> Result<usize, String> {
     let core: String = token
         .chars()
-        .filter(|c| c.is_ascii_alphabetic())
+        .filter(char::is_ascii_alphabetic)
         .map(|c| c.to_ascii_uppercase())
         .collect();
     match core.as_str() {
@@ -345,7 +345,7 @@ pub fn automaton(rule: u8, width: usize, gens: usize) -> Result<String, String> 
 
 fn join_ints(xs: &[i32]) -> String {
     xs.iter()
-        .map(|n| n.to_string())
+        .map(std::string::ToString::to_string)
         .collect::<Vec<_>>()
         .join(" ")
 }
@@ -400,7 +400,10 @@ mod tests {
 
     #[test]
     fn palindrome_reflects_around_last_element() {
-        let motif: Vec<String> = ["a", "b", "c", "d"].iter().map(|s| s.to_string()).collect();
+        let motif: Vec<String> = ["a", "b", "c", "d"]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
         assert_eq!(
             palindrome_tokens(&motif),
             vec!["a", "b", "c", "d", "c", "b", "a"]

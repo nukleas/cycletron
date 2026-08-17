@@ -55,7 +55,7 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
-    let known = analysis::sounds::builtin_sound_set();
+    let known = analysis::sounds::SoundSet::builtin_only();
     let mut invalid = 0usize;
     let mut warned = 0usize;
 
@@ -100,79 +100,18 @@ enum Review {
     Done { text: String, warns: usize },
 }
 
-/// Mirror of the in-app agent's `tool_review_pattern` pipeline
-/// (src-tauri/src/agent_loop.rs), minus user sample banks.
-fn review(code: &str, cycles: usize, known: &std::collections::HashSet<String>) -> Review {
-    if let Err(e) = analysis::validate_code(code) {
-        return Review::Invalid(e);
-    }
-    let digest = match analysis::inspect_code(code, cycles) {
-        Ok(d) => d,
-        Err(e) => return Review::Invalid(format!("did not evaluate: {e}")),
-    };
-
-    let mut out = String::from("REVIEW\n== digest ==\n");
-    out.push_str(&format!(
-        "  bpm {}  ·  {} events / {} cycles  ·  period {}  ·  max {} voices  ·  sounds: {}\n",
-        digest.bpm.map(|b| b.to_string()).unwrap_or_else(|| "unset".into()),
-        digest.total_events,
-        digest.cycles_queried,
-        digest
-            .period_cycles
-            .map(|p| format!("{p} cycle(s)"))
-            .unwrap_or_else(|| "none detected".into()),
-        digest.max_voices,
-        digest.sounds.join(", "),
-    ));
-
-    let mut warns = 0usize;
-    let section = |title: &str, findings: &[analysis::Finding], out: &mut String| {
-        out.push_str(&format!("== {title} ==\n"));
-        if findings.is_empty() {
-            out.push_str("  clean\n");
-        }
-        for f in findings {
-            out.push_str(&format!("  [{}] {}: {}\n", f.severity, f.code, f.message));
-        }
-    };
-
-    let mut lint = analysis::lint_source(code);
-    lint.extend(analysis::lint_digest(&digest, known));
-    warns += lint.iter().filter(|f| f.severity == "warn").count();
-    section("silence lint", &lint, &mut out);
-
-    if let Ok(c) = analysis::critique_code(code, cycles) {
-        warns += c.findings.iter().filter(|f| f.severity == "warn").count();
-        section("mix critique", &c.findings, &mut out);
-    }
-
-    if code.contains("pickRestart") || code.contains("arrange") {
-        if let Ok(a) = analysis::analyze_code(code, cycles) {
-            out.push_str("== form map ==\n");
-            for s in &a.sections {
-                out.push_str(&format!(
-                    "  {:<10} cyc {:>2}–{:<3} {:>5.1} ev/cyc  {}\n",
-                    s.label,
-                    s.start_cycle,
-                    s.end_cycle,
-                    s.avg_events_per_cycle,
-                    s.instruments.join(", ")
-                ));
-            }
-        }
-        match analysis::critique_form_code(code, cycles) {
-            Ok(c) => {
-                warns += c.findings.iter().filter(|f| f.severity == "warn").count();
-                section("form critique", &c.findings, &mut out);
-            }
-            Err(e) => out.push_str(&format!("== form critique ==\n  (unavailable: {e})\n")),
+/// The shared review pipeline (`cycletron_analysis::review_report`) with
+/// song-check's plain VERDICT framing.
+fn review(code: &str, cycles: usize, known: &analysis::sounds::SoundSet) -> Review {
+    match analysis::review_report(code, cycles, known) {
+        analysis::ReviewOutcome::Invalid(e) => Review::Invalid(e),
+        analysis::ReviewOutcome::Report { mut text, warns } => {
+            text.push_str(&if warns == 0 {
+                "\nVERDICT: ready to play.".to_string()
+            } else {
+                format!("\nVERDICT: {warns} warning(s).")
+            });
+            Review::Done { text, warns }
         }
     }
-
-    out.push_str(&if warns == 0 {
-        "\nVERDICT: ready to play.".to_string()
-    } else {
-        format!("\nVERDICT: {warns} warning(s).")
-    });
-    Review::Done { text: out, warns }
 }

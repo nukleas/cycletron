@@ -1,14 +1,17 @@
 mod agent_loop;
+mod codex_oauth;
 mod commands;
+mod demos;
+mod export;
 mod files;
 mod library;
 mod library_index;
 mod logs;
 mod menu;
-mod midi;
 mod midi_input;
 mod oauth;
 mod oauth_store;
+mod packs;
 mod persistence;
 mod secrets;
 mod settings;
@@ -16,19 +19,9 @@ mod shortcuts;
 mod snapshots;
 mod sounds;
 mod state;
-mod strudel;
-mod sections;
-mod structure;
 mod telemetry;
-mod tracks;
 mod tray;
 mod xai_oauth;
-mod codex_oauth;
-mod demos;
-mod export;
-mod packs;
-
-
 
 use state::AppState;
 use tauri::Manager;
@@ -137,8 +130,7 @@ pub fn run() {
     // Compose two layers: stderr fmt for dev, and a bounded ring buffer
     // so the in-app Logs modal can show recent activity without reaching
     // out to the OS log facility.
-    let filter = EnvFilter::from_default_env()
-        .add_directive("cycletron=debug".parse().unwrap());
+    let filter = EnvFilter::from_default_env().add_directive("cycletron=debug".parse().unwrap());
     let fmt_layer = tracing_subscriber::fmt::layer().with_writer(std::io::stderr);
     tracing_subscriber::registry()
         .with(filter)
@@ -182,13 +174,7 @@ pub fn run() {
             }
 
             // Native menu — emits `menu:<action>` events consumed by the frontend.
-            let recents = app
-                .state::<AppState>()
-                .recents
-                .lock()
-                .unwrap()
-                .entries
-                .clone();
+            let recents = app.state::<AppState>().recents.lock().entries.clone();
             let menu = menu::build_app_menu(app.handle(), &recents)?;
             app.set_menu(menu)?;
             let handle = app.handle().clone();
@@ -200,7 +186,7 @@ pub fn run() {
             match tray::build_tray(app.handle()) {
                 Ok(tray_state) => {
                     let holder = app.state::<tray::TrayStateHolder>();
-                    *holder.play_pause.lock().unwrap() = Some(tray_state.play_pause_item);
+                    *holder.play_pause.lock() = Some(tray_state.play_pause_item);
                 }
                 Err(e) => tracing::warn!("tray setup failed: {e}"),
             }
