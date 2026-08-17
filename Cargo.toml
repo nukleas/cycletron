@@ -44,7 +44,7 @@ midi-to-strudel = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.13", features = ["json", "stream"] }
 thiserror = "2"
 anyhow = "1"
 tracing = "0.1"
