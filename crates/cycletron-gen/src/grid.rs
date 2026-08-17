@@ -94,7 +94,7 @@ impl Grid {
     pub fn every(mut self, sound: &str, interval: usize, offset: usize) -> Self {
         assert!(interval > 0, "interval must be > 0");
         let hits: Vec<u8> = (0..self.steps)
-            .map(|i| u8::from(i >= offset && (i - offset) % interval == 0))
+            .map(|i| u8::from(i >= offset && (i - offset).is_multiple_of(interval)))
             .collect();
         self.lanes.push(Lane {
             sound: sound.to_string(),
@@ -108,7 +108,7 @@ impl Grid {
     /// columns (keeping the lane aligned with the rest).
     pub fn euclid(mut self, sound: &str, k: usize, n: usize) -> Self {
         assert!(
-            n > 0 && self.steps % n == 0,
+            n > 0 && self.steps.is_multiple_of(n),
             "euclid n ({n}) must divide grid steps ({})",
             self.steps
         );
@@ -153,10 +153,12 @@ impl Grid {
     pub fn to_mini(&self) -> Mini {
         Mini::Stack(self.lanes.iter().map(Self::lane_to_mini).collect())
     }
+}
 
-    /// The mini-notation string for use inside `s("…")`.
-    pub fn to_string(&self) -> String {
-        self.to_mini().emit()
+/// The mini-notation string for use inside `s("…")`.
+impl std::fmt::Display for Grid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.to_mini().emit())
     }
 }
 

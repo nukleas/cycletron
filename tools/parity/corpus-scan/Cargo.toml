@@ -3,6 +3,9 @@ name = "corpus-scan"
 version = "0.1.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "corpus-scan"
 path = "main.rs"

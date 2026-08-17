@@ -275,12 +275,11 @@ impl ResponsesAccumulator {
                     if let Some(arr) = item.get("content").and_then(|c| c.as_array()) {
                         for part in arr {
                             let t = part.get("type").and_then(|x| x.as_str()).unwrap_or("");
-                            if t == "output_text" || t == "text" {
-                                if let Some(text) = part.get("text").and_then(|x| x.as_str()) {
-                                    if self.text.is_empty() {
-                                        self.text.push_str(text);
-                                    }
-                                }
+                            if (t == "output_text" || t == "text")
+                                && let Some(text) = part.get("text").and_then(|x| x.as_str())
+                                && self.text.is_empty()
+                            {
+                                self.text.push_str(text);
                             }
                         }
                     }

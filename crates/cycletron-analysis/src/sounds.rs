@@ -147,7 +147,7 @@ static BUILTIN: std::sync::LazyLock<std::collections::HashSet<String>> =
             .chain(PERCUSSION.iter())
             .chain(INSTRUMENTS.iter())
             .chain(GM_INSTRUMENTS.iter())
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
         for (machine, _, voices) in MACHINE_KITS {
             for v in *voices {

@@ -210,6 +210,10 @@ impl Grammar {
     ) -> std::collections::BTreeMap<usize, String> {
         let usage = self.usage();
         let mut names = std::collections::BTreeMap::new();
+        #[expect(
+            clippy::needless_range_loop,
+            reason = "i indexes usage, sym_len, and the name map together"
+        )]
         for i in 0..self.rules.len() {
             // Don't name pure-rest phrases — they inline compactly as `<-!n>`.
             if usage[i] >= 2 && self.sym_len(Sym::N(i)) >= min_span && !self.is_all_rest(Sym::N(i))

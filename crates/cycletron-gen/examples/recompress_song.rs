@@ -67,11 +67,9 @@ fn main() {
         let after = compressed.emit().len();
         eprintln!(
             "  track {track}: {n} bars ({unique} unique) — {before} → {after} chars ({}% saved)",
-            if before > 0 {
-                100 * before.saturating_sub(after) / before
-            } else {
-                0
-            }
+            (100 * before.saturating_sub(after))
+                .checked_div(before)
+                .unwrap_or(0)
         );
         // Keep the `<...>` wrapper form for readability if it compressed to a cat.
         compressed.emit()

@@ -109,7 +109,7 @@ fn stack_peak(doc: &str) -> f64 {
             .pattern
             .query_arc(cyc, cyc + 1)
             .into_iter()
-            .filter(|h| h.has_onset())
+            .filter(strudel_core::Hap::has_onset)
             .collect();
         haps.sort_by(|a, b| {
             a.whole_or_part()
@@ -163,15 +163,15 @@ fn scale_gain(chain: &str, m: f64) -> String {
     let scaled = |g: f64| (g * m * 100.0).round() / 100.0;
     if let Some(i) = chain.find(".gain(") {
         let start = i + ".gain(".len();
-        if let Some(len) = chain[start..].find(')') {
-            if let Ok(g) = chain[start..start + len].trim().parse::<f64>() {
-                return format!(
-                    "{}.gain({}){}",
-                    &chain[..i],
-                    scaled(g),
-                    &chain[start + len + 1..]
-                );
-            }
+        if let Some(len) = chain[start..].find(')')
+            && let Ok(g) = chain[start..start + len].trim().parse::<f64>()
+        {
+            return format!(
+                "{}.gain({}){}",
+                &chain[..i],
+                scaled(g),
+                &chain[start + len + 1..]
+            );
         }
     }
     format!("{chain}.gain({})", scaled(1.0))
@@ -219,6 +219,10 @@ fn assemble(title: &str, bpm: u32, grid: &Grid, parts: Vec<Part>) -> Result<Piec
 /// the phrase instead of looping one robotic bar. The rhythm (density thinning)
 /// stays constant; only the pitch content develops. Emits `<[bar] [bar] [bar]
 /// [bar]>` (one bar per cycle), every note diatonic by construction.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "melodic-walk knobs; a params struct would obscure them"
+)]
 fn developed_phrase(
     scale: &Scale,
     seed: u64,

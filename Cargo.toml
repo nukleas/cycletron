@@ -26,6 +26,28 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/nukleas/cycletron"
 
+# Moderate lint policy (mirrors the spirit of strudel-rs's, minus its
+# DSP-specific type/method bans): perf + a few idiom lints at warn, gated to
+# deny in CI via `cargo clippy -- -D warnings`.
+[workspace.lints.clippy]
+perf = { level = "warn", priority = -1 }
+dbg_macro = "deny"
+todo = "warn"
+inefficient_to_string = "warn"
+cloned_instead_of_copied = "warn"
+flat_map_option = "warn"
+manual_let_else = "warn"
+manual_string_new = "warn"
+redundant_closure_for_method_calls = "warn"
+
+# Thin LTO: most of fat LTO's win without multiplying the full-Tauri link
+# time. Shipping builds can bump to lto = true / codegen-units = 1 later
+# without code changes.
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+
 [workspace.dependencies]
 # Internal crates
 cycletron-core = { path = "crates/cycletron-core" }

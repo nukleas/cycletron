@@ -40,7 +40,7 @@ pub struct SampleFolder {
 fn is_audio(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase())
+        .map(str::to_ascii_lowercase)
         .is_some_and(|e| AUDIO_EXTS.contains(&e.as_str()))
 }
 

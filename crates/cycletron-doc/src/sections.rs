@@ -225,10 +225,10 @@ fn infer_sections_binding_name(code: &str, form: &[Section]) -> Option<String> {
 /// formatting); falls back to a hand-rolled `const NAME = {` scan when the
 /// document doesn't parse or the binding isn't an object literal.
 fn find_binding_object(code: &str, name: &str) -> Option<(usize, usize)> {
-    if let Some(b) = crate::structure::find_binding(code, name) {
-        if let Some(range) = object_interior(code, b.expr_start, b.expr_end) {
-            return Some(range);
-        }
+    if let Some(b) = crate::structure::find_binding(code, name)
+        && let Some(range) = object_interior(code, b.expr_start, b.expr_end)
+    {
+        return Some(range);
     }
     find_binding_object_scan(code, name)
 }
@@ -473,6 +473,10 @@ fn find_matching(code: &str, open_idx: usize, open: u8, close: u8) -> Option<usi
     let mut depth = 0i32;
     let mut in_str: Option<u8> = None;
     let mut escape = false;
+    #[expect(
+        clippy::needless_range_loop,
+        reason = "i is also the returned span position, not just an index"
+    )]
     for i in open_idx..bytes.len() {
         let b = bytes[i];
         if let Some(q) = in_str {

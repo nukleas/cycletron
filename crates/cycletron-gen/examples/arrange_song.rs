@@ -54,7 +54,7 @@ fn main() {
             let cdoc = format!("setbpm(144);\n{expr}");
             let ndoc = format!("setbpm(144);\n{naive}");
             if docs_equivalent(&cdoc, &ndoc, bars.len()).unwrap_or(false)
-                && best.as_ref().map_or(true, |(l, _)| expr.len() < *l)
+                && best.as_ref().is_none_or(|(l, _)| expr.len() < *l)
             {
                 best = Some((expr.len(), expr));
             }

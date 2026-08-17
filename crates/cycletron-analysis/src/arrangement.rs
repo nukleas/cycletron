@@ -134,8 +134,8 @@ pub fn analyze(ev: &crate::Evaluated) -> ArrangementAnalysis {
             let end = start + cycles - 1;
             let last = end.min(window - 1);
             let mut set: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-            for c in start..=last {
-                set.extend(active[c].iter().cloned());
+            for cyc in &active[start..=last] {
+                set.extend(cyc.iter().cloned());
             }
             let span = last - start + 1;
             let avg = onset_counts[start..=last].iter().sum::<usize>() as f64 / span as f64;

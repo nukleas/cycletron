@@ -71,6 +71,12 @@ jobs:
         if: runner.environment == 'github-hosted'
         uses: Swatinem/rust-cache@v2
 
+      - name: cargo fmt (check)
+        run: cargo fmt --all --check
+
+      - name: cargo clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
       - name: cargo check (workspace)
         run: cargo check --workspace --locked
 

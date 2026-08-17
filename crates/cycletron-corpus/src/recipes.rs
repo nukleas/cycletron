@@ -130,10 +130,10 @@ pub fn load_recipes(dir: &Path) -> Vec<Recipe> {
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("recipe");
-        if let Ok(text) = std::fs::read_to_string(&path) {
-            if let Ok(recipe) = parse_recipe(stem, &text) {
-                out.push(recipe);
-            }
+        if let Ok(text) = std::fs::read_to_string(&path)
+            && let Ok(recipe) = parse_recipe(stem, &text)
+        {
+            out.push(recipe);
         }
     }
     out

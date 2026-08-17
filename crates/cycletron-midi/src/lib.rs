@@ -108,7 +108,7 @@ pub fn convert_bytes(data: &[u8], opts: &ImportOptions) -> anyhow::Result<Import
             .track_info
             .into_vec()
             .into_iter()
-            .filter(|t| t.channel.map_or(true, |c| allowed.contains(&c)))
+            .filter(|t| t.channel.is_none_or(|c| allowed.contains(&c)))
             .collect(),
         _ => midi.track_info,
     };

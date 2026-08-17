@@ -218,16 +218,17 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
     }
 
     // --- Static single-pitch melody ---------------------------------------
-    if let (Some(lo), Some(hi)) = (&d.note_low, &d.note_high) {
-        if lo.midi == hi.midi && d.total_events > 2 {
-            findings.push(note(
-                "static-pitch",
-                format!(
-                    "Every pitched note is {} — the line never moves melodically.",
-                    lo.name
-                ),
-            ));
-        }
+    if let (Some(lo), Some(hi)) = (&d.note_low, &d.note_high)
+        && lo.midi == hi.midi
+        && d.total_events > 2
+    {
+        findings.push(note(
+            "static-pitch",
+            format!(
+                "Every pitched note is {} — the line never moves melodically.",
+                lo.name
+            ),
+        ));
     }
 
     // --- Spectral masking / balance ---------------------------------------
@@ -392,10 +393,10 @@ pub fn lint_digest(d: &PatternDigest, known: &crate::sounds::SoundSet) -> Vec<Fi
     let mut bad_pan: Option<f64> = None;
     for cd in &d.cycles {
         for e in &cd.events {
-            if let Some(p) = e.pan {
-                if !(0.0..=1.0).contains(&p) {
-                    bad_pan = Some(p);
-                }
+            if let Some(p) = e.pan
+                && !(0.0..=1.0).contains(&p)
+            {
+                bad_pan = Some(p);
             }
         }
     }

@@ -53,7 +53,7 @@ impl LanePat {
                     .collect())
             }
             LanePat::Euclid { k, n } => {
-                if *n == 0 || steps % n != 0 {
+                if *n == 0 || !steps.is_multiple_of(*n) {
                     return Err(format!("euclid n ({n}) must divide grid steps ({steps})"));
                 }
                 let cell = crate::grid::bjorklund(*k, *n);

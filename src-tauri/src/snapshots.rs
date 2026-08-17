@@ -80,7 +80,7 @@ pub fn list(app_data_dir: &Path, file_path: &Path) -> Vec<Snapshot> {
         });
     }
     // Newest first.
-    out.sort_by(|a, b| b.created_at_ms.cmp(&a.created_at_ms));
+    out.sort_by_key(|s| std::cmp::Reverse(s.created_at_ms));
     out
 }
 

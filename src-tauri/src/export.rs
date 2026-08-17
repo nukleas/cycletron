@@ -271,10 +271,9 @@ fn render_pattern_to_wav(
 /// 1. Multiple `$:` tracks (named by id, comment, or index)
 /// 2. Top-level `stack(a, b, …)` arguments
 /// 3. Single layer (full mix)
-fn resolve_patterns(
-    code: &str,
-    want_stems: bool,
-) -> Result<(Vec<(String, Pattern)>, Option<Tempo>), String> {
+type NamedPatterns = (Vec<(String, Pattern)>, Option<Tempo>);
+
+fn resolve_patterns(code: &str, want_stems: bool) -> Result<NamedPatterns, String> {
     // Multi-track file path
     if let Ok(file) = parse_strudel_file(code)
         && !file.is_empty()
@@ -311,7 +310,7 @@ fn resolve_patterns(
                             ));
                         };
                         for (key, value) in spread_obj {
-                            obj.insert(key.clone(), value.clone());
+                            obj.insert(*key, value.clone());
                         }
                     } else {
                         return Err("Object spreads must be bare object identifiers".into());
@@ -320,7 +319,7 @@ fn resolve_patterns(
                 for (key, value_expr) in entries {
                     let value_pattern = evaluate_in_context(value_expr, &context)
                         .map_err(|e| format!("Eval error in object field '{key}': {e}"))?;
-                    obj.insert(key.clone(), value_pattern);
+                    obj.insert(*key, value_pattern);
                 }
                 context.bind_object(binding.name, obj);
             } else {
@@ -346,10 +345,11 @@ fn resolve_patterns(
         }
 
         // Single track: try to peel top-level stack for stem split.
-        if want_stems && stems.len() == 1 {
-            if let Some(split) = try_split_stack_expr(&file.tracks[0].expression, &context) {
-                return Ok((split, tempo));
-            }
+        if want_stems
+            && stems.len() == 1
+            && let Some(split) = try_split_stack_expr(&file.tracks[0].expression, &context)
+        {
+            return Ok((split, tempo));
         }
 
         return Ok((stems, tempo));
@@ -358,12 +358,11 @@ fn resolve_patterns(
     // Single expression / mini
     let evaluated = execute(code).map_err(|e| format!("Could not parse pattern: {e}"))?;
 
-    if want_stems {
-        if let Ok(expr) = parse_expr(code.trim())
-            && let Some(split) = try_split_stack_expr(&expr, &EvalContext::new())
-        {
-            return Ok((split, evaluated.tempo));
-        }
+    if want_stems
+        && let Ok(expr) = parse_expr(code.trim())
+        && let Some(split) = try_split_stack_expr(&expr, &EvalContext::new())
+    {
+        return Ok((split, evaluated.tempo));
     }
 
     Ok((vec![("mix".into(), evaluated.pattern)], evaluated.tempo))
@@ -748,14 +747,13 @@ fn find_ffmpeg() -> Option<PathBuf> {
             return Some(path);
         }
         // Bare name — let Command resolve via PATH by checking `command -v`.
-        if c == "ffmpeg" {
-            if let Ok(out) = Command::new("which").arg("ffmpeg").output()
-                && out.status.success()
-            {
-                let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                if !s.is_empty() {
-                    return Some(PathBuf::from(s));
-                }
+        if c == "ffmpeg"
+            && let Ok(out) = Command::new("which").arg("ffmpeg").output()
+            && out.status.success()
+        {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !s.is_empty() {
+                return Some(PathBuf::from(s));
             }
         }
     }

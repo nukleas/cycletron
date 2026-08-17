@@ -68,11 +68,9 @@ fn main() {
             unique,
             orig_body,
             new_doc,
-            if orig_body > 0 {
-                100 * orig_body.saturating_sub(new_doc) / orig_body
-            } else {
-                0
-            },
+            (100 * orig_body.saturating_sub(new_doc))
+                .checked_div(orig_body)
+                .unwrap_or(0),
             plays
         );
         if t == 0 {

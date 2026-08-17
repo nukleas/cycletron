@@ -18,7 +18,10 @@ fn show(label: &str, names: &[&str]) {
         c.emit(),
         reproduces(&b, &c)
     );
-    println!("  saved: {}%\n", if n > 0 { 100 * (n - cc) / n } else { 0 });
+    println!(
+        "  saved: {}%\n",
+        (100 * (n - cc)).checked_div(n).unwrap_or(0)
+    );
 }
 
 fn main() {

@@ -91,12 +91,11 @@ fn main() -> Result<()> {
                 .map(|p| format!("program={} ({})", p, gm_name(p)))
                 .unwrap_or_else(|| "no program".into());
             println!(
-                "  channel {} ({}{}): {} notes, {}",
+                "  channel {} ({}{}): {} notes, ",
                 ch + 1,
                 prog,
                 if *ch == 9 { ", GM percussion" } else { "" },
-                cs.note_count,
-                ""
+                cs.note_count
             );
 
             if cs.notes.is_empty() {

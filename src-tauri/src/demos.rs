@@ -64,24 +64,25 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
         }
 
         // Techniques: top-level category folders only.
-        if let Some((cat, rest)) = rel.split_once('/') {
-            if TECHNIQUE_DIRS.contains(&cat) && !rest.contains('/') {
-                let dest = demos
-                    .join("Techniques")
-                    .join(title_case_words(cat))
-                    .join(rest);
-                if write_if_missing(
-                    &dest,
-                    CorpusAssets::get(path.as_ref())
-                        .as_ref()
-                        .map(|f| f.data.as_ref()),
-                )? {
-                    report.written += 1;
-                } else {
-                    report.skipped += 1;
-                }
-                continue;
+        if let Some((cat, rest)) = rel.split_once('/')
+            && TECHNIQUE_DIRS.contains(&cat)
+            && !rest.contains('/')
+        {
+            let dest = demos
+                .join("Techniques")
+                .join(title_case_words(cat))
+                .join(rest);
+            if write_if_missing(
+                &dest,
+                CorpusAssets::get(path.as_ref())
+                    .as_ref()
+                    .map(|f| f.data.as_ref()),
+            )? {
+                report.written += 1;
+            } else {
+                report.skipped += 1;
             }
+            continue;
         }
 
         // Genres: genres/<slug>/generated-*.strudel → Demos/Genres/<Title>.strudel
@@ -199,7 +200,7 @@ fn write_if_missing(dest: &Path, data: Option<&[u8]>) -> Result<bool, String> {
 }
 
 fn title_case_kebab(s: &str) -> String {
-    s.split(|c| c == '-' || c == '_')
+    s.split(['-', '_'])
         .filter(|p| !p.is_empty())
         .map(|w| {
             let mut c = w.chars();

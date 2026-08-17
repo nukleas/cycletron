@@ -203,7 +203,7 @@ fn collect_midis(root: &Path) -> Vec<PathBuf> {
             matches!(
                 p.extension()
                     .and_then(|s| s.to_str())
-                    .map(|s| s.to_ascii_lowercase())
+                    .map(str::to_ascii_lowercase)
                     .as_deref(),
                 Some("mid") | Some("midi")
             )

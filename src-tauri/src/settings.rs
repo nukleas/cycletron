@@ -246,7 +246,7 @@ impl LlmSettings {
 pub fn builtin_profile(id: &str) -> Option<ProviderProfile> {
     let p = |codec: &str, base: Option<&str>, model: &str, max_tokens: u32| ProviderProfile {
         codec: codec.to_string(),
-        base_url: base.map(|s| s.to_string()),
+        base_url: base.map(std::string::ToString::to_string),
         model: model.to_string(),
         max_tokens,
     };

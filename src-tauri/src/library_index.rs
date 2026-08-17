@@ -81,14 +81,14 @@ pub fn root_warning(root: &Path) -> Option<String> {
             ));
         }
     }
-    if let Some(home) = std::env::var_os("HOME") {
-        if root == Path::new(&home) {
-            return Some(
-                "⚠ Your library root is your home directory — that's very broad. Point it at a \
+    if let Some(home) = std::env::var_os("HOME")
+        && root == Path::new(&home)
+    {
+        return Some(
+            "⚠ Your library root is your home directory — that's very broad. Point it at a \
                  songs folder so the agent only sees your music."
-                    .to_string(),
-            );
-        }
+                .to_string(),
+        );
     }
     None
 }
@@ -134,7 +134,7 @@ impl LibraryIndex {
         if root.is_dir() {
             walk(root, root, 0, &mut songs);
         }
-        songs.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
+        songs.sort_by_key(|s| std::cmp::Reverse(s.modified_ms));
         LibraryIndex { songs }
     }
 
@@ -194,10 +194,11 @@ fn walk(root: &Path, dir: &Path, depth: usize, out: &mut Vec<LibrarySong>) {
                 continue;
             }
             walk(root, &path, depth + 1, out);
-        } else if is_song(&path) && meta.len() <= MAX_SONG_BYTES {
-            if let Some(song) = read_song_meta(root, &path, &meta) {
-                out.push(song);
-            }
+        } else if is_song(&path)
+            && meta.len() <= MAX_SONG_BYTES
+            && let Some(song) = read_song_meta(root, &path, &meta)
+        {
+            out.push(song);
         }
     }
 }
@@ -206,7 +207,7 @@ fn is_song(path: &Path) -> bool {
     matches!(
         path.extension()
             .and_then(|s| s.to_str())
-            .map(|s| s.to_ascii_lowercase())
+            .map(str::to_ascii_lowercase)
             .as_deref(),
         Some("strudel") | Some("js")
     )
@@ -315,14 +316,14 @@ pub fn read_song(root: &Path, requested: &str) -> Result<files::FileDoc, String>
     }
     // Refuse oversized files: a real song is small; anything this large is a data
     // blob (a soundfont, a bundle) and would blow the agent's context if returned.
-    if let Ok(meta) = std::fs::metadata(&candidate) {
-        if meta.len() > MAX_SONG_BYTES {
-            return Err(format!(
-                "'{requested}' is {} KB — too large to be a song (limit {} KB). Skipping.",
-                meta.len() / 1024,
-                MAX_SONG_BYTES / 1024
-            ));
-        }
+    if let Ok(meta) = std::fs::metadata(&candidate)
+        && meta.len() > MAX_SONG_BYTES
+    {
+        return Err(format!(
+            "'{requested}' is {} KB — too large to be a song (limit {} KB). Skipping.",
+            meta.len() / 1024,
+            MAX_SONG_BYTES / 1024
+        ));
     }
     let doc =
         files::read_file(&candidate).map_err(|e| format!("could not read '{requested}': {e}"))?;

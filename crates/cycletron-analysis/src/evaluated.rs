@@ -133,19 +133,19 @@ fn fold_digest(
 
             let ev = event_from_hap(hap, begin, duration);
 
-            if let Some(s) = &ev.sound {
-                if !sounds.iter().any(|x| x == s) {
-                    sounds.push(s.clone());
-                }
+            if let Some(s) = &ev.sound
+                && !sounds.iter().any(|x| x == s)
+            {
+                sounds.push(s.clone());
             }
             if let (Some(name), Some(midi)) = (&ev.note, ev.midi) {
-                if note_low.as_ref().map_or(true, |n| midi < n.midi) {
+                if note_low.as_ref().is_none_or(|n| midi < n.midi) {
                     note_low = Some(NoteRef {
                         name: name.clone(),
                         midi,
                     });
                 }
-                if note_high.as_ref().map_or(true, |n| midi > n.midi) {
+                if note_high.as_ref().is_none_or(|n| midi > n.midi) {
                     note_high = Some(NoteRef {
                         name: name.clone(),
                         midi,

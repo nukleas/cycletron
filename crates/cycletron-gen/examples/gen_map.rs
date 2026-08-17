@@ -71,7 +71,7 @@ fn main() {
             let drums = e
                 .drums
                 .iter()
-                .map(|a| a.label())
+                .map(cycletron_gen::spec::DrumArchetype::label)
                 .collect::<Vec<_>>()
                 .join(" + ");
             let drums_md = if drums.is_empty() {
@@ -79,7 +79,11 @@ fn main() {
             } else {
                 drums.clone()
             };
-            let bass = e.bass.as_ref().map(|b| b.label()).unwrap_or("—");
+            let bass = e
+                .bass
+                .as_ref()
+                .map(cycletron_gen::spec::BassStyle::label)
+                .unwrap_or("—");
             let swing = if e.swing > 0.0 {
                 format!("{:.2}", e.swing)
             } else {

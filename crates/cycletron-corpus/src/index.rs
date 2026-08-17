@@ -99,22 +99,22 @@ impl InMemoryCorpusIndex {
                 }
 
                 // Tempo range filter
-                if let Some(min) = query.tempo_min {
-                    if e.tempo.map_or(true, |t| t < min) {
-                        return false;
-                    }
+                if let Some(min) = query.tempo_min
+                    && e.tempo.is_none_or(|t| t < min)
+                {
+                    return false;
                 }
-                if let Some(max) = query.tempo_max {
-                    if e.tempo.map_or(true, |t| t > max) {
-                        return false;
-                    }
+                if let Some(max) = query.tempo_max
+                    && e.tempo.is_none_or(|t| t > max)
+                {
+                    return false;
                 }
 
                 // Complexity filter
-                if let Some(ref c) = query.complexity {
-                    if e.complexity.as_ref().map_or(true, |ec| ec != c) {
-                        return false;
-                    }
+                if let Some(ref c) = query.complexity
+                    && e.complexity.as_ref() != Some(c)
+                {
+                    return false;
                 }
 
                 // Sounds filter: entry must have at least one matching sound

@@ -60,11 +60,8 @@ fn main() {
                 .as_ref()
                 .map(|w| [frac_to_f64(&w.begin), frac_to_f64(&w.end)]);
             let part = [frac_to_f64(&h.part.begin), frac_to_f64(&h.part.end)];
-            let ctx: std::collections::HashMap<_, _> = h
-                .context
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
+            let ctx: std::collections::HashMap<_, _> =
+                h.context.iter().map(|(k, v)| (*k, *v)).collect();
             let value = value_to_json(&h.value, &ctx);
             HapJson { whole, part, value }
         })

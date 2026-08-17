@@ -203,11 +203,12 @@ fn update_map_ledger(genres_dir: &Path) {
         .lines()
         .map(|line| {
             // Only genre entries carry a `"recipe":` field.
-            if let Some(name) = json_field(line, "name") {
-                if recipes.contains(&name) && line.contains("\"recipe\": null") {
-                    changed += 1;
-                    return line.replace("\"recipe\": null", &format!("\"recipe\": \"{name}.md\""));
-                }
+            if let Some(name) = json_field(line, "name")
+                && recipes.contains(&name)
+                && line.contains("\"recipe\": null")
+            {
+                changed += 1;
+                return line.replace("\"recipe\": null", &format!("\"recipe\": \"{name}.md\""));
             }
             line.to_string()
         })

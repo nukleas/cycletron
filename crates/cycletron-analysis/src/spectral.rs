@@ -145,15 +145,17 @@ fn noise_shape(tilt: f64) -> [f64; NB] {
 fn apply_filters(mut b: [f64; NB], cutoff: Option<f64>, hpf: Option<f64>) -> [f64; NB] {
     for (i, slot) in b.iter_mut().enumerate() {
         let c = band_center(i);
-        if let Some(lp) = cutoff {
-            if lp > 0.0 && c > lp {
-                *slot *= (lp / c).powi(2);
-            }
+        if let Some(lp) = cutoff
+            && lp > 0.0
+            && c > lp
+        {
+            *slot *= (lp / c).powi(2);
         }
-        if let Some(hp) = hpf {
-            if hp > 0.0 && c < hp {
-                *slot *= (c / hp).powi(2);
-            }
+        if let Some(hp) = hpf
+            && hp > 0.0
+            && c < hp
+        {
+            *slot *= (c / hp).powi(2);
         }
     }
     b
@@ -218,16 +220,12 @@ fn midi_hz(m: f64) -> f64 {
 /// which lives in the `Note` control or, for a bare `note(...)`, in the hap value
 /// itself (same resolution the digest uses).
 fn hap_fundamental(h: &strudel_core::Hap) -> Option<f64> {
-    if let Some(f) = getf(h, ContextKey::Frequency) {
-        if f > 0.0 {
-            return Some(f);
-        }
+    if let Some(f) = getf(h, ContextKey::Frequency)
+        && f > 0.0
+    {
+        return Some(f);
     }
-    let cand = h
-        .context
-        .get(&ContextKey::Note)
-        .cloned()
-        .unwrap_or_else(|| h.value.clone());
+    let cand = h.context.get(&ContextKey::Note).copied().unwrap_or(h.value);
     let (_, midi) = crate::inspect::resolve_note(&cand);
     midi.map(|m| midi_hz(m as f64))
 }
@@ -267,8 +265,8 @@ pub(crate) fn spectral_findings(ev: &crate::Evaluated, cycles: usize) -> Vec<Fin
                 energy: [0.0; NB],
                 hits: 0,
             });
-            for i in 0..NB {
-                v.energy[i] += e[i] * g2;
+            for (slot, energy) in v.energy.iter_mut().zip(e.iter()) {
+                *slot += energy * g2;
             }
             v.hits += 1;
         }
@@ -290,8 +288,8 @@ pub(crate) fn spectral_findings(ev: &crate::Evaluated, cycles: usize) -> Vec<Fin
     }
     let mut band_total = [0.0f64; NB];
     for v in &voices {
-        for i in 0..NB {
-            band_total[i] += v.energy[i];
+        for (total, energy) in band_total.iter_mut().zip(v.energy.iter()) {
+            *total += energy;
         }
     }
     let grand: f64 = band_total.iter().sum();

@@ -351,7 +351,7 @@ fn filename_genre_tags(id: &str) -> Vec<String> {
         .unwrap_or("");
     stem.split('-')
         .filter(|t| t.len() > 1 && !skip.contains(t))
-        .map(|t| t.to_lowercase())
+        .map(str::to_lowercase)
         .collect()
 }
 

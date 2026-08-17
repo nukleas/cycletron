@@ -99,8 +99,8 @@ pub(crate) fn event_from_hap(hap: &Hap<Value>, begin: f64, duration: f64) -> Eve
     // in the value itself. Resolve to a MIDI number if possible.
     let note_candidate = context
         .get(&ContextKey::Note)
-        .cloned()
-        .or_else(|| (!is_chord).then(|| value.clone()));
+        .copied()
+        .or_else(|| (!is_chord).then_some(*value));
     let (note, midi) = note_candidate.as_ref().map_or((None, None), resolve_note);
 
     // The sound is the Sound control if present, otherwise the value when it is

@@ -39,14 +39,11 @@ pub async fn send_message(
         }
     }
 
-    let client = match state.agent_client.lock().clone() {
-        Some(c) => c,
-        None => {
-            let msg = "AI is off. Turn it on with “Enable AI” in the AI panel, then pick a provider in Preferences → AI (or sign in with SuperGrok / add an API key).";
-            let mut session = state.session.lock();
-            session.add_assistant_message(msg.to_string());
-            return Ok(msg.to_string());
-        }
+    let Some(client) = state.agent_client.lock().clone() else {
+        let msg = "AI is off. Turn it on with “Enable AI” in the AI panel, then pick a provider in Preferences → AI (or sign in with SuperGrok / add an API key).";
+        let mut session = state.session.lock();
+        session.add_assistant_message(msg.to_string());
+        return Ok(msg.to_string());
     };
 
     let messages = {
@@ -334,10 +331,10 @@ fn push_recent(state: &State<'_, AppState>, path: PathBuf) {
     {
         let mut recents = state.recents.lock();
         recents.push(path);
-        if let Some(dir) = state.app_data_dir() {
-            if let Err(e) = recents.save(&dir) {
-                tracing::warn!("failed to persist recents: {e}");
-            }
+        if let Some(dir) = state.app_data_dir()
+            && let Err(e) = recents.save(&dir)
+        {
+            tracing::warn!("failed to persist recents: {e}");
         }
     }
 }
@@ -477,9 +474,9 @@ pub fn save_midi_to_library(
 
     let base = file_name
         .as_deref()
-        .map(|s| s.trim())
+        .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .unwrap_or_else(|| {
             pb.file_stem()
                 .map(|s| s.to_string_lossy().into_owned())
@@ -523,13 +520,13 @@ pub fn save_midi_to_library(
 #[tauri::command]
 pub fn session_undo(state: State<'_, AppState>) -> Option<String> {
     let mut session = state.session.lock();
-    session.undo().map(|s| s.to_string())
+    session.undo().map(std::string::ToString::to_string)
 }
 
 #[tauri::command]
 pub fn session_redo(state: State<'_, AppState>) -> Option<String> {
     let mut session = state.session.lock();
-    session.redo().map(|s| s.to_string())
+    session.redo().map(std::string::ToString::to_string)
 }
 
 // ---------------------------------------------------------------------------
@@ -555,10 +552,10 @@ pub fn set_library_root(
     {
         let mut lib = state.library.lock();
         lib.root = pb.clone();
-        if let Some(dir) = state.app_data_dir() {
-            if let Err(e) = lib.save(&dir) {
-                tracing::warn!("persist library settings: {e}");
-            }
+        if let Some(dir) = state.app_data_dir()
+            && let Err(e) = lib.save(&dir)
+        {
+            tracing::warn!("persist library settings: {e}");
         }
     }
     let _ = app_handle.emit("library-changed", &path);

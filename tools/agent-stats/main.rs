@@ -220,7 +220,7 @@ fn main() -> ExitCode {
     if !loops.is_empty() {
         println!("\nStruggle loops (a tool failing repeatedly within one request):");
         let mut loops = loops;
-        loops.sort_by(|a, b| b.2.cmp(&a.2));
+        loops.sort_by_key(|&(_, _, n)| std::cmp::Reverse(n));
         for (run, tool, n) in loops.into_iter().take(15) {
             println!("  run {run}: {tool} failed {n}× in one request");
         }

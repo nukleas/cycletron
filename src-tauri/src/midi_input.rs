@@ -141,7 +141,7 @@ pub async fn start_midi_input_listening(
             })
             .collect()
     };
-    drop(probe);
+    let _ = probe;
 
     let mut connections = state.connections.lock();
     let mut connected_names = state.connected_device_names.lock();

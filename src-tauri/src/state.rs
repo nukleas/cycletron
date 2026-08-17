@@ -382,7 +382,7 @@ fn resolve_corpus_path(path: &std::path::Path) -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let workspace_root = manifest_dir
         .parent()
-        .map(|p| p.to_path_buf())
+        .map(std::path::Path::to_path_buf)
         .unwrap_or(manifest_dir);
     workspace_root.join(path)
 }

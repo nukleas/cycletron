@@ -48,7 +48,7 @@ fn main() {
     println!("// drums: {lanes} lanes, all 16-step aligned");
     println!("setbpm(174);");
     println!("stack(");
-    println!("  s(\"{}\").gain(0.9),", drums.to_string());
+    println!("  s(\"{}\").gain(0.9),", drums);
     println!(
         "  {}.s(\"gm_synth_bass_1\").lpf(500).gain(0.6),",
         bass.as_note()

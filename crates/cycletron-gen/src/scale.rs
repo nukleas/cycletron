@@ -95,7 +95,9 @@ impl Scale {
         Ok(Scale::new(parse_key(root)?, Mode::parse(mode)?))
     }
 
-    /// Notes per octave (the mode's degree count).
+    /// Notes per octave (the mode's degree count). Never zero, so there is
+    /// deliberately no `is_empty`.
+    #[expect(clippy::len_without_is_empty, reason = "a scale always has degrees")]
     pub fn len(&self) -> i32 {
         self.mode.intervals().len() as i32
     }

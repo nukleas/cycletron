@@ -17,12 +17,15 @@ fn corpus_root() -> &'static Path {
 
 fn query(tags: &[&str], sounds: &[&str], keyword: Option<&str>) -> CorpusQuery {
     CorpusQuery {
-        tags: tags.iter().map(|s| s.to_string()).collect(),
+        tags: tags.iter().map(std::string::ToString::to_string).collect(),
         tempo_min: None,
         tempo_max: None,
         complexity: None,
-        sounds: sounds.iter().map(|s| s.to_string()).collect(),
-        keyword: keyword.map(|s| s.to_string()),
+        sounds: sounds
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect(),
+        keyword: keyword.map(std::string::ToString::to_string),
         limit: Some(5),
     }
 }

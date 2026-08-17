@@ -81,25 +81,24 @@ fn main() -> ExitCode {
                 continue;
             }
             scanned += 1;
-            if let Some(q) = &args.artist {
-                if !e
+            if let Some(q) = &args.artist
+                && !e
                     .artist
                     .as_deref()
                     .map(|a| contains_ci(a, q))
                     .unwrap_or(false)
-                {
-                    continue;
-                }
+            {
+                continue;
             }
-            if let Some(lo) = args.bpm_min {
-                if e.bpm < lo {
-                    continue;
-                }
+            if let Some(lo) = args.bpm_min
+                && e.bpm < lo
+            {
+                continue;
             }
-            if let Some(hi) = args.bpm_max {
-                if e.bpm > hi {
-                    continue;
-                }
+            if let Some(hi) = args.bpm_max
+                && e.bpm > hi
+            {
+                continue;
             }
 
             // Resolve the converted file once if any content filter is active.
@@ -108,15 +107,16 @@ fn main() -> ExitCode {
                 let Some(code) = abs.as_ref().and_then(|p| std::fs::read_to_string(p).ok()) else {
                     continue;
                 };
-                if let Some(snd) = &args.sound {
-                    if !uses_sound(&code, snd) {
-                        continue;
-                    }
+                if let Some(snd) = &args.sound
+                    && !uses_sound(&code, snd)
+                {
+                    continue;
                 }
-                if let Some(kw) = &args.keyword {
-                    if !contains_ci(&code, kw) && !contains_ci(&e.stem, kw) {
-                        continue;
-                    }
+                if let Some(kw) = &args.keyword
+                    && !contains_ci(&code, kw)
+                    && !contains_ci(&e.stem, kw)
+                {
+                    continue;
                 }
             }
 

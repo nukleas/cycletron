@@ -34,7 +34,7 @@ fn main() {
     let corpus_dir = args
         .get(1)
         .map(PathBuf::from)
-        .unwrap_or_else(|| default_corpus_dir());
+        .unwrap_or_else(default_corpus_dir);
     let out_dir = args
         .get(2)
         .map(PathBuf::from)
@@ -258,7 +258,7 @@ fn write_summary(out_dir: &Path, rows: &[Row]) {
 
     md.push_str("## Failure categories\n\n| Category | Files | Share |\n|---|---:|---:|\n");
     let mut cats: Vec<_> = by_cat.iter().collect();
-    cats.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+    cats.sort_by_key(|(_, files)| std::cmp::Reverse(files.len()));
     for (cat, files) in &cats {
         md.push_str(&format!(
             "| `{cat}` | {} | {:.1}% |\n",
@@ -285,7 +285,7 @@ fn write_summary(out_dir: &Path, rows: &[Row]) {
                 .unwrap_or("");
             md.push_str(&format!("- `{}` — {}\n", short_path(&r.path), err));
         }
-        md.push_str("\n");
+        md.push('\n');
     }
 
     fs::write(out_dir.join("parity-summary.md"), md).expect("write parity-summary.md");
@@ -386,7 +386,7 @@ fn print_summary(rows: &[Row]) {
         100.0 * passing as f64 / total.max(1) as f64
     );
     let mut cats: Vec<_> = by_cat.into_iter().collect();
-    cats.sort_by(|a, b| b.1.cmp(&a.1));
+    cats.sort_by_key(|&(_, n)| std::cmp::Reverse(n));
     for (cat, n) in cats {
         eprintln!("  {cat:>20}  {n}");
     }

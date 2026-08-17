@@ -187,11 +187,11 @@ pub fn remap_sounds(code: &str, known: &crate::sounds::SoundSet) -> Sanitized {
 
     for (wrong, right) in SOUND_ALIASES {
         // Don't clobber a name that genuinely resolves (e.g. a user bank).
-        if known.contains(*wrong) {
+        if known.contains(wrong) {
             continue;
         }
         // Catalog-backed: never map to a name the engine can't play.
-        if !(known.contains(*right) || right.starts_with("gm_")) {
+        if !(known.contains(right) || right.starts_with("gm_")) {
             continue;
         }
         let edits = word_boundary_edits(code, &spans, wrong, right);

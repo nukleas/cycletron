@@ -86,13 +86,13 @@ fn anchor_id(trimmed: &str) -> Option<(TrackKind, Option<String>)> {
     if seen {
         let after = &t[end..];
         let after_trim = after.trim_start();
-        if let Some(rest) = after_trim.strip_prefix(':') {
-            if !rest.starts_with(':') {
-                let label = t[..end].to_ascii_lowercase();
-                // A `// @id` marker still wins over the label if both are present.
-                let id = marker_id(rest).or(Some(label));
-                return Some((TrackKind::Labeled, id));
-            }
+        if let Some(rest) = after_trim.strip_prefix(':')
+            && !rest.starts_with(':')
+        {
+            let label = t[..end].to_ascii_lowercase();
+            // A `// @id` marker still wins over the label if both are present.
+            let id = marker_id(rest).or(Some(label));
+            return Some((TrackKind::Labeled, id));
         }
     }
     None
@@ -254,13 +254,12 @@ pub fn list_tracks(code: &str) -> Vec<TrackInfo> {
 fn find<'a>(tracks: &'a [Track], handle: &str) -> Option<&'a Track> {
     let h = handle.trim().trim_start_matches('@');
     let key = clean_id(handle);
-    if !key.is_empty() {
-        if let Some(t) = tracks
+    if !key.is_empty()
+        && let Some(t) = tracks
             .iter()
             .find(|t| t.id.as_deref().map(clean_id).as_deref() == Some(key.as_str()))
-        {
-            return Some(t);
-        }
+    {
+        return Some(t);
     }
     if let Ok(n) = h.parse::<usize>() {
         return tracks.iter().find(|t| t.index == n);
@@ -291,9 +290,9 @@ fn splice(code: &str, span: (usize, usize), replacement: &[String]) -> String {
     let lines: Vec<&str> = code.lines().collect();
     let trailing_newline = code.ends_with('\n');
     let mut out: Vec<String> = Vec::with_capacity(lines.len());
-    out.extend(lines[..span.0].iter().map(|s| s.to_string()));
+    out.extend(lines[..span.0].iter().map(std::string::ToString::to_string));
     out.extend(replacement.iter().cloned());
-    out.extend(lines[span.1..].iter().map(|s| s.to_string()));
+    out.extend(lines[span.1..].iter().map(std::string::ToString::to_string));
     let mut joined = out.join("\n");
     if trailing_newline {
         joined.push('\n');

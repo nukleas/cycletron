@@ -54,7 +54,7 @@ pub async fn run_agent_loop(
             "{}\n\n## Current editor code (what the user hears right now)\n\n```\n{}\n```\n\n\
              When the user asks to modify, add to, or expand the song, work from this code. \
              Do not ask them to paste it — you already have it.",
-            &*SYSTEM_PROMPT, code
+            *SYSTEM_PROMPT, code
         )
     } else {
         SYSTEM_PROMPT.clone()
@@ -83,7 +83,7 @@ pub async fn run_agent_loop(
         debug!("agent loop iteration {iteration}");
 
         let mut response = client
-            .stream_message(&system_prompt, &api_messages, &tool_defs, &event_tx)
+            .stream_message(&system_prompt, &api_messages, tool_defs, &event_tx)
             .await
             .map_err(|e| format!("AI provider error: {e}"))?;
 
@@ -91,7 +91,7 @@ pub async fn run_agent_loop(
         // arguments}```) instead of a native tool_call. Recover those into real
         // ToolUse blocks so the same models that pick the right tool but can't
         // format it still work. No-op when a native call is already present.
-        recover_text_tool_calls(&mut response.content, &tool_defs);
+        recover_text_tool_calls(&mut response.content, tool_defs);
 
         let mut response_text = String::new();
         let mut tool_calls: Vec<(String, String, serde_json::Value)> = Vec::new();
@@ -127,7 +127,7 @@ pub async fn run_agent_loop(
 
         let mut tool_results = Vec::new();
         for (id, name, input) in &tool_calls {
-            let input_empty = input.as_object().is_none_or(|o| o.is_empty());
+            let input_empty = input.as_object().is_none_or(serde_json::Map::is_empty);
             let mut write_kind: Option<String> = None;
             let (content, is_error) = if truncated && input_empty {
                 warn!("tool '{name}' arguments truncated at token limit; not executing");
@@ -926,14 +926,12 @@ fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> Result<St
     let cache_or_budget: Option<Result<String, String>> = {
         let w = state.agent_write.lock();
         if w.last_review_hash == Some(hash) {
-            if let Some(cached) = &w.last_review_result {
-                Some(Ok(format!(
+            w.last_review_result.as_ref().map(|cached| {
+                Ok(format!(
                     "{cached}\n\n(cached — identical code to previous review; \
                      call play_pattern with no code to play it, or edit then re-review.)"
-                )))
-            } else {
-                None
-            }
+                ))
+            })
         } else if w.review_calls >= crate::state::MAX_REVIEWS_PER_RUN {
             Some(Ok(format!(
                 "Review budget used ({}/{} this request). Fix from the prior review's \
@@ -1192,7 +1190,7 @@ fn tool_play_pattern(
     // always wrong — use upsert_section / upsert_track. Escape: force: true.
     let force = input
         .get("force")
-        .and_then(|v| v.as_bool())
+        .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
     if !reused
         && !force
@@ -2036,7 +2034,7 @@ mod recovery_tests {
         let mut content = vec![ContentBlock::Text {
             text: text.to_string(),
         }];
-        recover_text_tool_calls(&mut content, &defs());
+        recover_text_tool_calls(&mut content, defs());
         let call = content.iter().find_map(|b| match b {
             ContentBlock::ToolUse { name, input, .. } => Some((name.clone(), input.clone())),
             _ => None,
@@ -2053,7 +2051,7 @@ mod recovery_tests {
         let mut content = vec![ContentBlock::Text {
             text: text.to_string(),
         }];
-        recover_text_tool_calls(&mut content, &defs());
+        recover_text_tool_calls(&mut content, defs());
         let ok = content.iter().any(|b| {
             matches!(b, ContentBlock::ToolUse { name, input, .. }
             if name == "save_current_as" && input["name"] == "dub")
@@ -2067,7 +2065,7 @@ mod recovery_tests {
         let mut prose = vec![ContentBlock::Text {
             text: "Here's a nice house groove!".into(),
         }];
-        recover_text_tool_calls(&mut prose, &defs());
+        recover_text_tool_calls(&mut prose, defs());
         assert!(
             !prose
                 .iter()
@@ -2077,7 +2075,7 @@ mod recovery_tests {
         let mut bogus = vec![ContentBlock::Text {
             text: r#"{"name": "delete_everything", "arguments": {}}"#.into(),
         }];
-        recover_text_tool_calls(&mut bogus, &defs());
+        recover_text_tool_calls(&mut bogus, defs());
         assert!(
             !bogus
                 .iter()
