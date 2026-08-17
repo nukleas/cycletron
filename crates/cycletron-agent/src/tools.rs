@@ -1,3 +1,4 @@
+use crate::tool_name::ToolName;
 use crate::types::ToolDefinition;
 use serde_json::json;
 use std::sync::LazyLock;
@@ -13,7 +14,7 @@ pub fn music_tool_definitions() -> &'static [ToolDefinition] {
 fn build_tool_definitions() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
-            name: "search_corpus".to_string(),
+            name: ToolName::SearchCorpus.as_str().to_string(),
             description: "Search the strudel music corpus for patterns and examples. \
                 Returns matching entries with metadata."
                 .to_string(),
@@ -50,7 +51,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "get_example".to_string(),
+            name: ToolName::GetExample.as_str().to_string(),
             description: "Get the full source code of a corpus entry by ID.".to_string(),
             input_schema: json!({
                 "type": "object",
@@ -64,7 +65,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "list_library".to_string(),
+            name: ToolName::ListLibrary.as_str().to_string(),
             description: "List the USER'S OWN saved songs (their personal library, not the \
                 curated corpus), newest first — name, tempo, tags, sounds, and a preview. Use \
                 this to know what the user has already made, to reference or continue their work."
@@ -77,7 +78,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "search_library".to_string(),
+            name: ToolName::SearchLibrary.as_str().to_string(),
             description: "Search the USER'S OWN saved songs by keyword (name/tag/sound/path), \
                 tag, sound name, or tempo range. Use it for requests like 'remix my acid track' \
                 or 'what have I made around 90 BPM'."
@@ -95,7 +96,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "read_song".to_string(),
+            name: ToolName::ReadSong.as_str().to_string(),
             description: "Open one of the user's saved songs to read its full code — so you can \
                 remix, continue, or reference it. Pass the @path from list_library/search_library. \
                 Read-only and confined to the user's library."
@@ -109,7 +110,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "save_song".to_string(),
+            name: ToolName::SaveSong.as_str().to_string(),
             description: "Save code as a NAMED song in the user's library (persists to disk). Use \
                 when the user says 'save this as …'. Overwriting an existing song is allowed and \
                 snapshots the old version first, but announce the overwrite in your reply. Never \
@@ -126,7 +127,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "save_current_as".to_string(),
+            name: ToolName::SaveCurrentAs.as_str().to_string(),
             description: "Save the CURRENT editor buffer as a named song in the library — for \
                 'save what I'm hearing as …' without re-sending the code."
                 .to_string(),
@@ -140,7 +141,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "rename_song".to_string(),
+            name: ToolName::RenameSong.as_str().to_string(),
             description: "Rename a saved song (keeps its folder). Only when the user asks to rename."
                 .to_string(),
             input_schema: json!({
@@ -153,7 +154,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "move_song".to_string(),
+            name: ToolName::MoveSong.as_str().to_string(),
             description: "Move a saved song into a library folder (created if needed). Only when \
                 the user asks to organize."
                 .to_string(),
@@ -167,7 +168,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "new_folder".to_string(),
+            name: ToolName::NewFolder.as_str().to_string(),
             description: "Create a folder in the user's library (for organizing). Only when asked."
                 .to_string(),
             input_schema: json!({
@@ -179,7 +180,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "list_sounds".to_string(),
+            name: ToolName::ListSounds.as_str().to_string(),
             description:
                 "List the sounds currently playable: built-in synth/oscillator names, the \
                 default drum sample banks, common General MIDI instruments (gm_*, which stream \
@@ -193,7 +194,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "list_methods".to_string(),
+            name: ToolName::ListMethods.as_str().to_string(),
             description:
                 "List the strudel-rs DSL surface the validator ACCEPTS: free functions \
                 (stack, note, s, …), chainable pattern methods (fast, jux, lpf, room, chop, …), \
@@ -220,7 +221,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "generate_pattern".to_string(),
+            name: ToolName::GeneratePattern.as_str().to_string(),
             description:
                 "Generate a ready-to-play strudel pattern from an algorithmic-composition \
                 primitive. Returns complete `.strudel` code (comment + setbpm + chain) that \
@@ -270,7 +271,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "validate_pattern".to_string(),
+            name: ToolName::ValidatePattern.as_str().to_string(),
             description:
                 "Validate strudel pattern code. Returns 'valid' or error details — and, when \
                 the syntax is fine, also lints for SILENT failures that parse but never sound: \
@@ -290,7 +291,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "review_pattern".to_string(),
+            name: ToolName::ReviewPattern.as_str().to_string(),
             description:
                 "The combined quality gate — ONE call that runs the whole pre-play checklist: \
                 validation, a compact digest (bpm, events, loop period, voices, sounds), the \
@@ -318,7 +319,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "inspect_pattern".to_string(),
+            name: ToolName::InspectPattern.as_str().to_string(),
             description:
                 "Evaluate pattern code and report what it ACTUALLY emits — your ears while \
                 composing. Returns, over the first N cycles: a per-cycle event list (onset \
@@ -354,7 +355,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "analyze_arrangement".to_string(),
+            name: ToolName::AnalyzeArrangement.as_str().to_string(),
             description:
                 "Analyze a pattern's ARRANGEMENT over time — its structure, not its moment. \
                 Scans up to N cycles, detects the loop length, and segments it into sections \
@@ -384,7 +385,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "critique_pattern".to_string(),
+            name: ToolName::CritiquePattern.as_str().to_string(),
             description:
                 "Musically lint a pattern — does it sound GOOD, not just parse. (Use \
                 validate_pattern for correctness.) Evaluates the pattern over its loop and \
@@ -411,7 +412,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "critique_form".to_string(),
+            name: ToolName::CritiqueForm.as_str().to_string(),
             description:
                 "Critique a pattern's FORM — whether it's arranged like a song, not one looping \
                 bar. (Use critique_pattern for mix issues, analyze_arrangement for the raw \
@@ -441,7 +442,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "genre_recipe".to_string(),
+            name: ToolName::GenreRecipe.as_str().to_string(),
             description:
                 "Look up how to make a GENRE in strudel-rs terms. Returns a curated recipe: \
                 the tempo range, scales, defining sounds, reference artists, and — crucially — \
@@ -463,7 +464,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "play_pattern".to_string(),
+            name: ToolName::PlayPattern.as_str().to_string(),
             description:
                 "Play a WHOLE strudel document — ONLY to START A NEW SONG or fully replace the \
                 arrangement. AFTER review_pattern, call with NO code (reuses last reviewed buffer). \
@@ -498,7 +499,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "list_parts".to_string(),
+            name: ToolName::ListParts.as_str().to_string(),
             description:
                 "List the addressable tracks (parts) of the song currently in the editor: each \
                 track's @id (or index), whether it's muted, and a code preview. Call this before \
@@ -511,7 +512,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "list_sections".to_string(),
+            name: ToolName::ListSections.as_str().to_string(),
             description:
                 "List named sections of a pickRestart({…}) / arrange({…}) song currently in the \
                 editor (intro, drop1, outro, …). Use before upsert_section when changing one \
@@ -523,7 +524,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "upsert_track".to_string(),
+            name: ToolName::UpsertTrack.as_str().to_string(),
             description:
                 "Surgically add or replace ONE track in the current song, then hot-swap — every \
                 other track stays byte-identical (this is how you 'change the bass' or 'add a \
@@ -551,7 +552,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "upsert_tracks".to_string(),
+            name: ToolName::UpsertTracks.as_str().to_string(),
             description:
                 "Batch-add or replace SEVERAL `$:` tracks in one call, then hot-swap once. Prefer \
                 this over N separate upsert_track turns when rebuilding multiple parts."
@@ -576,7 +577,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "upsert_section".to_string(),
+            name: ToolName::UpsertSection.as_str().to_string(),
             description:
                 "Surgically replace ONE named section inside pickRestart({…}) / arrange({…}), \
                 then hot-swap — every other section stays byte-identical. Use for 'make drop1 \
@@ -601,7 +602,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "upsert_sections".to_string(),
+            name: ToolName::UpsertSections.as_str().to_string(),
             description:
                 "Batch-replace SEVERAL pickRestart/arrange sections in one call, then hot-swap \
                 once. Prefer this over N upsert_section turns or a full play_pattern rewrite."
@@ -625,7 +626,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "upsert_binding".to_string(),
+            name: ToolName::UpsertBinding.as_str().to_string(),
             description:
                 "Surgically replace ONE top-level const/let binding's body, then hot-swap — every \
                 other byte stays identical and the whole result is re-validated before it plays. \
@@ -652,7 +653,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "mute_track".to_string(),
+            name: ToolName::MuteTrack.as_str().to_string(),
             description:
                 "Silence one track without deleting it (comments it out), then hot-swap. \
                 Reversible with unmute_track. Use for breakdowns/drops or to A/B a part. \
@@ -670,7 +671,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "unmute_track".to_string(),
+            name: ToolName::UnmuteTrack.as_str().to_string(),
             description:
                 "Restore a track previously silenced with mute_track, then hot-swap. \
                 `id` is the track @id or 1-based index."
@@ -687,7 +688,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "stop".to_string(),
+            name: ToolName::Stop.as_str().to_string(),
             description: "Stop audio playback.".to_string(),
             input_schema: json!({
                 "type": "object",
@@ -695,7 +696,7 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "set_tempo".to_string(),
+            name: ToolName::SetTempo.as_str().to_string(),
             description: "Set the playback tempo in BPM.".to_string(),
             input_schema: json!({
                 "type": "object",

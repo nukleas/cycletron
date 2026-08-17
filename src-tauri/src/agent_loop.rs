@@ -1,5 +1,6 @@
 use crate::state::AppState;
 use cycletron_agent::LlmProvider;
+use cycletron_agent::ToolName;
 use cycletron_agent::types::*;
 use cycletron_analysis as strudel;
 use cycletron_core::types::{ChatMessage, ChatRole, CorpusQuery, PlaybackState, ToolTrace};
@@ -227,41 +228,56 @@ async fn execute_tool(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    match name {
-        "search_corpus" => tool_search_corpus(input, state),
-        "get_example" => tool_get_example(input, state),
-        "list_library" => tool_list_library(input, state),
-        "search_library" => tool_search_library(input, state),
-        "read_song" => tool_read_song(input, state),
-        "save_song" => tool_save_song(input, state, event_tx),
-        "save_current_as" => tool_save_current_as(input, state, event_tx),
-        "rename_song" => tool_rename_song(input, state, event_tx),
-        "move_song" => tool_move_song(input, state, event_tx),
-        "new_folder" => tool_new_folder(input, state, event_tx),
-        "list_sounds" => tool_list_sounds(state),
-        "list_methods" => tool_list_methods(input),
-        "generate_pattern" => tool_generate_pattern(input),
-        "validate_pattern" => tool_validate_pattern(input, state),
-        "review_pattern" => tool_review_pattern(input, state),
-        "inspect_pattern" => tool_inspect_pattern(input),
-        "analyze_arrangement" => tool_analyze_arrangement(input),
-        "critique_pattern" => tool_critique_pattern(input),
-        "critique_form" => tool_critique_form(input),
-        "genre_recipe" => tool_genre_recipe(input, state),
-        "play_pattern" => tool_play_pattern(input, state, event_tx),
-        "list_parts" => tool_list_parts(state),
-        "list_sections" => tool_list_sections(state),
-        "upsert_track" => tool_upsert_track(input, state, event_tx),
-        "upsert_tracks" => tool_upsert_tracks(input, state, event_tx),
-        "upsert_section" => tool_upsert_section(input, state, event_tx),
-        "upsert_sections" => tool_upsert_sections(input, state, event_tx),
-        "upsert_binding" => tool_upsert_binding(input, state, event_tx),
-        "mute_track" => tool_mute_track(input, state, event_tx),
-        "unmute_track" => tool_unmute_track(input, state, event_tx),
-        "stop" => tool_stop(state, event_tx),
-        "set_tempo" => tool_set_tempo(input, state, event_tx),
-        _ => Err(format!("unknown tool: {name}")),
+    // Exhaustive over ToolName (no wildcard): a tool defined in
+    // cycletron-agent without a dispatch arm here is a compile error.
+    let Some(tool) = ToolName::parse(name) else {
+        return Err(format!("unknown tool: {name}"));
+    };
+    match tool {
+        ToolName::SearchCorpus => tool_search_corpus(input, state),
+        ToolName::GetExample => tool_get_example(input, state),
+        ToolName::ListLibrary => tool_list_library(input, state),
+        ToolName::SearchLibrary => tool_search_library(input, state),
+        ToolName::ReadSong => tool_read_song(input, state),
+        ToolName::SaveSong => tool_save_song(input, state, event_tx),
+        ToolName::SaveCurrentAs => tool_save_current_as(input, state, event_tx),
+        ToolName::RenameSong => tool_rename_song(input, state, event_tx),
+        ToolName::MoveSong => tool_move_song(input, state, event_tx),
+        ToolName::NewFolder => tool_new_folder(input, state, event_tx),
+        ToolName::ListSounds => tool_list_sounds(state),
+        ToolName::ListMethods => tool_list_methods(input),
+        ToolName::GeneratePattern => tool_generate_pattern(input),
+        ToolName::ValidatePattern => tool_validate_pattern(input, state),
+        ToolName::ReviewPattern => tool_review_pattern(input, state),
+        ToolName::InspectPattern => tool_inspect_pattern(input),
+        ToolName::AnalyzeArrangement => tool_analyze_arrangement(input),
+        ToolName::CritiquePattern => tool_critique_pattern(input),
+        ToolName::CritiqueForm => tool_critique_form(input),
+        ToolName::GenreRecipe => tool_genre_recipe(input, state),
+        ToolName::PlayPattern => tool_play_pattern(input, state, event_tx),
+        ToolName::ListParts => tool_list_parts(state),
+        ToolName::ListSections => tool_list_sections(state),
+        ToolName::UpsertTrack => tool_upsert_track(input, state, event_tx),
+        ToolName::UpsertTracks => tool_upsert_tracks(input, state, event_tx),
+        ToolName::UpsertSection => tool_upsert_section(input, state, event_tx),
+        ToolName::UpsertSections => tool_upsert_sections(input, state, event_tx),
+        ToolName::UpsertBinding => tool_upsert_binding(input, state, event_tx),
+        ToolName::MuteTrack => tool_mute_track(input, state, event_tx),
+        ToolName::UnmuteTrack => tool_unmute_track(input, state, event_tx),
+        ToolName::Stop => tool_stop(state, event_tx),
+        ToolName::SetTempo => tool_set_tempo(input, state, event_tx),
     }
+}
+
+/// Required string argument: uniform "missing 'key' parameter" error.
+fn req_str<'a>(input: &'a serde_json::Value, key: &str) -> Result<&'a str, String> {
+    input[key]
+        .as_str()
+        .ok_or_else(|| format!("missing '{key}' parameter"))
+}
+
+fn opt_usize(input: &serde_json::Value, key: &str, default: usize) -> usize {
+    input[key].as_u64().map_or(default, |n| n as usize)
 }
 
 fn tool_search_corpus(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
@@ -300,7 +316,7 @@ fn tool_search_corpus(input: &serde_json::Value, state: &AppState) -> Result<Str
 }
 
 fn tool_get_example(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
-    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
+    let id = req_str(input, "id")?;
     let corpus = state.corpus.lock().unwrap();
     match &*corpus {
         Some(index) => index.get_source(id).map_err(|e| e.to_string()),
@@ -412,8 +428,8 @@ fn tool_save_song(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let name = input["name"].as_str().ok_or("missing 'name'")?;
-    let code = input["code"].as_str().ok_or("missing 'code'")?;
+    let name = req_str(input, "name")?;
+    let code = req_str(input, "code")?;
     let folder = input["folder"].as_str();
     let root = state.library_root();
     let rel = crate::library_index::save_song(&root, state.app_data_dir().as_deref(), name, code, folder)?;
@@ -427,7 +443,7 @@ fn tool_save_current_as(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let name = input["name"].as_str().ok_or("missing 'name'")?;
+    let name = req_str(input, "name")?;
     let folder = input["folder"].as_str();
     let code = current_document(state)?;
     let root = state.library_root();
@@ -441,8 +457,8 @@ fn tool_rename_song(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let path = input["path"].as_str().ok_or("missing 'path'")?;
-    let new_name = input["new_name"].as_str().ok_or("missing 'new_name'")?;
+    let path = req_str(input, "path")?;
+    let new_name = req_str(input, "new_name")?;
     let root = state.library_root();
     let rel = crate::library_index::rename_song(&root, path, new_name)?;
     emit_library_changed(event_tx, &rel);
@@ -454,8 +470,8 @@ fn tool_move_song(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let path = input["path"].as_str().ok_or("missing 'path'")?;
-    let folder = input["folder"].as_str().ok_or("missing 'folder'")?;
+    let path = req_str(input, "path")?;
+    let folder = req_str(input, "folder")?;
     let root = state.library_root();
     let rel = crate::library_index::move_song(&root, path, folder)?;
     emit_library_changed(event_tx, &rel);
@@ -467,7 +483,7 @@ fn tool_new_folder(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let path = input["path"].as_str().ok_or("missing 'path'")?;
+    let path = req_str(input, "path")?;
     let root = state.library_root();
     let rel = crate::library_index::create_folder(&root, path)?;
     emit_library_changed(event_tx, &rel);
@@ -681,7 +697,7 @@ fn tool_generate_pattern(input: &serde_json::Value) -> Result<String, String> {
             })
         }
         "infinity" => {
-            let count = input["count"].as_u64().unwrap_or(16) as usize;
+            let count = opt_usize(input, "count", 16);
             let root = input["root"].as_i64().unwrap_or(60) as i32;
             Ok(cycletron_gen::infinity(count, root))
         }
@@ -700,8 +716,8 @@ fn tool_generate_pattern(input: &serde_json::Value) -> Result<String, String> {
         }
         "automaton" => {
             let rule = input["rule"].as_u64().unwrap_or(90).min(255) as u8;
-            let width = input["width"].as_u64().unwrap_or(8) as usize;
-            let gens = input["gens"].as_u64().unwrap_or(4) as usize;
+            let width = opt_usize(input, "width", 8);
+            let gens = opt_usize(input, "gens", 4);
             cycletron_gen::automaton(rule, width, gens)
         }
         other => Err(format!(
@@ -924,8 +940,8 @@ pub(crate) fn review_code(code: &str, cycles: usize, state: &AppState) -> String
 }
 
 fn tool_inspect_pattern(input: &serde_json::Value) -> Result<String, String> {
-    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
-    let cycles = input["cycles"].as_u64().unwrap_or(8) as usize;
+    let code = req_str(input, "code")?;
+    let cycles = opt_usize(input, "cycles", 8);
     // "auto": full event log for short windows, summary for long forms (a
     // 64-cycle dump is thousands of lines nobody can scan).
     let verbosity = input["verbosity"].as_str().unwrap_or("auto");
@@ -945,8 +961,8 @@ fn tool_inspect_pattern(input: &serde_json::Value) -> Result<String, String> {
 }
 
 fn tool_analyze_arrangement(input: &serde_json::Value) -> Result<String, String> {
-    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
-    let max_cycles = input["max_cycles"].as_u64().unwrap_or(32) as usize;
+    let code = req_str(input, "code")?;
+    let max_cycles = opt_usize(input, "max_cycles", 32);
 
     match strudel::Evaluated::new(code, max_cycles) {
         Ok(ev) => Ok(strudel::analyze_to_text(&strudel::analyze(&ev))),
@@ -957,8 +973,8 @@ fn tool_analyze_arrangement(input: &serde_json::Value) -> Result<String, String>
 }
 
 fn tool_critique_pattern(input: &serde_json::Value) -> Result<String, String> {
-    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
-    let cycles = input["cycles"].as_u64().unwrap_or(16) as usize;
+    let code = req_str(input, "code")?;
+    let cycles = opt_usize(input, "cycles", 16);
 
     match strudel::Evaluated::new(code, cycles.max(4)) {
         Ok(ev) => Ok(strudel::critique_to_text(&strudel::critique(&ev))),
@@ -969,8 +985,8 @@ fn tool_critique_pattern(input: &serde_json::Value) -> Result<String, String> {
 }
 
 fn tool_critique_form(input: &serde_json::Value) -> Result<String, String> {
-    let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
-    let cycles = input["cycles"].as_u64().unwrap_or(32) as usize;
+    let code = req_str(input, "code")?;
+    let cycles = opt_usize(input, "cycles", 32);
 
     match strudel::Evaluated::new(code, cycles.clamp(8, 64)) {
         Ok(ev) => Ok(strudel::form_critique_to_text(&strudel::critique_form(&ev))),
@@ -1374,8 +1390,8 @@ fn tool_upsert_track(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
-    let expr = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let id = req_str(input, "id")?;
+    let expr = req_str(input, "code")?;
     let code = current_document(state)?;
     let (new_code, wrote) = cycletron_doc::tracks::upsert_track(&code, id, expr)?;
     state.stamp_write_kind("track");
@@ -1415,8 +1431,8 @@ fn tool_upsert_section(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
-    let expr = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let id = req_str(input, "id")?;
+    let expr = req_str(input, "code")?;
     let code = current_document(state)?;
     let (new_code, wrote) = cycletron_doc::sections::upsert_section(&code, id, expr)?;
     state.stamp_write_kind("section");
@@ -1457,8 +1473,8 @@ fn tool_upsert_binding(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let name = input["name"].as_str().ok_or("missing 'name' parameter")?;
-    let expr = input["code"].as_str().ok_or("missing 'code' parameter")?;
+    let name = req_str(input, "name")?;
+    let expr = req_str(input, "code")?;
     let code = current_document(state)?;
     let (new_code, wrote) = cycletron_doc::structure::upsert_binding(&code, name, expr)?;
     state.stamp_write_kind("binding");
@@ -1503,7 +1519,7 @@ fn tool_mute_track(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
+    let id = req_str(input, "id")?;
     let code = current_document(state)?;
     let new_code = cycletron_doc::tracks::mute_track(&code, id)?;
     apply_document(state, event_tx, &new_code, &format!("Track '{id}' muted."))
@@ -1515,7 +1531,7 @@ fn tool_unmute_track(
     state: &AppState,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
-    let id = input["id"].as_str().ok_or("missing 'id' parameter")?;
+    let id = req_str(input, "id")?;
     let code = current_document(state)?;
     let new_code = cycletron_doc::tracks::unmute_track(&code, id)?;
     apply_document(state, event_tx, &new_code, &format!("Track '{id}' unmuted."))
