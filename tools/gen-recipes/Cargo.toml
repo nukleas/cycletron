@@ -8,4 +8,5 @@ name = "gen-recipes"
 path = "main.rs"
 
 [dependencies]
+cycletron-corpus = { workspace = true }
 cycletron-gen = { workspace = true }

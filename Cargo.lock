@@ -945,6 +945,7 @@ name = "corpus-check"
 version = "0.1.0"
 dependencies = [
  "cycletron-analysis",
+ "cycletron-core",
  "cycletron-corpus",
  "serde_json",
  "strudel-core",
@@ -1996,6 +1997,7 @@ dependencies = [
 name = "gen-recipes"
 version = "0.1.0"
 dependencies = [
+ "cycletron-corpus",
  "cycletron-gen",
 ]
 
@@ -3052,6 +3054,7 @@ name = "midi-ingest"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cycletron-core",
  "midi-to-strudel",
  "serde",
  "serde_json",

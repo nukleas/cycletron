@@ -164,7 +164,7 @@ pub fn export_audio(
             ));
 
             for (i, (name, pattern)) in stem_patterns.iter().enumerate() {
-                let safe = sanitize_filename(name);
+                let safe = cycletron_core::text::slug::filename(name, "stem", None);
                 let stem_wav = stem_dir.join(format!("{:02}-{safe}.wav", i + 1));
                 clipped +=
                     render_pattern_to_wav(pattern, tempo, gain, duration_secs, &stem_wav)?;
@@ -823,21 +823,6 @@ fn stem_dir_for(mix_wav: &Path) -> PathBuf {
         .parent()
         .unwrap_or_else(|| Path::new("."))
         .join(format!("{stem}-stems"))
-}
-
-fn sanitize_filename(name: &str) -> String {
-    let s: String = name
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .collect();
-    let s = s.trim_matches('-').to_string();
-    if s.is_empty() { "stem".into() } else { s }
 }
 
 fn register_sample_manifests(renderer: &mut OfflineRenderer) {

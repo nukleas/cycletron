@@ -149,13 +149,8 @@ fn collect_recipe_files(root: &Path) -> Vec<PathBuf> {
         .filter(|e| e.file_type().is_file())
         .map(|e| e.path().to_path_buf())
         .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("md"))
-        .filter(|p| {
-            // Skip directory docs (README.md, _template.md) — only recipes are gated.
-            p.file_stem()
-                .and_then(|s| s.to_str())
-                .map(|stem| !(stem.starts_with('_') || stem.eq_ignore_ascii_case("readme")))
-                .unwrap_or(true)
-        })
+        // Skip directory docs (README.md, _template.md) — only recipes are gated.
+        .filter(|p| !cycletron_corpus::layout::is_doc_file(p))
         .collect();
     out.sort();
     out
@@ -282,16 +277,7 @@ fn batch_validate(path: &Path) -> ExitCode {
 /// Strip a leading `---\n … \n---\n` YAML frontmatter block (bakery exports
 /// carry one; strudel-rs does not parse it).
 fn strip_frontmatter(code: &str) -> &str {
-    let t = code.trim_start_matches(['\u{feff}', ' ', '\n', '\r', '\t']);
-    if let Some(rest) = t.strip_prefix("---") {
-        // find the closing fence at a line start
-        if let Some(end) = rest.find("\n---") {
-            let after = &rest[end + 4..];
-            // skip to end of that line
-            return after.strip_prefix('\n').unwrap_or(after.trim_start_matches(['\r', '\n']));
-        }
-    }
-    code
+    cycletron_core::text::frontmatter::split(code).1
 }
 
 /// Coarse-bucket a validation error into a comparable reason so the histogram

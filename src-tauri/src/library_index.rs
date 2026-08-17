@@ -237,19 +237,7 @@ fn first_code_line(code: &str) -> String {
 }
 
 /// Best-effort tempo from `setbpm(N)` / `setcpm(N)` when frontmatter has none.
-fn scan_bpm(code: &str) -> Option<f64> {
-    for key in ["setbpm(", "setcpm("] {
-        if let Some(i) = code.find(key) {
-            let rest = &code[i + key.len()..];
-            let end = rest.find(')')?;
-            if let Ok(v) = rest[..end].trim().parse::<f64>() {
-                // setcpm is cycles/min; ×4 ≈ BPM in 4/4. setbpm is already BPM.
-                return Some(if key.starts_with("setcpm") { v * 4.0 } else { v });
-            }
-        }
-    }
-    None
-}
+use cycletron_core::text::tempo::scan_bpm;
 
 /// Distinct sound names used, from `s("…")` / `.s("…")` / `.sound("…")`. Strips
 /// mini-notation ornaments (`*4`, `:2`, `(3,8)`, `~`) down to bare names.
@@ -341,21 +329,7 @@ fn rel_of(root: &Path, path: &Path) -> String {
 }
 
 /// Filename-safe slug: lowercase, non-alphanumerics collapsed to `-`, trimmed.
-fn slugify(name: &str) -> String {
-    let mut out = String::new();
-    let mut dash = false;
-    for c in name.trim().chars() {
-        if c.is_ascii_alphanumeric() {
-            out.push(c.to_ascii_lowercase());
-            dash = false;
-        } else if !dash && !out.is_empty() {
-            out.push('-');
-            dash = true;
-        }
-    }
-    let s = out.trim_matches('-').to_string();
-    if s.is_empty() { "untitled".to_string() } else { s }
-}
+use cycletron_core::text::slug::slugify;
 
 /// Frontmatter for a named save (created today), preserving a detected tempo.
 fn with_frontmatter(name: &str, code: &str) -> String {

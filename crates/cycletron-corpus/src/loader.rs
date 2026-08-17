@@ -164,7 +164,7 @@ pub fn load_curated_dir(curated_root: &Path) -> anyhow::Result<Vec<CorpusEntry>>
 
         let id = rel.display().to_string();
         let title = first_comment_line(&code);
-        let tempo = first_tempo_directive(&code);
+        let tempo = cycletron_core::text::tempo::scan_bpm(&code);
         let sounds = extract_sounds(&code);
         let effects = extract_effects(&code);
         let features = extract_features(&code);
@@ -215,29 +215,6 @@ fn first_comment_line(code: &str) -> Option<String> {
 /// Extract tempo (BPM) from the first `setbpm(N)` / `setcpm(N)` / `setcps(N)`
 /// directive. Returns `None` if none of those appear. Conversion mirrors
 /// strudel-rs: setbpm → N, setcpm → N*4, setcps → N*240.
-fn first_tempo_directive(code: &str) -> Option<f64> {
-    for line in code.lines() {
-        let trimmed = line.trim();
-        if let Some(n) = parse_tempo(trimmed, "setbpm") {
-            return Some(n);
-        }
-        if let Some(n) = parse_tempo(trimmed, "setcpm") {
-            return Some(n * 4.0);
-        }
-        if let Some(n) = parse_tempo(trimmed, "setcps") {
-            return Some(n * 240.0);
-        }
-    }
-    None
-}
-
-fn parse_tempo(line: &str, prefix: &str) -> Option<f64> {
-    let rest = line.strip_prefix(prefix)?.trim_start();
-    let rest = rest.strip_prefix('(')?;
-    let end = rest.find(')')?;
-    rest[..end].trim().parse().ok()
-}
-
 /// Extract sound family / synth labels from curated source code.
 /// Checks for known sound prefixes and quoted synth names; returns short
 /// canonical labels suitable for tag-matching (e.g. "tr808", "gm", "fm").
@@ -403,23 +380,6 @@ mod tests {
     fn first_comment_line_stops_at_non_comment() {
         let code = "setbpm(120);\n// comment after code\n";
         assert_eq!(first_comment_line(code), None);
-    }
-
-    #[test]
-    fn first_tempo_directive_reads_setbpm() {
-        assert_eq!(first_tempo_directive("setbpm(124);\nrest"), Some(124.0));
-    }
-
-    #[test]
-    fn first_tempo_directive_converts_setcpm() {
-        // 30 cpm = 120 bpm at 4 beats/cycle.
-        assert_eq!(first_tempo_directive("setcpm(30);"), Some(120.0));
-    }
-
-    #[test]
-    fn first_tempo_directive_converts_setcps() {
-        // 0.5 cps = 30 cpm = 120 bpm.
-        assert_eq!(first_tempo_directive("setcps(0.5);"), Some(120.0));
     }
 
     #[test]

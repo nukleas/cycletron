@@ -183,12 +183,10 @@ fn update_map_ledger(genres_dir: &Path) {
             if p.extension().and_then(|x| x.to_str()) != Some("md") {
                 return None;
             }
-            let stem = p.file_stem()?.to_str()?.to_string();
-            if stem.starts_with('_') || stem.eq_ignore_ascii_case("readme") {
-                None
-            } else {
-                Some(stem)
+            if cycletron_corpus::layout::is_doc_file(&p) {
+                return None;
             }
+            Some(p.file_stem()?.to_str()?.to_string())
         })
         .collect();
 

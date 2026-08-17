@@ -265,15 +265,7 @@ fn write_file(path: &Path, contents: &str) -> std::io::Result<()> {
 /// Make a filesystem-safe stem (the source names have spaces, parens, etc.),
 /// capped so `artist__title` stays well under the 255-byte filename limit.
 fn sanitize(stem: &str) -> String {
-    let s: String = stem
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
-        .collect();
-    let mut trimmed = s.trim_matches('-').to_string();
-    if trimmed.len() > 100 {
-        trimmed.truncate(100);
-    }
-    if trimmed.is_empty() { "midi".to_string() } else { trimmed }
+    cycletron_core::text::slug::filename(stem, "midi", Some(100))
 }
 
 fn parse_args() -> Result<Args, String> {

@@ -10,6 +10,7 @@ name = "midi-ingest"
 path = "main.rs"
 
 [dependencies]
+cycletron-core = { workspace = true }
 midi-to-strudel = { workspace = true }
 strudel-dsl = { workspace = true }
 strudel-core = { workspace = true }
