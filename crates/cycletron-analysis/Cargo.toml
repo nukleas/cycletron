@@ -14,3 +14,8 @@ strudel-mini = { workspace = true }
 
 [dev-dependencies]
 cycletron-gen = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "review"
+harness = false

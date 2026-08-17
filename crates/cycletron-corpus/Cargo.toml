@@ -11,3 +11,10 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 walkdir = "2"
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "corpus"
+harness = false
