@@ -68,13 +68,7 @@ pub fn set_key(provider_id: &str, key: &str) -> Result<(), String> {
 /// For Grok this also returns true when an xAI SuperGrok OAuth session is stored.
 /// For Codex this also returns true when a ChatGPT OAuth session is stored.
 pub fn has_key(provider_id: &str) -> bool {
-    if provider_id == "grok" && crate::xai_oauth::has_session() {
-        return true;
-    }
-    if provider_id == "codex" && crate::codex_oauth::has_session() {
-        return true;
-    }
-    get_key(provider_id).is_some()
+    crate::oauth::has_subscription_session(provider_id) || get_key(provider_id).is_some()
 }
 
 fn env_var_for(provider_id: &str) -> Option<&'static str> {

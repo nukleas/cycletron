@@ -71,28 +71,14 @@ pub struct CodexOAuthStatus {
     pub codex_cli_available: bool,
 }
 
-// ── Storage ───────────────────────────────────────────────────────────────
-
-fn load_tokens() -> Option<CodexTokens> {
-    STORE.load()
-}
-
-fn save_tokens(tokens: &CodexTokens) -> Result<(), String> {
-    STORE.save(tokens)
-}
-
-fn clear_tokens() -> Result<(), String> {
-    STORE.clear()
-}
-
-fn access_still_valid(t: &CodexTokens) -> bool {
-    t.expires_at - EXPIRY_SKEW_SECS > oauth_store::now_unix() && !t.access_token.is_empty()
+fn still_valid(t: &CodexTokens) -> bool {
+    oauth_store::still_valid(t.expires_at, EXPIRY_SKEW_SECS, &t.access_token)
 }
 
 // ── Status / credentials ──────────────────────────────────────────────────
 
 pub fn status() -> CodexOAuthStatus {
-    let t = load_tokens();
+    let t: Option<CodexTokens> = STORE.load();
     CodexOAuthStatus {
         signed_in: t
             .as_ref()
@@ -106,12 +92,14 @@ pub fn status() -> CodexOAuthStatus {
 }
 
 pub fn has_session() -> bool {
-    load_tokens().is_some_and(|t| !t.access_token.is_empty() || !t.refresh_token.is_empty())
+    STORE
+        .load::<CodexTokens>()
+        .is_some_and(|t| !t.access_token.is_empty() || !t.refresh_token.is_empty())
 }
 
 /// Access token + account id for request headers (no network).
 pub fn peek_credential() -> Option<(String, String)> {
-    let t = load_tokens()?;
+    let t: CodexTokens = STORE.load()?;
     if t.access_token.is_empty() || t.account_id.is_empty() {
         return None;
     }
@@ -119,25 +107,25 @@ pub fn peek_credential() -> Option<(String, String)> {
 }
 
 pub async fn ensure_fresh() -> Result<(String, String), String> {
-    let Some(tokens) = load_tokens() else {
+    let Some(tokens) = STORE.load::<CodexTokens>() else {
         return Err(
             "Not signed in with Codex. Open Preferences → Codex → Import CLI session or Sign in."
                 .into(),
         );
     };
-    if access_still_valid(&tokens) {
+    if still_valid(&tokens) {
         return Ok((tokens.access_token, tokens.account_id));
     }
     if tokens.refresh_token.is_empty() {
         return Err("Codex session expired and no refresh token is stored. Sign in again.".into());
     }
     let refreshed = refresh_token(&tokens.refresh_token).await?;
-    save_tokens(&refreshed)?;
+    STORE.save(&refreshed)?;
     Ok((refreshed.access_token, refreshed.account_id))
 }
 
 pub fn logout() -> Result<(), String> {
-    clear_tokens()
+    STORE.clear()
 }
 
 // ── Import from Codex CLI ─────────────────────────────────────────────────
@@ -199,7 +187,7 @@ pub fn import_from_codex_cli() -> Result<CodexOAuthStatus, String> {
         )
     })?;
     tokens.source = Some("codex-cli-import".into());
-    save_tokens(&tokens)?;
+    STORE.save(&tokens)?;
     tracing::info!(
         target: "cycletron::codex_oauth",
         email = ?tokens.email,
@@ -211,76 +199,43 @@ pub fn import_from_codex_cli() -> Result<CodexOAuthStatus, String> {
 
 // ── Token refresh ─────────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
-struct TokenResponse {
-    access_token: Option<String>,
-    refresh_token: Option<String>,
-    id_token: Option<String>,
-    expires_in: Option<i64>,
-    error: Option<String>,
-    error_description: Option<String>,
-}
+use crate::oauth_store::TokenResponse;
 
 async fn refresh_token(refresh: &str) -> Result<CodexTokens, String> {
-    let client = reqwest::Client::new();
-    let resp = client
-        .post(TOKEN_URL)
-        .header("Accept", "application/json")
-        .form(&[
-            ("grant_type", "refresh_token"),
-            ("refresh_token", refresh),
-            ("client_id", CLIENT_ID),
-        ])
-        .send()
+    use crate::oauth_store::RefreshError;
+    let grant = oauth_store::refresh_grant(TOKEN_URL, CLIENT_ID, refresh, "Codex")
         .await
-        .map_err(|e| format!("Codex token refresh failed: {e}"))?;
+        .map_err(|e| match e {
+            RefreshError::InvalidGrant { err, desc } => {
+                let _ = STORE.clear();
+                format!(
+                    "Codex session revoked or expired ({err} {desc}). Run `codex login` or Sign in again."
+                )
+            }
+            RefreshError::Forbidden { desc } => format!("Codex refresh failed: 403 Forbidden {desc}"),
+            RefreshError::Other(msg) => msg,
+        })?;
 
-    let http_status = resp.status();
-    let body: TokenResponse = resp
-        .json()
-        .await
-        .map_err(|e| format!("Codex refresh parse failed: {e}"))?;
-
-    if !http_status.is_success() || body.error.is_some() {
-        let err = body.error.unwrap_or_else(|| http_status.to_string());
-        let desc = body.error_description.unwrap_or_default();
-        if err == "invalid_grant" || http_status.as_u16() == 400 || http_status.as_u16() == 401 {
-            let _ = clear_tokens();
-            return Err(format!(
-                "Codex session revoked or expired ({err} {desc}). Run `codex login` or Sign in again."
-            ));
-        }
-        return Err(format!("Codex refresh failed: {err} {desc}"));
-    }
-
-    let access = body
-        .access_token
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| "refresh response missing access_token".to_string())?;
-    let new_refresh = body
-        .refresh_token
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| refresh.to_string());
-    let prev = load_tokens();
-    let account_id = account_id_from_jwt(&access)
+    let prev: Option<CodexTokens> = STORE.load();
+    let account_id = account_id_from_jwt(&grant.access_token)
         .or_else(|| prev.as_ref().map(|p| p.account_id.clone()))
         .unwrap_or_default();
     if account_id.is_empty() {
         return Err("refresh response missing ChatGPT account id".into());
     }
-    let expires_at = oauth_store::exp_from_jwt(&access)
-        .or_else(|| body.expires_in.map(|e| oauth_store::now_unix() + e))
+    let expires_at = oauth_store::exp_from_jwt(&grant.access_token)
+        .or_else(|| grant.expires_in.map(|e| oauth_store::now_unix() + e))
         .unwrap_or_else(|| oauth_store::now_unix() + 3600);
-    let email = body
+    let email = grant
         .id_token
         .as_deref()
         .and_then(oauth_store::email_from_jwt)
         .or_else(|| prev.as_ref().and_then(|p| p.email.clone()));
 
     Ok(CodexTokens {
-        access_token: access,
-        refresh_token: new_refresh,
-        id_token: body.id_token.or_else(|| prev.and_then(|p| p.id_token)),
+        access_token: grant.access_token,
+        refresh_token: grant.refresh_token,
+        id_token: grant.id_token.or_else(|| prev.and_then(|p| p.id_token)),
         account_id,
         expires_at,
         email,
@@ -457,7 +412,7 @@ pub async fn login_with_browser() -> Result<CodexOAuthStatus, String> {
         email,
         source: Some("browser-pkce".into()),
     };
-    save_tokens(&tokens)?;
+    STORE.save(&tokens)?;
     tracing::info!(
         target: "cycletron::codex_oauth",
         email = ?tokens.email,

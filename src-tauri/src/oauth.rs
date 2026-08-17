@@ -25,6 +25,16 @@ pub async fn refresh_if_stale(provider_id: &str) -> bool {
     true
 }
 
+/// Does `provider_id` have a stored subscription-OAuth session? The single
+/// place that knows which providers support subscription sign-in.
+pub fn has_subscription_session(provider_id: &str) -> bool {
+    match provider_id {
+        "grok" => crate::xai_oauth::has_session(),
+        "codex" => crate::codex_oauth::has_session(),
+        _ => false,
+    }
+}
+
 /// The bearer access token from `provider_id`'s OAuth session, if one exists.
 /// `None` for API-key providers (and when no session is signed in).
 pub fn peek_access_token(provider_id: &str) -> Option<String> {
