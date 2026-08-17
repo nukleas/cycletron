@@ -30,6 +30,7 @@ tools/parity/reports/
 # Environment & secrets
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 
@@ -78,3 +79,10 @@ corpus/test_ingest*/
 # User-local sample pack library (installed in-app; contents are
 # user-provided and may not be redistributable)
 /Packs/
+
+# Local corpus staging — bakery-scraped candidates (third-party patterns,
+# not redistributable from this public repo) and ingestion outputs.
+# Regenerate with tools/corpus-fetch/fetch-corpus.sh + hap-ingest/midi-ingest.
+/corpus/_examples/
+/corpus/ingested/
+/.corpus-cache/

@@ -37,6 +37,10 @@ const SOUND_ALIASES: &[(&str, &str)] = &[
     ("cowbell", "cb"),
     ("rimshot", "rs"),
     ("rim", "rs"),
+    ("rd", "RolandTR909_rd"),
+    ("sh", "hh"),
+    ("tb", "perc"),
+    ("piano", "gm_piano"),
     // GM soundfont: web-strudel's long name → strudel-rs's short name.
     ("gm_electric_piano_1", "gm_epiano1"),
 ];
@@ -216,14 +220,30 @@ fn string_spans(code: &str) -> Vec<(usize, usize)> {
     let mut spans = Vec::new();
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'"' {
+        // `//` comments hold prose ("the piano line"), not mini-notation —
+        // skip to end of line so their words are never remapped.
+        if bytes[i] == b'/' && i + 1 < bytes.len() && bytes[i + 1] == b'/' {
+            i += 2;
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            continue;
+        }
+        // JS-strudel sources use all three quote styles; unterminated strings
+        // are left unspanned rather than swallowing the rest of the file.
+        let quote = bytes[i];
+        if quote == b'"' || quote == b'\'' || quote == b'`' {
             let start = i + 1;
             let mut j = start;
-            while j < bytes.len() && bytes[j] != b'"' {
+            while j < bytes.len() && bytes[j] != quote {
                 j += if bytes[j] == b'\\' { 2 } else { 1 };
             }
-            spans.push((start, j.min(bytes.len())));
-            i = j + 1;
+            if j < bytes.len() && bytes[j] == quote {
+                spans.push((start, j));
+                i = j + 1;
+            } else {
+                i = start;
+            }
         } else {
             i += 1;
         }

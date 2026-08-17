@@ -144,6 +144,11 @@ pub fn load_curated_dir(curated_root: &Path) -> anyhow::Result<Vec<CorpusEntry>>
             Ok(r) => r.to_path_buf(),
             Err(_) => continue,
         };
+        // Staging / draft dirs (`_examples`, `genres/_drafts`) stay out of
+        // search_corpus until a candidate is promoted into a real category.
+        if crate::layout::is_underscore_hidden(&rel) {
+            continue;
+        }
         let category = rel
             .components()
             .next()
@@ -424,6 +429,10 @@ mod tests {
         assert!(
             entries.iter().any(|e| e.tempo.is_some()),
             "expected at least one entry with a parsed tempo"
+        );
+        assert!(
+            entries.iter().all(|e| !e.id.contains("_examples/")),
+            "staging _examples must not be indexed as curated"
         );
     }
 }

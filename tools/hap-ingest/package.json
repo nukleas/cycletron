@@ -1,0 +1,15 @@
+{
+  "name": "hap-ingest",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/patch-strudel.mjs"
+  },
+  "dependencies": {
+    "@kabelsalat/web": "file:./stubs",
+    "@strudel/core": "^1.2.5",
+    "@strudel/mini": "^1.2.5",
+    "@strudel/tonal": "^1.2.5",
+    "@strudel/transpiler": "^1.2.5"
+  }
+}

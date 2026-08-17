@@ -196,6 +196,13 @@ fn collect_strudel_files(root: &Path) -> Vec<PathBuf> {
             .unwrap_or("")
             .to_ascii_lowercase();
         if ext == "strudel" {
+            // Staging / draft dirs (`_examples`, `genres/_drafts`, …) are
+            // walk-skipped so they can hold unpicked candidates. A direct
+            // `corpus-check path/to/_examples` still validates that folder.
+            let rel = path.strip_prefix(root).unwrap_or(path);
+            if cycletron_corpus::layout::is_underscore_hidden(rel) {
+                continue;
+            }
             out.push(path.to_path_buf());
         }
     }

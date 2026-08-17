@@ -63,6 +63,11 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
             continue;
         }
 
+        // Staging dirs stay out of the shipped library.
+        if cycletron_corpus::layout::is_underscore_hidden(std::path::Path::new(&rel)) {
+            continue;
+        }
+
         // Techniques: top-level category folders only.
         if let Some((cat, rest)) = rel.split_once('/')
             && TECHNIQUE_DIRS.contains(&cat)
@@ -172,6 +177,10 @@ pub fn export_corpus_assets(dest: &Path) -> Result<(), String> {
     }
     for path in CorpusAssets::iter() {
         let rel = path.as_ref();
+        let rel_unix = rel.replace('\\', "/");
+        if cycletron_corpus::layout::is_underscore_hidden(std::path::Path::new(&rel_unix)) {
+            continue;
+        }
         let Some(file) = CorpusAssets::get(rel) else {
             continue;
         };

@@ -14,7 +14,8 @@ corpus/
 ├── harmony/   — chord progressions, voicings, drone + melody
 ├── form/      — multi-section pieces, builds, intros, AABB switching
 ├── timbre/    — synth design: FM, supersaw, bitcrush, pluck+delay
-└── motion/    — continuous modulation: LFOs, rotating Euclidean
+├── motion/    — continuous modulation: LFOs, rotating Euclidean
+└── _examples/ — unpicked MusicRepo candidates (local staging: not gated, not shipped, not committed)
 ```
 
 Each example is a complete, self-contained `.strudel` file with `setbpm(N);`

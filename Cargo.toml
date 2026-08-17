@@ -11,6 +11,7 @@ members = [
     "tools/parity/dsl-eval",
     "tools/parity/corpus-scan",
     "tools/corpus-check",
+    "tools/hap-ingest",
     "tools/midi-inspect",
     "tools/midi-ingest",
     "tools/strudel-search",
