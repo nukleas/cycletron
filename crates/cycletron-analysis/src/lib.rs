@@ -34,11 +34,8 @@ mod tests {
     use crate::form::{label_energy, parse_pickrestart_labels};
     use crate::inspect::{midi_to_name, note_name_to_midi};
 
-    fn known() -> std::collections::HashSet<String> {
-        ["bd", "hh", "sd", "sawtooth", "sine", "supersaw", "wt_pluck"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect()
+    fn known() -> sounds::SoundSet {
+        sounds::SoundSet::builtin_only()
     }
 
     #[test]

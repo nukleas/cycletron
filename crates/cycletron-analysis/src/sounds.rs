@@ -76,24 +76,74 @@ pub const GM_INSTRUMENTS: &[&str] = &[
     "gm_synth_bass_1", "gm_lead_1_square", "gm_pad_warm", "gm_marimba", "gm_xylophone",
 ];
 
+static BUILTIN: std::sync::LazyLock<std::collections::HashSet<String>> =
+    std::sync::LazyLock::new(|| {
+        let mut set: std::collections::HashSet<String> = SYNTHS
+            .iter()
+            .chain(WAVETABLES.iter())
+            .chain(DEFAULT_DRUMS.iter())
+            .chain(PERCUSSION.iter())
+            .chain(INSTRUMENTS.iter())
+            .chain(GM_INSTRUMENTS.iter())
+            .map(|s| s.to_string())
+            .collect();
+        for (machine, _, voices) in MACHINE_KITS {
+            for v in *voices {
+                set.insert(format!("{machine}_{v}"));
+            }
+        }
+        set
+    });
+
 /// Every sound name that resolves without user-loaded banks: synths,
 /// wavetables, default drums, and drum-machine voices. `gm_*` names are NOT
 /// enumerated (any GM name streams on demand) — callers should treat the
-/// `gm_` prefix as known. Used by the silence linter.
-pub fn builtin_sound_set() -> std::collections::HashSet<String> {
-    let mut set: std::collections::HashSet<String> = SYNTHS
-        .iter()
-        .chain(WAVETABLES.iter())
-        .chain(DEFAULT_DRUMS.iter())
-        .chain(PERCUSSION.iter())
-        .chain(INSTRUMENTS.iter())
-        .chain(GM_INSTRUMENTS.iter())
-        .map(|s| s.to_string())
-        .collect();
-    for (machine, _, voices) in MACHINE_KITS {
-        for v in *voices {
-            set.insert(format!("{machine}_{v}"));
+/// `gm_` prefix as known. Built once; used by the silence linter.
+pub fn builtin_sound_set() -> &'static std::collections::HashSet<String> {
+    &BUILTIN
+}
+
+/// The resolvable sound set for lint/repair: the static builtin catalog plus
+/// any user-loaded sample banks, layered without copying the builtin names.
+pub struct SoundSet {
+    builtin: &'static std::collections::HashSet<String>,
+    user: Vec<String>,
+}
+
+impl SoundSet {
+    pub fn builtin_only() -> Self {
+        Self {
+            builtin: builtin_sound_set(),
+            user: Vec::new(),
         }
     }
-    set
+
+    pub fn with_user_banks(user: Vec<String>) -> Self {
+        Self {
+            builtin: builtin_sound_set(),
+            user,
+        }
+    }
+
+    pub fn contains(&self, name: &str) -> bool {
+        self.builtin.contains(name) || self.user.iter().any(|u| u == name)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.builtin
+            .iter()
+            .map(String::as_str)
+            .chain(self.user.iter().map(String::as_str))
+    }
+
+    /// A set that resolves nothing — for exercising catalog-gated paths.
+    #[cfg(test)]
+    pub(crate) fn empty() -> Self {
+        static NONE: std::sync::LazyLock<std::collections::HashSet<String>> =
+            std::sync::LazyLock::new(std::collections::HashSet::new);
+        Self {
+            builtin: &NONE,
+            user: Vec::new(),
+        }
+    }
 }

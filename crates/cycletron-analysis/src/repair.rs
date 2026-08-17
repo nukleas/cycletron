@@ -11,7 +11,7 @@
 //!
 //! No regex dependency: the workspace has none, so these are hand-rolled scans.
 
-use std::collections::HashSet;
+
 
 /// Result of [`sanitize_source`]: the repaired code plus one human-readable note
 /// per substitution applied (empty `notes` when nothing was touched).
@@ -47,7 +47,7 @@ const SOUND_ALIASES: &[(&str, &str)] = &[
 /// catalog-backed sound-alias remapping ([`remap_sounds`]). This is what the
 /// agent's `play_pattern` runs; `known` is the resolvable sound set
 /// (`sounds::builtin_sound_set` + any user-loaded banks).
-pub fn sanitize_source_with_catalog(input: &str, known: &HashSet<String>) -> Sanitized {
+pub fn sanitize_source_with_catalog(input: &str, known: &crate::sounds::SoundSet) -> Sanitized {
     let mut s = sanitize_source(input);
     let remapped = remap_sounds(&s.code, known);
     s.code = remapped.code;
@@ -182,7 +182,7 @@ fn clamp_negative_pan(code: &str) -> (String, usize) {
 /// Replacements are confined to the inside of double-quoted mini-notation
 /// strings, so identifiers (`let kick = …`), method names, and comments are
 /// never touched. Whole-word matching keeps suffixes like `:2` and `*4` intact.
-pub fn remap_sounds(code: &str, known: &HashSet<String>) -> Sanitized {
+pub fn remap_sounds(code: &str, known: &crate::sounds::SoundSet) -> Sanitized {
     let spans = string_spans(code);
     let mut all_edits: Vec<(usize, usize, String)> = Vec::new();
     let mut notes = Vec::new();
@@ -361,9 +361,10 @@ mod tests {
         assert_eq!(out.notes.len(), 3);
     }
 
-    fn builtin() -> HashSet<String> {
-        crate::sounds::builtin_sound_set()
+    fn builtin() -> crate::sounds::SoundSet {
+        crate::sounds::SoundSet::builtin_only()
     }
+
 
     #[test]
     fn remaps_drum_aliases_inside_strings() {
@@ -395,8 +396,7 @@ mod tests {
 
     #[test]
     fn remap_respects_a_loaded_bank_of_the_same_name() {
-        let mut known = builtin();
-        known.insert("kick".to_string());
+        let known = crate::sounds::SoundSet::with_user_banks(vec!["kick".to_string()]);
         let code = "s(\"kick sd\")";
         assert_eq!(remap_sounds(code, &known).code, code);
     }
@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn remap_skips_when_target_not_playable() {
         // Empty catalog: `bd` is not playable → no remap (catalog-backed guard).
-        let out = remap_sounds("s(\"kick\")", &HashSet::new());
+        let out = remap_sounds("s(\"kick\")", &crate::sounds::SoundSet::empty());
         assert_eq!(out.code, "s(\"kick\")");
         assert!(out.notes.is_empty());
     }

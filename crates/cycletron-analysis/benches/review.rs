@@ -7,8 +7,6 @@
 //! Baselines: `-- --save-baseline pre` / `-- --baseline pre`
 
 use core::hint::black_box;
-use std::collections::HashSet;
-
 use criterion::{criterion_group, criterion_main, Criterion};
 use cycletron_analysis as analysis;
 
@@ -17,7 +15,7 @@ const MEDIUM: &str = include_str!("../../../corpus/showcase/hard-industrial-acid
 const LARGE: &str = include_str!("../../../ui/songs/agency/13-kill-switch.strudel");
 
 /// Mirror of `review_code` (src-tauri/src/agent_loop.rs) without AppState.
-fn review(code: &str, cycles: usize, known: &HashSet<String>) -> usize {
+fn review(code: &str, cycles: usize, known: &analysis::sounds::SoundSet) -> usize {
     analysis::validate_code(code).unwrap();
     let digest = analysis::inspect_code(code, cycles).unwrap();
     let mut findings = analysis::lint_source(code);
@@ -31,7 +29,7 @@ fn review(code: &str, cycles: usize, known: &HashSet<String>) -> usize {
 }
 
 fn bench_review(c: &mut Criterion) {
-    let known = analysis::sounds::builtin_sound_set();
+    let known = analysis::sounds::SoundSet::builtin_only();
     let mut group = c.benchmark_group("review");
     for (id, code, cycles) in [
         ("small_8", SMALL, 8),

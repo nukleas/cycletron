@@ -314,7 +314,7 @@ pub fn lint_source(code: &str) -> Vec<Finding> {
 /// in the panner), and gm_* streaming making cycle 0 empty. `known` is the
 /// resolvable sound set (see `sounds::known_sound_set`); any `gm_*` name is
 /// accepted since GM instruments stream on demand.
-pub fn lint_digest(d: &PatternDigest, known: &std::collections::HashSet<String>) -> Vec<Finding> {
+pub fn lint_digest(d: &PatternDigest, known: &crate::sounds::SoundSet) -> Vec<Finding> {
     let mut findings = Vec::new();
     let warn = |c: &str, m: String| Finding {
         severity: "warn".to_string(),
@@ -343,9 +343,9 @@ pub fn lint_digest(d: &PatternDigest, known: &std::collections::HashSet<String>)
             continue;
         }
         let prefix: String = s.chars().take(3).collect();
-        let mut suggestions: Vec<&String> = known
+        let mut suggestions: Vec<&str> = known
             .iter()
-            .filter(|k| k.starts_with(&prefix) || k.contains(s.as_str()) || s.contains(k.as_str()))
+            .filter(|k| k.starts_with(&prefix) || k.contains(s.as_str()) || s.contains(*k))
             .collect();
         suggestions.sort();
         suggestions.truncate(3);

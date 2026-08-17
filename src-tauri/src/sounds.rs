@@ -233,10 +233,10 @@ pub use cycletron_analysis::sounds::{
 /// user-loaded banks. `gm_*` names are NOT enumerated here (any GM name streams
 /// on demand) — callers should treat the `gm_` prefix as known. Used by the
 /// silence linter.
-pub fn known_sound_set(state: &AppState) -> std::collections::HashSet<String> {
-    let mut set = builtin_sound_set();
-    set.extend(state.loaded_sample_banks.lock().unwrap().iter().cloned());
-    set
+pub fn known_sound_set(state: &AppState) -> cycletron_analysis::sounds::SoundSet {
+    cycletron_analysis::sounds::SoundSet::with_user_banks(
+        state.loaded_sample_banks.lock().unwrap().clone(),
+    )
 }
 
 pub fn sound_catalog(state: &AppState) -> serde_json::Value {

@@ -326,7 +326,7 @@ fn validate(code: &str) -> Result<(), String> {
         }
     }
     if let Ok(digest) = cycletron_analysis::inspect_code(code, 4) {
-        let known = cycletron_analysis::sounds::builtin_sound_set();
+        let known = cycletron_analysis::sounds::SoundSet::builtin_only();
         for f in cycletron_analysis::lint_digest(&digest, &known) {
             if f.code == "unknown-sound" {
                 dead.push(format!("{}: {}", f.code, f.message));

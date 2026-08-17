@@ -55,7 +55,7 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
-    let known = analysis::sounds::builtin_sound_set();
+    let known = analysis::sounds::SoundSet::builtin_only();
     let mut invalid = 0usize;
     let mut warned = 0usize;
 
@@ -102,7 +102,7 @@ enum Review {
 
 /// Mirror of the in-app agent's `tool_review_pattern` pipeline
 /// (src-tauri/src/agent_loop.rs), minus user sample banks.
-fn review(code: &str, cycles: usize, known: &std::collections::HashSet<String>) -> Review {
+fn review(code: &str, cycles: usize, known: &analysis::sounds::SoundSet) -> Review {
     if let Err(e) = analysis::validate_code(code) {
         return Review::Invalid(e);
     }
