@@ -2803,12 +2803,44 @@ body.is-drop-target::after {
     margin-left: auto;
 }
 
+.midi-lab-analysis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px 12px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(5, 6, 10, 0.35);
+}
+.midi-lab-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.midi-lab-stat--wide {
+    grid-column: 1 / -1;
+}
+.midi-lab-stat-k {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.midi-lab-stat-v {
+    font-size: 11px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .midi-lab-body {
     display: grid;
     grid-template-columns: 1.2fr 1fr;
     gap: 1px;
     min-height: 220px;
-    max-height: 280px;
+    max-height: 320px;
     background: var(--border);
 }
 .midi-lab-tracks,
@@ -2827,6 +2859,20 @@ body.is-drop-target::after {
     letter-spacing: 0.25em;
     margin-bottom: 8px;
     text-shadow: 2px 0 0 rgba(255, 43, 214, 0.4), 0 0 4px var(--neon-glow);
+}
+.midi-lab-options-sub {
+    margin-top: 12px;
+}
+.midi-lab-hint {
+    margin: 0 0 8px;
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.35;
+}
+.midi-lab-field select:disabled,
+.midi-lab-field input:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 .midi-lab-track-list { display: flex; flex-direction: column; gap: 2px; }

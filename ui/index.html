@@ -668,6 +668,14 @@
                 <span id="midiLabFileName" class="midi-lab-filename">no file</span>
                 <span id="midiLabMeta" class="midi-lab-meta"></span>
             </div>
+            <div id="midiLabAnalysis" class="midi-lab-analysis" hidden>
+                <div class="midi-lab-stat"><span class="midi-lab-stat-k">Duration</span><span id="midiLabDur" class="midi-lab-stat-v">—</span></div>
+                <div class="midi-lab-stat"><span class="midi-lab-stat-k">Notes</span><span id="midiLabNotes" class="midi-lab-stat-v">—</span></div>
+                <div class="midi-lab-stat"><span class="midi-lab-stat-k">Pitch</span><span id="midiLabPitch" class="midi-lab-stat-v">—</span></div>
+                <div class="midi-lab-stat"><span class="midi-lab-stat-k">Polyphony</span><span id="midiLabPoly" class="midi-lab-stat-v">—</span></div>
+                <div class="midi-lab-stat"><span class="midi-lab-stat-k">Channels</span><span id="midiLabChans" class="midi-lab-stat-v">—</span></div>
+                <div class="midi-lab-stat midi-lab-stat--wide"><span class="midi-lab-stat-k">Programs</span><span id="midiLabProgs" class="midi-lab-stat-v">—</span></div>
+            </div>
             <div class="midi-lab-body">
                 <div class="midi-lab-tracks">
                     <h4>Tracks</h4>
@@ -728,6 +736,34 @@
                     <label class="midi-lab-field midi-lab-check">
                         <input type="checkbox" id="midiLabDetectDrums" checked>
                         <span>Detect drum names</span>
+                    </label>
+
+                    <h4 class="midi-lab-options-sub">Cleanup</h4>
+                    <p class="midi-lab-hint">Applied in memory before convert. Source .mid is never rewritten.</p>
+                    <label class="midi-lab-field midi-lab-check">
+                        <input type="checkbox" id="midiLabCleanup" checked>
+                        <span>Clean notes before convert</span>
+                    </label>
+                    <label class="midi-lab-field">
+                        <span>Short notes</span>
+                        <select id="midiLabShortNotes">
+                            <option value="0">Keep all</option>
+                            <option value="16">Drop &lt; 1/16 beat</option>
+                            <option value="32" selected>Drop &lt; 1/32 beat</option>
+                            <option value="64">Drop &lt; 1/64 beat</option>
+                        </select>
+                    </label>
+                    <label class="midi-lab-field midi-lab-check">
+                        <input type="checkbox" id="midiLabRemoveDups" checked>
+                        <span>Remove duplicate overlaps</span>
+                    </label>
+                    <label class="midi-lab-field">
+                        <span>Velocity</span>
+                        <select id="midiLabVelocity">
+                            <option value="off">Leave as-is</option>
+                            <option value="moderate" selected>Moderate (56–108)</option>
+                            <option value="strong">Strong (64–100)</option>
+                        </select>
                     </label>
                 </div>
             </div>
