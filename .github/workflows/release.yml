@@ -197,7 +197,7 @@ jobs:
           echo "APPLE_SIGNING_IDENTITY=$SIGN_ID" >> "$GITHUB_ENV"
 
       - name: Build, sign, and upload to the draft release
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           # Updater signature (all platforms).
