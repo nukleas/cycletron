@@ -101,3 +101,30 @@ impl Default for AppConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// TOML round-trip over the full config shape — guards the on-disk format
+    /// (user configs at rest) across `toml` crate upgrades.
+    #[test]
+    fn config_toml_round_trip() {
+        let config = AppConfig::default();
+        let text = toml::to_string_pretty(&config).unwrap();
+        let back: AppConfig = toml::from_str(&text).unwrap();
+        assert_eq!(back.corpus.path, config.corpus.path);
+        assert_eq!(back.corpus.curated_path, config.corpus.curated_path);
+        assert_eq!(back.audio.default_tempo, config.audio.default_tempo);
+        assert_eq!(back.ui.theme, config.ui.theme);
+    }
+
+    /// A minimal hand-written config (missing every defaulted key) still parses.
+    #[test]
+    fn config_parses_with_defaults() {
+        let text = "[corpus]\npath = \"/tmp/corpus\"\n\n[audio]\n\n[ui]\n";
+        let c: AppConfig = toml::from_str(text).unwrap();
+        assert_eq!(c.audio.default_tempo, 120.0);
+        assert_eq!(c.ui.theme, "dark");
+    }
+}
