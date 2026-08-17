@@ -1196,6 +1196,7 @@ dependencies = [
  "cycletron-corpus",
  "cycletron-doc",
  "cycletron-gen",
+ "cycletron-midi",
  "hound",
  "http-body-util",
  "hyper",
@@ -1271,6 +1272,16 @@ dependencies = [
  "strudel-core",
  "strudel-dsl",
  "strudel-mini",
+]
+
+[[package]]
+name = "cycletron-midi"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cycletron-analysis",
+ "midi-to-strudel",
+ "serde",
 ]
 
 [[package]]
@@ -3063,7 +3074,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cycletron-core",
- "midi-to-strudel",
+ "cycletron-midi",
  "serde",
  "serde_json",
  "strudel-core",
@@ -5379,6 +5390,7 @@ dependencies = [
 name = "strudel-search"
 version = "0.1.0"
 dependencies = [
+ "cycletron-midi",
  "serde",
  "serde_json",
  "walkdir",

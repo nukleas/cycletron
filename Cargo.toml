@@ -5,6 +5,7 @@ members = [
     "crates/cycletron-corpus",
     "crates/cycletron-doc",
     "crates/cycletron-gen",
+    "crates/cycletron-midi",
     "crates/cycletron-analysis",
     "src-tauri",
     "tools/parity/dsl-eval",
@@ -32,6 +33,7 @@ cycletron-agent = { path = "crates/cycletron-agent" }
 cycletron-corpus = { path = "crates/cycletron-corpus" }
 cycletron-doc = { path = "crates/cycletron-doc" }
 cycletron-gen = { path = "crates/cycletron-gen" }
+cycletron-midi = { path = "crates/cycletron-midi" }
 cycletron-analysis = { path = "crates/cycletron-analysis" }
 # strudel-rs engine crates — pinned to public Codeberg main so the app builds
 # from a clean clone (no sibling checkout needed). Bump `rev` to move the engine.

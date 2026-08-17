@@ -13,29 +13,10 @@
 //!
 //! Default --index: ../strudel-training/ingested (the ingested store).
 
-use serde::{Deserialize, Serialize};
+use cycletron_midi::index::Index;
+use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-
-#[derive(Deserialize)]
-struct Index {
-    #[serde(default)]
-    dataset: String,
-    entries: Vec<Entry>,
-}
-
-#[derive(Deserialize)]
-struct Entry {
-    stem: String,
-    #[serde(default)]
-    artist: Option<String>,
-    #[serde(default)]
-    bpm: f64,
-    #[serde(default)]
-    valid: bool,
-    #[serde(default)]
-    strudel: Option<String>,
-}
 
 #[derive(Serialize)]
 struct Hit {

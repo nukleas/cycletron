@@ -11,7 +11,7 @@ path = "main.rs"
 
 [dependencies]
 cycletron-core = { workspace = true }
-midi-to-strudel = { workspace = true }
+cycletron-midi = { workspace = true }
 strudel-dsl = { workspace = true }
 strudel-core = { workspace = true }
 serde = { workspace = true }

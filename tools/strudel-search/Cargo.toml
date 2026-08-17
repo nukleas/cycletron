@@ -10,6 +10,7 @@ name = "strudel-search"
 path = "main.rs"
 
 [dependencies]
+cycletron-midi = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 walkdir = "2"

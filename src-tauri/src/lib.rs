@@ -5,7 +5,6 @@ mod library;
 mod library_index;
 mod logs;
 mod menu;
-mod midi;
 mod midi_input;
 mod oauth;
 mod oauth_store;

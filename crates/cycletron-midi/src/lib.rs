@@ -3,6 +3,9 @@
 //! The upstream crate is CLI-shaped: its `run()` function takes parsed
 //! `ConversionArgs` and writes to disk. We mirror the conversion pipeline
 //! directly so we can take a byte slice and return a `String`, no files.
+//! Used by the app's MIDI Lab commands and the `midi-ingest` tool.
+
+pub mod index;
 
 use midi_to_strudel::{
     InstrumentMode, MidiData, OutputFormatter, SectionNamingStrategy, TrackBuilder,
@@ -212,7 +215,7 @@ mod tests {
     #[test]
     fn converts_real_midi() {
         let candidate = std::path::Path::new(
-            "../../strudel-corpus/normalized/midi/toms-diner-suzanne-vega__d88c1f79.mid",
+            "../../../strudel-corpus/normalized/midi/toms-diner-suzanne-vega__d88c1f79.mid",
         );
         if !candidate.exists() {
             eprintln!("skipping MIDI smoke test: fixture not found");
@@ -226,7 +229,7 @@ mod tests {
 
     fn fixture() -> Option<&'static std::path::Path> {
         let p = std::path::Path::new(
-            "../../strudel-corpus/normalized/midi/toms-diner-suzanne-vega__d88c1f79.mid",
+            "../../../strudel-corpus/normalized/midi/toms-diner-suzanne-vega__d88c1f79.mid",
         );
         p.exists().then_some(p)
     }

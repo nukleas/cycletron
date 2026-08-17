@@ -1,7 +1,7 @@
 use crate::agent_loop;
 use crate::files::{self, FileDoc, Recents};
 use crate::library::{self, DirEntry};
-use crate::midi;
+use cycletron_midi as midi;
 use crate::logs::{self, LogEntry};
 use crate::settings::UserSettings;
 use crate::snapshots::{self, Snapshot};
