@@ -7,7 +7,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::de::DeserializeOwned;
@@ -34,15 +34,12 @@ impl TokenStore {
 
     /// Call once at app startup with the resolved app-data directory.
     pub fn init(&self, app_data_dir: &Path) {
-        if let Ok(mut guard) = self.dir.lock() {
-            *guard = Some(app_data_dir.to_path_buf());
-        }
+        *self.dir.lock() = Some(app_data_dir.to_path_buf());
     }
 
     fn path(&self) -> Result<PathBuf, String> {
         self.dir
             .lock()
-            .map_err(|e| e.to_string())?
             .clone()
             .map(|d| d.join(self.file))
             .ok_or_else(|| format!("{} OAuth store not initialized", self.label))

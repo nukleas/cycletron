@@ -35,6 +35,7 @@ midir = "0.11"
 # OS keychain for API-key storage (release builds only; debug uses a local file).
 # Platform backends: macOS keychain, Linux Secret Service, Windows Credential Manager.
 keyring = { version = "3", features = ["apple-native", "sync-secret-service", "windows-native"] }
+parking_lot = "0.12"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

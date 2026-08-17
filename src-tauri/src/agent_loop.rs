@@ -46,7 +46,7 @@ pub async fn run_agent_loop(
 
     // Build the system prompt with current editor code injected
     let current_code = {
-        let session = state.session.lock().unwrap();
+        let session = state.session.lock();
         session.current_pattern.clone()
     };
     let system_prompt = if let Some(code) = &current_code {
@@ -305,7 +305,7 @@ fn tool_search_corpus(input: &serde_json::Value, state: &AppState) -> Result<Str
         limit: input["limit"].as_u64().map(|n| n as usize),
     };
 
-    let corpus = state.corpus.lock().unwrap();
+    let corpus = state.corpus.lock();
     match &*corpus {
         Some(index) => {
             let results = index.search(&query);
@@ -317,7 +317,7 @@ fn tool_search_corpus(input: &serde_json::Value, state: &AppState) -> Result<Str
 
 fn tool_get_example(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
     let id = req_str(input, "id")?;
-    let corpus = state.corpus.lock().unwrap();
+    let corpus = state.corpus.lock();
     match &*corpus {
         Some(index) => index.get_source(id).map_err(|e| e.to_string()),
         None => Err("corpus not loaded".to_string()),
@@ -862,7 +862,7 @@ fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> Result<St
     // Cache hit / budget check. Do not call stamp_write_kind while holding the
     // agent_write lock — it re-locks the same mutex (non-reentrant → deadlock).
     let cache_or_budget: Option<Result<String, String>> = {
-        let w = state.agent_write.lock().unwrap();
+        let w = state.agent_write.lock();
         if w.last_review_hash == Some(hash) {
             if let Some(cached) = &w.last_review_result {
                 Some(Ok(format!(
@@ -905,7 +905,7 @@ fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> Result<St
     // (parseable) reviews so play_pattern can reuse the buffer without a second
     // full-document generation from the model.
     {
-        let mut w = state.agent_write.lock().unwrap();
+        let mut w = state.agent_write.lock();
         w.review_calls += 1;
         w.last_review_hash = Some(hash);
         w.last_review_result = Some(result.clone());
@@ -997,7 +997,7 @@ fn tool_critique_form(input: &serde_json::Value) -> Result<String, String> {
 }
 
 fn tool_genre_recipe(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
-    let recipes = state.recipes.lock().unwrap();
+    let recipes = state.recipes.lock();
     if recipes.is_empty() {
         return Ok("No genre recipes are loaded yet (corpus/genres/ is empty).".to_string());
     }
@@ -1200,7 +1200,7 @@ fn tool_play_pattern(
         }
         // Stash as last-reviewed so a later play_pattern() reuses it.
         {
-            let mut w = state.agent_write.lock().unwrap();
+            let mut w = state.agent_write.lock();
             w.last_review_hash = Some(code_hash(&raw));
             w.last_review_result = Some(report.clone());
             w.last_reviewed_code = Some(raw.clone());
@@ -1291,7 +1291,7 @@ fn apply_document(
 
     // 4. Commit the repaired code: store it and inject into the WASM REPL.
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         session.set_pattern(code.clone());
         session.playback = PlaybackState::Playing;
     }
@@ -1318,7 +1318,6 @@ fn current_document(state: &AppState) -> Result<String, String> {
     state
         .session
         .lock()
-        .unwrap()
         .current_pattern
         .clone()
         .ok_or_else(|| {
@@ -1542,7 +1541,7 @@ fn tool_stop(
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> Result<String, String> {
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         session.playback = PlaybackState::Stopped;
     }
 
@@ -1561,7 +1560,7 @@ fn tool_set_tempo(
     let bpm = input["bpm"].as_f64().ok_or("missing 'bpm' parameter")?;
 
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         session.tempo = bpm;
     }
 
@@ -1642,7 +1641,7 @@ mod write_path_tests {
 
     fn state_with_code(code: &str) -> AppState {
         let s = AppState::new();
-        s.session.lock().unwrap().set_pattern(code.to_string());
+        s.session.lock().set_pattern(code.to_string());
         s.reset_agent_write_run();
         s
     }
@@ -1671,7 +1670,7 @@ mod write_path_tests {
         let b = tool_review_pattern(&json!({"code": r#"s("bd*4")"#}), &s).unwrap();
         assert!(b.contains("(cached"), "second identical review should cache: {b}");
         // Cache hits must not burn the review budget.
-        assert_eq!(s.agent_write.lock().unwrap().review_calls, 1);
+        assert_eq!(s.agent_write.lock().review_calls, 1);
     }
 
     #[test]
@@ -1693,7 +1692,7 @@ mod write_path_tests {
                 );
             }
         }
-        assert_eq!(s.agent_write.lock().unwrap().review_calls, 2);
+        assert_eq!(s.agent_write.lock().review_calls, 2);
     }
 
     #[test]
@@ -1710,7 +1709,7 @@ mod write_path_tests {
             "play with no code should reuse: {out}"
         );
         assert_eq!(
-            s.session.lock().unwrap().current_pattern.as_deref(),
+            s.session.lock().current_pattern.as_deref(),
             Some(code)
         );
         assert_eq!(s.take_write_kind().as_deref(), Some("reuse"));
@@ -1785,7 +1784,7 @@ mod write_path_tests {
             out.contains("NOT PLAYED") || out.contains("NOT APPLIED") || out.contains("INVALID"),
             "invalid code must not play: {out}"
         );
-        assert!(s.session.lock().unwrap().current_pattern.is_none());
+        assert!(s.session.lock().current_pattern.is_none());
     }
 
     #[test]
@@ -1849,7 +1848,7 @@ setbpm(120);
         )
         .unwrap();
         assert!(out.contains("Section @b"), "{out}");
-        let doc = s.session.lock().unwrap().current_pattern.clone().unwrap();
+        let doc = s.session.lock().current_pattern.clone().unwrap();
         assert!(doc.contains(r#"b: s("hh*8").gain(0.5)"#));
         assert!(doc.contains(r#"a: s("bd*4")"#));
     }
@@ -1868,7 +1867,7 @@ $: lead.slow(2)
         )
         .unwrap();
         assert!(out.contains("Binding `lead`"), "{out}");
-        let doc = s.session.lock().unwrap().current_pattern.clone().unwrap();
+        let doc = s.session.lock().current_pattern.clone().unwrap();
         // Only the binding body changed; the track and directive are intact.
         assert!(doc.contains(r#"const lead = note("a c e").s("square");"#), "{doc}");
         assert!(doc.contains("$: lead.slow(2)"));

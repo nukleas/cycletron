@@ -14,7 +14,7 @@ use midir::{MidiInput, MidiInputConnection};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 
@@ -143,8 +143,8 @@ pub async fn start_midi_input_listening(
     };
     drop(probe);
 
-    let mut connections = state.connections.lock().unwrap();
-    let mut connected_names = state.connected_device_names.lock().unwrap();
+    let mut connections = state.connections.lock();
+    let mut connected_names = state.connected_device_names.lock();
 
     for (idx, device_name) in ports_to_connect {
         // `connect` consumes the `MidiInput`, so each port needs a fresh one.
@@ -194,8 +194,8 @@ pub async fn stop_midi_input_listening(
 }
 
 fn stop_midi_input_listening_internal(state: &MidiInputState) {
-    state.connections.lock().unwrap().clear();
-    state.connected_device_names.lock().unwrap().clear();
+    state.connections.lock().clear();
+    state.connected_device_names.lock().clear();
     state.is_listening.store(false, Ordering::SeqCst);
     tracing::info!("MIDI input listening stopped");
 }
@@ -205,7 +205,7 @@ fn stop_midi_input_listening_internal(state: &MidiInputState) {
 pub async fn get_midi_input_status(
     state: tauri::State<'_, MidiInputState>,
 ) -> Result<MidiInputStatus, String> {
-    let connected_devices = state.connected_device_names.lock().unwrap().clone();
+    let connected_devices = state.connected_device_names.lock().clone();
     let available_devices = list_midi_input_devices().await?;
     Ok(MidiInputStatus {
         is_listening: state.is_listening.load(Ordering::SeqCst),

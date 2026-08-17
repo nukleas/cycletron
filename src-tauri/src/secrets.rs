@@ -16,7 +16,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use parking_lot::Mutex;
 
 use keyring::Entry;
 
@@ -28,9 +28,7 @@ static DEV_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
 /// Call once at app startup with the resolved app-data directory.
 /// Required for debug file storage; harmless in release.
 pub fn init(app_data_dir: &Path) {
-    if let Ok(mut guard) = DEV_DIR.lock() {
-        *guard = Some(app_data_dir.to_path_buf());
-    }
+    *DEV_DIR.lock() = Some(app_data_dir.to_path_buf());
     if cfg!(debug_assertions) {
         tracing::info!(
             target: "cycletron::secrets",
@@ -85,7 +83,6 @@ fn env_var_for(provider_id: &str) -> Option<&'static str> {
 fn file_path() -> Result<PathBuf, String> {
     DEV_DIR
         .lock()
-        .map_err(|e| e.to_string())?
         .clone()
         .map(|d| d.join(DEV_KEYS_FILE))
         .ok_or_else(|| "secrets store not initialized (call secrets::init first)".into())

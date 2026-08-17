@@ -1204,6 +1204,7 @@ dependencies = [
  "midly",
  "mime_guess",
  "open",
+ "parking_lot",
  "reqwest 0.12.28",
  "rust-embed",
  "rustc-hash",

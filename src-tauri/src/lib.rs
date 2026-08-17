@@ -181,7 +181,6 @@ pub fn run() {
                 .state::<AppState>()
                 .recents
                 .lock()
-                .unwrap()
                 .entries
                 .clone();
             let menu = menu::build_app_menu(app.handle(), &recents)?;
@@ -195,7 +194,7 @@ pub fn run() {
             match tray::build_tray(app.handle()) {
                 Ok(tray_state) => {
                     let holder = app.state::<tray::TrayStateHolder>();
-                    *holder.play_pause.lock().unwrap() = Some(tray_state.play_pause_item);
+                    *holder.play_pause.lock() = Some(tray_state.play_pause_item);
                 }
                 Err(e) => tracing::warn!("tray setup failed: {e}"),
             }

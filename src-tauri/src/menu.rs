@@ -197,7 +197,6 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
                 .state::<crate::state::AppState>()
                 .recents
                 .lock()
-                .unwrap()
                 .entries
                 .get(idx)
                 .cloned();
@@ -212,7 +211,7 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         let state = app.state::<crate::state::AppState>();
         let dir = state.app_data_dir();
         {
-            let mut r = state.recents.lock().unwrap();
+            let mut r = state.recents.lock();
             *r = crate::files::Recents::new();
             if let Some(dir) = dir {
                 let _ = r.save(&dir);
@@ -266,7 +265,6 @@ pub fn rebuild_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .state::<crate::state::AppState>()
         .recents
         .lock()
-        .unwrap()
         .entries
         .clone();
     let menu = build_app_menu(app, &recents)?;

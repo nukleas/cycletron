@@ -7,7 +7,8 @@
 
 use std::collections::VecDeque;
 use std::fmt::Write as _;
-use std::sync::{Mutex, OnceLock};
+use parking_lot::Mutex;
+use std::sync::OnceLock;
 use tracing::{Event, Subscriber};
 use tracing_subscriber::Layer;
 use tracing_subscriber::layer::Context;
@@ -30,11 +31,11 @@ fn ring() -> &'static Mutex<VecDeque<LogEntry>> {
 }
 
 pub fn snapshot() -> Vec<LogEntry> {
-    ring().lock().unwrap().iter().cloned().collect()
+    ring().lock().iter().cloned().collect()
 }
 
 pub fn clear() {
-    ring().lock().unwrap().clear();
+    ring().lock().clear();
 }
 
 pub struct InMemoryLayer;
@@ -53,7 +54,7 @@ impl<S: Subscriber> Layer<S> for InMemoryLayer {
             message,
         };
 
-        let mut ring = ring().lock().unwrap();
+        let mut ring = ring().lock();
         if ring.len() == MAX_ENTRIES {
             ring.pop_front();
         }

@@ -52,7 +52,7 @@ pub fn autosave_session(
 ) -> Result<bool, String> {
     let now = Instant::now();
     {
-        let mut last = state.last_autosave.lock().unwrap();
+        let mut last = state.last_autosave.lock();
         if let Some(prev) = *last
             && now.duration_since(prev) < AUTOSAVE_MIN_INTERVAL
         {
@@ -66,7 +66,7 @@ pub fn autosave_session(
         .ok_or_else(|| "app data dir not initialized".to_string())?;
 
     let (file_path, messages) = {
-        let session = state.session.lock().unwrap();
+        let session = state.session.lock();
         (session.file_path.clone(), session.messages.clone())
     };
 
@@ -90,7 +90,7 @@ pub fn restore_session(state: State<'_, AppState>) -> Option<SessionSnapshot> {
     let snap = read_snapshot(&dir)?;
 
     {
-        let mut session = state.session.lock().unwrap();
+        let mut session = state.session.lock();
         session.messages = snap.messages.clone();
         session.tempo = snap.bpm;
         if let Some(path) = &snap.file_path {

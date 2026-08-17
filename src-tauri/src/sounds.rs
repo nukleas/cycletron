@@ -211,7 +211,7 @@ pub fn read_audio_file(path: String) -> Result<tauri::ipc::Response, String> {
 /// can report them. Idempotent; de-dupes.
 #[tauri::command]
 pub fn register_sound_banks(names: Vec<String>, state: State<'_, AppState>) -> Result<(), String> {
-    let mut banks = state.loaded_sample_banks.lock().unwrap();
+    let mut banks = state.loaded_sample_banks.lock();
     for n in names {
         if !n.is_empty() && !banks.contains(&n) {
             banks.push(n);
@@ -235,12 +235,12 @@ pub use cycletron_analysis::sounds::{
 /// silence linter.
 pub fn known_sound_set(state: &AppState) -> cycletron_analysis::sounds::SoundSet {
     cycletron_analysis::sounds::SoundSet::with_user_banks(
-        state.loaded_sample_banks.lock().unwrap().clone(),
+        state.loaded_sample_banks.lock().clone(),
     )
 }
 
 pub fn sound_catalog(state: &AppState) -> serde_json::Value {
-    let user_banks = state.loaded_sample_banks.lock().unwrap().clone();
+    let user_banks = state.loaded_sample_banks.lock().clone();
     let machines: Vec<serde_json::Value> = MACHINE_KITS.iter().map(|(machine, display, voices)| {
         let banks: Vec<String> = voices.iter().map(|v| format!("{machine}_{v}")).collect();
         serde_json::json!({
