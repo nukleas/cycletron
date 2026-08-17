@@ -189,7 +189,8 @@ mod tests {
         assert_eq!(verify_grid(&g).unwrap(), 3);
         // And the whole grid is a legal, non-silent pattern.
         assert!(g.has_onsets());
-        let ast = strudel_mini::parse(&g.to_string()).expect("stack parses");
+        let mini = g.to_string();
+        let ast = strudel_mini::parse(&mini).expect("stack parses");
         assert!(
             !strudel_mini::evaluate(&ast)
                 .unwrap()

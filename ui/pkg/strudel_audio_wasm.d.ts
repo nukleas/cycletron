@@ -313,6 +313,14 @@ export function getSampleArenaNextPtr(): number;
  */
 export function getVoiceCountPtr(): number;
 
+/**
+ * Global WebAssembly module entry point automatically invoked on load.
+ *
+ * Sets up the panic hook interface and registers an internal error-capture mechanism.
+ * This fallback captures panic messages into thread-local storage, allowing the
+ * hosting JavaScript environment (such as an AudioWorklet thread) to safely extract
+ * error details following a WebAssembly trap.
+ */
 export function init(): void;
 
 /**
