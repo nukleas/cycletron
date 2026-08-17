@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+# The emptiness gate (validate_doc → validate_emits) lives in the analysis
+# crate; the dev-dependency in the other direction (analysis tests build
+# fixtures with these generators) is legal — dev-deps don't form cycles.
+cycletron-analysis = { workspace = true }
 # Round-trip verification: emit mini-notation, parse it back, check the events.
 strudel-mini = { workspace = true }
 strudel-core = { workspace = true }

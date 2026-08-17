@@ -10,10 +10,9 @@ name = "midi-ingest"
 path = "main.rs"
 
 [dependencies]
+cycletron-analysis = { workspace = true }
 cycletron-core = { workspace = true }
 cycletron-midi = { workspace = true }
-strudel-dsl = { workspace = true }
-strudel-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 walkdir = "2"

@@ -8,9 +8,6 @@ name = "corpus-check"
 path = "main.rs"
 
 [dependencies]
-strudel-dsl = { workspace = true }
-strudel-mini = { workspace = true }
-strudel-core = { workspace = true }
 cycletron-core = { workspace = true }
 cycletron-corpus = { workspace = true }
 cycletron-analysis = { workspace = true }

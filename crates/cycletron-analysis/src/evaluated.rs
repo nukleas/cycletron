@@ -82,6 +82,21 @@ impl Evaluated {
     }
 }
 
+/// The emptiness gate shared by corpus tooling and the generators: the code
+/// must evaluate AND emit at least one hap within `window` cycles. A pattern
+/// that parses but stays silent across the window is a curation/generation
+/// bug.
+pub fn validate_emits(code: &str, window: usize) -> Result<(), String> {
+    let ev = Evaluated::new(code, window)?;
+    if ev.has_any_haps() {
+        Ok(())
+    } else {
+        Err(format!(
+            "pattern emits no events in {window} cycles — silent pattern"
+        ))
+    }
+}
+
 /// Fold raw per-cycle haps into the serializable digest (onset events only).
 fn fold_digest(
     haps: &[Vec<Hap<Value>>],

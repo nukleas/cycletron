@@ -948,9 +948,6 @@ dependencies = [
  "cycletron-core",
  "cycletron-corpus",
  "serde_json",
- "strudel-core",
- "strudel-dsl",
- "strudel-mini",
  "walkdir",
 ]
 
@@ -1269,6 +1266,7 @@ dependencies = [
 name = "cycletron-gen"
 version = "0.1.0"
 dependencies = [
+ "cycletron-analysis",
  "strudel-core",
  "strudel-dsl",
  "strudel-mini",
@@ -3073,12 +3071,11 @@ name = "midi-ingest"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cycletron-analysis",
  "cycletron-core",
  "cycletron-midi",
  "serde",
  "serde_json",
- "strudel-core",
- "strudel-dsl",
  "walkdir",
 ]
 

@@ -16,12 +16,14 @@ pub mod form;
 pub mod inspect;
 pub mod methods;
 pub mod repair;
+pub mod review;
 pub mod sounds;
 pub mod spectral;
 
 pub use arrangement::*;
 pub use critique::*;
-pub use evaluated::Evaluated;
+pub use evaluated::{Evaluated, validate_emits};
+pub use review::{ReviewOutcome, review_report};
 pub use execute::execute;
 pub use form::*;
 pub use inspect::*;

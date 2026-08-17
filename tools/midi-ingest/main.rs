@@ -178,20 +178,7 @@ fn convert(data: &[u8], bar_limit: usize) -> anyhow::Result<(String, f64)> {
 /// loop. (Promotion into the curated corpus still faces the strict cycle-0
 /// gate, plus human cleanup.)
 fn validate(code: &str, window: usize) -> Result<(), String> {
-    if code.trim().is_empty() {
-        return Err("empty conversion".to_string());
-    }
-    let out = strudel_dsl::execute(code).map_err(|e| e.to_string())?;
-    require_haps(&out.pattern, window)
-}
-
-fn require_haps(pattern: &strudel_core::Pattern, window: usize) -> Result<(), String> {
-    let window = window.max(1) as i32;
-    if (0..window).any(|c| !pattern.query_arc(c, c + 1).is_empty()) {
-        Ok(())
-    } else {
-        Err(format!("emits no events in first {window} cycle(s)"))
-    }
+    cycletron_analysis::validate_emits(code, window.max(1))
 }
 
 fn collect_midis(root: &Path) -> Vec<PathBuf> {

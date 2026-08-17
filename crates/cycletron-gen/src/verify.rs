@@ -30,20 +30,7 @@ pub fn onsets(mini_str: &str) -> Result<Vec<f64>, String> {
 /// one event in cycle 0 (a silent pattern is a generation bug). This lets a
 /// composer confirm its output plays before it is ever written to disk.
 pub fn validate_doc(code: &str) -> Result<(), String> {
-    if code.trim().is_empty() {
-        return Err("empty document".to_string());
-    }
-    // Structural file → standalone DSL → mini-notation (strudel-rs cascade).
-    let out = strudel_dsl::execute(code).map_err(|e| e.to_string())?;
-    require_haps(&out.pattern)
-}
-
-fn require_haps(pattern: &strudel_core::Pattern) -> Result<(), String> {
-    if pattern.query_arc(0i32, 1i32).is_empty() {
-        Err("document emits no events in cycle 0 — silent".to_string())
-    } else {
-        Ok(())
-    }
+    cycletron_analysis::validate_emits(code, 1)
 }
 
 /// Note tokens of a mini-notation string, in time order, as the strudel-rs

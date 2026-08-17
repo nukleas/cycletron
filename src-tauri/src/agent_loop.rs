@@ -903,85 +903,24 @@ fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> Result<St
 /// Core review pipeline — pure-ish (needs state only for the sound catalog).
 /// Shared by `review_pattern` and (later) play-with-review.
 pub(crate) fn review_code(code: &str, cycles: usize, state: &AppState) -> String {
-    // One evaluation shared by every analysis below. Form checks need ≥8
-    // cycles; the mix critique needs ≥4.
-    let has_form = code.contains("pickRestart") || code.contains("arrange");
-    let window = if has_form { cycles.clamp(8, 64) } else { cycles.clamp(4, 64) };
-    let ev = match strudel::Evaluated::new(code, window) {
-        Ok(ev) => ev,
-        Err(e) => {
-            return format!(
-                "INVALID: {e}{}\n\nFix the error and review again.",
-                error_context(code, &e)
-            );
+    match strudel::review_report(code, cycles, &crate::sounds::known_sound_set(state)) {
+        strudel::ReviewOutcome::Invalid(e) => format!(
+            "INVALID: {e}{}\n\nFix the error and review again.",
+            error_context(code, &e)
+        ),
+        strudel::ReviewOutcome::Report { mut text, warns } => {
+            text.push_str(&if warns == 0 {
+                "\nVERDICT: ready to play. Call play_pattern with no code to play this buffer."
+                    .to_string()
+            } else {
+                format!(
+                    "\nVERDICT: {warns} warning(s) — fix the warns, then play \
+                     (play_pattern with no code reuses this buffer after a clean re-review)."
+                )
+            });
+            text
         }
-    };
-    let digest = ev.digest();
-
-    let mut out = String::from("REVIEW\n== digest ==\n");
-    out.push_str(&format!(
-        "  bpm {}  ·  {} events / {} cycles  ·  period {}  ·  max {} voices  ·  sounds: {}\n",
-        digest.bpm.map(|b| b.to_string()).unwrap_or_else(|| "unset".into()),
-        digest.total_events,
-        digest.cycles_queried,
-        digest
-            .period_cycles
-            .map(|p| format!("{p} cycle(s)"))
-            .unwrap_or_else(|| "none detected".into()),
-        digest.max_voices,
-        digest.sounds.join(", "),
-    ));
-
-    let mut warns = 0usize;
-    let section = |title: &str, findings: &[strudel::Finding], out: &mut String| {
-        out.push_str(&format!("== {title} ==\n"));
-        if findings.is_empty() {
-            out.push_str("  clean\n");
-        }
-        for f in findings {
-            out.push_str(&format!("  [{}] {}: {}\n", f.severity, f.code, f.message));
-        }
-    };
-
-    let mut lint = strudel::lint_source(code);
-    lint.extend(strudel::lint_digest(digest, &crate::sounds::known_sound_set(state)));
-    warns += lint.iter().filter(|f| f.severity == "warn").count();
-    section("silence lint", &lint, &mut out);
-
-    let c = strudel::critique(&ev);
-    warns += c.findings.iter().filter(|f| f.severity == "warn").count();
-    section("mix critique", &c.findings, &mut out);
-
-    if has_form {
-        // Section→label map so the form is visible without a separate
-        // analyze_arrangement call (labels come from the pickRestart selector).
-        let a = strudel::analyze(&ev);
-        out.push_str("== form map ==\n");
-        for s in &a.sections {
-            out.push_str(&format!(
-                "  {:<10} cyc {:>2}–{:<3} {:>5.1} ev/cyc  {}\n",
-                s.label,
-                s.start_cycle,
-                s.end_cycle,
-                s.avg_events_per_cycle,
-                s.instruments.join(", ")
-            ));
-        }
-        let c = strudel::critique_form(&ev);
-        warns += c.findings.iter().filter(|f| f.severity == "warn").count();
-        section("form critique", &c.findings, &mut out);
     }
-
-    out.push_str(&if warns == 0 {
-        "\nVERDICT: ready to play. Call play_pattern with no code to play this buffer."
-            .to_string()
-    } else {
-        format!(
-            "\nVERDICT: {warns} warning(s) — fix the warns, then play \
-             (play_pattern with no code reuses this buffer after a clean re-review)."
-        )
-    });
-    out
 }
 
 fn tool_inspect_pattern(input: &serde_json::Value) -> Result<String, String> {
