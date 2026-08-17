@@ -31,8 +31,38 @@ env:
   CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
 
 jobs:
+  # tauri-action creates the draft itself when none exists for the tag; with
+  # three matrix runners starting near-simultaneously that lookup races and
+  # can produce two drafts for the same tag, splitting the assets and the
+  # latest.json merge across them (happened on alpha.12). Create the single
+  # draft up front and hand every builder its id instead.
+  create-release:
+    runs-on: ubuntu-latest
+    env:
+      # The default GITHUB_TOKEN is refused for release creation on this repo
+      # ("Resource not accessible by integration") even with contents:write,
+      # so use a PAT (RELEASE_TOKEN) which can create releases here.
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+    outputs:
+      release-id: ${{ steps.create.outputs.release-id }}
+    steps:
+      - name: Create the draft release
+        id: create
+        run: |
+          # Reuse the existing release on a workflow re-run.
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --draft \
+              --title "Cycletron $GITHUB_REF_NAME" \
+              --notes "Automated build. Draft pre-release — review before publishing."
+          fi
+          ID=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --json databaseId --jq .databaseId)
+          echo "release-id=$ID" >> "$GITHUB_OUTPUT"
+
   release:
     name: Build & release (${{ matrix.platform }})
+    needs: create-release
     runs-on: ${{ matrix.platform }}
     # Holds APPLE_CERTIFICATE_BASE64; its deployment policy permits only v* tags,
     # so the Developer ID key is unreachable from PRs, forks, or branch pushes.
@@ -166,12 +196,9 @@ jobs:
           echo "Signing with: $SIGN_ID"
           echo "APPLE_SIGNING_IDENTITY=$SIGN_ID" >> "$GITHUB_ENV"
 
-      - name: Build, sign, and draft the release
+      - name: Build, sign, and upload to the draft release
         uses: tauri-apps/tauri-action@v0
         env:
-          # The default GITHUB_TOKEN is refused for release creation on this repo
-          # ("Resource not accessible by integration") even with contents:write,
-          # so use a PAT (RELEASE_TOKEN) which can create releases here.
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           # Updater signature (all platforms).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -182,19 +209,12 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
-          tagName: ${{ github.ref_name }}
-          # Must NOT default to context.sha: the fine-grained RELEASE_TOKEN 403s
-          # on create-release when target_commitish is a bare SHA ("Resource not
-          # accessible by personal access token"). A branch name works, and the
-          # value is ignored anyway because the v* tag always exists.
-          releaseCommitish: master
-          releaseName: 'Cycletron ${{ github.ref_name }}'
-          releaseBody: 'Automated build. Draft pre-release — review before publishing.'
-          releaseDraft: true
-          # Not marked prerelease: GitHub's releases/latest (the updater
-          # endpoint) skips prereleases, so auto-update would 404 or go stale.
-          # The alpha status is carried by the version string itself.
-          prerelease: false
+          # Upload into the draft made by create-release; tauri-action never
+          # creates or looks up a release itself. The draft is not marked
+          # prerelease: GitHub's releases/latest (the updater endpoint) skips
+          # prereleases, so auto-update would 404 or go stale. The alpha
+          # status is carried by the version string itself.
+          releaseId: ${{ needs.create-release.outputs.release-id }}
           includeUpdaterJson: true
           args: ${{ matrix.args }}
 
