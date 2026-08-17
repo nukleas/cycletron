@@ -29,7 +29,7 @@
     "@tauri-apps/plugin-updater": "^2.10.1",
     "codemirror": "^6.0.1",
     "coi-serviceworker": "^0.1.7",
-    "marked": "^15.0.0"
+    "marked": "^18.0.9"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
