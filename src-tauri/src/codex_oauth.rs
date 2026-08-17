@@ -34,8 +34,7 @@ const CLIENT_ID: &str = "app_EMoamEEZ73f0CkXaXp7hrann";
 const TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
 const AUTHORIZE_URL: &str = "https://auth.openai.com/oauth/authorize";
 const REDIRECT_URI: &str = "http://localhost:1455/auth/callback";
-const SCOPE: &str =
-    "openid profile email offline_access api.connectors.read api.connectors.invoke";
+const SCOPE: &str = "openid profile email offline_access api.connectors.read api.connectors.invoke";
 const TOKEN_FILE: &str = "codex-oauth.json";
 const EXPIRY_SKEW_SECS: i64 = 300; // 5 min — matches Codex CLI practice
 
@@ -162,7 +161,8 @@ fn codex_cli_session() -> Option<CodexTokens> {
     if account_id.is_empty() {
         return None;
     }
-    let expires_at = oauth_store::exp_from_jwt(&access).unwrap_or_else(|| oauth_store::now_unix() + 3600);
+    let expires_at =
+        oauth_store::exp_from_jwt(&access).unwrap_or_else(|| oauth_store::now_unix() + 3600);
     let email = t
         .id_token
         .as_deref()
@@ -271,9 +271,7 @@ pub async fn login_with_browser() -> Result<CodexOAuthStatus, String> {
              Close any running `codex login` / another Cycletron sign-in, or run `codex login` and Import CLI session."
         )
     })?;
-    listener
-        .set_nonblocking(true)
-        .map_err(|e| e.to_string())?;
+    listener.set_nonblocking(true).map_err(|e| e.to_string())?;
 
     // Open browser on the async runtime thread.
     if let Err(e) = open::that(&auth_url) {

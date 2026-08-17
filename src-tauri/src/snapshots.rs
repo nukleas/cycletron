@@ -91,7 +91,9 @@ pub fn read(app_data_dir: &Path, file_path: &Path, id: &str) -> std::io::Result<
 }
 
 fn prune_oldest(dir: &Path, keep: usize) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     let mut files: Vec<(i64, PathBuf)> = entries
         .flatten()
         .filter_map(|e| {

@@ -5,9 +5,9 @@
 //! The buffer is bounded (most recent N entries) so it never grows
 //! unboundedly even in a long session.
 
+use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::fmt::Write as _;
-use parking_lot::Mutex;
 use std::sync::OnceLock;
 use tracing::{Event, Subscriber};
 use tracing_subscriber::Layer;

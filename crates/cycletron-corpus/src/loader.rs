@@ -63,11 +63,7 @@ impl RawMetadataRow {
             .unwrap_or(&self.normalized_path)
             .to_string();
         // Use the filename stem (before __hash) as id
-        let id = filename
-            .rsplit('/')
-            .next()
-            .unwrap_or(&filename)
-            .to_string();
+        let id = filename.rsplit('/').next().unwrap_or(&filename).to_string();
         Some(CorpusEntry {
             id,
             filename,
@@ -187,7 +183,11 @@ pub fn load_curated_dir(curated_root: &Path) -> anyhow::Result<Vec<CorpusEntry>>
     }
 
     entries.sort_by(|a, b| a.id.cmp(&b.id));
-    debug!("loaded {} curated entries from {}", entries.len(), curated_root.display());
+    debug!(
+        "loaded {} curated entries from {}",
+        entries.len(),
+        curated_root.display()
+    );
     Ok(entries)
 }
 

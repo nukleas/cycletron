@@ -48,7 +48,11 @@ fn main() {
 
     for (fi, fam) in families.iter().enumerate() {
         writeln!(md, "## {}\n", fam.display).unwrap();
-        writeln!(md, "| genre | bpm | mood | swing | drums | bass | spec | recipe |").unwrap();
+        writeln!(
+            md,
+            "| genre | bpm | mood | swing | drums | bass | spec | recipe |"
+        )
+        .unwrap();
         writeln!(md, "| --- | --- | --- | --- | --- | --- | --- | --- |").unwrap();
         writeln!(
             json,
@@ -70,9 +74,17 @@ fn main() {
                 .map(|a| a.label())
                 .collect::<Vec<_>>()
                 .join(" + ");
-            let drums_md = if drums.is_empty() { "—".to_string() } else { drums.clone() };
+            let drums_md = if drums.is_empty() {
+                "—".to_string()
+            } else {
+                drums.clone()
+            };
             let bass = e.bass.as_ref().map(|b| b.label()).unwrap_or("—");
-            let swing = if e.swing > 0.0 { format!("{:.2}", e.swing) } else { "—".into() };
+            let swing = if e.swing > 0.0 {
+                format!("{:.2}", e.swing)
+            } else {
+                "—".into()
+            };
             writeln!(
                 md,
                 "| {} | {}–{} | {} | {} | {} | {} | {} | {} |",
@@ -120,7 +132,12 @@ fn main() {
             .unwrap();
         }
         md.push('\n');
-        writeln!(json, "    ]}}{}", if fi + 1 < families.len() { "," } else { "" }).unwrap();
+        writeln!(
+            json,
+            "    ]}}{}",
+            if fi + 1 < families.len() { "," } else { "" }
+        )
+        .unwrap();
     }
 
     writeln!(

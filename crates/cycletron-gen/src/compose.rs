@@ -253,7 +253,12 @@ fn developed_phrase(
 }
 
 /// Helper: a verified `note("…")` part from a slot line.
-fn note_part(scale: &Scale, slots: &[Option<i32>], octave: i32, chain: &str) -> Result<Part, String> {
+fn note_part(
+    scale: &Scale,
+    slots: &[Option<i32>],
+    octave: i32,
+    chain: &str,
+) -> Result<Part, String> {
     let m = scale.to_mini_slots(slots, octave);
     verify_notes(&scale.slot_notes(slots, octave), &m.emit())?;
     Ok(Part {
@@ -305,7 +310,10 @@ pub fn compose_from_spec(genre: &GenreSpec, seed: u64) -> Result<Piece, String> 
     let swing_delay = genre.swing_unit.delay(genre.swing, genre.steps);
     for archetype in &genre.drums {
         for lane in archetype.lanes() {
-            let counts = lane.pat.counts(genre.steps).map_err(|e| format!("{title}: {e}"))?;
+            let counts = lane
+                .pat
+                .counts(genre.steps)
+                .map_err(|e| format!("{title}: {e}"))?;
             if genre.swing > 0.0 && lane.swings {
                 let (mut straight, mut swung) = (counts.clone(), counts);
                 for i in 0..genre.steps {
@@ -353,7 +361,15 @@ pub fn compose_from_spec(genre: &GenreSpec, seed: u64) -> Result<Piece, String> 
         )?);
     }
 
-    if let Some(HarmonySpec { degrees, octave, voicing, rhythm, sound, fx }) = &genre.harmony {
+    if let Some(HarmonySpec {
+        degrees,
+        octave,
+        voicing,
+        rhythm,
+        sound,
+        fx,
+    }) = &genre.harmony
+    {
         let struct_chain = if rhythm.is_empty() {
             String::new()
         } else {
@@ -372,18 +388,36 @@ pub fn compose_from_spec(genre: &GenreSpec, seed: u64) -> Result<Piece, String> 
 
     match &genre.melody {
         MelodySpec::None => {}
-        MelodySpec::Walk { len, start, max_step, lo, hi, density, octave, sound, fx } => {
+        MelodySpec::Walk {
+            len,
+            start,
+            max_step,
+            lo,
+            hi,
+            density,
+            octave,
+            sound,
+            fx,
+        } => {
             // A 4-bar developing phrase (not a 1-bar random loop). Diatonic by
             // construction, so we build the Part directly and let the whole-doc
             // validate in `assemble` confirm it plays.
-            let phrase =
-                developed_phrase(&scale, seed, *len, *start, *max_step, *lo, *hi, *density, *octave);
+            let phrase = developed_phrase(
+                &scale, seed, *len, *start, *max_step, *lo, *hi, *density, *octave,
+            );
             parts.push(Part {
                 src: phrase.as_note(),
                 chain: format!(".s(\"{sound}\"){fx}"),
             });
         }
-        MelodySpec::Arpeggio { chord, octaves, dir, octave, sound, fx } => {
+        MelodySpec::Arpeggio {
+            chord,
+            octaves,
+            dir,
+            octave,
+            sound,
+            fx,
+        } => {
             let degrees = melody::arpeggio(chord, *octaves, scale.len(), *dir);
             let slots: Vec<Option<i32>> = degrees.iter().map(|&d| Some(d)).collect();
             parts.push(note_part(
@@ -444,8 +478,7 @@ mod tests {
         for (name, res) in all(7) {
             let piece = res.unwrap_or_else(|e| panic!("{name} failed: {e}"));
             // to_strudel already passed validate_doc inside assemble(); re-check.
-            validate_doc(&piece.to_strudel())
-                .unwrap_or_else(|e| panic!("{name} doc invalid: {e}"));
+            validate_doc(&piece.to_strudel()).unwrap_or_else(|e| panic!("{name} doc invalid: {e}"));
         }
     }
 
@@ -457,7 +490,10 @@ mod tests {
         let s = spec::find("amapiano").unwrap();
         let doc = compose_from_spec(&s, 1).unwrap().to_strudel();
         let peak = stack_peak(&doc);
-        assert!(peak <= 1.85, "amapiano peak {peak:.2} exceeds headroom:\n{doc}");
+        assert!(
+            peak <= 1.85,
+            "amapiano peak {peak:.2} exceeds headroom:\n{doc}"
+        );
         // gains are reduced but the mix is not crushed to silence.
         assert!(peak > 1.0, "amapiano over-attenuated to {peak:.2}");
     }
@@ -469,15 +505,21 @@ mod tests {
         // not a one-bar loop.
         let s = spec::find("house").unwrap();
         let doc = compose_from_spec(&s, 1).unwrap().to_strudel();
-        assert!(doc.contains(".every(4, x => x.fast(2))"), "no drum fill:\n{doc}");
+        assert!(
+            doc.contains(".every(4, x => x.fast(2))"),
+            "no drum fill:\n{doc}"
+        );
         // The lead line is a 4-bar slowcat of bracketed bars.
         let note_line = doc
             .lines()
-            .find(|l| l.contains("note(\"<[") && l.contains("] [") )
+            .find(|l| l.contains("note(\"<[") && l.contains("] ["))
             .unwrap_or_else(|| panic!("no multi-bar developed lead in:\n{doc}"));
         // bars 1 and 2 restate the motif, bar 4 is its retrograde → not all
         // four bars identical.
-        assert!(note_line.matches("] [").count() >= 2, "lead not 4 bars: {note_line}");
+        assert!(
+            note_line.matches("] [").count() >= 2,
+            "lead not 4 bars: {note_line}"
+        );
     }
 
     /// Every archetype in the library lowers to a grid the strudel-rs

@@ -122,8 +122,8 @@ pub async fn run_agent_loop(
         // `{}`. Executing it just yields "missing 'code' parameter", which the
         // model can't act on — it retries, truncates again, and loops. Detect
         // it here and feed back an honest, actionable error instead.
-        let truncated = response.stop_reason.as_deref() == Some("max_tokens")
-            || response.incomplete_tool_input;
+        let truncated =
+            response.stop_reason.as_deref() == Some("max_tokens") || response.incomplete_tool_input;
 
         let mut tool_results = Vec::new();
         for (id, name, input) in &tool_calls {
@@ -330,14 +330,32 @@ fn tool_get_example(input: &serde_json::Value, state: &AppState) -> Result<Strin
 
 /// One line per song for the agent: name, tempo, tags, sounds, path, preview.
 fn format_song_line(s: &crate::library_index::LibrarySong) -> String {
-    let bpm = s.bpm.map(|b| format!("{b:.0} BPM")).unwrap_or_else(|| "—".into());
-    let tags = if s.tags.is_empty() { String::new() } else { format!(" · #{}", s.tags.join(" #")) };
+    let bpm = s
+        .bpm
+        .map(|b| format!("{b:.0} BPM"))
+        .unwrap_or_else(|| "—".into());
+    let tags = if s.tags.is_empty() {
+        String::new()
+    } else {
+        format!(" · #{}", s.tags.join(" #"))
+    };
     let sounds = if s.sounds.is_empty() {
         String::new()
     } else {
-        format!(" · sounds: {}", s.sounds.iter().take(6).cloned().collect::<Vec<_>>().join(", "))
+        format!(
+            " · sounds: {}",
+            s.sounds
+                .iter()
+                .take(6)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
     };
-    format!("• {} [{bpm}]{tags}  @{}{sounds}\n    {}", s.name, s.rel_path, s.preview)
+    format!(
+        "• {} [{bpm}]{tags}  @{}{sounds}\n    {}",
+        s.name, s.rel_path, s.preview
+    )
 }
 
 /// List the user's saved songs (newest first). Optional `limit` (default 30).
@@ -352,8 +370,15 @@ fn tool_list_library(input: &serde_json::Value, state: &AppState) -> Result<Stri
     }
     let limit = input["limit"].as_u64().map(|n| n as usize).unwrap_or(30);
     let shown = idx.songs.len().min(limit);
-    let mut out = format!("{warn}Your library: {} song(s){}\n", idx.songs.len(),
-        if shown < idx.songs.len() { format!(" (showing newest {shown})") } else { String::new() });
+    let mut out = format!(
+        "{warn}Your library: {} song(s){}\n",
+        idx.songs.len(),
+        if shown < idx.songs.len() {
+            format!(" (showing newest {shown})")
+        } else {
+            String::new()
+        }
+    );
     for s in idx.songs.iter().take(limit) {
         out.push_str(&format_song_line(s));
         out.push('\n');
@@ -379,7 +404,9 @@ fn tool_search_library(input: &serde_json::Value, state: &AppState) -> Result<St
     let idx = crate::library_index::LibraryIndex::build(&root);
     let hits = idx.search(&q);
     if hits.is_empty() {
-        return Ok(format!("{warn}No songs in your library match that. Try list_library to see everything."));
+        return Ok(format!(
+            "{warn}No songs in your library match that. Try list_library to see everything."
+        ));
     }
     let mut out = format!("{warn}{} matching song(s):\n", hits.len());
     for s in hits {
@@ -405,8 +432,14 @@ fn tool_read_song(input: &serde_json::Value, state: &AppState) -> Result<String,
     let header = format!(
         "// {} — {}{}\n",
         fm.name.unwrap_or_else(|| path.to_string()),
-        fm.bpm.map(|b| format!("{b:.0} BPM")).unwrap_or_else(|| "tempo unset".into()),
-        if fm.tags.is_empty() { String::new() } else { format!(" · #{}", fm.tags.join(" #")) },
+        fm.bpm
+            .map(|b| format!("{b:.0} BPM"))
+            .unwrap_or_else(|| "tempo unset".into()),
+        if fm.tags.is_empty() {
+            String::new()
+        } else {
+            format!(" · #{}", fm.tags.join(" #"))
+        },
     );
     Ok(format!("{header}{}", doc.code))
 }
@@ -432,9 +465,17 @@ fn tool_save_song(
     let code = req_str(input, "code")?;
     let folder = input["folder"].as_str();
     let root = state.library_root();
-    let rel = crate::library_index::save_song(&root, state.app_data_dir().as_deref(), name, code, folder)?;
+    let rel = crate::library_index::save_song(
+        &root,
+        state.app_data_dir().as_deref(),
+        name,
+        code,
+        folder,
+    )?;
     emit_library_changed(event_tx, &rel);
-    Ok(format!("Saved '{name}' to your library at @{rel} (prior version snapshotted; undo from the file's history)."))
+    Ok(format!(
+        "Saved '{name}' to your library at @{rel} (prior version snapshotted; undo from the file's history)."
+    ))
 }
 
 /// Save the CURRENT editor buffer as a named song.
@@ -447,7 +488,13 @@ fn tool_save_current_as(
     let folder = input["folder"].as_str();
     let code = current_document(state)?;
     let root = state.library_root();
-    let rel = crate::library_index::save_song(&root, state.app_data_dir().as_deref(), name, &code, folder)?;
+    let rel = crate::library_index::save_song(
+        &root,
+        state.app_data_dir().as_deref(),
+        name,
+        &code,
+        folder,
+    )?;
     emit_library_changed(event_tx, &rel);
     Ok(format!("Saved the current song as '{name}' at @{rel}."))
 }
@@ -515,7 +562,10 @@ fn tool_list_methods(input: &serde_json::Value) -> Result<String, String> {
 /// block instead. This rescues those. No-op if a native `ToolUse` is present or
 /// no recognisable tool call is in the text.
 fn recover_text_tool_calls(content: &mut Vec<ContentBlock>, tool_defs: &[ToolDefinition]) {
-    if content.iter().any(|b| matches!(b, ContentBlock::ToolUse { .. })) {
+    if content
+        .iter()
+        .any(|b| matches!(b, ContentBlock::ToolUse { .. }))
+    {
         return;
     }
     let known: std::collections::HashSet<&str> =
@@ -737,7 +787,11 @@ fn code_hash(code: &str) -> u64 {
 
 /// Resolve optional `code` for review/validate: explicit arg → current editor.
 fn resolve_code_or_editor(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
-    if let Some(c) = input["code"].as_str().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(c) = input["code"]
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         return Ok(c.to_string());
     }
     current_document(state).map_err(|_| {
@@ -810,13 +864,21 @@ fn error_context(code: &str, err: &str) -> String {
     let Some(pos) = err
         .rsplit_once(" at ")
         .and_then(|(_, span)| span.split("..").next())
-        .and_then(|s| s.trim().trim_end_matches(|c: char| !c.is_ascii_digit()).parse::<usize>().ok())
+        .and_then(|s| {
+            s.trim()
+                .trim_end_matches(|c: char| !c.is_ascii_digit())
+                .parse::<usize>()
+                .ok()
+        })
     else {
         return String::new();
     };
     let pos = pos.min(code.len());
     let line_start = code[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let line_end = code[pos..].find('\n').map(|i| pos + i).unwrap_or(code.len());
+    let line_end = code[pos..]
+        .find('\n')
+        .map(|i| pos + i)
+        .unwrap_or(code.len());
     let line_no = code[..line_start].matches('\n').count() + 1;
     let col = code[line_start..pos].chars().count();
     let line = &code[line_start..line_end];
@@ -840,9 +902,9 @@ fn error_context(code: &str, err: &str) -> String {
 /// the tell-tale of `s("bd*4".fast(2))` (method chained on the string literal).
 fn quote_then_method(line: &str) -> bool {
     let b = line.as_bytes();
-    b.windows(2)
-        .enumerate()
-        .any(|(i, w)| w[0] == b'"' && w[1] == b'.' && b.get(i + 2).is_some_and(u8::is_ascii_alphabetic))
+    b.windows(2).enumerate().any(|(i, w)| {
+        w[0] == b'"' && w[1] == b'.' && b.get(i + 2).is_some_and(u8::is_ascii_alphabetic)
+    })
 }
 
 /// The combined quality gate: validate + silence lint + mix critique + (for
@@ -1136,12 +1198,13 @@ fn tool_play_pattern(
         && !force
         && state.listed_structure()
         && raw.len() >= crate::state::FULL_REWRITE_GUARD_CHARS
-        && current_document(state).map(|d| d.len() > 200).unwrap_or(false)
+        && current_document(state)
+            .map(|d| d.len() > 200)
+            .unwrap_or(false)
     {
         state.stamp_write_kind("full_blocked");
-        let secs = cycletron_doc::sections::list_sections(
-            &current_document(state).unwrap_or_default(),
-        );
+        let secs =
+            cycletron_doc::sections::list_sections(&current_document(state).unwrap_or_default());
         let hint = if secs.is_empty() {
             "upsert_track / upsert_tracks (or list_parts first)".to_string()
         } else {
@@ -1184,9 +1247,8 @@ fn tool_play_pattern(
         let cycles = input["cycles"].as_u64().unwrap_or(8).min(64) as usize;
         let report = review_code(&raw, cycles, state);
         if report.starts_with("INVALID") || report.starts_with("Could not inspect") {
-            let mut msg = format!(
-                "NOT PLAYED — built-in review failed, so nothing changed.\n{report}"
-            );
+            let mut msg =
+                format!("NOT PLAYED — built-in review failed, so nothing changed.\n{report}");
             if report.contains("Arrow functions") || raw.contains("=>") {
                 msg.push_str(
                     "\n\nHint: free-standing `const f = x => …` helpers are not valid \
@@ -1315,16 +1377,11 @@ fn apply_document(
 /// The document currently in the editor/session, or a friendly error when there
 /// is nothing to edit yet.
 fn current_document(state: &AppState) -> Result<String, String> {
-    state
-        .session
-        .lock()
-        .current_pattern
-        .clone()
-        .ok_or_else(|| {
-            "There's no song in the editor yet. Use play_pattern to start one, then edit its \
+    state.session.lock().current_pattern.clone().ok_or_else(|| {
+        "There's no song in the editor yet. Use play_pattern to start one, then edit its \
              tracks with upsert_track / mute_track."
-                .to_string()
-        })
+            .to_string()
+    })
 }
 
 /// List the addressable tracks of the current song (read-only; no playback).
@@ -1342,7 +1399,10 @@ fn tool_list_parts(state: &AppState) -> Result<String, String> {
             None => format!("#{} (no id — address by index)", p.index),
         };
         let muted = if p.muted { " [MUTED]" } else { "" };
-        out.push_str(&format!("  {}. {}{}  —  {}\n", p.index, handle, muted, p.preview));
+        out.push_str(&format!(
+            "  {}. {}{}  —  {}\n",
+            p.index, handle, muted, p.preview
+        ));
     }
     out.push_str(
         "\nEdit one with upsert_track {id, code}; batch with upsert_tracks; \
@@ -1419,7 +1479,11 @@ fn tool_upsert_tracks(
         &format!(
             "{} track(s) updated: {}.",
             wrote.len(),
-            wrote.iter().map(|id| format!("@{id}")).collect::<Vec<_>>().join(", ")
+            wrote
+                .iter()
+                .map(|id| format!("@{id}"))
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     )
 }
@@ -1460,7 +1524,11 @@ fn tool_upsert_sections(
         &format!(
             "{} section(s) updated: {}.",
             wrote.len(),
-            wrote.iter().map(|id| format!("@{id}")).collect::<Vec<_>>().join(", ")
+            wrote
+                .iter()
+                .map(|id| format!("@{id}"))
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     )
 }
@@ -1533,7 +1601,12 @@ fn tool_unmute_track(
     let id = req_str(input, "id")?;
     let code = current_document(state)?;
     let new_code = cycletron_doc::tracks::unmute_track(&code, id)?;
-    apply_document(state, event_tx, &new_code, &format!("Track '{id}' unmuted."))
+    apply_document(
+        state,
+        event_tx,
+        &new_code,
+        &format!("Track '{id}' unmuted."),
+    )
 }
 
 fn tool_stop(
@@ -1668,7 +1741,10 @@ mod write_path_tests {
         let a = tool_review_pattern(&json!({"code": r#"s("bd*4")"#}), &s).unwrap();
         assert!(!a.contains("(cached"));
         let b = tool_review_pattern(&json!({"code": r#"s("bd*4")"#}), &s).unwrap();
-        assert!(b.contains("(cached"), "second identical review should cache: {b}");
+        assert!(
+            b.contains("(cached"),
+            "second identical review should cache: {b}"
+        );
         // Cache hits must not burn the review budget.
         assert_eq!(s.agent_write.lock().review_calls, 1);
     }
@@ -1708,18 +1784,14 @@ mod write_path_tests {
             out.contains("reused") || out.contains("playback"),
             "play with no code should reuse: {out}"
         );
-        assert_eq!(
-            s.session.lock().current_pattern.as_deref(),
-            Some(code)
-        );
+        assert_eq!(s.session.lock().current_pattern.as_deref(), Some(code));
         assert_eq!(s.take_write_kind().as_deref(), Some("reuse"));
     }
 
     #[test]
     fn play_with_code_stamps_full() {
         let s = AppState::new();
-        let out =
-            tool_play_pattern(&json!({"code": r#"s("sd*2")"#}), &s, &sink()).unwrap();
+        let out = tool_play_pattern(&json!({"code": r#"s("sd*2")"#}), &s, &sink()).unwrap();
         assert!(out.contains("playback"), "{out}");
         // stamp may already be taken by a caller; stamp_write_kind sets pending
         // — tool_play_pattern stamps "full" for explicit code.
@@ -1740,8 +1812,8 @@ mod write_path_tests {
 
     #[test]
     fn section_upsert_beats_full_rewrite_on_chars() {
-        let song = std::fs::read_to_string("/tmp/cycletron-bench-song.strudel")
-            .unwrap_or_else(|_| {
+        let song =
+            std::fs::read_to_string("/tmp/cycletron-bench-song.strudel").unwrap_or_else(|_| {
                 r#"
 "<intro@1 drop1@2>".slow(4).pickRestart({
   intro: stack(s("bd*4")),
@@ -1804,11 +1876,15 @@ $: "<intro@1 drop1@2 outro@1>".slow(4).pickRestart({
         let s = state_with_code(&song);
         let listed = tool_list_sections(&s).unwrap();
         assert!(listed.contains("@drop1"), "{listed}");
-        assert!(listed.contains("stack") || listed.contains("bd"), "fat preview: {listed}");
+        assert!(
+            listed.contains("stack") || listed.contains("bd"),
+            "fat preview: {listed}"
+        );
 
         let big = format!("{song}\n// rewrite attempt\n");
         assert!(big.len() >= crate::state::FULL_REWRITE_GUARD_CHARS);
-        let blocked = tool_play_pattern(&json!({"code": big, "review": false}), &s, &sink()).unwrap();
+        let blocked =
+            tool_play_pattern(&json!({"code": big, "review": false}), &s, &sink()).unwrap();
         assert!(
             blocked.contains("NOT PLAYED") && blocked.contains("blocked"),
             "expected full rewrite block, got: {blocked}"
@@ -1869,7 +1945,10 @@ $: lead.slow(2)
         assert!(out.contains("Binding `lead`"), "{out}");
         let doc = s.session.lock().current_pattern.clone().unwrap();
         // Only the binding body changed; the track and directive are intact.
-        assert!(doc.contains(r#"const lead = note("a c e").s("square");"#), "{doc}");
+        assert!(
+            doc.contains(r#"const lead = note("a c e").s("square");"#),
+            "{doc}"
+        );
         assert!(doc.contains("$: lead.slow(2)"));
         assert!(doc.contains("setbpm(120);"));
         assert!(!doc.contains("sawtooth"));
@@ -1886,12 +1965,20 @@ $: lead.slow(2)
         let s = AppState::new();
         let secs = cycletron_doc::sections::list_sections(&song);
         eprintln!("=== write-path bench ===");
-        eprintln!("song: {} chars, {} lines, {} sections", song.len(), song.lines().count(), secs.len());
+        eprintln!(
+            "song: {} chars, {} lines, {} sections",
+            song.len(),
+            song.lines().count(),
+            secs.len()
+        );
 
         let t0 = Instant::now();
         let report = review_code(&song, 8, &s);
         let review_ms = t0.elapsed().as_millis();
-        eprintln!("review_code (8 cyc): {review_ms} ms  verdict={}", report.lines().last().unwrap_or(""));
+        eprintln!(
+            "review_code (8 cyc): {review_ms} ms  verdict={}",
+            report.lines().last().unwrap_or("")
+        );
 
         let t1 = Instant::now();
         let _ = cycletron_doc::sections::list_sections(&song);
@@ -1900,7 +1987,8 @@ $: lead.slow(2)
         if let Some(drop) = secs.iter().find(|x| x.id == "drop1") {
             let body = &song[drop.expr_start..drop.expr_end];
             let t2 = Instant::now();
-            let (new_doc, _) = cycletron_doc::sections::upsert_section(&song, "drop1", body).unwrap();
+            let (new_doc, _) =
+                cycletron_doc::sections::upsert_section(&song, "drop1", body).unwrap();
             eprintln!(
                 "upsert_section(drop1) same body: {} µs  (emit proxy: section={} vs full×2={})",
                 t2.elapsed().as_micros(),
@@ -1920,7 +2008,10 @@ $: lead.slow(2)
             .unwrap_or(500);
         eprintln!("emit-size proxy (chars the model must stream):");
         eprintln!("  legacy review+play:     {legacy_edit}");
-        eprintln!("  review + play reuse:    {reuse_edit}  (−{}%)", 100 - 100 * reuse_edit / legacy_edit);
+        eprintln!(
+            "  review + play reuse:    {reuse_edit}  (−{}%)",
+            100 - 100 * reuse_edit / legacy_edit
+        );
         eprintln!(
             "  upsert_section(drop1):  {section_edit}  (−{}%)",
             100 - 100 * section_edit / legacy_edit
@@ -1942,7 +2033,9 @@ mod recovery_tests {
         // of a native tool_use block — the case recover_text_tool_calls exists for.
         let text = "Sure, let's play it:\n```json\n{\n  \"name\": \"play_pattern\",\n  \
                     \"arguments\": { \"code\": \"s(\\\"bd*4\\\")\" }\n}\n```";
-        let mut content = vec![ContentBlock::Text { text: text.to_string() }];
+        let mut content = vec![ContentBlock::Text {
+            text: text.to_string(),
+        }];
         recover_text_tool_calls(&mut content, &defs());
         let call = content.iter().find_map(|b| match b {
             ContentBlock::ToolUse { name, input, .. } => Some((name.clone(), input.clone())),
@@ -1955,26 +2048,41 @@ mod recovery_tests {
 
     #[test]
     fn recovers_function_wrapped_and_stringified_args() {
-        let text = r#"{"function": {"name": "save_current_as", "arguments": "{\"name\": \"dub\"}"}}"#;
-        let mut content = vec![ContentBlock::Text { text: text.to_string() }];
+        let text =
+            r#"{"function": {"name": "save_current_as", "arguments": "{\"name\": \"dub\"}"}}"#;
+        let mut content = vec![ContentBlock::Text {
+            text: text.to_string(),
+        }];
         recover_text_tool_calls(&mut content, &defs());
-        let ok = content.iter().any(|b| matches!(b, ContentBlock::ToolUse { name, input, .. }
-            if name == "save_current_as" && input["name"] == "dub"));
+        let ok = content.iter().any(|b| {
+            matches!(b, ContentBlock::ToolUse { name, input, .. }
+            if name == "save_current_as" && input["name"] == "dub")
+        });
         assert!(ok, "got: {content:?}");
     }
 
     #[test]
     fn leaves_prose_and_native_calls_alone() {
         // Plain prose → no tool call invented.
-        let mut prose = vec![ContentBlock::Text { text: "Here's a nice house groove!".into() }];
+        let mut prose = vec![ContentBlock::Text {
+            text: "Here's a nice house groove!".into(),
+        }];
         recover_text_tool_calls(&mut prose, &defs());
-        assert!(!prose.iter().any(|b| matches!(b, ContentBlock::ToolUse { .. })));
+        assert!(
+            !prose
+                .iter()
+                .any(|b| matches!(b, ContentBlock::ToolUse { .. }))
+        );
         // Unknown tool name in text → ignored.
         let mut bogus = vec![ContentBlock::Text {
             text: r#"{"name": "delete_everything", "arguments": {}}"#.into(),
         }];
         recover_text_tool_calls(&mut bogus, &defs());
-        assert!(!bogus.iter().any(|b| matches!(b, ContentBlock::ToolUse { .. })));
+        assert!(
+            !bogus
+                .iter()
+                .any(|b| matches!(b, ContentBlock::ToolUse { .. }))
+        );
     }
 }
 
@@ -2041,9 +2149,7 @@ mod session_history_tests {
         assert_eq!(api.len(), 4);
 
         assert_eq!(api[1].role, "assistant");
-        assert!(
-            matches!(&api[1].content[0], ContentBlock::Text { text } if text == "Here you go")
-        );
+        assert!(matches!(&api[1].content[0], ContentBlock::Text { text } if text == "Here you go"));
         match &api[1].content[1] {
             ContentBlock::ToolUse { id, name, input } => {
                 assert_eq!(id, "call_1");

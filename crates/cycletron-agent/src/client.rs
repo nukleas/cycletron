@@ -39,7 +39,6 @@ impl ClaudeClient {
             max_tokens,
         }
     }
-
 }
 
 #[async_trait::async_trait]

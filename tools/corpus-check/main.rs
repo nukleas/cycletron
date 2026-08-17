@@ -52,7 +52,10 @@ fn main() -> ExitCode {
     // 1. Curated `.strudel` files.
     for path in collect_strudel_files(&root) {
         match std::fs::read_to_string(&path) {
-            Ok(code) => units.push(Unit { label: short(&path), code }),
+            Ok(code) => units.push(Unit {
+                label: short(&path),
+                code,
+            }),
             Err(e) => failures.push((short(&path), format!("io: {e}"))),
         }
     }
@@ -109,7 +112,10 @@ fn main() -> ExitCode {
     // behavior fails the gate instead of silently stale-ing the docs/prompt.
     let contract = cycletron_analysis::engine_contract::check();
     if !contract.is_empty() {
-        println!("\nengine-contract: {} documented claim(s) drifted from the engine", contract.len());
+        println!(
+            "\nengine-contract: {} documented claim(s) drifted from the engine",
+            contract.len()
+        );
         for msg in &contract {
             println!("  DRIFT {msg}");
         }
@@ -242,7 +248,10 @@ fn batch_validate(path: &Path) -> ExitCode {
             Err(e) => {
                 let reason = classify_error(&e);
                 *buckets.entry(reason.to_string()).or_default() += 1;
-                let esc = e.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ");
+                let esc = e
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace('\n', " ");
                 results.push_str(&format!(
                     "{{\"id\":\"{id}\",\"ok\":false,\"reason\":\"{reason}\",\"error\":\"{esc}\"}}\n"
                 ));

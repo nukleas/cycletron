@@ -173,7 +173,9 @@ pub fn within(root: &Path, candidate: &Path) -> bool {
 /// Tauri commands.
 pub fn reveal_in_os(path: &Path) -> Result<(), String> {
     let target = if path.is_file() {
-        path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| path.to_path_buf())
+        path.parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| path.to_path_buf())
     } else {
         path.to_path_buf()
     };

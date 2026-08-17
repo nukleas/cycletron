@@ -17,7 +17,11 @@ pub enum ReviewOutcome {
 pub fn review_report(code: &str, cycles: usize, known: &SoundSet) -> ReviewOutcome {
     // Form checks need ≥8 cycles; the mix critique needs ≥4.
     let has_form = code.contains("pickRestart") || code.contains("arrange");
-    let window = if has_form { cycles.clamp(8, 64) } else { cycles.clamp(4, 64) };
+    let window = if has_form {
+        cycles.clamp(8, 64)
+    } else {
+        cycles.clamp(4, 64)
+    };
     let ev = match Evaluated::new(code, window) {
         Ok(ev) => ev,
         Err(e) => return ReviewOutcome::Invalid(e),
@@ -27,7 +31,10 @@ pub fn review_report(code: &str, cycles: usize, known: &SoundSet) -> ReviewOutco
     let mut out = String::from("REVIEW\n== digest ==\n");
     out.push_str(&format!(
         "  bpm {}  ·  {} events / {} cycles  ·  period {}  ·  max {} voices  ·  sounds: {}\n",
-        digest.bpm.map(|b| b.to_string()).unwrap_or_else(|| "unset".into()),
+        digest
+            .bpm
+            .map(|b| b.to_string())
+            .unwrap_or_else(|| "unset".into()),
         digest.total_events,
         digest.cycles_queried,
         digest

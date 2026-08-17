@@ -126,7 +126,10 @@ pub fn load_recipes(dir: &Path) -> Vec<Recipe> {
         .collect();
     paths.sort();
     for path in paths {
-        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("recipe");
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("recipe");
         if let Ok(text) = std::fs::read_to_string(&path) {
             if let Ok(recipe) = parse_recipe(stem, &text) {
                 out.push(recipe);

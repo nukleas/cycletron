@@ -31,9 +31,7 @@ fn main() {
         chord_roots
             .iter()
             .map(|&d| {
-                let voiced = Mini::Stack(
-                    scale.seventh(d, 3).into_iter().map(Mini::atom).collect(),
-                );
+                let voiced = Mini::Stack(scale.seventh(d, 3).into_iter().map(Mini::atom).collect());
                 Mini::Group(Box::new(voiced))
             })
             .collect(),
@@ -51,8 +49,14 @@ fn main() {
     println!("setbpm(174);");
     println!("stack(");
     println!("  s(\"{}\").gain(0.9),", drums.to_string());
-    println!("  {}.s(\"gm_synth_bass_1\").lpf(500).gain(0.6),", bass.as_note());
-    println!("  note(\"{}\").s(\"gm_epiano1\").struct(\"~ 1 ~ 1\").release(0.2).gain(0.4),", chords.emit());
+    println!(
+        "  {}.s(\"gm_synth_bass_1\").lpf(500).gain(0.6),",
+        bass.as_note()
+    );
+    println!(
+        "  note(\"{}\").s(\"gm_epiano1\").struct(\"~ 1 ~ 1\").release(0.2).gain(0.4),",
+        chords.emit()
+    );
     println!("  {}.s(\"triangle\").gain(0.4).room(0.3)", melody.as_note());
     println!(")");
     println!("\n// bass notes:   {:?}", scale.notes(&bass_degs, 2));

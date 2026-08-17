@@ -287,7 +287,6 @@ impl Accumulator {
             self.finish_reason = Some(reason.clone());
         }
     }
-
 }
 
 impl StreamDecoder for Accumulator {

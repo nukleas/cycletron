@@ -35,7 +35,10 @@ fn main() {
         .get(1)
         .map(PathBuf::from)
         .unwrap_or_else(|| default_corpus_dir());
-    let out_dir = args.get(2).map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+    let out_dir = args
+        .get(2)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."));
 
     let corpus_dir = corpus_dir.canonicalize().unwrap_or(corpus_dir);
     eprintln!("scanning {} …", corpus_dir.display());
@@ -59,10 +62,7 @@ fn main() {
         };
         // Skip derived parts (the agent-part excerpts are fragments, not
         // full patterns — they don't parse as standalone code)
-        if path
-            .components()
-            .any(|c| c.as_os_str() == "derived")
-        {
+        if path.components().any(|c| c.as_os_str() == "derived") {
             continue;
         }
         let bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
@@ -170,9 +170,15 @@ fn classify_error(err: &str) -> &'static str {
 
     if e.contains("unknown function") || e.contains("undefined function") {
         "unknown-function"
-    } else if e.contains("unknown method") || e.contains("no method") || e.contains("method not found") {
+    } else if e.contains("unknown method")
+        || e.contains("no method")
+        || e.contains("method not found")
+    {
         "unknown-method"
-    } else if e.contains("unknown identifier") || e.contains("undefined variable") || e.contains("not defined") {
+    } else if e.contains("unknown identifier")
+        || e.contains("undefined variable")
+        || e.contains("not defined")
+    {
         "unknown-identifier"
     } else if e.contains("expected") && (e.contains("argument") || e.contains("arity")) {
         "arity-mismatch"
@@ -180,11 +186,18 @@ fn classify_error(err: &str) -> &'static str {
         "type-mismatch"
     } else if e.contains("sample") && e.contains("not found") {
         "sample-not-found"
-    } else if e.contains("unsupported") || e.contains("not supported") || e.contains("not implemented") {
+    } else if e.contains("unsupported")
+        || e.contains("not supported")
+        || e.contains("not implemented")
+    {
         "unsupported"
     } else if e.contains("division by zero") || e.contains("overflow") {
         "numeric"
-    } else if e.contains("unexpected token") || e.contains("unexpected character") || e.contains("parse") || e.contains("syntax") {
+    } else if e.contains("unexpected token")
+        || e.contains("unexpected character")
+        || e.contains("parse")
+        || e.contains("syntax")
+    {
         "parse-error"
     } else if e.contains("mini") && (e.contains("parse") || e.contains("pattern")) {
         "mini-parse"
@@ -215,7 +228,10 @@ fn write_summary(out_dir: &Path, rows: &[Row]) {
     // by category
     let mut by_cat: BTreeMap<&str, Vec<&Row>> = BTreeMap::new();
     for r in rows.iter().filter(|r| !r.ok) {
-        by_cat.entry(r.category.unwrap_or("other")).or_default().push(r);
+        by_cat
+            .entry(r.category.unwrap_or("other"))
+            .or_default()
+            .push(r);
     }
 
     // Top missing identifiers / functions — pull from error strings.
@@ -260,7 +276,13 @@ fn write_summary(out_dir: &Path, rows: &[Row]) {
     for (cat, files) in cats.iter().take(8) {
         md.push_str(&format!("### `{cat}` ({})\n\n", files.len()));
         for r in files.iter().take(10) {
-            let err = r.error.as_deref().unwrap_or("").lines().next().unwrap_or("");
+            let err = r
+                .error
+                .as_deref()
+                .unwrap_or("")
+                .lines()
+                .next()
+                .unwrap_or("");
             md.push_str(&format!("- `{}` — {}\n", short_path(&r.path), err));
         }
         md.push_str("\n");
@@ -273,7 +295,10 @@ fn write_tickets(out_dir: &Path, rows: &[Row]) {
     let failing: Vec<&Row> = rows.iter().filter(|r| !r.ok).collect();
     let mut by_cat: BTreeMap<&str, Vec<&Row>> = BTreeMap::new();
     for r in &failing {
-        by_cat.entry(r.category.unwrap_or("other")).or_default().push(r);
+        by_cat
+            .entry(r.category.unwrap_or("other"))
+            .or_default()
+            .push(r);
     }
 
     let mut md = String::new();
@@ -282,13 +307,28 @@ fn write_tickets(out_dir: &Path, rows: &[Row]) {
     md.push_str("> category; each group is a candidate feature ticket for strudel-rs.\n\n");
 
     let priorities: Vec<(&str, &str)> = vec![
-        ("unknown-function", "Add missing combinators / factory functions"),
-        ("unknown-method", "Add missing Pattern methods (fluent chain)"),
-        ("unknown-identifier", "Expose globals (scales, sounds, named constants)"),
-        ("arity-mismatch", "Align function signatures with strudel-js"),
+        (
+            "unknown-function",
+            "Add missing combinators / factory functions",
+        ),
+        (
+            "unknown-method",
+            "Add missing Pattern methods (fluent chain)",
+        ),
+        (
+            "unknown-identifier",
+            "Expose globals (scales, sounds, named constants)",
+        ),
+        (
+            "arity-mismatch",
+            "Align function signatures with strudel-js",
+        ),
         ("type-mismatch", "Value coercion / overload resolution"),
         ("unsupported", "Implement explicitly-unsupported features"),
-        ("parse-error", "DSL parser fixes (syntax the JS REPL accepts)"),
+        (
+            "parse-error",
+            "DSL parser fixes (syntax the JS REPL accepts)",
+        ),
         ("mini-parse", "Mini-notation parser fixes"),
         ("sample-not-found", "Sample registry completeness"),
         ("numeric", "Numeric edge cases"),
@@ -296,12 +336,22 @@ fn write_tickets(out_dir: &Path, rows: &[Row]) {
     ];
 
     for (cat, title) in &priorities {
-        let Some(files) = by_cat.get(cat) else { continue };
-        if files.is_empty() { continue; }
+        let Some(files) = by_cat.get(cat) else {
+            continue;
+        };
+        if files.is_empty() {
+            continue;
+        }
         md.push_str(&format!("## {title} — `{cat}` ({})\n\n", files.len()));
         md.push_str("Representative failures:\n\n");
         for r in files.iter().take(15) {
-            let err = r.error.as_deref().unwrap_or("").lines().next().unwrap_or("");
+            let err = r
+                .error
+                .as_deref()
+                .unwrap_or("")
+                .lines()
+                .next()
+                .unwrap_or("");
             md.push_str(&format!("- `{}`\n  {}\n", short_path(&r.path), err));
         }
         md.push_str("\nSuggested ticket body:\n");
@@ -340,9 +390,7 @@ fn print_summary(rows: &[Row]) {
     for (cat, n) in cats {
         eprintln!("  {cat:>20}  {n}");
     }
-    eprintln!(
-        "\nReport files:\n  parity-report.jsonl\n  parity-summary.md\n  feature-tickets.md"
-    );
+    eprintln!("\nReport files:\n  parity-report.jsonl\n  parity-summary.md\n  feature-tickets.md");
 }
 
 fn short_path(p: &str) -> String {

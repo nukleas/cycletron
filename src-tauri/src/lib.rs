@@ -1,5 +1,8 @@
 mod agent_loop;
+mod codex_oauth;
 mod commands;
+mod demos;
+mod export;
 mod files;
 mod library;
 mod library_index;
@@ -8,6 +11,7 @@ mod menu;
 mod midi_input;
 mod oauth;
 mod oauth_store;
+mod packs;
 mod persistence;
 mod secrets;
 mod settings;
@@ -18,12 +22,6 @@ mod state;
 mod telemetry;
 mod tray;
 mod xai_oauth;
-mod codex_oauth;
-mod demos;
-mod export;
-mod packs;
-
-
 
 use state::AppState;
 use tauri::Manager;
@@ -132,8 +130,7 @@ pub fn run() {
     // Compose two layers: stderr fmt for dev, and a bounded ring buffer
     // so the in-app Logs modal can show recent activity without reaching
     // out to the OS log facility.
-    let filter = EnvFilter::from_default_env()
-        .add_directive("cycletron=debug".parse().unwrap());
+    let filter = EnvFilter::from_default_env().add_directive("cycletron=debug".parse().unwrap());
     let fmt_layer = tracing_subscriber::fmt::layer().with_writer(std::io::stderr);
     tracing_subscriber::registry()
         .with(filter)
@@ -177,12 +174,7 @@ pub fn run() {
             }
 
             // Native menu — emits `menu:<action>` events consumed by the frontend.
-            let recents = app
-                .state::<AppState>()
-                .recents
-                .lock()
-                .entries
-                .clone();
+            let recents = app.state::<AppState>().recents.lock().entries.clone();
             let menu = menu::build_app_menu(app.handle(), &recents)?;
             app.set_menu(menu)?;
             let handle = app.handle().clone();

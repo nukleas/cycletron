@@ -6,7 +6,7 @@
 use core::hint::black_box;
 use std::path::Path;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use cycletron_core::types::CorpusQuery;
 use cycletron_corpus::index::InMemoryCorpusIndex;
 use cycletron_corpus::loader::load_curated_dir;
@@ -15,11 +15,7 @@ fn corpus_root() -> &'static Path {
     Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus"))
 }
 
-fn query(
-    tags: &[&str],
-    sounds: &[&str],
-    keyword: Option<&str>,
-) -> CorpusQuery {
+fn query(tags: &[&str], sounds: &[&str], keyword: Option<&str>) -> CorpusQuery {
     CorpusQuery {
         tags: tags.iter().map(|s| s.to_string()).collect(),
         tempo_min: None,

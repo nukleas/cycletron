@@ -5,8 +5,8 @@ use cycletron_agent::{ClaudeClient, CodexClient, LlmProvider, OpenAiClient};
 use cycletron_core::config::AppConfig;
 use cycletron_core::session::Session;
 use cycletron_corpus::{InMemoryCorpusIndex, Recipe};
-use std::path::PathBuf;
 use parking_lot::Mutex;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Shared application state managed by Tauri.
@@ -368,8 +368,7 @@ impl AppState {
 /// `build_agent_client` reads its full credential directly — this returns only
 /// the bearer, used for generic key resolution.
 pub(crate) fn resolve_provider_credential(provider_id: &str) -> Option<String> {
-    crate::oauth::peek_access_token(provider_id)
-        .or_else(|| crate::secrets::get_key(provider_id))
+    crate::oauth::peek_access_token(provider_id).or_else(|| crate::secrets::get_key(provider_id))
 }
 
 /// Turn a relative corpus path into an absolute one, anchored at the

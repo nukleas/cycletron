@@ -45,7 +45,10 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
         }
         // Skip nested README etc. already filtered by extension.
         let dest = demos.join("Songs").join(rel);
-        if write_if_missing(&dest, SongAssets::get(rel).as_ref().map(|f| f.data.as_ref()))? {
+        if write_if_missing(
+            &dest,
+            SongAssets::get(rel).as_ref().map(|f| f.data.as_ref()),
+        )? {
             report.written += 1;
         } else {
             report.skipped += 1;
@@ -53,9 +56,7 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
     }
 
     // Curated techniques → Demos/Techniques/{Category}/file.strudel
-    const TECHNIQUE_DIRS: &[&str] = &[
-        "rhythm", "melody", "harmony", "form", "timbre", "motion",
-    ];
+    const TECHNIQUE_DIRS: &[&str] = &["rhythm", "melody", "harmony", "form", "timbre", "motion"];
     for path in CorpusAssets::iter() {
         let rel = path.as_ref().replace('\\', "/");
         if !rel.ends_with(".strudel") {
@@ -246,7 +247,11 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let report = seed_into_library(&dir).expect("seed");
-        assert!(report.written > 50, "expected many demos, got {}", report.written);
+        assert!(
+            report.written > 50,
+            "expected many demos, got {}",
+            report.written
+        );
         assert!(dir.join("Demos/Songs").is_dir());
         assert!(dir.join("Demos/Techniques").is_dir());
         assert!(dir.join("Demos/Genres").is_dir());

@@ -49,8 +49,12 @@ fn main() -> ExitCode {
         }
         "automaton" => {
             let rule = flag("--rule").and_then(|s| s.parse().ok()).unwrap_or(90u8);
-            let width = flag("--width").and_then(|s| s.parse().ok()).unwrap_or(8usize);
-            let gens = flag("--gens").and_then(|s| s.parse().ok()).unwrap_or(4usize);
+            let width = flag("--width")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(8usize);
+            let gens = flag("--gens")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(4usize);
             cycletron_gen::automaton(rule, width, gens)
         }
         other => Err(format!(

@@ -33,7 +33,10 @@ fn map_backtick_regions(src: &str, mut f: impl FnMut(&str) -> String) -> String 
 }
 
 fn main() {
-    let path = std::env::args().nth(1).map(PathBuf::from).expect("usage: recompress_song <file>");
+    let path = std::env::args()
+        .nth(1)
+        .map(PathBuf::from)
+        .expect("usage: recompress_song <file>");
     let src = std::fs::read_to_string(&path).expect("read song");
 
     let mut track = 0;
@@ -64,7 +67,11 @@ fn main() {
         let after = compressed.emit().len();
         eprintln!(
             "  track {track}: {n} bars ({unique} unique) — {before} → {after} chars ({}% saved)",
-            if before > 0 { 100 * before.saturating_sub(after) / before } else { 0 }
+            if before > 0 {
+                100 * before.saturating_sub(after) / before
+            } else {
+                0
+            }
         );
         // Keep the `<...>` wrapper form for readability if it compressed to a cat.
         compressed.emit()

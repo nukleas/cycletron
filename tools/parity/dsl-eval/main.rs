@@ -55,11 +55,14 @@ fn main() {
     let json_haps: Vec<HapJson> = haps
         .iter()
         .map(|h| {
-            let whole = h.whole.as_ref().map(|w| {
-                [frac_to_f64(&w.begin), frac_to_f64(&w.end)]
-            });
+            let whole = h
+                .whole
+                .as_ref()
+                .map(|w| [frac_to_f64(&w.begin), frac_to_f64(&w.end)]);
             let part = [frac_to_f64(&h.part.begin), frac_to_f64(&h.part.end)];
-            let ctx: std::collections::HashMap<_, _> = h.context.iter()
+            let ctx: std::collections::HashMap<_, _> = h
+                .context
+                .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
             let value = value_to_json(&h.value, &ctx);
@@ -95,18 +98,31 @@ fn value_to_json(
 
     // Extract main value
     match val {
-        Value::String(s) => { obj.insert("s".into(), serde_json::Value::String(s.as_str().to_string())); }
-        Value::Number(n) => { obj.insert("n".into(), serde_json::json!(round6(*n))); }
+        Value::String(s) => {
+            obj.insert(
+                "s".into(),
+                serde_json::Value::String(s.as_str().to_string()),
+            );
+        }
+        Value::Number(n) => {
+            obj.insert("n".into(), serde_json::json!(round6(*n)));
+        }
         _ => {}
     }
 
     // Extract controls from context
     for (k, v) in ctx {
         let key = format!("{k:?}").to_lowercase();
-        if key == "locations" || key == "tags" { continue; }
+        if key == "locations" || key == "tags" {
+            continue;
+        }
         match v {
-            Value::Number(n) => { obj.insert(key, serde_json::json!(round6(*n))); }
-            Value::String(s) => { obj.insert(key, serde_json::Value::String(s.as_str().to_string())); }
+            Value::Number(n) => {
+                obj.insert(key, serde_json::json!(round6(*n)));
+            }
+            Value::String(s) => {
+                obj.insert(key, serde_json::Value::String(s.as_str().to_string()));
+            }
             _ => {}
         }
     }

@@ -178,11 +178,8 @@ pub fn inspect_bytes(data: &[u8]) -> anyhow::Result<MidiMetadata> {
         .map(|(index, t)| {
             let channel = t.channel;
             let name = t.name.clone();
-            let is_drum = channel == Some(9)
-                || name
-                    .as_deref()
-                    .map(is_drum_track_name)
-                    .unwrap_or(false);
+            let is_drum =
+                channel == Some(9) || name.as_deref().map(is_drum_track_name).unwrap_or(false);
             PublicTrackInfo {
                 index,
                 channel,

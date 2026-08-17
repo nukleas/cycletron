@@ -140,10 +140,16 @@ fn fold_digest(
             }
             if let (Some(name), Some(midi)) = (&ev.note, ev.midi) {
                 if note_low.as_ref().map_or(true, |n| midi < n.midi) {
-                    note_low = Some(NoteRef { name: name.clone(), midi });
+                    note_low = Some(NoteRef {
+                        name: name.clone(),
+                        midi,
+                    });
                 }
                 if note_high.as_ref().map_or(true, |n| midi > n.midi) {
-                    note_high = Some(NoteRef { name: name.clone(), midi });
+                    note_high = Some(NoteRef {
+                        name: name.clone(),
+                        midi,
+                    });
                 }
             }
             if ev.pan.is_some_and(|p| (p - 0.5).abs() > 1e-6) {
@@ -152,7 +158,11 @@ fn fold_digest(
             events.push(ev);
         }
 
-        events.sort_by(|a, b| a.begin.partial_cmp(&b.begin).unwrap_or(std::cmp::Ordering::Equal));
+        events.sort_by(|a, b| {
+            a.begin
+                .partial_cmp(&b.begin)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         total_events += events.len();
         if events.is_empty() && sounding_until <= c as f64 + 1e-9 {
             silent_cycles.push(c);

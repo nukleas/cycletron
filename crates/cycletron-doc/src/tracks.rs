@@ -108,11 +108,7 @@ fn marker_id(text: &str) -> Option<String> {
         .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
         .collect::<String>()
         .to_ascii_lowercase();
-    if id.is_empty() {
-        None
-    } else {
-        Some(id)
-    }
+    if id.is_empty() { None } else { Some(id) }
 }
 
 /// Is this a preamble line — a directive, a standalone comment, or blank —
@@ -277,7 +273,13 @@ fn clean_id(id: &str) -> String {
     id.trim()
         .trim_start_matches('@')
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .trim_matches('-')
         .to_string()
@@ -301,7 +303,10 @@ fn splice(code: &str, span: (usize, usize), replacement: &[String]) -> String {
 
 /// Apply several track upserts sequentially (re-parse each time so later
 /// patches see earlier inserts). Returns the final document and the ids written.
-pub fn upsert_tracks(code: &str, patches: &[(String, String)]) -> Result<(String, Vec<String>), String> {
+pub fn upsert_tracks(
+    code: &str,
+    patches: &[(String, String)],
+) -> Result<(String, Vec<String>), String> {
     let mut doc = code.to_string();
     let mut wrote = Vec::with_capacity(patches.len());
     for (id, expr) in patches {
@@ -322,7 +327,11 @@ pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, Str
     }
     let numeric = is_index_handle(handle);
     // A numeric handle names an index, never a new id.
-    let id = if numeric { String::new() } else { clean_id(handle) };
+    let id = if numeric {
+        String::new()
+    } else {
+        clean_id(handle)
+    };
     let tracks = parse_tracks(code);
 
     if let Some(t) = find(&tracks, handle) {
@@ -363,7 +372,11 @@ pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, Str
              non-empty id (letters/digits) to be addressable later."
         ));
     }
-    let sep = if code.is_empty() || code.ends_with('\n') { "" } else { "\n" };
+    let sep = if code.is_empty() || code.ends_with('\n') {
+        ""
+    } else {
+        "\n"
+    };
     let new_code = format!("{code}{sep}$: {expr} // @{id}\n");
     Ok((new_code, id))
 }
@@ -507,11 +520,19 @@ mod tests {
         assert_eq!(id, "bass-line");
         let (twice, id2) = upsert_track(&once, "bass_line", "note(\"e2\")").unwrap();
         assert_eq!(id2, "bass-line");
-        assert_eq!(twice.matches("@bass-line").count(), 1, "should be one track:\n{twice}");
+        assert_eq!(
+            twice.matches("@bass-line").count(),
+            1,
+            "should be one track:\n{twice}"
+        );
         assert!(twice.contains("note(\"e2\")") && !twice.contains("note(\"c2\")"));
         // The hyphen spelling of the same handle also resolves to it.
         let (thrice, _) = upsert_track(&twice, "bass-line", "note(\"g2\")").unwrap();
-        assert_eq!(thrice.matches("@bass-line").count(), 1, "hyphen alias must match:\n{thrice}");
+        assert_eq!(
+            thrice.matches("@bass-line").count(),
+            1,
+            "hyphen alias must match:\n{thrice}"
+        );
     }
 
     #[test]

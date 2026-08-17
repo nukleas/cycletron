@@ -126,7 +126,11 @@ mod tests {
     #[test]
     fn definitions_and_enum_agree() {
         let defs = crate::tools::music_tool_definitions();
-        assert_eq!(defs.len(), ToolName::ALL.len(), "definition count vs enum count");
+        assert_eq!(
+            defs.len(),
+            ToolName::ALL.len(),
+            "definition count vs enum count"
+        );
         let mut seen = std::collections::HashSet::new();
         for d in defs {
             assert!(
@@ -134,7 +138,11 @@ mod tests {
                 "definition '{}' has no ToolName variant",
                 d.name
             );
-            assert!(seen.insert(d.name.as_str()), "duplicate definition '{}'", d.name);
+            assert!(
+                seen.insert(d.name.as_str()),
+                "duplicate definition '{}'",
+                d.name
+            );
         }
     }
 }

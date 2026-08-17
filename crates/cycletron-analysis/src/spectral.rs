@@ -63,7 +63,11 @@ enum Class {
 /// Map a sound name to a timbre class. Unknown names default to a mid tonal voice.
 fn classify(sound: &str) -> Class {
     // Machine-kit voices carry a `Bank_voice` name; judge by the voice tail.
-    let s = sound.rsplit('_').next().unwrap_or(sound).to_ascii_lowercase();
+    let s = sound
+        .rsplit('_')
+        .next()
+        .unwrap_or(sound)
+        .to_ascii_lowercase();
     match s.as_str() {
         "bd" | "sbd" => Class::Kick,
         "sd" | "sn" | "cp" | "perc" | "hand" | "tabla" | "east" => Class::Snare,
@@ -335,7 +339,9 @@ fn masking_findings(voices: &[Voice], band_total: &[f64; NB]) -> Vec<Finding> {
         if total < 0.06 * grand {
             continue;
         }
-        let home = (0..NB).max_by(|&a, &b| v.energy[a].total_cmp(&v.energy[b])).unwrap();
+        let home = (0..NB)
+            .max_by(|&a, &b| v.energy[a].total_cmp(&v.energy[b]))
+            .unwrap();
         let mine = v.energy[home];
         let competing = band_total[home] - mine;
         if mine > 0.0 && competing > mine * MASK_RATIO {
@@ -346,8 +352,11 @@ fn masking_findings(voices: &[Voice], band_total: &[f64; NB]) -> Vec<Finding> {
                 .map(|o| (o.energy[home], o.label.as_str()))
                 .collect();
             others.sort_by(|a, b| b.0.total_cmp(&a.0));
-            let names: Vec<String> =
-                others.iter().take(2).map(|(_, n)| (*n).to_string()).collect();
+            let names: Vec<String> = others
+                .iter()
+                .take(2)
+                .map(|(_, n)| (*n).to_string())
+                .collect();
             let ratio = competing / mine;
             hits.push((
                 ratio,
@@ -455,9 +464,13 @@ mod tests {
           note("<e4 g4>").s("wt_choir").lpf(4200).gain(0.5)
         )"#;
         let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
-        assert!(codes(&fs, "masking") >= 1, "expected a masking note, got: {fs:?}");
         assert!(
-            fs.iter().any(|f| f.code == "masking" && f.message.contains("wt_choir")),
+            codes(&fs, "masking") >= 1,
+            "expected a masking note, got: {fs:?}"
+        );
+        assert!(
+            fs.iter()
+                .any(|f| f.code == "masking" && f.message.contains("wt_choir")),
             "the masked voice should be the choir/vocal: {fs:?}"
         );
     }
@@ -473,12 +486,19 @@ mod tests {
           note("a5 c6 e6 c6").s("triangle").gain(0.4)
         )"#;
         let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
-        assert_eq!(codes(&fs, "masking"), 0, "clean mix should not flag masking: {fs:?}");
+        assert_eq!(
+            codes(&fs, "masking"),
+            0,
+            "clean mix should not flag masking: {fs:?}"
+        );
     }
 
     #[test]
     fn single_voice_has_no_masking() {
-        let fs = spectral_findings(&crate::Evaluated::new(r#"s("bd*4").gain(0.9)"#, 2).unwrap(), 2);
+        let fs = spectral_findings(
+            &crate::Evaluated::new(r#"s("bd*4").gain(0.9)"#, 2).unwrap(),
+            2,
+        );
         assert_eq!(codes(&fs, "masking"), 0);
     }
 
@@ -491,7 +511,11 @@ mod tests {
           note("<[c3,eb3,g3]>").s("wt_pad").lpf(600).gain(0.6)
         )"#;
         let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
-        assert_eq!(codes(&fs, "dull"), 1, "dark hat-less mix should be dull: {fs:?}");
+        assert_eq!(
+            codes(&fs, "dull"),
+            1,
+            "dark hat-less mix should be dull: {fs:?}"
+        );
     }
 
     #[test]
@@ -503,6 +527,10 @@ mod tests {
           s("hh*8").gain(0.3)
         )"#;
         let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
-        assert_eq!(codes(&fs, "dull"), 0, "a mix with hats has air, not dull: {fs:?}");
+        assert_eq!(
+            codes(&fs, "dull"),
+            0,
+            "a mix with hats has air, not dull: {fs:?}"
+        );
     }
 }

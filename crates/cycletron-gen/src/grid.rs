@@ -63,11 +63,7 @@ impl Grid {
     /// wide) — the escape hatch the spec composer uses after swing-splitting
     /// an archetype lane.
     pub fn lane(mut self, sound: &str, counts: Vec<u8>) -> Self {
-        assert_eq!(
-            counts.len(),
-            self.steps,
-            "lane width must equal grid steps"
-        );
+        assert_eq!(counts.len(), self.steps, "lane width must equal grid steps");
         self.lanes.push(Lane {
             sound: sound.to_string(),
             hits: counts,
@@ -97,8 +93,9 @@ impl Grid {
     /// offbeat open hats).
     pub fn every(mut self, sound: &str, interval: usize, offset: usize) -> Self {
         assert!(interval > 0, "interval must be > 0");
-        let hits: Vec<u8> =
-            (0..self.steps).map(|i| u8::from(i >= offset && (i - offset) % interval == 0)).collect();
+        let hits: Vec<u8> = (0..self.steps)
+            .map(|i| u8::from(i >= offset && (i - offset) % interval == 0))
+            .collect();
         self.lanes.push(Lane {
             sound: sound.to_string(),
             hits,
@@ -183,7 +180,8 @@ pub fn bjorklund(k: usize, n: usize) -> Vec<bool> {
     while b > 1 {
         let m = a.min(b);
         // Append one tail group onto each of the first `m` head groups.
-        let tail: Vec<Vec<bool>> = groups.split_off(groups.len() - (if a >= b { b } else { a }).min(m));
+        let tail: Vec<Vec<bool>> =
+            groups.split_off(groups.len() - (if a >= b { b } else { a }).min(m));
         for (i, t) in tail.into_iter().enumerate() {
             groups[i].extend(t);
         }
@@ -218,7 +216,9 @@ mod tests {
 
     #[test]
     fn ratchet_lanes_subdivide_slots() {
-        let g = Grid::new(16).every("hh", 2, 0).ratchet("hh", &[(7, 3), (15, 4)]);
+        let g = Grid::new(16)
+            .every("hh", 2, 0)
+            .ratchet("hh", &[(7, 3), (15, 4)]);
         let s = g.to_string();
         assert!(s.contains("hh*3"), "got: {s}");
         assert!(s.contains("hh*4"), "got: {s}");

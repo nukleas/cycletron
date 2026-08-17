@@ -31,8 +31,7 @@ use crate::oauth_store::{self, TokenStore};
 const CLIENT_ID: &str = "b1a00492-073a-47ea-816f-4c329264a828";
 const DEVICE_CODE_URL: &str = "https://auth.x.ai/oauth2/device/code";
 const TOKEN_URL: &str = "https://auth.x.ai/oauth2/token";
-const SCOPE: &str =
-    "openid profile email offline_access grok-cli:access api:access conversations:read conversations:write";
+const SCOPE: &str = "openid profile email offline_access grok-cli:access api:access conversations:read conversations:write";
 const TOKEN_FILE: &str = "xai-oauth.json";
 /// Refresh this many seconds before JWT/expiry.
 const EXPIRY_SKEW_SECS: i64 = 120;
@@ -98,7 +97,9 @@ pub fn status() -> OAuthStatus {
 
 /// True when we have a usable OAuth session (valid access token, or refreshable).
 pub fn has_session() -> bool {
-    STORE.load::<OAuthTokens>().is_some_and(|t| !t.access_token.is_empty() || !t.refresh_token.is_empty())
+    STORE
+        .load::<OAuthTokens>()
+        .is_some_and(|t| !t.access_token.is_empty() || !t.refresh_token.is_empty())
 }
 
 /// Return a non-expired access token without network I/O. Prefer calling
@@ -121,7 +122,9 @@ pub fn peek_access_token() -> Option<String> {
 /// Refresh if needed and return a valid access token.
 pub async fn ensure_fresh() -> Result<String, String> {
     let Some(tokens) = STORE.load::<OAuthTokens>() else {
-        return Err("Not signed in with xAI. Open Preferences → Grok → Sign in with SuperGrok.".into());
+        return Err(
+            "Not signed in with xAI. Open Preferences → Grok → Sign in with SuperGrok.".into(),
+        );
     };
     if still_valid(&tokens) {
         return Ok(tokens.access_token);
@@ -157,9 +160,7 @@ fn grok_build_session() -> Option<OAuthTokens> {
     let map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&raw).ok()?;
     // Prefer the Grok CLI client entry; otherwise first entry with tokens.
     let preferred_key = format!("https://auth.x.ai::{CLIENT_ID}");
-    let entry_val = map
-        .get(&preferred_key)
-        .or_else(|| map.values().next())?;
+    let entry_val = map.get(&preferred_key).or_else(|| map.values().next())?;
     let entry: GrokBuildEntry = serde_json::from_value(entry_val.clone()).ok()?;
     let access = entry.key.filter(|s| !s.is_empty())?;
     let refresh = entry.refresh_token.unwrap_or_default();
@@ -190,13 +191,12 @@ fn parse_rfc3339(s: &str) -> Option<i64> {
 
 /// Copy the Grok Build session into Cycletron's store (then we own refresh).
 pub fn import_from_grok_build() -> Result<OAuthStatus, String> {
-    let mut tokens = grok_build_session()
-        .ok_or_else(|| {
-            format!(
-                "No Grok Build session at {}. Run `grok login` first, or use Sign in with SuperGrok.",
-                grok_auth_path().display()
-            )
-        })?;
+    let mut tokens = grok_build_session().ok_or_else(|| {
+        format!(
+            "No Grok Build session at {}. Run `grok login` first, or use Sign in with SuperGrok.",
+            grok_auth_path().display()
+        )
+    })?;
     tokens.source = Some("grok-build-import".into());
     STORE.save(&tokens)?;
     tracing::info!(
@@ -253,7 +253,11 @@ pub async fn start_device_login() -> Result<DeviceStart, String> {
 }
 
 /// Poll until the user approves the device code (or timeout / deny).
-pub async fn poll_device_login(device_code: &str, interval_secs: u64, expires_in: u64) -> Result<OAuthStatus, String> {
+pub async fn poll_device_login(
+    device_code: &str,
+    interval_secs: u64,
+    expires_in: u64,
+) -> Result<OAuthStatus, String> {
     let client = reqwest::Client::new();
     let deadline = oauth_store::now_unix() + expires_in as i64;
     let mut interval = Duration::from_secs(interval_secs.max(1));
@@ -307,7 +311,9 @@ pub async fn poll_device_login(device_code: &str, interval_secs: u64, expires_in
             .ok_or_else(|| "token response missing access_token".to_string())?;
         let refresh = body.refresh_token.unwrap_or_default();
         if refresh.is_empty() {
-            return Err("token response missing refresh_token (offline_access scope required)".into());
+            return Err(
+                "token response missing refresh_token (offline_access scope required)".into(),
+            );
         }
         let expires_in = body.expires_in.unwrap_or(3600);
         let email = body
@@ -363,4 +369,3 @@ async fn refresh_token(refresh: &str) -> Result<OAuthTokens, String> {
             .or(Some("refresh".into())),
     })
 }
-

@@ -83,10 +83,18 @@ pub struct LaneSpec {
 
 impl LaneSpec {
     fn straight(sound: &'static str, pat: LanePat) -> Self {
-        LaneSpec { sound, pat, swings: false }
+        LaneSpec {
+            sound,
+            pat,
+            swings: false,
+        }
     }
     fn swung(sound: &'static str, pat: LanePat) -> Self {
-        LaneSpec { sound, pat, swings: true }
+        LaneSpec {
+            sound,
+            pat,
+            swings: true,
+        }
     }
 }
 
@@ -145,13 +153,28 @@ impl DrumArchetype {
         use DrumArchetype::*;
         use LanePat::*;
         match self {
-            FourOnFloor => vec![LaneSpec::straight("bd", Every { interval: 4, offset: 0 })],
-            OffbeatOpenHat => vec![LaneSpec::swung("oh", Every { interval: 4, offset: 2 })],
+            FourOnFloor => vec![LaneSpec::straight(
+                "bd",
+                Every {
+                    interval: 4,
+                    offset: 0,
+                },
+            )],
+            OffbeatOpenHat => vec![LaneSpec::swung(
+                "oh",
+                Every {
+                    interval: 4,
+                    offset: 2,
+                },
+            )],
             BackbeatClap => vec![LaneSpec::straight("cp", Hits(vec![4, 12]))],
             BackbeatSnare => vec![LaneSpec::straight("sd", Hits(vec![4, 12]))],
             ClosedHats { interval, offset } => vec![LaneSpec::swung(
                 "hh",
-                Every { interval: *interval, offset: *offset },
+                Every {
+                    interval: *interval,
+                    offset: *offset,
+                },
             )],
             TwoStep => vec![
                 LaneSpec::straight("bd", Hits(vec![0, 10])),
@@ -175,7 +198,13 @@ impl DrumArchetype {
                 LaneSpec::straight("sd", Hits(vec![8])),
             ],
             TrapHats => vec![
-                LaneSpec::straight("hh", Every { interval: 2, offset: 0 }),
+                LaneSpec::straight(
+                    "hh",
+                    Every {
+                        interval: 2,
+                        offset: 0,
+                    },
+                ),
                 LaneSpec::straight("hh", Ratchet(vec![(7, 3), (15, 4)])),
             ],
             Rapid808 => vec![LaneSpec::straight("bd", Hits(vec![0, 3, 6, 10, 13]))],
@@ -183,7 +212,13 @@ impl DrumArchetype {
             Shuffled2Step => vec![
                 LaneSpec::straight("bd", Hits(vec![0, 10])),
                 LaneSpec::straight("sd", Hits(vec![4, 12])),
-                LaneSpec::swung("hh", Every { interval: 2, offset: 1 }),
+                LaneSpec::swung(
+                    "hh",
+                    Every {
+                        interval: 2,
+                        offset: 1,
+                    },
+                ),
             ],
             DubSkank => vec![
                 LaneSpec::straight("bd", Hits(vec![0, 8])),
@@ -233,7 +268,10 @@ impl DrumArchetype {
             OffbeatOpenHat,
             BackbeatClap,
             BackbeatSnare,
-            ClosedHats { interval: 2, offset: 0 },
+            ClosedHats {
+                interval: 2,
+                offset: 0,
+            },
             TwoStep,
             BoomBap,
             Breakbeat,
@@ -376,8 +414,15 @@ impl BassStyle {
     pub fn library() -> Vec<BassStyle> {
         use BassStyle::*;
         vec![
-            Drone, OffbeatRoot, ReeseSparse, Rolling16th, Walking, OctaveBounce, Sub808,
-            SubWobble, Acid303,
+            Drone,
+            OffbeatRoot,
+            ReeseSparse,
+            Rolling16th,
+            Walking,
+            OctaveBounce,
+            Sub808,
+            SubWobble,
+            Acid303,
         ]
     }
 }
@@ -593,7 +638,10 @@ fn house() -> GenreSpec {
             DrumArchetype::FourOnFloor,
             DrumArchetype::OffbeatOpenHat,
             DrumArchetype::BackbeatClap,
-            DrumArchetype::ClosedHats { interval: 2, offset: 0 },
+            DrumArchetype::ClosedHats {
+                interval: 2,
+                offset: 0,
+            },
         ],
         drum_fx: ".gain(0.9)".into(),
         bass: Some(BassSpec {
@@ -641,7 +689,10 @@ fn drum_and_bass() -> GenreSpec {
         steps: 16,
         drums: vec![
             DrumArchetype::TwoStep,
-            DrumArchetype::ClosedHats { interval: 1, offset: 0 },
+            DrumArchetype::ClosedHats {
+                interval: 1,
+                offset: 0,
+            },
         ],
         drum_fx: ".gain(0.92)".into(),
         bass: Some(BassSpec {
@@ -679,7 +730,10 @@ fn techno() -> GenreSpec {
         drums: vec![
             DrumArchetype::FourOnFloor,
             DrumArchetype::BackbeatClap,
-            DrumArchetype::ClosedHats { interval: 2, offset: 1 },
+            DrumArchetype::ClosedHats {
+                interval: 2,
+                offset: 1,
+            },
             DrumArchetype::EuclidTom { k: 5, n: 16 },
         ],
         drum_fx: ".gain(0.9)".into(),
@@ -761,7 +815,10 @@ fn hip_hop() -> GenreSpec {
         steps: 16,
         drums: vec![
             DrumArchetype::BoomBap,
-            DrumArchetype::ClosedHats { interval: 2, offset: 0 },
+            DrumArchetype::ClosedHats {
+                interval: 2,
+                offset: 0,
+            },
         ],
         drum_fx: ".gain(0.85)".into(),
         bass: Some(BassSpec {

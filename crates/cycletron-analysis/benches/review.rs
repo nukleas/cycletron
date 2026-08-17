@@ -7,7 +7,7 @@
 //! Baselines: `-- --save-baseline pre` / `-- --baseline pre`
 
 use core::hint::black_box;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use cycletron_analysis as analysis;
 
 const SMALL: &str = include_str!("../../../corpus/showcase/techno-loop.strudel");

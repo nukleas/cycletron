@@ -90,4 +90,3 @@ pub struct TransportState {
     pub cycle: f64,
     pub pattern_code: Option<String>,
 }
-

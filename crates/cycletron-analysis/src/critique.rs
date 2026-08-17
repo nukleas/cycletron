@@ -42,7 +42,10 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
     };
 
     // Critique over the loop period when known, else the whole window.
-    let span = d.period_cycles.unwrap_or(d.cycles_queried).min(d.cycles.len());
+    let span = d
+        .period_cycles
+        .unwrap_or(d.cycles_queried)
+        .min(d.cycles.len());
 
     // --- Fully silent ------------------------------------------------------
     if d.total_events == 0 {
@@ -50,7 +53,10 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
             "silent",
             "Pattern emits no events — nothing will sound.".to_string(),
         ));
-        return Critique { ok: false, findings };
+        return Critique {
+            ok: false,
+            findings,
+        };
     }
 
     // --- Silent cycles within the loop ------------------------------------
@@ -65,7 +71,11 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
             "silent-cycles",
             format!(
                 "Cycle(s) {} are silent — intentional rest, or a gap in the loop?",
-                silent.iter().map(usize::to_string).collect::<Vec<_>>().join(", ")
+                silent
+                    .iter()
+                    .map(usize::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ),
         ));
     }
@@ -192,7 +202,11 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
     let low_pitch = d.note_low.as_ref().is_some_and(|n| n.midi < 48); // below C3
     let low_drum = d.sounds.iter().any(|s| {
         let s = s.to_lowercase();
-        s.contains("bd") || s.contains("sub") || s.contains("bass") || s == "sbd" || s.contains("808")
+        s.contains("bd")
+            || s.contains("sub")
+            || s.contains("bass")
+            || s == "sbd"
+            || s.contains("808")
     });
     if has_pitched && !low_pitch && !low_drum {
         findings.push(note(
@@ -208,7 +222,10 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
         if lo.midi == hi.midi && d.total_events > 2 {
             findings.push(note(
                 "static-pitch",
-                format!("Every pitched note is {} — the line never moves melodically.", lo.name),
+                format!(
+                    "Every pitched note is {} — the line never moves melodically.",
+                    lo.name
+                ),
             ));
         }
     }
@@ -228,7 +245,9 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
 /// energy)? Matches the default drum names and drum-machine voices like
 /// `RolandTR808_bd` (the voice is the suffix after the last `_`).
 fn is_percussive(sound: &str) -> bool {
-    const DRUMS: [&str; 12] = ["bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs"];
+    const DRUMS: [&str; 12] = [
+        "bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs",
+    ];
     let voice = sound.rsplit('_').next().unwrap_or(sound);
     DRUMS.contains(&voice)
 }
@@ -238,7 +257,9 @@ fn is_percussive(sound: &str) -> bool {
 /// as a sound name and plays nothing.
 fn looks_like_chord_symbol(s: &str) -> bool {
     let mut chars = s.chars();
-    let Some(first) = chars.next() else { return false };
+    let Some(first) = chars.next() else {
+        return false;
+    };
     if !('A'..='G').contains(&first) {
         return false;
     }
@@ -354,7 +375,11 @@ pub fn lint_digest(d: &PatternDigest, known: &crate::sounds::SoundSet) -> Vec<Fi
         } else {
             format!(
                 "Did you mean {}?",
-                suggestions.iter().map(|s| format!("'{s}'")).collect::<Vec<_>>().join(" / ")
+                suggestions
+                    .iter()
+                    .map(|s| format!("'{s}'"))
+                    .collect::<Vec<_>>()
+                    .join(" / ")
             )
         };
         findings.push(warn(

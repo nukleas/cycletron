@@ -11,8 +11,6 @@
 //!
 //! No regex dependency: the workspace has none, so these are hand-rolled scans.
 
-
-
 /// Result of [`sanitize_source`]: the repaired code plus one human-readable note
 /// per substitution applied (empty `notes` when nothing was touched).
 #[derive(Debug, Clone, Default)]
@@ -306,7 +304,8 @@ fn is_single_identifier(s: &str) -> bool {
         Some(c) if c.is_ascii_alphabetic() || c == '_' || c == '$' => {}
         _ => return false,
     }
-    s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+    s.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
 }
 
 #[cfg(test)]
@@ -364,7 +363,6 @@ mod tests {
     fn builtin() -> crate::sounds::SoundSet {
         crate::sounds::SoundSet::builtin_only()
     }
-
 
     #[test]
     fn remaps_drum_aliases_inside_strings() {

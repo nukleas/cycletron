@@ -5,9 +5,9 @@
 //! dir, unverified JWT/base64 decode, the home dir, and the wall clock — live
 //! here so the security-sensitive bits exist exactly once.
 
+use parking_lot::Mutex;
 use std::fs;
 use std::path::{Path, PathBuf};
-use parking_lot::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::de::DeserializeOwned;
@@ -124,10 +124,15 @@ pub struct RefreshedGrant {
 #[derive(Debug)]
 pub enum RefreshError {
     /// The grant is dead (invalid_grant / 400 / 401) — re-login required.
-    InvalidGrant { err: String, desc: String },
+    InvalidGrant {
+        err: String,
+        desc: String,
+    },
     /// HTTP 403 — the grant works but the account isn't entitled; re-login
     /// will not help.
-    Forbidden { desc: String },
+    Forbidden {
+        desc: String,
+    },
     Other(String),
 }
 

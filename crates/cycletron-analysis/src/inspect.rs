@@ -101,9 +101,7 @@ pub(crate) fn event_from_hap(hap: &Hap<Value>, begin: f64, duration: f64) -> Eve
         .get(&ContextKey::Note)
         .cloned()
         .or_else(|| (!is_chord).then(|| value.clone()));
-    let (note, midi) = note_candidate
-        .as_ref()
-        .map_or((None, None), resolve_note);
+    let (note, midi) = note_candidate.as_ref().map_or((None, None), resolve_note);
 
     // The sound is the Sound control if present, otherwise the value when it is
     // a sample/synth name (i.e. it didn't parse as a note).
@@ -203,7 +201,9 @@ pub(crate) fn resolve_note(v: &Value) -> (Option<String>, Option<i32>) {
                 (None, None)
             }
         }
-        Value::String(s) => note_name_to_midi(s).map_or((None, None), |m| (Some(s.to_string()), Some(m))),
+        Value::String(s) => {
+            note_name_to_midi(s).map_or((None, None), |m| (Some(s.to_string()), Some(m)))
+        }
         _ => (None, None),
     }
 }
@@ -298,7 +298,15 @@ pub fn digest_to_text(d: &PatternDigest) -> String {
             hi.midi - lo.midi
         );
     }
-    let _ = writeln!(s, "Stereo field: {}.", if d.uses_pan { "uses panning" } else { "centred (mono image)" });
+    let _ = writeln!(
+        s,
+        "Stereo field: {}.",
+        if d.uses_pan {
+            "uses panning"
+        } else {
+            "centred (mono image)"
+        }
+    );
     if !d.silent_cycles.is_empty() {
         let _ = writeln!(
             s,
@@ -313,7 +321,10 @@ pub fn digest_to_text(d: &PatternDigest) -> String {
 
     let _ = writeln!(s, "\nPer-cycle events (begin · voice · note · controls):");
     // Show at most the first `period` cycles when periodic, else all queried.
-    let show = d.period_cycles.unwrap_or(d.cycles_queried).min(d.cycles.len());
+    let show = d
+        .period_cycles
+        .unwrap_or(d.cycles_queried)
+        .min(d.cycles.len());
     for cd in &d.cycles[..show] {
         if cd.events.is_empty() {
             let _ = writeln!(s, "  cycle {}: (silent)", cd.cycle);
@@ -354,7 +365,11 @@ pub fn digest_to_text(d: &PatternDigest) -> String {
         }
     }
     if show < d.cycles_queried {
-        let _ = writeln!(s, "  … ({} more cycle(s) repeat the loop)", d.cycles_queried - show);
+        let _ = writeln!(
+            s,
+            "  … ({} more cycle(s) repeat the loop)",
+            d.cycles_queried - show
+        );
     }
 
     s
@@ -367,7 +382,11 @@ pub fn digest_to_text(d: &PatternDigest) -> String {
 pub fn digest_to_summary(d: &PatternDigest) -> String {
     use std::fmt::Write;
     let mut s = String::new();
-    let _ = write!(s, "Digest ({} cycles): {} events", d.cycles_queried, d.total_events);
+    let _ = write!(
+        s,
+        "Digest ({} cycles): {} events",
+        d.cycles_queried, d.total_events
+    );
     if let Some(bpm) = d.bpm {
         let _ = write!(s, " at {bpm:.0} BPM");
         if let Some(spc) = d.seconds_per_cycle {
@@ -392,7 +411,11 @@ pub fn digest_to_summary(d: &PatternDigest) -> String {
         let _ = writeln!(
             s,
             "Silent cycle(s): {}.",
-            d.silent_cycles.iter().map(usize::to_string).collect::<Vec<_>>().join(", ")
+            d.silent_cycles
+                .iter()
+                .map(usize::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
         );
     }
     // Per-cycle event counts, run-length compressed: "c0–c7: 4 ev".

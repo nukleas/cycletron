@@ -42,7 +42,10 @@ impl CodexClient {
             headers.insert("ChatGPT-Account-Id", v);
         }
         // Identity headers the Codex backend expects from CLI-class clients.
-        headers.insert("OpenAI-Beta", HeaderValue::from_static("responses=experimental"));
+        headers.insert(
+            "OpenAI-Beta",
+            HeaderValue::from_static("responses=experimental"),
+        );
         headers.insert("originator", HeaderValue::from_static("codex_cli_rs"));
 
         let http = reqwest::Client::builder()
@@ -202,10 +205,7 @@ impl ResponsesAccumulator {
                 let delta = v
                     .get("delta")
                     .and_then(|d| d.as_str())
-                    .or_else(|| {
-                        v.pointer("/delta/text")
-                            .and_then(|t| t.as_str())
-                    })
+                    .or_else(|| v.pointer("/delta/text").and_then(|t| t.as_str()))
                     .unwrap_or("");
                 if !delta.is_empty() {
                     self.text.push_str(delta);
@@ -307,7 +307,6 @@ impl ResponsesAccumulator {
             _ => {}
         }
     }
-
 }
 
 impl StreamDecoder for ResponsesAccumulator {

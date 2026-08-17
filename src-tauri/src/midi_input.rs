@@ -11,10 +11,10 @@
 //! MIDI stack directly.
 
 use midir::{MidiInput, MidiInputConnection};
+use parking_lot::Mutex;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use parking_lot::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 

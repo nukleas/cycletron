@@ -35,7 +35,9 @@ fn main() -> ExitCode {
         Ok(a) => a,
         Err(e) => {
             eprintln!("midi-ingest: {e}");
-            eprintln!("usage: midi-ingest <midi-dir> [--genre <tag>] [--out <dir>] [--limit <n>] [--bars <n>]");
+            eprintln!(
+                "usage: midi-ingest <midi-dir> [--genre <tag>] [--out <dir>] [--limit <n>] [--bars <n>]"
+            );
             return ExitCode::from(2);
         }
     };
@@ -59,7 +61,10 @@ fn main() -> ExitCode {
         midis.truncate(args.limit);
     }
     if midis.is_empty() {
-        eprintln!("midi-ingest: no .mid/.midi files under {}", args.dir.display());
+        eprintln!(
+            "midi-ingest: no .mid/.midi files under {}",
+            args.dir.display()
+        );
         return ExitCode::from(2);
     }
 
@@ -67,7 +72,11 @@ fn main() -> ExitCode {
     let mut valid_count = 0usize;
 
     for path in &midis {
-        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("midi").to_string();
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("midi")
+            .to_string();
         let artist = path
             .parent()
             .and_then(|p| p.file_name())
@@ -96,7 +105,10 @@ fn main() -> ExitCode {
                         let header = format!(
                             "// ingested: {}\n// dataset: {dataset}{}  bpm: {bpm:.1}\n",
                             path.display(),
-                            args.genre.as_deref().map(|g| format!("  genre: {g}")).unwrap_or_default(),
+                            args.genre
+                                .as_deref()
+                                .map(|g| format!("  genre: {g}"))
+                                .unwrap_or_default(),
                         );
                         if let Err(e) = write_file(&file, &format!("{header}\n{code}")) {
                             error = Some(format!("write: {e}"));
@@ -189,7 +201,10 @@ fn collect_midis(root: &Path) -> Vec<PathBuf> {
         .map(|e| e.path().to_path_buf())
         .filter(|p| {
             matches!(
-                p.extension().and_then(|s| s.to_str()).map(|s| s.to_ascii_lowercase()).as_deref(),
+                p.extension()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_ascii_lowercase())
+                    .as_deref(),
                 Some("mid") | Some("midi")
             )
         })
@@ -222,10 +237,18 @@ fn parse_args() -> Result<Args, String> {
             "--genre" => genre = Some(it.next().ok_or("--genre needs a value")?),
             "--out" => out = PathBuf::from(it.next().ok_or("--out needs a value")?),
             "--limit" => {
-                limit = it.next().ok_or("--limit needs a value")?.parse().map_err(|_| "--limit must be a number")?
+                limit = it
+                    .next()
+                    .ok_or("--limit needs a value")?
+                    .parse()
+                    .map_err(|_| "--limit must be a number")?
             }
             "--bars" => {
-                bars = it.next().ok_or("--bars needs a value")?.parse().map_err(|_| "--bars must be a number")?
+                bars = it
+                    .next()
+                    .ok_or("--bars needs a value")?
+                    .parse()
+                    .map_err(|_| "--bars must be a number")?
             }
             other if other.starts_with("--") => return Err(format!("unknown flag {other}")),
             other => {

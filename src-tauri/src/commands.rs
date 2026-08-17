@@ -1,12 +1,12 @@
 use crate::agent_loop;
 use crate::files::{self, FileDoc, Recents};
 use crate::library::{self, DirEntry};
-use cycletron_midi as midi;
 use crate::logs::{self, LogEntry};
 use crate::settings::UserSettings;
 use crate::snapshots::{self, Snapshot};
 use crate::state::AppState;
 use cycletron_analysis as strudel;
+use cycletron_midi as midi;
 use midi_to_strudel::{InstrumentMode, SectionNamingStrategy, drums::DrumBank};
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -97,7 +97,10 @@ pub fn validate_pattern(code: String) -> Result<String, String> {
 /// actually emits (events per cycle, sounds, pitch range, loop length, silent
 /// cycles). Lets the editor "see" a pattern, mirroring the agent's tool.
 #[tauri::command]
-pub fn inspect_pattern(code: String, cycles: Option<usize>) -> Result<strudel::PatternDigest, String> {
+pub fn inspect_pattern(
+    code: String,
+    cycles: Option<usize>,
+) -> Result<strudel::PatternDigest, String> {
     strudel::Evaluated::new(&code, cycles.unwrap_or(8)).map(strudel::Evaluated::into_digest)
 }
 
@@ -125,7 +128,8 @@ pub fn critique_pattern(code: String, cycles: Option<usize>) -> Result<strudel::
 /// name-vs-density sanity. Reuses the `Critique` shape as `critique_pattern`.
 #[tauri::command]
 pub fn critique_form(code: String, cycles: Option<usize>) -> Result<strudel::Critique, String> {
-    strudel::Evaluated::new(&code, cycles.unwrap_or(32).clamp(8, 64)).map(|ev| strudel::critique_form(&ev))
+    strudel::Evaluated::new(&code, cycles.unwrap_or(32).clamp(8, 64))
+        .map(|ev| strudel::critique_form(&ev))
 }
 
 /// Genre recipes. With no `genre`, returns every loaded recipe (for a picker);
@@ -406,12 +410,11 @@ fn build_import_options(input: Option<ImportMidiOptions>) -> Result<midi::Import
         opts.detect_drum_names = b;
     }
     if let Some(s) = input.instrument_mode.as_deref() {
-        opts.instrument_mode = InstrumentMode::parse(s)
-            .ok_or_else(|| format!("unknown instrument_mode: {s}"))?;
+        opts.instrument_mode =
+            InstrumentMode::parse(s).ok_or_else(|| format!("unknown instrument_mode: {s}"))?;
     }
     if let Some(s) = input.drum_bank.as_deref() {
-        opts.drum_bank =
-            DrumBank::parse(s).ok_or_else(|| format!("unknown drum_bank: {s}"))?;
+        opts.drum_bank = DrumBank::parse(s).ok_or_else(|| format!("unknown drum_bank: {s}"))?;
     }
     if let Some(chs) = input.included_channels {
         opts.included_channels = Some(chs);
@@ -423,10 +426,7 @@ fn build_import_options(input: Option<ImportMidiOptions>) -> Result<midi::Import
 /// session's current file — the UI treats the result as an unsaved buffer
 /// derived from MIDI.
 #[tauri::command]
-pub fn import_midi(
-    path: String,
-    options: Option<ImportMidiOptions>,
-) -> Result<MidiImport, String> {
+pub fn import_midi(path: String, options: Option<ImportMidiOptions>) -> Result<MidiImport, String> {
     let pb = PathBuf::from(&path);
     let opts = build_import_options(options)?;
     let result = midi::convert_file(&pb, &opts).map_err(|e| format!("midi import: {e:#}"))?;
@@ -580,10 +580,7 @@ pub fn list_library(
         _ => root.clone(),
     };
     if !library::within(&root, &target) {
-        return Err(format!(
-            "{} is outside the library",
-            target.display()
-        ));
+        return Err(format!("{} is outside the library", target.display()));
     }
     library::list_dir(&target).map_err(|e| format!("list {}: {e}", target.display()))
 }
@@ -691,10 +688,7 @@ pub fn get_user_settings(state: State<'_, AppState>) -> UserSettings {
 /// API keys are NOT part of `settings` — they go through `set_provider_key`
 /// into the OS keychain.
 #[tauri::command]
-pub fn set_user_settings(
-    settings: UserSettings,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub fn set_user_settings(settings: UserSettings, state: State<'_, AppState>) -> Result<(), String> {
     // Apply to the in-memory config so the rest of the app sees the change.
     {
         let mut config = state.config.lock();
@@ -747,7 +741,9 @@ pub fn xai_oauth_status() -> crate::xai_oauth::OAuthStatus {
 
 /// Copy a Grok Build / Grok CLI session from `~/.grok/auth.json` into Cycletron.
 #[tauri::command]
-pub fn xai_oauth_import_grok_build(state: State<'_, AppState>) -> Result<crate::xai_oauth::OAuthStatus, String> {
+pub fn xai_oauth_import_grok_build(
+    state: State<'_, AppState>,
+) -> Result<crate::xai_oauth::OAuthStatus, String> {
     let status = crate::xai_oauth::import_from_grok_build()?;
     state.rebuild_agent_client();
     Ok(status)
@@ -810,7 +806,9 @@ pub fn codex_oauth_status() -> crate::codex_oauth::CodexOAuthStatus {
 
 /// Copy a Codex CLI session from `~/.codex/auth.json` into Cycletron.
 #[tauri::command]
-pub fn codex_oauth_import_cli(state: State<'_, AppState>) -> Result<crate::codex_oauth::CodexOAuthStatus, String> {
+pub fn codex_oauth_import_cli(
+    state: State<'_, AppState>,
+) -> Result<crate::codex_oauth::CodexOAuthStatus, String> {
     let status = crate::codex_oauth::import_from_codex_cli()?;
     // Prefer Codex as active after import.
     {
@@ -826,7 +824,9 @@ pub fn codex_oauth_import_cli(state: State<'_, AppState>) -> Result<crate::codex
 
 /// Browser PKCE login (same client as `codex login`). Binds localhost:1455.
 #[tauri::command]
-pub async fn codex_oauth_login(state: State<'_, AppState>) -> Result<crate::codex_oauth::CodexOAuthStatus, String> {
+pub async fn codex_oauth_login(
+    state: State<'_, AppState>,
+) -> Result<crate::codex_oauth::CodexOAuthStatus, String> {
     let status = crate::codex_oauth::login_with_browser().await?;
     {
         let mut us = state.user_settings.lock();
@@ -898,7 +898,8 @@ pub fn read_snapshot(
 pub fn set_dock_badge(count: u32, app_handle: tauri::AppHandle) -> Result<(), String> {
     let target = if count == 0 { None } else { Some(count) };
     if let Some(window) = app_handle.get_webview_window("main") {
-        window.set_badge_count(target.map(|n| n as i64))
+        window
+            .set_badge_count(target.map(|n| n as i64))
             .map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -921,7 +922,11 @@ pub fn clear_logs() {
 /// console isn't visible.
 #[tauri::command]
 pub fn log_diagnostic(level: String, target: String, message: String) {
-    let tgt = if target.is_empty() { "cycletron::frontend".to_string() } else { target };
+    let tgt = if target.is_empty() {
+        "cycletron::frontend".to_string()
+    } else {
+        target
+    };
     match level.as_str() {
         "error" => tracing::error!(target: "cycletron::frontend", source = %tgt, "{}", message),
         "warn" => tracing::warn!(target: "cycletron::frontend", source = %tgt, "{}", message),
@@ -938,10 +943,17 @@ pub fn diagnostic_dump(app_handle: tauri::AppHandle) -> String {
     let identifier = app_handle.config().identifier.clone();
     let mut out = String::new();
     out.push_str("=== Cycletron diagnostic dump ===\n");
-    out.push_str(&format!("App      : {} {}\n", package.name, package.version));
+    out.push_str(&format!(
+        "App      : {} {}\n",
+        package.name, package.version
+    ));
     out.push_str(&format!("Bundle   : {}\n", identifier));
     out.push_str(&format!("Tauri    : {}\n", tauri::VERSION));
-    out.push_str(&format!("OS       : {} {}\n", std::env::consts::OS, std::env::consts::ARCH));
+    out.push_str(&format!(
+        "OS       : {} {}\n",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    ));
     out.push_str(&format!("Time     : {}\n", chrono::Utc::now().to_rfc3339()));
     out.push_str("\n=== Recent logs ===\n");
     for entry in logs::snapshot() {
@@ -1061,8 +1073,12 @@ pub fn spawn_external_change_watcher(app_handle: tauri::AppHandle) {
                 continue;
             }
             let Some(path) = current_path else { continue };
-            let Ok(meta) = std::fs::metadata(&path) else { continue };
-            let Ok(modified) = meta.modified() else { continue };
+            let Ok(meta) = std::fs::metadata(&path) else {
+                continue;
+            };
+            let Ok(modified) = meta.modified() else {
+                continue;
+            };
             // First sighting just records the baseline.
             let Some(prev) = last_mtime else {
                 last_mtime = Some(modified);

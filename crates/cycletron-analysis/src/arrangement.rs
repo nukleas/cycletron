@@ -108,8 +108,12 @@ pub fn analyze(ev: &crate::Evaluated) -> ArrangementAnalysis {
     // token spans `.slow(n)` cycles (no .slow → 1), consecutive repeats merge.
     // Density flicker inside a labelled section (an intentional 2-on/2-off
     // pad) can no longer shred one section into micro-fragments.
-    let labeled = parse_pickrestart_labels(ev.code())
-        .map(|labels| (labels, parse_pickrestart_slow(ev.code()).unwrap_or(1) as usize));
+    let labeled = parse_pickrestart_labels(ev.code()).map(|labels| {
+        (
+            labels,
+            parse_pickrestart_slow(ev.code()).unwrap_or(1) as usize,
+        )
+    });
 
     // A pickRestart selector defines the song's loop explicitly: total length =
     // (expanded token count) × the per-token `.slow(n)` factor. This is the
@@ -220,7 +224,10 @@ pub fn analyze_to_text(a: &ArrangementAnalysis) -> String {
 
     let len = match a.period_cycles {
         Some(p) => format!("{p}-cycle loop"),
-        None => format!("no repeat within {} cycles (evolving or longer form)", a.window_cycles),
+        None => format!(
+            "no repeat within {} cycles (evolving or longer form)",
+            a.window_cycles
+        ),
     };
     let _ = write!(s, "Arrangement: {len}");
     if let Some(secs) = a.total_seconds {
@@ -234,7 +241,10 @@ pub fn analyze_to_text(a: &ArrangementAnalysis) -> String {
         let _ = writeln!(s, "Form: {}", a.form);
     }
 
-    let _ = writeln!(s, "\nSections (label · cycles · time · instruments · density):");
+    let _ = writeln!(
+        s,
+        "\nSections (label · cycles · time · instruments · density):"
+    );
     for sec in &a.sections {
         let span = if sec.cycles == 1 {
             format!("cyc {}", sec.start_cycle)

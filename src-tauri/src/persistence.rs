@@ -130,7 +130,10 @@ mod tests {
         let back = read_snapshot(&dir).unwrap();
         assert_eq!(back.bpm, 123.0);
         assert_eq!(back.code, "s(\"bd\")");
-        assert_eq!(back.file_path.unwrap().to_string_lossy(), "/tmp/foo.strudel");
+        assert_eq!(
+            back.file_path.unwrap().to_string_lossy(),
+            "/tmp/foo.strudel"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }

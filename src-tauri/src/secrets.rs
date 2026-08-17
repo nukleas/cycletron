@@ -13,10 +13,10 @@
 //! provider’s environment variable (`ANTHROPIC_API_KEY`, `XAI_API_KEY`,
 //! `OPENAI_API_KEY`).
 
+use parking_lot::Mutex;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use parking_lot::Mutex;
 
 use keyring::Entry;
 

@@ -214,7 +214,11 @@ pub mod slug {
             }
         }
         let s = out.trim_matches('-').to_string();
-        if s.is_empty() { "untitled".to_string() } else { s }
+        if s.is_empty() {
+            "untitled".to_string()
+        } else {
+            s
+        }
     }
 }
 
@@ -251,10 +255,15 @@ mod tests {
 
     #[test]
     fn frontmatter_parse_scalars_and_arrays() {
-        let fm = frontmatter::parse("name: \"My Song\"\nbpm: 128\ntags: [house, 'four-floor']\nlist:\n  - a\n  - b\n");
+        let fm = frontmatter::parse(
+            "name: \"My Song\"\nbpm: 128\ntags: [house, 'four-floor']\nlist:\n  - a\n  - b\n",
+        );
         assert_eq!(fm.scalar("name").as_deref(), Some("My Song"));
         assert_eq!(fm.scalar("bpm").as_deref(), Some("128"));
-        assert_eq!(fm.array("tags"), Some(vec!["house".into(), "four-floor".into()]));
+        assert_eq!(
+            fm.array("tags"),
+            Some(vec!["house".into(), "four-floor".into()])
+        );
         assert_eq!(fm.array("list"), Some(vec!["a".into(), "b".into()]));
     }
 
@@ -289,7 +298,10 @@ mod tests {
     fn slug_filename_replaces_and_caps() {
         assert_eq!(slug::filename("My Song (v2)!", "x", None), "My-Song--v2");
         assert_eq!(slug::filename("!!!", "stem", None), "stem");
-        assert_eq!(slug::filename(&"a".repeat(200), "midi", Some(100)).len(), 100);
+        assert_eq!(
+            slug::filename(&"a".repeat(200), "midi", Some(100)).len(),
+            100
+        );
     }
 
     #[test]
