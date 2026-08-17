@@ -80,9 +80,13 @@ corpus/test_ingest*/
 # user-provided and may not be redistributable)
 /Packs/
 
-# Local corpus staging — bakery-scraped candidates (third-party patterns,
-# not redistributable from this public repo) and ingestion outputs.
-# Regenerate with tools/corpus-fetch/fetch-corpus.sh + hap-ingest/midi-ingest.
-/corpus/_examples/
+# Underscore-prefixed FOLDERS are always private local staging (drafts,
+# scraped candidates, scratch) — never committed, anywhere in the tree.
+# Underscore-prefixed *files* (corpus/genres/_template.md, _map.json) are
+# fine to track. The corpus loaders/gate skip these dirs at runtime too.
+_*/
+
+# Ingestion outputs + fetched bakery cache — regenerate with
+# tools/corpus-fetch/fetch-corpus.sh + hap-ingest/midi-ingest.
 /corpus/ingested/
 /.corpus-cache/
