@@ -224,8 +224,8 @@ pub fn register_sound_banks(names: Vec<String>, state: State<'_, AppState>) -> R
 // Built-in sound catalog lives in the shared analysis crate so CLI tools use
 // the same known-sound set; user-loaded banks are layered on here.
 pub use cycletron_analysis::sounds::{
-    builtin_sound_set, DEFAULT_DRUMS, DRUM_MACHINE_NOTE, GM_INSTRUMENTS, INSTRUMENTS, MACHINE_KITS,
-    PERCUSSION, SYNTHS, WAVETABLES,
+    DEFAULT_DRUMS, DRUM_MACHINE_NOTE, GM_INSTRUMENTS, INSTRUMENTS, MACHINE_KITS, PERCUSSION,
+    SYNTHS, WAVETABLES,
 };
 
 /// Everything currently playable, for the UI and the agent's `list_sounds` tool.

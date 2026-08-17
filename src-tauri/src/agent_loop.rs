@@ -757,17 +757,19 @@ fn infer_write_kind(name: &str, input: &serde_json::Value) -> Option<String> {
 fn tool_validate_pattern(input: &serde_json::Value, state: &AppState) -> Result<String, String> {
     let code = resolve_code_or_editor(input, state)?;
 
-    match strudel::validate_code(&code) {
-        Ok(_) => {
+    if code.trim().is_empty() {
+        return Ok("valid — safe to play".to_string());
+    }
+    match strudel::Evaluated::new(&code, 4) {
+        Ok(ev) => {
             // Syntax is fine — now hunt the silent-failure class: events that
             // evaluate but will never sound (unknown sounds, unvoiced chords,
             // NaN pan). Lint over a short window; failures here never block.
             let mut lint = strudel::lint_source(&code);
-            lint.extend(
-                strudel::inspect_code(&code, 4)
-                    .map(|d| strudel::lint_digest(&d, &crate::sounds::known_sound_set(state)))
-                    .unwrap_or_default(),
-            );
+            lint.extend(strudel::lint_digest(
+                ev.digest(),
+                &crate::sounds::known_sound_set(state),
+            ));
             if lint.is_empty() {
                 Ok("valid — safe to play".to_string())
             } else {
@@ -901,16 +903,20 @@ fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> Result<St
 /// Core review pipeline — pure-ish (needs state only for the sound catalog).
 /// Shared by `review_pattern` and (later) play-with-review.
 pub(crate) fn review_code(code: &str, cycles: usize, state: &AppState) -> String {
-    if let Err(e) = strudel::validate_code(code) {
-        return format!(
-            "INVALID: {e}{}\n\nFix the error and review again.",
-            error_context(code, &e.to_string())
-        );
-    }
-    let digest = match strudel::inspect_code(code, cycles) {
-        Ok(d) => d,
-        Err(e) => return format!("Could not inspect — the code did not evaluate: {e}"),
+    // One evaluation shared by every analysis below. Form checks need ≥8
+    // cycles; the mix critique needs ≥4.
+    let has_form = code.contains("pickRestart") || code.contains("arrange");
+    let window = if has_form { cycles.clamp(8, 64) } else { cycles.clamp(4, 64) };
+    let ev = match strudel::Evaluated::new(code, window) {
+        Ok(ev) => ev,
+        Err(e) => {
+            return format!(
+                "INVALID: {e}{}\n\nFix the error and review again.",
+                error_context(code, &e)
+            );
+        }
     };
+    let digest = ev.digest();
 
     let mut out = String::from("REVIEW\n== digest ==\n");
     out.push_str(&format!(
@@ -938,38 +944,32 @@ pub(crate) fn review_code(code: &str, cycles: usize, state: &AppState) -> String
     };
 
     let mut lint = strudel::lint_source(code);
-    lint.extend(strudel::lint_digest(&digest, &crate::sounds::known_sound_set(state)));
+    lint.extend(strudel::lint_digest(digest, &crate::sounds::known_sound_set(state)));
     warns += lint.iter().filter(|f| f.severity == "warn").count();
     section("silence lint", &lint, &mut out);
 
-    if let Ok(c) = strudel::critique_code(code, cycles) {
-        warns += c.findings.iter().filter(|f| f.severity == "warn").count();
-        section("mix critique", &c.findings, &mut out);
-    }
+    let c = strudel::critique(&ev);
+    warns += c.findings.iter().filter(|f| f.severity == "warn").count();
+    section("mix critique", &c.findings, &mut out);
 
-    if code.contains("pickRestart") || code.contains("arrange") {
+    if has_form {
         // Section→label map so the form is visible without a separate
         // analyze_arrangement call (labels come from the pickRestart selector).
-        if let Ok(a) = strudel::analyze_code(code, cycles) {
-            out.push_str("== form map ==\n");
-            for s in &a.sections {
-                out.push_str(&format!(
-                    "  {:<10} cyc {:>2}–{:<3} {:>5.1} ev/cyc  {}\n",
-                    s.label,
-                    s.start_cycle,
-                    s.end_cycle,
-                    s.avg_events_per_cycle,
-                    s.instruments.join(", ")
-                ));
-            }
+        let a = strudel::analyze(&ev);
+        out.push_str("== form map ==\n");
+        for s in &a.sections {
+            out.push_str(&format!(
+                "  {:<10} cyc {:>2}–{:<3} {:>5.1} ev/cyc  {}\n",
+                s.label,
+                s.start_cycle,
+                s.end_cycle,
+                s.avg_events_per_cycle,
+                s.instruments.join(", ")
+            ));
         }
-        match strudel::critique_form_code(code, cycles) {
-            Ok(c) => {
-                warns += c.findings.iter().filter(|f| f.severity == "warn").count();
-                section("form critique", &c.findings, &mut out);
-            }
-            Err(e) => out.push_str(&format!("== form critique ==\n  (unavailable: {e})\n")),
-        }
+        let c = strudel::critique_form(&ev);
+        warns += c.findings.iter().filter(|f| f.severity == "warn").count();
+        section("form critique", &c.findings, &mut out);
     }
 
     out.push_str(&if warns == 0 {
@@ -996,9 +996,9 @@ fn tool_inspect_pattern(input: &serde_json::Value) -> Result<String, String> {
         _ => cycles <= 4,
     };
 
-    match strudel::inspect_code(code, cycles) {
-        Ok(digest) if !want_events => Ok(strudel::digest_to_summary(&digest)),
-        Ok(digest) => Ok(strudel::digest_to_text(&digest)),
+    match strudel::Evaluated::new(code, cycles) {
+        Ok(ev) if !want_events => Ok(strudel::digest_to_summary(ev.digest())),
+        Ok(ev) => Ok(strudel::digest_to_text(ev.digest())),
         Err(e) => Ok(format!(
             "Could not inspect — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and inspect again."
         )),
@@ -1009,8 +1009,8 @@ fn tool_analyze_arrangement(input: &serde_json::Value) -> Result<String, String>
     let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
     let max_cycles = input["max_cycles"].as_u64().unwrap_or(32) as usize;
 
-    match strudel::analyze_code(code, max_cycles) {
-        Ok(analysis) => Ok(strudel::analyze_to_text(&analysis)),
+    match strudel::Evaluated::new(code, max_cycles) {
+        Ok(ev) => Ok(strudel::analyze_to_text(&strudel::analyze(&ev))),
         Err(e) => Ok(format!(
             "Could not analyze — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and analyze again."
         )),
@@ -1021,8 +1021,8 @@ fn tool_critique_pattern(input: &serde_json::Value) -> Result<String, String> {
     let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
     let cycles = input["cycles"].as_u64().unwrap_or(16) as usize;
 
-    match strudel::critique_code(code, cycles) {
-        Ok(critique) => Ok(strudel::critique_to_text(&critique)),
+    match strudel::Evaluated::new(code, cycles.max(4)) {
+        Ok(ev) => Ok(strudel::critique_to_text(&strudel::critique(&ev))),
         Err(e) => Ok(format!(
             "Could not critique — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and critique again."
         )),
@@ -1033,8 +1033,8 @@ fn tool_critique_form(input: &serde_json::Value) -> Result<String, String> {
     let code = input["code"].as_str().ok_or("missing 'code' parameter")?;
     let cycles = input["cycles"].as_u64().unwrap_or(32) as usize;
 
-    match strudel::critique_form_code(code, cycles) {
-        Ok(critique) => Ok(strudel::form_critique_to_text(&critique)),
+    match strudel::Evaluated::new(code, cycles.clamp(8, 64)) {
+        Ok(ev) => Ok(strudel::form_critique_to_text(&strudel::critique_form(&ev))),
         Err(e) => Ok(format!(
             "Could not critique the form — the code did not evaluate: {e}\n\nFix it (try validate_pattern) and try again."
         )),
@@ -1317,22 +1317,21 @@ fn apply_document(
 
     // 2. Re-validate through the REAL evaluator. Fail closed: never inject code
     //    the engine can't parse — that is silence with no feedback loop.
-    if let Err(e) = strudel::validate_code(&code) {
-        return Ok(format!(
-            "NOT APPLIED — the resulting pattern does not evaluate, so nothing changed.\n\
-             INVALID: {e}{}{repair_summary}\n\nFix the error and try again.",
-            error_context(&code, &e.to_string()),
-        ));
-    }
+    let evaluated = match strudel::Evaluated::new(&code, 4) {
+        Ok(ev) => ev,
+        Err(e) => {
+            return Ok(format!(
+                "NOT APPLIED — the resulting pattern does not evaluate, so nothing changed.\n\
+                 INVALID: {e}{}{repair_summary}\n\nFix the error and try again.",
+                error_context(&code, &e),
+            ));
+        }
+    };
 
     // 3. Silence lint (advisory): valid syntax, but audibly-dead layers —
     //    invented sounds, unvoiced chords, out-of-range pan. Surface, don't block.
     let mut lint = strudel::lint_source(&code);
-    lint.extend(
-        strudel::inspect_code(&code, 4)
-            .map(|d| strudel::lint_digest(&d, &known))
-            .unwrap_or_default(),
-    );
+    lint.extend(strudel::lint_digest(evaluated.digest(), &known));
     let warns: Vec<_> = lint.iter().filter(|f| f.severity == "warn").collect();
 
     // 4. Commit the repaired code: store it and inject into the WASM REPL.

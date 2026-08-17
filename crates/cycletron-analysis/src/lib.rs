@@ -10,6 +10,7 @@
 pub mod arrangement;
 pub mod critique;
 pub mod engine_contract;
+pub mod evaluated;
 pub mod execute;
 pub mod form;
 pub mod inspect;
@@ -20,6 +21,7 @@ pub mod spectral;
 
 pub use arrangement::*;
 pub use critique::*;
+pub use evaluated::Evaluated;
 pub use execute::execute;
 pub use form::*;
 pub use inspect::*;
@@ -36,6 +38,24 @@ mod tests {
 
     fn known() -> sounds::SoundSet {
         sounds::SoundSet::builtin_only()
+    }
+
+    // Evaluate-then-analyze in one step, with each analysis's historical
+    // window policy, so the assertions below stay focused on behavior.
+    fn inspect_code(code: &str, cycles: usize) -> Result<PatternDigest, String> {
+        Evaluated::new(code, cycles).map(Evaluated::into_digest)
+    }
+
+    fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
+        Evaluated::new(code, cycles.max(4)).map(|ev| critique(&ev))
+    }
+
+    fn analyze_code(code: &str, cycles: usize) -> Result<ArrangementAnalysis, String> {
+        Evaluated::new(code, cycles).map(|ev| analyze(&ev))
+    }
+
+    fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String> {
+        Evaluated::new(code, cycles.clamp(8, 64)).map(|ev| critique_form(&ev))
     }
 
     #[test]

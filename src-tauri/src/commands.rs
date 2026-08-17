@@ -98,7 +98,7 @@ pub fn validate_pattern(code: String) -> Result<String, String> {
 /// cycles). Lets the editor "see" a pattern, mirroring the agent's tool.
 #[tauri::command]
 pub fn inspect_pattern(code: String, cycles: Option<usize>) -> Result<strudel::PatternDigest, String> {
-    strudel::inspect_code(&code, cycles.unwrap_or(8))
+    strudel::Evaluated::new(&code, cycles.unwrap_or(8)).map(strudel::Evaluated::into_digest)
 }
 
 /// Analyze a pattern's arrangement: detect the loop period and segment it into
@@ -109,7 +109,7 @@ pub fn analyze_arrangement(
     code: String,
     max_cycles: Option<usize>,
 ) -> Result<strudel::ArrangementAnalysis, String> {
-    strudel::analyze_code(&code, max_cycles.unwrap_or(32))
+    strudel::Evaluated::new(&code, max_cycles.unwrap_or(32)).map(|ev| strudel::analyze(&ev))
 }
 
 /// Critique a pattern: heuristic musical lint (clipping, silent cycles, mono
@@ -117,7 +117,7 @@ pub fn analyze_arrangement(
 /// that's validate_pattern — but whether it's likely to sound good.
 #[tauri::command]
 pub fn critique_pattern(code: String, cycles: Option<usize>) -> Result<strudel::Critique, String> {
-    strudel::critique_code(&code, cycles.unwrap_or(16))
+    strudel::Evaluated::new(&code, cycles.unwrap_or(16).max(4)).map(|ev| strudel::critique(&ev))
 }
 
 /// Critique a pattern's FORM: section-length grid, energy contrast/build,
@@ -125,7 +125,7 @@ pub fn critique_pattern(code: String, cycles: Option<usize>) -> Result<strudel::
 /// name-vs-density sanity. Reuses the `Critique` shape as `critique_pattern`.
 #[tauri::command]
 pub fn critique_form(code: String, cycles: Option<usize>) -> Result<strudel::Critique, String> {
-    strudel::critique_form_code(&code, cycles.unwrap_or(32))
+    strudel::Evaluated::new(&code, cycles.unwrap_or(32).clamp(8, 64)).map(|ev| strudel::critique_form(&ev))
 }
 
 /// Genre recipes. With no `genre`, returns every loaded recipe (for a picker);

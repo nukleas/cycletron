@@ -16,14 +16,13 @@ const LARGE: &str = include_str!("../../../ui/songs/agency/13-kill-switch.strude
 
 /// Mirror of `review_code` (src-tauri/src/agent_loop.rs) without AppState.
 fn review(code: &str, cycles: usize, known: &analysis::sounds::SoundSet) -> usize {
-    analysis::validate_code(code).unwrap();
-    let digest = analysis::inspect_code(code, cycles).unwrap();
+    let ev = analysis::Evaluated::new(code, cycles).unwrap();
     let mut findings = analysis::lint_source(code);
-    findings.extend(analysis::lint_digest(&digest, known));
-    findings.extend(analysis::critique_code(code, cycles).unwrap().findings);
+    findings.extend(analysis::lint_digest(ev.digest(), known));
+    findings.extend(analysis::critique(&ev).findings);
     if code.contains("pickRestart") || code.contains("arrange") {
-        black_box(analysis::analyze_code(code, cycles).unwrap());
-        findings.extend(analysis::critique_form_code(code, cycles).unwrap().findings);
+        black_box(analysis::analyze(&ev));
+        findings.extend(analysis::critique_form(&ev).findings);
     }
     findings.len()
 }

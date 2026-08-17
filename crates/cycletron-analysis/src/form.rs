@@ -3,7 +3,7 @@
 //! arrangement-shape problems. Shares the [`Critique`]/[`Finding`] vocabulary
 //! with the mix critique.
 
-use crate::arrangement::analyze_code;
+use crate::arrangement::analyze;
 use crate::critique::{Critique, Finding};
 use crate::inspect::*;
 
@@ -101,9 +101,10 @@ struct FormSection {
 /// (every section lasts one cycle) instead of a wall of off-grid spam.
 /// Without pickRestart, falls back to density segmentation as before.
 /// `cycles` clamps to 8..=64.
-pub fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String> {
-    let window = cycles.clamp(8, 64);
-    let d = inspect_code(code, window)?;
+pub fn critique_form(ev: &crate::Evaluated) -> Critique {
+    let code = ev.code();
+    let d = ev.digest();
+    let window = ev.window();
 
     let mut findings: Vec<Finding> = Vec::new();
     let warn = |c: &str, m: String| Finding {
@@ -151,7 +152,7 @@ pub fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String>
                     ),
                 ));
                 let ok = false;
-                return Ok(Critique { ok, findings });
+                return Critique { ok, findings };
             }
             Some(n) => {
                 labels_known = true;
@@ -200,7 +201,7 @@ pub fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String>
 
     if !labels_known {
         // Fallback: density segmentation (no pickRestart to trust).
-        let a = analyze_code(code, window)?;
+        let a = analyze(ev);
         if a.sections.len() <= 1 && a.window_cycles >= 8 {
             let span = a.period_cycles.unwrap_or(a.window_cycles);
             findings.push(note(
@@ -364,7 +365,7 @@ pub fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String>
     findings.retain(|f| seen.insert((f.code.clone(), f.message.clone())));
 
     let ok = !findings.iter().any(|f| f.severity == "warn");
-    Ok(Critique { ok, findings })
+    Critique { ok, findings }
 }
 
 /// Render a form critique as a compact human/agent-readable report.

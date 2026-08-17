@@ -103,13 +103,13 @@ enum Review {
 /// Mirror of the in-app agent's `tool_review_pattern` pipeline
 /// (src-tauri/src/agent_loop.rs), minus user sample banks.
 fn review(code: &str, cycles: usize, known: &analysis::sounds::SoundSet) -> Review {
-    if let Err(e) = analysis::validate_code(code) {
-        return Review::Invalid(e);
-    }
-    let digest = match analysis::inspect_code(code, cycles) {
-        Ok(d) => d,
-        Err(e) => return Review::Invalid(format!("did not evaluate: {e}")),
+    let has_form = code.contains("pickRestart") || code.contains("arrange");
+    let window = if has_form { cycles.clamp(8, 64) } else { cycles.clamp(4, 64) };
+    let ev = match analysis::Evaluated::new(code, window) {
+        Ok(ev) => ev,
+        Err(e) => return Review::Invalid(e),
     };
+    let digest = ev.digest();
 
     let mut out = String::from("REVIEW\n== digest ==\n");
     out.push_str(&format!(
@@ -137,36 +137,30 @@ fn review(code: &str, cycles: usize, known: &analysis::sounds::SoundSet) -> Revi
     };
 
     let mut lint = analysis::lint_source(code);
-    lint.extend(analysis::lint_digest(&digest, known));
+    lint.extend(analysis::lint_digest(digest, known));
     warns += lint.iter().filter(|f| f.severity == "warn").count();
     section("silence lint", &lint, &mut out);
 
-    if let Ok(c) = analysis::critique_code(code, cycles) {
-        warns += c.findings.iter().filter(|f| f.severity == "warn").count();
-        section("mix critique", &c.findings, &mut out);
-    }
+    let c = analysis::critique(&ev);
+    warns += c.findings.iter().filter(|f| f.severity == "warn").count();
+    section("mix critique", &c.findings, &mut out);
 
-    if code.contains("pickRestart") || code.contains("arrange") {
-        if let Ok(a) = analysis::analyze_code(code, cycles) {
-            out.push_str("== form map ==\n");
-            for s in &a.sections {
-                out.push_str(&format!(
-                    "  {:<10} cyc {:>2}–{:<3} {:>5.1} ev/cyc  {}\n",
-                    s.label,
-                    s.start_cycle,
-                    s.end_cycle,
-                    s.avg_events_per_cycle,
-                    s.instruments.join(", ")
-                ));
-            }
+    if has_form {
+        let a = analysis::analyze(&ev);
+        out.push_str("== form map ==\n");
+        for s in &a.sections {
+            out.push_str(&format!(
+                "  {:<10} cyc {:>2}–{:<3} {:>5.1} ev/cyc  {}\n",
+                s.label,
+                s.start_cycle,
+                s.end_cycle,
+                s.avg_events_per_cycle,
+                s.instruments.join(", ")
+            ));
         }
-        match analysis::critique_form_code(code, cycles) {
-            Ok(c) => {
-                warns += c.findings.iter().filter(|f| f.severity == "warn").count();
-                section("form critique", &c.findings, &mut out);
-            }
-            Err(e) => out.push_str(&format!("== form critique ==\n  (unavailable: {e})\n")),
-        }
+        let c = analysis::critique_form(&ev);
+        warns += c.findings.iter().filter(|f| f.severity == "warn").count();
+        section("form critique", &c.findings, &mut out);
     }
 
     out.push_str(&if warns == 0 {

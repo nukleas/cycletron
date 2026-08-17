@@ -25,10 +25,10 @@ pub struct Finding {
     pub message: String,
 }
 
-/// Critique a pattern: evaluate it, then run heuristic checks over the first
-/// loop (or `cycles` if it doesn't repeat). `cycles` clamps to 1..=64.
-pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
-    let d = inspect_code(code, cycles.max(4))?;
+/// Critique a pattern over its evaluated window: heuristic checks over the
+/// first loop (or the whole window if it doesn't repeat).
+pub fn critique(ev: &crate::Evaluated) -> Critique {
+    let d = ev.digest();
     let mut findings: Vec<Finding> = Vec::new();
     let warn = |c: &str, m: String| Finding {
         severity: "warn".to_string(),
@@ -50,7 +50,7 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
             "silent",
             "Pattern emits no events — nothing will sound.".to_string(),
         ));
-        return Ok(Critique { ok: false, findings });
+        return Critique { ok: false, findings };
     }
 
     // --- Silent cycles within the loop ------------------------------------
@@ -218,10 +218,10 @@ pub fn critique_code(code: &str, cycles: usize) -> Result<Critique, String> {
     // fails — a voice buried in a band another voice owns (the vocal-under-
     // strings case). Estimated symbolically from each voice's sound, register,
     // and filters; advisory notes only, so the gate still passes.
-    findings.extend(crate::spectral::spectral_findings(code, span.max(1)));
+    findings.extend(crate::spectral::spectral_findings(ev, span.max(1)));
 
     let ok = !findings.iter().any(|f| f.severity == "warn");
-    Ok(Critique { ok, findings })
+    Critique { ok, findings }
 }
 
 /// Is this sound a drum/percussion voice (a short transient, not sustained

@@ -305,16 +305,20 @@ fn classify_error(e: &str) -> &'static str {
     }
 }
 
-/// Mirror of `src-tauri/src/strudel.rs::validate_code`, plus a non-emptiness
-/// assertion: a pattern that parses but produces no events in cycle 0 is
-/// almost certainly a curation mistake.
+/// The same evaluation pipeline the in-app agent uses, plus a non-emptiness
+/// assertion: a pattern that parses but produces no events across the scan
+/// window is almost certainly a curation mistake.
 fn validate(code: &str) -> Result<(), String> {
-    if code.trim().is_empty() {
-        return Err("empty pattern".to_string());
+    // Scan a small window, not just cycle 0 — full songs legitimately open
+    // with a rest/pickup, so a strict cycle-0 check false-fails them. One
+    // evaluation serves the emptiness gate AND the silence lint below.
+    const WINDOW: usize = 8;
+    let ev = cycletron_analysis::Evaluated::new(code, WINDOW)?;
+    if !ev.has_any_haps() {
+        return Err(format!(
+            "pattern emits no events in {WINDOW} cycles — silent pattern"
+        ));
     }
-    // Structural file → standalone DSL → mini-notation (strudel-rs cascade).
-    let out = strudel_dsl::execute(code).map_err(|e| e.to_string())?;
-    require_haps(&out.pattern)?;
     // Silence lint: a pattern can parse + emit haps yet still ship a DEAD layer —
     // an unvoiced `chord(...)` (never expands to pitches) or an invented sound
     // name (falls back to sine). Gate on those two silent-bug classes (same
@@ -325,32 +329,16 @@ fn validate(code: &str) -> Result<(), String> {
             dead.push(format!("{}: {}", f.code, f.message));
         }
     }
-    if let Ok(digest) = cycletron_analysis::inspect_code(code, 4) {
-        let known = cycletron_analysis::sounds::SoundSet::builtin_only();
-        for f in cycletron_analysis::lint_digest(&digest, &known) {
-            if f.code == "unknown-sound" {
-                dead.push(format!("{}: {}", f.code, f.message));
-            }
+    let known = cycletron_analysis::sounds::SoundSet::builtin_only();
+    for f in cycletron_analysis::lint_digest(ev.digest(), &known) {
+        if f.code == "unknown-sound" {
+            dead.push(format!("{}: {}", f.code, f.message));
         }
     }
     if dead.is_empty() {
         Ok(())
     } else {
         Err(dead.join("\n"))
-    }
-}
-
-fn require_haps(pattern: &strudel_core::Pattern) -> Result<(), String> {
-    // Scan a small window, not just cycle 0 — full songs legitimately open with
-    // a rest/pickup, so a strict cycle-0 check false-fails them. A pattern silent
-    // across the whole window is a real curation bug (dead layer / typo).
-    const WINDOW: i32 = 8;
-    if pattern.query_arc(0i32, WINDOW).is_empty() {
-        Err(format!(
-            "pattern emits no events in {WINDOW} cycles — silent pattern"
-        ))
-    } else {
-        Ok(())
     }
 }
 

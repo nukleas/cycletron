@@ -230,26 +230,23 @@ fn hap_fundamental(h: &strudel_core::Hap) -> Option<f64> {
 
 /// Analyse masking + spectral balance over the loop. Returns findings to fold
 /// into the mix critique (severity "note" — advisory, never blocks the gate).
-pub fn spectral_findings(code: &str, cycles: usize) -> Vec<Finding> {
-    let Ok(out) = strudel_dsl::execute(code) else {
-        return Vec::new();
-    };
-    let cycles = cycles.clamp(1, 16) as i32;
+pub(crate) fn spectral_findings(ev: &crate::Evaluated, cycles: usize) -> Vec<Finding> {
+    let cycles = cycles.clamp(1, 16).min(ev.window());
 
     // Accumulate energy per voice identity across the loop.
     use std::collections::BTreeMap;
     let mut voices: BTreeMap<String, Voice> = BTreeMap::new();
 
-    for cyc in 0..cycles {
-        for h in out.pattern.query_arc(cyc, cyc + 1) {
+    for cycle_haps in &ev.cycle_haps()[..cycles] {
+        for h in cycle_haps {
             if !h.has_onset() {
                 continue;
             }
-            let Some(sound) = hap_sound(&h) else { continue };
-            let cutoff = getf(&h, ContextKey::Cutoff);
-            let hpf = getf(&h, ContextKey::Hpf);
-            let f0 = hap_fundamental(&h);
-            let gain = getf(&h, ContextKey::Gain).unwrap_or(1.0);
+            let Some(sound) = hap_sound(h) else { continue };
+            let cutoff = getf(h, ContextKey::Cutoff);
+            let hpf = getf(h, ContextKey::Hpf);
+            let f0 = hap_fundamental(h);
+            let gain = getf(h, ContextKey::Gain).unwrap_or(1.0);
 
             let e = event_energy(&sound, f0, cutoff, hpf);
             let g2 = gain * gain; // power
@@ -457,7 +454,7 @@ mod tests {
           note("a4 c5 e5").s("wt_trumpet").gain(0.78),
           note("<e4 g4>").s("wt_choir").lpf(4200).gain(0.5)
         )"#;
-        let fs = spectral_findings(doc, 2);
+        let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
         assert!(codes(&fs, "masking") >= 1, "expected a masking note, got: {fs:?}");
         assert!(
             fs.iter().any(|f| f.code == "masking" && f.message.contains("wt_choir")),
@@ -475,13 +472,13 @@ mod tests {
           s("hh*8").gain(0.3),
           note("a5 c6 e6 c6").s("triangle").gain(0.4)
         )"#;
-        let fs = spectral_findings(doc, 2);
+        let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
         assert_eq!(codes(&fs, "masking"), 0, "clean mix should not flag masking: {fs:?}");
     }
 
     #[test]
     fn single_voice_has_no_masking() {
-        let fs = spectral_findings(r#"s("bd*4").gain(0.9)"#, 2);
+        let fs = spectral_findings(&crate::Evaluated::new(r#"s("bd*4").gain(0.9)"#, 2).unwrap(), 2);
         assert_eq!(codes(&fs, "masking"), 0);
     }
 
@@ -493,7 +490,7 @@ mod tests {
           note("c2 eb2 g2").s("sawtooth").lpf(500).gain(0.7),
           note("<[c3,eb3,g3]>").s("wt_pad").lpf(600).gain(0.6)
         )"#;
-        let fs = spectral_findings(doc, 2);
+        let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
         assert_eq!(codes(&fs, "dull"), 1, "dark hat-less mix should be dull: {fs:?}");
     }
 
@@ -505,7 +502,7 @@ mod tests {
           note("c2 eb2 g2").s("sawtooth").lpf(500).gain(0.7),
           s("hh*8").gain(0.3)
         )"#;
-        let fs = spectral_findings(doc, 2);
+        let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
         assert_eq!(codes(&fs, "dull"), 0, "a mix with hats has air, not dull: {fs:?}");
     }
 }
