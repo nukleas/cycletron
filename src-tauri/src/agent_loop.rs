@@ -1917,7 +1917,7 @@ $: lead.slow(2)
 mod recovery_tests {
     use super::*;
 
-    fn defs() -> Vec<ToolDefinition> {
+    fn defs() -> &'static [ToolDefinition] {
         cycletron_agent::tools::music_tool_definitions()
     }
 

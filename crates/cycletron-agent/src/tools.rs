@@ -1,8 +1,16 @@
 use crate::types::ToolDefinition;
 use serde_json::json;
+use std::sync::LazyLock;
 
-/// Create the standard tool definitions for the music composition agent.
-pub fn music_tool_definitions() -> Vec<ToolDefinition> {
+/// The standard tool definitions for the music composition agent. Built once —
+/// 32 definitions with `json!` schemas are hundreds of allocations, and the
+/// agent loop needs them on every run.
+pub fn music_tool_definitions() -> &'static [ToolDefinition] {
+    static DEFS: LazyLock<Vec<ToolDefinition>> = LazyLock::new(build_tool_definitions);
+    &DEFS
+}
+
+fn build_tool_definitions() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
             name: "search_corpus".to_string(),
