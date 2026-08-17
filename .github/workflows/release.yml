@@ -53,7 +53,7 @@ jobs:
             args: '--bundles nsis'
             rust-targets: ''
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Node 22
         uses: actions/setup-node@v4

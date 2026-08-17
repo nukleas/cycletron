@@ -25,7 +25,7 @@ jobs:
       run:
         working-directory: ui
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -44,7 +44,7 @@ jobs:
     steps:
       # strudel-rs is a pinned git dependency (Codeberg, public), fetched by
       # cargo — no sibling checkout needed.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The self-hosted runner image is bare; the cargo workspace includes the
       # Tauri app (src-tauri), so its native deps must be present. Harmless on
@@ -89,7 +89,7 @@ jobs:
     name: Gate A file checklist
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Required release files
         run: |
           test -f LICENSE
