@@ -8,8 +8,8 @@
 # pkgver 0.1.0alpha.N; _tag keeps the real tag for the download URL.
 
 pkgname=cycletron-bin
-_tag=0.1.0-alpha.12
-pkgver=0.1.0alpha.12
+_tag=0.1.0-alpha.13
+pkgver=0.1.0alpha.13
 pkgrel=1
 pkgdesc="Live coding for music, built on Rust — fast native desktop instrument"
 arch=('x86_64')
@@ -20,7 +20,7 @@ provides=('cycletron')
 conflicts=('cycletron')
 options=('!strip')
 source=("https://github.com/nukleas/cycletron/releases/download/v${_tag}/Cycletron_${_tag}_amd64.deb")
-sha256sums=('9f54f4013f0a26c8cded0596643c2af6030d336601a9c64491eb0ba1ace9be6d')
+sha256sums=('ffacf7df15788231550d03a4ab83bcfdfb475b9dc53bb63a5ef0a9d54bfeadca')
 
 package() {
     bsdtar -xf data.tar.gz -C "$pkgdir"
