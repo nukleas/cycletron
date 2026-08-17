@@ -279,10 +279,10 @@ fn resolve_patterns(code: &str, want_stems: bool) -> Result<NamedPatterns, Strin
         && !file.is_empty()
     {
         let mut tempo: Option<Tempo> = None;
-        for directive in &file.directives {
-            match directive {
-                Directive::SetCpm(cpm) => tempo = Some(Tempo::from_cpm(*cpm)),
-                Directive::SetBpm(bpm) => tempo = Some(Tempo::from_bpm(*bpm)),
+        for directive in file.directives.iter() {
+            match *directive {
+                Directive::SetCpm(cpm) => tempo = Some(Tempo::from_cpm(cpm)),
+                Directive::SetBpm(bpm) => tempo = Some(Tempo::from_bpm(bpm)),
             }
         }
 

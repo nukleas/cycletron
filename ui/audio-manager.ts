@@ -18,7 +18,7 @@ const ALLOC_LOG_CAPACITY = 64;
 
 const MAX_NAME_LEN = 32;
 const MAX_STAGING_BATCH = 32;
-const STAGING_STRIDE = 13;
+const STAGING_STRIDE = 12;
 
 export interface DecodedSample {
     name: string;
@@ -552,39 +552,45 @@ export class StrudelAudioManager {
                 u8[bankLenIdx] = writeStringToShared(name, u8, bankNameBufIdx, MAX_NAME_LEN - 1);
                 const bankIdx = processor.registerBankNameFromBuffer();
 
-                // Left channel - absolute byte ptr = cursor * 4.
+                const numChannels = audioBuffer.numberOfChannels;
+                const frameCount = audioBuffer.length;
+                const itemTotalLen = frameCount * numChannels;
+
                 const leftSlice = audioBuffer.getChannelData(0);
-                const leftPtr = cursor * 4;
-                f32.set(leftSlice, cursor);
-                cursor += leftSlice.length;
 
-                // Right channel (defaults to 0 for mono)
-                let rightPtr = 0;
-                let rightLen = 0;
-
-                if (audioBuffer.numberOfChannels > 1) {
+                // channel - absolute byte ptr = cursor * 4.
+                const itemPtr = cursor * 4;
+                if (numChannels === 1) {
+                    // Mono: Bulk copy the slice directly
+                    f32.set(leftSlice, cursor);
+                    cursor += frameCount;
+                } else {
+                    // Stereo (or more): Interleave the channels manually
                     const rightSlice = audioBuffer.getChannelData(1);
-                    rightLen = rightSlice.length;
-                    rightPtr = cursor * 4;
-                    f32.set(rightSlice, cursor);
-                    cursor += rightLen;
+
+                    let c = cursor;
+                    for (let f = 0; f < frameCount; f++) {
+                        f32[c++] = leftSlice[f];
+                        f32[c++] = rightSlice[f];
+                    }
+                    cursor = c;
                 }
 
+                // Write directly into the cached staging view
                 const off = base + (batchIdx * STAGING_STRIDE);
 
-                u32[off] = leftPtr;
-                u32[off + 1] = leftSlice.length;
-                u32[off + 2] = rightPtr;
-                u32[off + 3] = rightLen;
-                f32[off + 4] = audioBuffer.sampleRate;
-                u32[off + 5] = bankIdx;
-                u32[off + 6] = sampleIdx;
-                u32[off + 7] = midiNote;
-                u32[off + 8] = loopStart;
-                u32[off + 9] = loopEnd;
-                u32[off + 10] = keyRangeLow <= 127 ? keyRangeLow : 255;
-                u32[off + 11] = keyRangeHigh <= 127 ? keyRangeHigh : 255;
-                f32[off + 12] = baseDetuneCents;
+                u32[off] = itemPtr;
+                u32[off + 1] = itemTotalLen;
+                u32[off + 2] = numChannels;
+                f32[off + 3] = audioBuffer.sampleRate;
+                u32[off + 4] = bankIdx;
+                u32[off + 5] = sampleIdx;
+                u32[off + 6] = midiNote;
+                u32[off + 7] = loopStart;
+                u32[off + 8] = loopEnd;
+                u32[off + 9] = keyRangeLow <= 127 ? keyRangeLow : 255;
+                u32[off + 10] = keyRangeHigh <= 127 ? keyRangeHigh : 255;
+                f32[off + 11] = baseDetuneCents;
 
                 items[i].audioBuffer = null!;
             }

@@ -3175,7 +3175,7 @@ dependencies = [
 [[package]]
 name = "midi-to-strudel"
 version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 dependencies = [
  "anyhow",
  "clap",
@@ -4290,9 +4290,9 @@ dependencies = [
 
 [[package]]
 name = "quinn-proto"
-version = "0.11.16"
+version = "0.11.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f4bfc015262b9df63c8845072ce59068853ff5872180c2ce2f13038b970e560"
+checksum = "04759210543be93709136e28212294a659ef5001836ff4eab4d663e4529bba83"
 dependencies = [
  "aws-lc-rs",
  "bytes",
@@ -5296,7 +5296,7 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 [[package]]
 name = "strudel-audio"
 version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 dependencies = [
  "cpal",
  "parking_lot",
@@ -5314,10 +5314,9 @@ dependencies = [
 [[package]]
 name = "strudel-core"
 version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 dependencies = [
  "hashbrown 0.17.1",
- "rand 0.10.2",
  "rustc-hash",
  "serde",
  "strudel-internal",
@@ -5328,7 +5327,7 @@ dependencies = [
 [[package]]
 name = "strudel-dsl"
 version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 dependencies = [
  "anyhow",
  "clap",
@@ -5349,7 +5348,7 @@ dependencies = [
 [[package]]
 name = "strudel-dsp"
 version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 dependencies = [
  "rand 0.10.2",
  "strudel-internal",
@@ -5358,12 +5357,12 @@ dependencies = [
 [[package]]
 name = "strudel-internal"
 version = "0.0.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 
 [[package]]
 name = "strudel-macros"
 version = "0.0.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 dependencies = [
  "cargo_metadata 0.23.1",
  "convert_case",
@@ -5376,7 +5375,7 @@ dependencies = [
 [[package]]
 name = "strudel-mini"
 version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 dependencies = [
  "anyhow",
  "clap",
@@ -5385,6 +5384,7 @@ dependencies = [
  "serde_json",
  "strudel-core",
  "strudel-internal",
+ "strudel-macros",
  "strudel-music-theory",
  "thiserror 2.0.20",
 ]
@@ -5392,7 +5392,7 @@ dependencies = [
 [[package]]
 name = "strudel-music-theory"
 version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 dependencies = [
  "serde",
  "strudel-internal",
@@ -5411,7 +5411,7 @@ dependencies = [
 [[package]]
 name = "strudel-soundfont"
 version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 dependencies = [
  "base64-turbo",
  "log",
@@ -5420,6 +5420,7 @@ dependencies = [
  "rayon",
  "rustc-hash",
  "strudel-internal",
+ "strudel-macros",
  "strudel-music-theory",
  "symphonia",
  "thiserror 2.0.20",
@@ -5429,7 +5430,7 @@ dependencies = [
 [[package]]
 name = "strudel-sounds"
 version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=770b63a7d1de474c312460ec365134f82df675ff#770b63a7d1de474c312460ec365134f82df675ff"
+source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a#559c9ff5c2d38861f53e2e5cba9e35d76ccbaa8a"
 dependencies = [
  "anyhow",
  "dirs",
