@@ -1,5 +1,4 @@
 // Chicago / deep house · A minor · 124 BPM
-// hats → groove → lift → fill  (4 cycles each)
 setbpm(124);
 
 "<hats groove@2 lift@2 fill>".slow(4).pickRestart({
