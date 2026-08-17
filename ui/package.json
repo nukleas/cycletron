@@ -34,7 +34,7 @@
   "devDependencies": {
     "typescript": "^5.9.3",
     "unplugin-inline-enum": "^0.6.4",
-    "vite": "^6.4.1",
+    "vite": "^8.2.1",
     "vite-plugin-tsc": "^0.1.1"
   }
 }
