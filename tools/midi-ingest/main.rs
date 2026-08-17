@@ -18,7 +18,7 @@
 //! --limit 0 (no cap).
 
 use cycletron_midi::index::{Entry, Index};
-use cycletron_midi::{ImportOptions, convert_bytes};
+use cycletron_midi::{CleanupOptions, ImportOptions, convert_bytes};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -28,6 +28,8 @@ struct Args {
     out: PathBuf,
     limit: usize,
     bars: usize,
+    /// When true (default), apply conservative in-memory note cleanup.
+    cleanup: bool,
 }
 
 fn main() -> ExitCode {
@@ -36,7 +38,7 @@ fn main() -> ExitCode {
         Err(e) => {
             eprintln!("midi-ingest: {e}");
             eprintln!(
-                "usage: midi-ingest <midi-dir> [--genre <tag>] [--out <dir>] [--limit <n>] [--bars <n>]"
+                "usage: midi-ingest <midi-dir> [--genre <tag>] [--out <dir>] [--limit <n>] [--bars <n>] [--no-cleanup]"
             );
             return ExitCode::from(2);
         }
@@ -87,9 +89,13 @@ fn main() -> ExitCode {
 
         match std::fs::read(path)
             .map_err(|e| e.to_string())
-            .and_then(|d| convert(&d, args.bars).map_err(|e| e.to_string()))
+            .and_then(|d| convert(&d, args.bars, args.cleanup).map_err(|e| e.to_string()))
         {
-            Ok((code, b)) => {
+            Ok((raw_code, b)) => {
+                // Catalog-gated alias remaps + mechanical repairs so ingested
+                // snippets use sounds the engine can actually play.
+                let known = cycletron_analysis::sounds::SoundSet::builtin_only();
+                let code = cycletron_analysis::sanitize_source_with_catalog(&raw_code, &known).code;
                 bpm = b;
                 code_len = code.len();
                 match validate(&code, args.bars.max(4)) {
@@ -174,12 +180,15 @@ fn main() -> ExitCode {
 /// Ingest conversion: the app's `convert_bytes` with auto-resolution, a bar
 /// cap, and a 16-notes/bar fallback (denser default than the app's 64 — short
 /// idiom-sized snippets, not full songs).
-fn convert(data: &[u8], bar_limit: usize) -> anyhow::Result<(String, f64)> {
-    let opts = ImportOptions {
+fn convert(data: &[u8], bar_limit: usize, cleanup: bool) -> anyhow::Result<(String, f64)> {
+    let mut opts = ImportOptions {
         bar_limit,
         notes_per_bar: 16,
         ..ImportOptions::default()
     };
+    if !cleanup {
+        opts.cleanup = CleanupOptions::off();
+    }
     let result = convert_bytes(data, &opts)?;
     Ok((result.code, result.bpm))
 }
@@ -230,6 +239,7 @@ fn parse_args() -> Result<Args, String> {
     let mut out = PathBuf::from("corpus/ingested");
     let mut limit = 0usize;
     let mut bars = 4usize;
+    let mut cleanup = true;
 
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -250,6 +260,7 @@ fn parse_args() -> Result<Args, String> {
                     .parse()
                     .map_err(|_| "--bars must be a number")?
             }
+            "--no-cleanup" => cleanup = false,
             other if other.starts_with("--") => return Err(format!("unknown flag {other}")),
             other => {
                 if dir.is_some() {
@@ -265,5 +276,6 @@ fn parse_args() -> Result<Args, String> {
         out,
         limit,
         bars: bars.max(1),
+        cleanup,
     })
 }

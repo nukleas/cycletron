@@ -35,10 +35,19 @@ export interface SessionSnapshot {
     saved_at: string;
 }
 
+export interface CleanupReport {
+    notes_before: number;
+    notes_after: number;
+    removed_short: number;
+    removed_duplicates: number;
+    velocity_adjusted: number;
+}
+
 export interface MidiImport {
     code: string;
     bpm: number;
     source_path: string;
+    cleanup: CleanupReport;
 }
 
 export interface MidiTrackInfo {
@@ -48,12 +57,22 @@ export interface MidiTrackInfo {
     name: string | null;
     note_count: number;
     is_drum: boolean;
+    pitch_min: number | null;
+    pitch_max: number | null;
 }
 
 export interface MidiMetadata {
     bpm: number;
     cycle_len: number;
     tracks: MidiTrackInfo[];
+    duration_secs: number;
+    note_count: number;
+    pitch_min: number | null;
+    pitch_max: number | null;
+    pitch_range_label: string;
+    max_polyphony: number;
+    channel_count: number;
+    programs: number[];
 }
 
 export interface AppInfo {
@@ -190,4 +209,10 @@ export interface ImportMidiOptions {
     instrumentMode?: 'hybrid' | 'waveforms' | 'gm' | 'auto';
     drumBank?: 'simple' | '808' | '909' | '707' | 'linn' | 'dmx' | 'auto';
     includedChannels?: number[];
+    /** Master cleanup switch. false disables all cleanup knobs. Default true. */
+    cleanup?: boolean;
+    /** Drop notes shorter than 1/N of a quarter. 0 = off. */
+    shortNoteDivisor?: number;
+    removeDuplicates?: boolean;
+    velocityMode?: 'off' | 'moderate' | 'strong';
 }

@@ -369,6 +369,8 @@ pub struct MidiImport {
     pub code: String,
     pub bpm: f64,
     pub source_path: String,
+    /// In-memory cleanup stats (source file is never rewritten).
+    pub cleanup: midi::CleanupReport,
 }
 
 /// Frontend-supplied MIDI conversion options. All fields optional; missing
@@ -387,6 +389,14 @@ pub struct ImportMidiOptions {
     pub instrument_mode: Option<String>,
     pub drum_bank: Option<String>,
     pub included_channels: Option<Vec<u8>>,
+    /// Master switch for pre-conversion cleanup. When `Some(false)`, all
+    /// cleanup is disabled regardless of the per-knob fields below.
+    pub cleanup: Option<bool>,
+    /// Drop notes shorter than 1/N of a quarter. 0 = off. Typical 16/32/64.
+    pub short_note_divisor: Option<u32>,
+    pub remove_duplicates: Option<bool>,
+    /// `"off" | "moderate" | "strong"`.
+    pub velocity_mode: Option<String>,
 }
 
 fn build_import_options(input: Option<ImportMidiOptions>) -> Result<midi::ImportOptions, String> {
@@ -429,6 +439,23 @@ fn build_import_options(input: Option<ImportMidiOptions>) -> Result<midi::Import
     if let Some(chs) = input.included_channels {
         opts.included_channels = Some(chs);
     }
+
+    // Cleanup knobs. Master `cleanup: false` forces everything off; otherwise
+    // individual fields override the conservative defaults.
+    if input.cleanup == Some(false) {
+        opts.cleanup = midi::CleanupOptions::off();
+    } else {
+        if let Some(n) = input.short_note_divisor {
+            opts.cleanup.short_note_divisor = n;
+        }
+        if let Some(b) = input.remove_duplicates {
+            opts.cleanup.remove_duplicates = b;
+        }
+        if let Some(s) = input.velocity_mode.as_deref() {
+            opts.cleanup.velocity_mode = midi::VelocityMode::parse(s)
+                .ok_or_else(|| format!("unknown velocity_mode: {s}"))?;
+        }
+    }
     Ok(opts)
 }
 
@@ -444,6 +471,7 @@ pub fn import_midi(path: String, options: Option<ImportMidiOptions>) -> Result<M
         code: result.code,
         bpm: result.bpm,
         source_path: pb.to_string_lossy().into_owned(),
+        cleanup: result.cleanup,
     })
 }
 

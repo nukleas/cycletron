@@ -35,6 +35,7 @@ export class MidiLab {
     private previewHint: HTMLElement | null = null;
     private fileNameEl: HTMLElement | null = null;
     private metaEl: HTMLElement | null = null;
+    private analysisEl: HTMLElement | null = null;
 
     private currentPath: string | null = null;
     private meta: MidiMetadata | null = null;
@@ -51,6 +52,7 @@ export class MidiLab {
         this.previewHint = document.getElementById('midiLabPreviewHint');
         this.fileNameEl = document.getElementById('midiLabFileName');
         this.metaEl = document.getElementById('midiLabMeta');
+        this.analysisEl = document.getElementById('midiLabAnalysis');
         if (!this.root) return;
 
         const $ = (id: string) => document.getElementById(id);
@@ -67,8 +69,21 @@ export class MidiLab {
             if (notesPerBar) notesPerBar.disabled = !!autoRes.checked;
         });
 
+        const cleanupMaster = $('midiLabCleanup') as HTMLInputElement | null;
+        cleanupMaster?.addEventListener('change', () => this.syncCleanupControls());
+        this.syncCleanupControls();
+
         this.inited = true;
         this.updateButtonState();
+    }
+
+    /** Enable/disable per-knob cleanup fields from the master checkbox. */
+    private syncCleanupControls(): void {
+        const on = !!(document.getElementById('midiLabCleanup') as HTMLInputElement | null)?.checked;
+        for (const id of ['midiLabShortNotes', 'midiLabRemoveDups', 'midiLabVelocity']) {
+            const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+            if (el) el.disabled = !on;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -111,6 +126,7 @@ export class MidiLab {
         this.excluded.clear();
         if (this.fileNameEl) this.fileNameEl.textContent = 'no file';
         if (this.metaEl) this.metaEl.textContent = '';
+        this.clearAnalysis();
         if (this.trackListEl) {
             this.trackListEl.innerHTML = '<div class="midi-lab-track-empty">Select a .mid file to inspect tracks.</div>';
         }
@@ -152,6 +168,7 @@ export class MidiLab {
         } catch (e: any) {
             this.meta = null;
             if (this.metaEl) this.metaEl.textContent = 'inspect failed';
+            this.clearAnalysis();
             if (this.trackListEl) {
                 this.trackListEl.innerHTML = `<div class="midi-lab-track-empty">Could not inspect:<br>${escapeHtml(String(e))}</div>`;
             }
@@ -164,6 +181,34 @@ export class MidiLab {
         const bpm = Math.round(this.meta.bpm);
         const tracks = this.meta.tracks.length;
         this.metaEl.textContent = `bpm ${bpm} · tracks ${tracks}`;
+        this.renderAnalysis();
+    }
+
+    private clearAnalysis(): void {
+        if (this.analysisEl) this.analysisEl.hidden = true;
+        for (const id of ['midiLabDur', 'midiLabNotes', 'midiLabPitch', 'midiLabPoly', 'midiLabChans', 'midiLabProgs']) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '—';
+        }
+    }
+
+    private renderAnalysis(): void {
+        if (!this.analysisEl || !this.meta) {
+            this.clearAnalysis();
+            return;
+        }
+        this.analysisEl.hidden = false;
+        const m = this.meta;
+        const set = (id: string, text: string) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+        set('midiLabDur', formatDuration(m.duration_secs));
+        set('midiLabNotes', String(m.note_count));
+        set('midiLabPitch', m.pitch_range_label || '—');
+        set('midiLabPoly', m.max_polyphony > 0 ? `${m.max_polyphony} max` : '—');
+        set('midiLabChans', String(m.channel_count));
+        set('midiLabProgs', m.programs.length ? m.programs.map(p => gmLabel(p)).join(', ') : '—');
     }
 
     private renderTracks(): void {
@@ -202,7 +247,7 @@ export class MidiLab {
         const name = document.createElement('span');
         name.className = 'midi-lab-track-name';
         const label = track.name?.trim() ||
-            (track.is_drum ? 'drum kit' : track.program != null ? `program ${track.program}` : 'track');
+            (track.is_drum ? 'drum kit' : track.program != null ? gmLabel(track.program) : 'track');
         name.textContent = label;
         if (track.is_drum) {
             const drum = document.createElement('span');
@@ -214,7 +259,11 @@ export class MidiLab {
 
         const count = document.createElement('span');
         count.className = 'midi-lab-track-count';
-        count.textContent = `${track.note_count}n`;
+        const pitch =
+            track.pitch_min != null && track.pitch_max != null
+                ? ` · ${midiLabel(track.pitch_min)}–${midiLabel(track.pitch_max)}`
+                : '';
+        count.textContent = `${track.note_count}n${pitch}`;
         row.appendChild(count);
 
         return row;
@@ -233,6 +282,7 @@ export class MidiLab {
             const v = parseInt(el.value, 10);
             return Number.isFinite(v) ? v : undefined;
         };
+        const cleanupOn = chk('midiLabCleanup') ?? true;
         const opts: ImportMidiOptions = {
             drumBank: (sel('midiLabDrumBank') as ImportMidiOptions['drumBank']) ?? undefined,
             instrumentMode: (sel('midiLabInstrument') as ImportMidiOptions['instrumentMode']) ?? undefined,
@@ -243,7 +293,14 @@ export class MidiLab {
             compose: chk('midiLabCompose'),
             sectionNaming: (sel('midiLabSectionNaming') as ImportMidiOptions['sectionNaming']) ?? undefined,
             detectDrumNames: chk('midiLabDetectDrums'),
+            cleanup: cleanupOn,
         };
+        if (cleanupOn) {
+            const short = num('midiLabShortNotes');
+            if (short !== undefined) opts.shortNoteDivisor = short;
+            opts.removeDuplicates = chk('midiLabRemoveDups');
+            opts.velocityMode = (sel('midiLabVelocity') as ImportMidiOptions['velocityMode']) ?? undefined;
+        }
         // Build included channels from the meta + excluded set.
         if (this.meta && this.excluded.size > 0) {
             opts.includedChannels = this.meta.tracks
@@ -265,7 +322,13 @@ export class MidiLab {
             });
             if (this.previewEl) this.previewEl.textContent = result.code;
             if (this.previewHint) {
-                this.previewHint.textContent = `${Math.round(result.bpm)} bpm · ${result.code.split('\n').length} lines`;
+                const lines = result.code.split('\n').length;
+                const cleaned = result.cleanup?.notes_before
+                    ? result.cleanup.notes_before - result.cleanup.notes_after
+                    : 0;
+                const cleanHint = cleaned > 0 ? ` · cleaned ${cleaned} notes` : '';
+                this.previewHint.textContent =
+                    `${Math.round(result.bpm)} bpm · ${lines} lines${cleanHint}`;
             }
         } catch (e: any) {
             if (this.previewEl) this.previewEl.textContent = '';
@@ -321,6 +384,39 @@ function deriveFileName(path: string): string {
     const stem = basename(path).replace(/\.(mid|midi)$/i, '');
     return `${stem}.strudel`;
 }
+
+function formatDuration(secs: number): string {
+    if (!Number.isFinite(secs) || secs <= 0) return '—';
+    if (secs < 60) return `${secs.toFixed(1)}s`;
+    const m = Math.floor(secs / 60);
+    const s = Math.round(secs % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+function midiLabel(midi: number): string {
+    const n = Math.max(0, Math.min(127, Math.round(midi)));
+    return `${NOTE_NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
+}
+
+/** Short GM program label (program is 0-based). */
+function gmLabel(program: number): string {
+    const name = GM_SHORT[program];
+    return name ? `${program} ${name}` : `prog ${program}`;
+}
+
+// Abbreviated GM names for the analysis strip — not a full soundfont map.
+const GM_SHORT: Record<number, string> = {
+    0: 'Piano', 1: 'BrtPiano', 4: 'E.Piano', 5: 'E.Piano2',
+    16: 'Organ', 24: 'NylonGtr', 25: 'SteelGtr', 26: 'JazzGtr',
+    27: 'CleanGtr', 29: 'Overdrive', 30: 'DistGtr',
+    32: 'AcBass', 33: 'FingerBass', 34: 'PickBass', 38: 'SynthBass',
+    40: 'Violin', 42: 'Cello', 48: 'Strings', 52: 'Choir',
+    56: 'Trumpet', 61: 'Brass', 65: 'AltoSax', 66: 'TenorSax',
+    73: 'Flute', 80: 'SquareLead', 81: 'SawLead', 88: 'NewAgePad',
+    89: 'WarmPad',
+};
 
 export const midiLab = new MidiLab();
 window.midiLab = midiLab;
