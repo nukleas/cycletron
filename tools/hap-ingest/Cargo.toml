@@ -1,0 +1,20 @@
+[package]
+name = "hap-ingest"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "hap-ingest"
+path = "main.rs"
+
+[dependencies]
+cycletron-gen = { workspace = true }
+strudel-dsl = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }

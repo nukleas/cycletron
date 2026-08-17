@@ -4,6 +4,14 @@
 
 use std::path::Path;
 
+/// `_`-prefixed path components mark staging/scratch areas (`corpus/_examples`,
+/// `genres/_drafts`) that hold unpicked candidates: no loader, gate, or demo
+/// seeding should pick them up. `rel` must be relative to the corpus root.
+pub fn is_underscore_hidden(rel: &Path) -> bool {
+    rel.components()
+        .any(|c| c.as_os_str().to_string_lossy().starts_with('_'))
+}
+
 /// Markdown files that document a directory rather than being recipes
 /// (`README.md`, `_template.md`, …).
 pub fn is_doc_file(path: &Path) -> bool {
@@ -16,6 +24,15 @@ pub fn is_doc_file(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn underscore_components_hide() {
+        assert!(is_underscore_hidden(Path::new("_examples/x.strudel")));
+        assert!(is_underscore_hidden(Path::new("genres/_drafts/x.strudel")));
+        assert!(!is_underscore_hidden(Path::new(
+            "rhythm/four_floor.strudel"
+        )));
+    }
 
     #[test]
     fn doc_files_detected() {

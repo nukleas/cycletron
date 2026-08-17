@@ -1,0 +1,9 @@
+{
+  "name": "@kabelsalat/web",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "kabelsalat-web.mjs",
+  "exports": {
+    ".": "./kabelsalat-web.mjs"
+  }
+}
