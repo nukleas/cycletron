@@ -112,6 +112,19 @@ pub fn analyze_arrangement(
     strudel::Evaluated::new(&code, max_cycles.unwrap_or(32)).map(|ev| strudel::analyze(&ev))
 }
 
+/// Detect one-playthrough length for offline export (WAV/MIDI).
+///
+/// Unlike `analyze_arrangement` (short loop window for the agent), this scans
+/// far enough to resolve full MIDI dumps and `pickRestart` forms. Returns
+/// `None` fields when no clean length is found.
+#[tauri::command]
+pub fn detect_pattern_length(
+    code: String,
+    max_cycles: Option<usize>,
+) -> Result<Option<strudel::PatternLength>, String> {
+    strudel::detect_pattern_length(&code, max_cycles.unwrap_or(1024))
+}
+
 /// Critique a pattern: heuristic musical lint (clipping, silent cycles, mono
 /// image, semitone clashes, missing low end, static pitch). Not correctness —
 /// that's validate_pattern — but whether it's likely to sound good.

@@ -263,6 +263,7 @@ pub fn run() {
             commands::updater_install_kind,
             commands::inspect_pattern,
             commands::analyze_arrangement,
+            commands::detect_pattern_length,
             commands::critique_pattern,
             commands::critique_form,
             commands::genre_recipe,

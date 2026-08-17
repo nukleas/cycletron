@@ -422,14 +422,15 @@ interface ExportMidiOptions {
     cycles: number;
 }
 
-/** Detected natural loop length of a pattern, via the `analyze_arrangement`
- * command (the same loop-period estimator the agent uses). Both fields null
- * when the pattern doesn't repeat within the scan window (evolving/long form). */
+/** Detected one-playthrough length of a pattern for offline export. Both
+ * fields null when no clean length can be calculated. */
 interface DetectedLength {
-    /** Loop length in cycles (= bars, 1 cycle = 1 bar). */
+    /** Length in cycles (= bars, 1 cycle = 1 bar at the usual 4/4 mapping). */
     bars: number | null;
-    /** Loop duration in seconds. */
+    /** Duration in seconds when tempo is known from the code. */
     seconds: number | null;
+    /** How length was derived (for the auto-label). */
+    kind: 'pickrestart' | 'loop' | 'content_end' | null;
 }
 
 /** `mm:ss` from seconds. */
@@ -438,9 +439,27 @@ function fmtMinSec(seconds: number): string {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-/** Ask the backend for the pattern's natural loop length. Never throws —
- * returns nulls on any failure so export falls back to the manual default. */
+/** Ask the backend for the pattern's natural export length. Prefers the
+ * dedicated long-form detector (MIDI dumps, pickRestart forms); falls back to
+ * short-window arrangement analysis. Never throws. */
 async function detectLength(code: string): Promise<DetectedLength> {
+    try {
+        const len = await invoke<{
+            cycles: number;
+            seconds: number | null;
+            kind: 'pick_restart' | 'loop' | 'content_end';
+        } | null>('detect_pattern_length', {code, maxCycles: 1024});
+        if (len && len.cycles > 0) {
+            const kind =
+                len.kind === 'pick_restart' ? 'pickrestart'
+                : len.kind === 'content_end' ? 'content_end'
+                : 'loop';
+            return {bars: len.cycles, seconds: len.seconds ?? null, kind};
+        }
+    } catch (e) {
+        console.warn('[file-manager] detect_pattern_length failed:', e);
+    }
+    // Fallback: short arrangement scan (agent loop-period estimator).
     try {
         const a = await invoke<{
             period_cycles: number | null;
@@ -448,12 +467,12 @@ async function detectLength(code: string): Promise<DetectedLength> {
             repeats: boolean;
         }>('analyze_arrangement', {code, maxCycles: 128});
         if (a.repeats && a.period_cycles && a.period_cycles > 0) {
-            return {bars: a.period_cycles, seconds: a.total_seconds ?? null};
+            return {bars: a.period_cycles, seconds: a.total_seconds ?? null, kind: 'loop'};
         }
     } catch (e) {
         console.warn('[file-manager] length detection failed:', e);
     }
-    return {bars: null, seconds: null};
+    return {bars: null, seconds: null, kind: null};
 }
 
 /**
@@ -474,9 +493,14 @@ async function promptExportAudioOptions(
         const autoAvail = detected.bars != null;
         const autoBars = detected.bars ?? DEFAULT_EXPORT_BARS;
         const autoSecs = detected.seconds ?? (autoBars * 4 * 60) / bpm;
+        const kindHint =
+            detected.kind === 'pickrestart' ? 'form'
+            : detected.kind === 'content_end' ? 'to end'
+            : detected.kind === 'loop' ? 'loop'
+            : '';
         const autoLabel = autoAvail
-            ? `Full loop — ${autoBars} bars ≈ ${fmtMinSec(autoSecs)}`
-            : 'Full loop (no clean loop detected)';
+            ? `Full ${kindHint || 'length'} — ${autoBars} bars ≈ ${fmtMinSec(autoSecs)}`
+            : 'Full length (could not detect)';
         const initialBars = autoAvail ? autoBars : DEFAULT_EXPORT_BARS;
         overlay.innerHTML = `
             <div class="picker-modal export-modal">
@@ -604,9 +628,14 @@ async function promptExportMidiOptions(
         const autoAvail = detected.bars != null;
         const autoCycles = detected.bars ?? DEFAULT_MIDI_CYCLES;
         const autoSecs = detected.seconds ?? (autoCycles * 4 * 60) / bpm;
+        const kindHint =
+            detected.kind === 'pickrestart' ? 'form'
+            : detected.kind === 'content_end' ? 'to end'
+            : detected.kind === 'loop' ? 'loop'
+            : '';
         const autoLabel = autoAvail
-            ? `Full loop — ${autoCycles} cycles ≈ ${fmtMinSec(autoSecs)}`
-            : 'Full loop (no clean loop detected)';
+            ? `Full ${kindHint || 'length'} — ${autoCycles} cycles ≈ ${fmtMinSec(autoSecs)}`
+            : 'Full length (could not detect)';
         overlay.innerHTML = `
             <div class="picker-modal export-modal">
                 <div class="picker-header">
