@@ -6,7 +6,7 @@ use crate::logs::{self, LogEntry};
 use crate::settings::UserSettings;
 use crate::snapshots::{self, Snapshot};
 use crate::state::AppState;
-use crate::strudel;
+use cycletron_analysis as strudel;
 use midi_to_strudel::{InstrumentMode, SectionNamingStrategy, drums::DrumBank};
 use serde::Deserialize;
 use std::path::PathBuf;

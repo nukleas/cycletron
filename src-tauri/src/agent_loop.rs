@@ -1,11 +1,8 @@
 use crate::state::AppState;
-use crate::strudel;
 use cycletron_agent::LlmProvider;
 use cycletron_agent::types::*;
-use cycletron_core::traits::CorpusIndex;
-use cycletron_core::types::{
-    ChatMessage, ChatRole, CorpusQuery, MusicalRole, PlaybackState, ToolTrace,
-};
+use cycletron_analysis as strudel;
+use cycletron_core::types::{ChatMessage, ChatRole, CorpusQuery, PlaybackState, ToolTrace};
 use std::sync::LazyLock;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
@@ -277,9 +274,6 @@ fn tool_search_corpus(input: &serde_json::Value, state: &AppState) -> Result<Str
                     .collect()
             })
             .unwrap_or_default(),
-        role: input["role"].as_str().and_then(|r| {
-            serde_json::from_value::<MusicalRole>(serde_json::Value::String(r.to_string())).ok()
-        }),
         tempo_min: input["tempo_min"].as_f64(),
         tempo_max: input["tempo_max"].as_f64(),
         complexity: input["complexity"].as_str().map(String::from),

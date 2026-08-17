@@ -1,4 +1,4 @@
-use cycletron_core::types::{CorpusEntry, CorpusPart, MusicalRole};
+use cycletron_core::types::CorpusEntry;
 use serde::Deserialize;
 use std::io::BufRead;
 use std::path::Path;
@@ -114,90 +114,6 @@ pub fn load_metadata(path: &Path) -> anyhow::Result<Vec<CorpusEntry>> {
         entries.len()
     );
     Ok(entries)
-}
-
-/// Load part excerpts from agent-part-excerpts.tsv.
-///
-/// The TSV has this shape (produced by the corpus build tooling):
-///
-/// `normalized_path  derived_path  title  author  file_type  part_role  …`
-///
-/// `derived_path` points at the extracted-part file on disk (e.g.
-/// `derived/agent-parts/bassline/song--bass__hash.js`). We read that file
-/// lazily when populating each `CorpusPart::code`. `corpus_path` is the
-/// corpus root so we can resolve the relative `derived_path`.
-pub fn load_parts(path: &Path, corpus_path: &Path) -> anyhow::Result<Vec<CorpusPart>> {
-    let content = std::fs::read_to_string(path)?;
-    let mut parts = Vec::new();
-    let mut lines = content.lines();
-
-    let header = lines.next().unwrap_or_default();
-    let columns: Vec<&str> = header.split('\t').collect();
-
-    let find = |names: &[&str]| -> Option<usize> {
-        columns.iter().position(|c| names.contains(c))
-    };
-
-    let source_col = find(&["normalized_path", "source_id", "source_path", "file"]);
-    let derived_col = find(&["derived_path", "part_path"]);
-    let role_col = find(&["part_role", "role", "agent_role"]);
-    let code_col = find(&["code", "excerpt"]);
-    let label_col = find(&["label"]);
-
-    for line in lines {
-        let fields: Vec<&str> = line.split('\t').collect();
-        let source_id = source_col
-            .and_then(|i| fields.get(i))
-            .unwrap_or(&"")
-            .to_string();
-        let role_str = role_col.and_then(|i| fields.get(i)).unwrap_or(&"");
-        let label = label_col
-            .and_then(|i| fields.get(i))
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string());
-
-        let role = match *role_str {
-            "drum-groove" | "drums" => MusicalRole::DrumGroove,
-            "bassline" | "bass" => MusicalRole::Bassline,
-            "melodic-hook" | "melody" => MusicalRole::MelodicHook,
-            "harmony-loop" | "harmony" => MusicalRole::HarmonyLoop,
-            "texture-bed" | "texture" => MusicalRole::TextureBed,
-            "transition-seed" | "transition" => MusicalRole::TransitionSeed,
-            "arrangement-seed" | "arrangement" => MusicalRole::ArrangementSeed,
-            "remix-seed" | "remix" => MusicalRole::RemixSeed,
-            _ => continue,
-        };
-
-        // Prefer an inline `code` column if present; otherwise resolve
-        // `derived_path` against the corpus root and read the file.
-        let code = if let Some(i) = code_col
-            && let Some(v) = fields.get(i)
-            && !v.is_empty()
-        {
-            (*v).to_string()
-        } else if let Some(i) = derived_col
-            && let Some(rel) = fields.get(i).filter(|s| !s.is_empty())
-        {
-            match std::fs::read_to_string(corpus_path.join(rel)) {
-                Ok(s) => s,
-                Err(_) => continue, // referenced file missing — skip silently
-            }
-        } else {
-            continue;
-        };
-
-        if !code.trim().is_empty() {
-            parts.push(CorpusPart {
-                source_id,
-                role,
-                code,
-                label,
-            });
-        }
-    }
-
-    debug!("loaded {} corpus parts", parts.len());
-    Ok(parts)
 }
 
 /// Load the source code for a corpus entry from the normalized/ directory.

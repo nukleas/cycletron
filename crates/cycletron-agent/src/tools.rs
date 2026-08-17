@@ -17,12 +17,6 @@ pub fn music_tool_definitions() -> Vec<ToolDefinition> {
                         "items": { "type": "string" },
                         "description": "Musical tags to filter by (e.g., 'acid', 'house', 'breakbeat')"
                     },
-                    "role": {
-                        "type": "string",
-                        "enum": ["drum-groove", "bassline", "melodic-hook", "harmony-loop",
-                                 "texture-bed", "transition-seed", "arrangement-seed", "remix-seed"],
-                        "description": "Musical role to search for"
-                    },
                     "tempo_min": {
                         "type": "number",
                         "description": "Minimum tempo in BPM"

@@ -255,7 +255,7 @@ mod tests {
             "composed output should not embed setcpm, got:\n{}",
             result.code
         );
-        crate::strudel::validate_code(&result.code)
+        cycletron_analysis::validate_code(&result.code)
             .unwrap_or_else(|e| panic!("composed output should validate: {e}\n{}", result.code));
     }
 
@@ -273,7 +273,7 @@ mod tests {
             ..Default::default()
         };
         let result = convert_file(path, &opts).expect("should convert");
-        crate::strudel::validate_code(&result.code)
+        cycletron_analysis::validate_code(&result.code)
             .unwrap_or_else(|e| panic!("compose+compact should validate: {e}\n{}", result.code));
     }
 

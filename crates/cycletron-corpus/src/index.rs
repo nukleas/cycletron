@@ -1,13 +1,10 @@
-use cycletron_core::traits::CorpusIndex;
 use cycletron_core::types::*;
 use std::path::{Path, PathBuf};
 use tracing::info;
 
 /// In-memory corpus index backed by Vec. Fast enough for ~250 entries.
-/// Implements the CorpusIndex trait for swappability.
 pub struct InMemoryCorpusIndex {
     entries: Vec<CorpusEntry>,
-    parts: Vec<CorpusPart>,
     corpus_path: PathBuf,
 }
 
@@ -41,7 +38,6 @@ impl InMemoryCorpusIndex {
         }
 
         let metadata_path = corpus_path.join("inventory/normalized-metadata.jsonl");
-        let parts_path = corpus_path.join("inventory/agent-part-excerpts.tsv");
 
         if metadata_path.exists() {
             entries.extend(crate::loader::load_metadata(&metadata_path)?);
@@ -49,29 +45,15 @@ impl InMemoryCorpusIndex {
             tracing::warn!("metadata index not found at {}", metadata_path.display());
         }
 
-        let parts = if parts_path.exists() {
-            crate::loader::load_parts(&parts_path, corpus_path)?
-        } else {
-            tracing::warn!("parts index not found at {}", parts_path.display());
-            Vec::new()
-        };
-
-        info!(
-            "corpus loaded: {} entries, {} parts",
-            entries.len(),
-            parts.len()
-        );
+        info!("corpus loaded: {} entries", entries.len());
 
         Ok(Self {
             entries,
-            parts,
             corpus_path: corpus_path.to_path_buf(),
         })
     }
-}
 
-impl CorpusIndex for InMemoryCorpusIndex {
-    fn search(&self, query: &CorpusQuery) -> Vec<CorpusEntry> {
+    pub fn search(&self, query: &CorpusQuery) -> Vec<CorpusEntry> {
         let limit = query.limit.unwrap_or(5);
 
         self.entries
@@ -139,11 +121,11 @@ impl CorpusIndex for InMemoryCorpusIndex {
             .collect()
     }
 
-    fn get(&self, id: &str) -> Option<&CorpusEntry> {
+    pub fn get(&self, id: &str) -> Option<&CorpusEntry> {
         self.entries.iter().find(|e| e.id == id)
     }
 
-    fn get_source(&self, id: &str) -> cycletron_core::Result<String> {
+    pub fn get_source(&self, id: &str) -> cycletron_core::Result<String> {
         let entry = self
             .get(id)
             .ok_or_else(|| cycletron_core::Error::Corpus(format!("entry not found: {id}")))?;
@@ -155,16 +137,11 @@ impl CorpusIndex for InMemoryCorpusIndex {
             .map_err(|e| cycletron_core::Error::Corpus(e.to_string()))
     }
 
-    fn search_parts(&self, role: MusicalRole, limit: usize) -> Vec<CorpusPart> {
-        self.parts
-            .iter()
-            .filter(|p| p.role == role)
-            .take(limit)
-            .cloned()
-            .collect()
+    pub fn len(&self) -> usize {
+        self.entries.len()
     }
 
-    fn len(&self) -> usize {
-        self.entries.len()
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 }
