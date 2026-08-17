@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+# Single-pass multi-needle scan for curated-metadata extraction. Already in
+# Cargo.lock transitively — zero new compiled dependencies.
+aho-corasick = "1"
 cycletron-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

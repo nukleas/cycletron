@@ -2,9 +2,31 @@ use cycletron_core::types::*;
 use std::path::{Path, PathBuf};
 use tracing::info;
 
+/// Lowercased copies of each entry's searchable fields, precomputed at load
+/// time so `search()` allocates nothing per entry.
+struct SearchKeys {
+    tags: Vec<String>,
+    sounds: Vec<String>,
+    title: Option<String>,
+    filename: String,
+}
+
+impl SearchKeys {
+    fn of(e: &CorpusEntry) -> Self {
+        Self {
+            tags: e.tags.iter().map(|t| t.to_lowercase()).collect(),
+            sounds: e.sounds.iter().map(|s| s.to_lowercase()).collect(),
+            title: e.title.as_ref().map(|t| t.to_lowercase()),
+            filename: e.filename.to_lowercase(),
+        }
+    }
+}
+
 /// In-memory corpus index backed by Vec. Fast enough for ~250 entries.
 pub struct InMemoryCorpusIndex {
     entries: Vec<CorpusEntry>,
+    /// `keys[i]` belongs to `entries[i]`.
+    keys: Vec<SearchKeys>,
     corpus_path: PathBuf,
 }
 
@@ -47,8 +69,10 @@ impl InMemoryCorpusIndex {
 
         info!("corpus loaded: {} entries", entries.len());
 
+        let keys = entries.iter().map(SearchKeys::of).collect();
         Ok(Self {
             entries,
+            keys,
             corpus_path: corpus_path.to_path_buf(),
         })
     }
@@ -56,16 +80,20 @@ impl InMemoryCorpusIndex {
     pub fn search(&self, query: &CorpusQuery) -> Vec<CorpusEntry> {
         let limit = query.limit.unwrap_or(5);
 
+        // Lowercase the query ONCE; entry-side casing was normalized at load.
+        let q_tags: Vec<String> = query.tags.iter().map(|t| t.to_lowercase()).collect();
+        let q_sounds: Vec<String> = query.sounds.iter().map(|s| s.to_lowercase()).collect();
+        let q_keyword = query.keyword.as_ref().map(|k| k.to_lowercase());
+
         self.entries
             .iter()
-            .filter(|e| {
+            .zip(&self.keys)
+            .filter(|(e, k)| {
                 // Tag filter: entry must have ALL requested tags
-                if !query.tags.is_empty()
-                    && !query.tags.iter().all(|t| {
-                        e.tags
-                            .iter()
-                            .any(|et| et.to_lowercase().contains(&t.to_lowercase()))
-                    })
+                if !q_tags.is_empty()
+                    && !q_tags
+                        .iter()
+                        .all(|t| k.tags.iter().any(|et| et.contains(t)))
                 {
                     return false;
                 }
@@ -90,25 +118,19 @@ impl InMemoryCorpusIndex {
                 }
 
                 // Sounds filter: entry must have at least one matching sound
-                if !query.sounds.is_empty()
-                    && !query.sounds.iter().any(|s| {
-                        e.sounds
-                            .iter()
-                            .any(|es| es.to_lowercase().contains(&s.to_lowercase()))
-                    })
+                if !q_sounds.is_empty()
+                    && !q_sounds
+                        .iter()
+                        .any(|s| k.sounds.iter().any(|es| es.contains(s)))
                 {
                     return false;
                 }
 
                 // Keyword filter: search in title, filename, and tags
-                if let Some(ref kw) = query.keyword {
-                    let kw_lower = kw.to_lowercase();
-                    let in_title = e
-                        .title
-                        .as_ref()
-                        .map_or(false, |t| t.to_lowercase().contains(&kw_lower));
-                    let in_filename = e.filename.to_lowercase().contains(&kw_lower);
-                    let in_tags = e.tags.iter().any(|t| t.to_lowercase().contains(&kw_lower));
+                if let Some(ref kw) = q_keyword {
+                    let in_title = k.title.as_ref().is_some_and(|t| t.contains(kw));
+                    let in_filename = k.filename.contains(kw);
+                    let in_tags = k.tags.iter().any(|t| t.contains(kw));
                     if !in_title && !in_filename && !in_tags {
                         return false;
                     }
@@ -117,7 +139,7 @@ impl InMemoryCorpusIndex {
                 true
             })
             .take(limit)
-            .cloned()
+            .map(|(e, _)| e.clone())
             .collect()
     }
 
