@@ -19,6 +19,7 @@ midi-to-strudel = { workspace = true }
 strudel-dsl = { workspace = true }
 strudel-mini = { workspace = true }
 strudel-audio = { workspace = true }
+strudel-sounds = { workspace = true }
 strudel-core = { workspace = true }
 strudel-music-theory = { workspace = true }
 midly = { workspace = true }

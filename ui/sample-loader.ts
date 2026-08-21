@@ -10,6 +10,13 @@
 import type {MainThreadProcessor} from './pkg';
 import type {DecodedSample, StrudelAudioManager} from './audio-manager.js';
 import {GM_BANK_NAMES, GM_FONT_FILES} from './soundfont-tables.js';
+import {
+    ESSENTIAL_DRUMS,
+    FISCHER_808_BASE,
+    INSTRUMENT_BANKS,
+    MACHINE_KITS,
+    PERCUSSION_COLORS,
+} from './sample-tables.js';
 
 /**
  * A decoded soundfont zone retained on the JS side for the live MIDI monitor
@@ -33,147 +40,29 @@ export interface MonitorZone {
 /** Marker for an unpitched sample (drum). */
 const UNPITCHED = 0xFFFF_FFFF;
 
+/** One bank's entry in a strudel.json manifest: array (indexed unpitched
+ *  samples), note-map (pitched), or a single path. */
+export type ManifestBankValue = string | string[] | Record<string, string>;
+
+const NOTE_SEMITONES: Record<string, number> = {
+    C: 0, Cs: 1, D: 2, Ds: 3, E: 4, F: 5, Fs: 6, G: 7, Gs: 8, A: 9, As: 10, B: 11,
+};
+
+/** Parse `"C3"`, `"Ds4"`, `"Fs5"` → MIDI note number; UNPITCHED on failure. */
+function parseNoteNameToMidi(name: string): number {
+    const m = /^([A-G]s?)(-?\d+)$/.exec(name);
+    if (!m) return UNPITCHED;
+    const semi = NOTE_SEMITONES[m[1]];
+    if (semi === undefined) return UNPITCHED;
+    return 12 * (parseInt(m[2], 10) + 1) + semi;
+}
+
 /** WebAudioFont CDN root — fallback when an instrument isn't bundled locally. */
 const WAF_BASE_URL = 'https://felixroos.github.io/webaudiofontdata/sound';
 /** Bundled soundfonts served same-origin from `ui/public/soundfonts/` (offline). */
 const LOCAL_WAF_BASE = '/soundfonts';
 /** Bundled drum kit served same-origin from `ui/public/samples/` (offline). */
 const LOCAL_SAMPLES_BASE = '/samples/';
-/**
- * Michael Fischer's 1994 TR-808 sample set (CC0), the source of the bundled
- * default kit — remote fallback if a file is somehow missing from the bundle.
- */
-const FISCHER_808_BASE = 'https://raw.githubusercontent.com/tidalcycles/sounds-tr808-fischer/main/';
-
-/**
- * Streamed drum machine kits live in the upstream tidal-drum-machines repo.
- * That collection carries no license, so we never redistribute it — kits
- * without a cleanly licensed replacement stream from here at runtime (as
- * strudel.cc does) and are simply absent offline.
- */
-const TDM_BASE = 'https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/';
-
-/**
- * All drum machine voices, each mapped to the URL it loads from.
- * Naming: `{MachineName}_{voice}` — these are the canonical web-strudel names.
- * The engine supports `.bank()` prefix lookup, so `s("bd").bank("RolandTR808")`
- * resolves to `RolandTR808_bd`; the full underscore name works too. A voice the
- * kit lacks (e.g. LinnDrum has no `cr`) resolves to nothing and plays silent.
- *
- * TR-808 (Michael Fischer's CC0 set), TR-707 (public-domain hyperreal set),
- * and LinnDrum (BushDrum, CC0) are bundled in `ui/public/machines/`; TR-909
- * and DR-55 have no cleanly licensed sample set, so they stream from upstream.
- * See ATTRIBUTION.md. Grouped as [machineName, displayName, [voice, url][]].
- */
-export const MACHINE_KITS: Array<[string, string, Array<[string, string]>]> = [
-    ['RolandTR808', 'TR-808', [
-        ['bd',  '/machines/RolandTR808_bd.wav'],
-        ['sd',  '/machines/RolandTR808_sd.wav'],
-        ['hh',  '/machines/RolandTR808_hh.wav'],
-        ['oh',  '/machines/RolandTR808_oh.wav'],
-        ['cp',  '/machines/RolandTR808_cp.wav'],
-        ['rim', '/machines/RolandTR808_rim.wav'],
-        ['lt',  '/machines/RolandTR808_lt.wav'],
-        ['mt',  '/machines/RolandTR808_mt.wav'],
-        ['ht',  '/machines/RolandTR808_ht.wav'],
-        ['cb',  '/machines/RolandTR808_cb.wav'],
-    ]],
-    ['RolandTR909', 'TR-909', [
-        ['bd',  TDM_BASE + 'RolandTR909/rolandtr909-bd/Bassdrum-01.wav'],
-        ['sd',  TDM_BASE + 'RolandTR909/rolandtr909-sd/naredrum.wav'],
-        ['hh',  TDM_BASE + 'RolandTR909/rolandtr909-hh/hh01.wav'],
-        ['oh',  TDM_BASE + 'RolandTR909/rolandtr909-oh/Hat%20Open.wav'],
-        ['cp',  TDM_BASE + 'RolandTR909/rolandtr909-cp/Clap.wav'],
-        ['rd',  TDM_BASE + 'RolandTR909/rolandtr909-rd/Ride.wav'],
-        ['rim', TDM_BASE + 'RolandTR909/rolandtr909-rim/Rimhot.wav'],
-    ]],
-    ['RolandTR707', 'TR-707', [
-        ['bd',  '/machines/RolandTR707_bd.wav'],
-        ['sd',  '/machines/RolandTR707_sd.wav'],
-        ['hh',  '/machines/RolandTR707_hh.wav'],
-        ['oh',  '/machines/RolandTR707_oh.wav'],
-        ['cp',  '/machines/RolandTR707_cp.wav'],
-        ['lt',  '/machines/RolandTR707_lt.wav'],
-        ['ht',  '/machines/RolandTR707_ht.wav'],
-    ]],
-    ['LinnDrum', 'LinnDrum', [
-        ['bd',  '/machines/LinnDrum_bd.wav'],
-        ['sd',  '/machines/LinnDrum_sd.wav'],
-        ['hh',  '/machines/LinnDrum_hh.wav'],
-        ['cp',  '/machines/LinnDrum_cp.wav'],
-    ]],
-    ['BossDR55', 'DR-55', [
-        ['bd',  TDM_BASE + 'BossDR55/bossdr55-bd/Bassdrum-01.wav'],
-        ['sd',  TDM_BASE + 'BossDR55/bossdr55-sd/Snaredrum-01.wav'],
-        ['hh',  TDM_BASE + 'BossDR55/bossdr55-hh/Hihat1.wav'],
-        ['rim', TDM_BASE + 'BossDR55/bossdr55-rim/Rimshot.wav'],
-    ]],
-];
-
-/**
- * Percussion & texture "color" banks — CC0 recordings from the Versilian
- * Community Sample Library (VCSL, https://github.com/sgossner/VCSL) bundled in
- * `ui/public/samples/` (see ATTRIBUTION.md for the per-bank source mapping).
- * Each bank is a single raw fortissimo one-shot (index 0 only — `:n` replays
- * the same sample). Agent guidance scopes them to sparse genre-appropriate
- * accents, tamed with gain/filtering — they are not default percussion.
- * Each entry is [bankName, relativePath].
- */
-export const PERCUSSION_COLORS: Array<[string, string]> = [
-    ['perc',       'perc/Cajon_hit1_fff_rr1.wav'],
-    ['click',      'click/claves_ff.wav'],
-    ['metal',      'metal/Anvil_Hit1_v3_rr1_Mid.wav'],
-    ['east',       'east/wood_click_ff.wav'],
-    ['hand',       'hand/Conga_HitN_v3_rr1_Sum.wav'],
-    ['industrial', 'industrial/BrakeDrum1_Hammer_v3_rr1_Mid.wav'],
-    ['space',      'space/glass3_Asharp4_Fast_1_Main.wav'],
-    ['arpy',       'arpy/Clavisynth_C4_vl3.wav'],
-    ['tabla',      'tabla/Darbuka_1_hit_vl2_rr1.wav'],
-    ['jvbass',     'jvbass/FMPiano_C1_vl3.wav'],
-];
-
-/**
- * Melodic / speech expansion banks — short CC0 slices from the Tidal
- * Clean-Samples ecosystem, bundled in `ui/public/samples/`. Each bank has
- * multiple variants selected with `s("flbass:2")` (sample index). See
- * ATTRIBUTION.md for per-bank provenance. Must stay in sync with
- * `INSTRUMENTS` in `crates/cycletron-analysis/src/sounds.rs`.
- */
-export const INSTRUMENT_BANKS: Array<[string, string[]]> = [
-    ['flbass', [
-        'flbass/c2_finger_short.wav',
-        'flbass/c3_finger_short.wav',
-        'flbass/c2_palm_mute.wav',
-        'flbass/c3_pick_short.wav',
-    ]],
-    ['uke', [
-        'uke/c3_short_soft.wav',
-        'uke/c3_short_hard.wav',
-        'uke/c4_soft.wav',
-        'uke/c4_harmonic.wav',
-    ]],
-    ['cpluck', [
-        'cpluck/c2_short.wav',
-        'cpluck/c3_short.wav',
-        'cpluck/c4_pluck.wav',
-        'cpluck/body_low.wav',
-    ]],
-    ['cbow', [
-        'cbow/c2_short.wav',
-        'cbow/c3_short.wav',
-        'cbow/c4_short.wav',
-        'cbow/c5_short.wav',
-    ]],
-    ['speech', [
-        'speech/a.wav',
-        'speech/b.wav',
-        'speech/c.wav',
-        'speech/d.wav',
-        'speech/e.wav',
-        'speech/f.wav',
-        'speech/g.wav',
-    ]],
-];
 
 /**
  * Fetch the first URL that responds OK, trying each in order. Used for
@@ -333,25 +222,7 @@ export class SampleLoader {
     }
 
     async loadEssentialDrums(): Promise<number> {
-        // The default 12-voice kit is Michael Fischer's 1994 TR-808 set (CC0),
-        // bundled in ui/public/samples/ (offline); falls back to the upstream
-        // repo if a file is somehow missing from the bundle. `sub` is the
-        // bundled path, `src` the path inside the Fischer repo.
-        const subs: Array<{ name: string; sub: string; src: string }> = [
-            {name: 'bd', sub: 'bd/BD0050.WAV', src: 'bd8/BD0050.WAV'},
-            {name: 'sd', sub: 'sd/SD5050.WAV', src: 'sd8/SD5050.WAV'},
-            {name: 'sn', sub: 'sn/SD0075.WAV', src: 'sd8/SD0075.WAV'},
-            {name: 'hh', sub: 'hh/CH.WAV',     src: 'ch8/CH.WAV'},
-            {name: 'cp', sub: 'cp/CP.WAV',     src: 'cp8/CP.WAV'},
-            {name: 'oh', sub: 'oh/OH00.WAV',   src: 'oh8/OH00.WAV'},
-            {name: 'ht', sub: 'ht/HT50.WAV',   src: 'ht8/HT50.WAV'},
-            {name: 'mt', sub: 'mt/MT50.WAV',   src: 'mt8/MT50.WAV'},
-            {name: 'lt', sub: 'lt/LT50.WAV',   src: 'lt8/LT50.WAV'},
-            {name: 'cr', sub: 'cr/CY0050.WAV', src: 'cy8/CY0050.WAV'},
-            {name: 'cb', sub: 'cb/CB.WAV',     src: 'cb8/CB.WAV'},
-            {name: 'rs', sub: 'rs/RS.WAV',     src: 'rs8/RS.WAV'},
-        ];
-        const essentials = subs.map(({name, sub, src}) => ({
+        const essentials = ESSENTIAL_DRUMS.map(({name, sub, src}) => ({
             name,
             url: LOCAL_SAMPLES_BASE + sub,
             fallback: FISCHER_808_BASE + src,
@@ -579,6 +450,60 @@ export class SampleLoader {
         if (valid.length === 0) return 0;
         this.audioManager.sendSampleBatch(valid);
         console.log(`[SampleLoader] local bank "${name}": ${valid.length}/${datas.length} samples`);
+        return valid.length;
+    }
+
+    /**
+     * Load one bank from a strudel.json manifest (ported from the strudel-rs
+     * www REPL's `loadBankFromParsedManifest`). Array entries are indexed
+     * unpitched samples — the engine assigns `:n` indexes in **arrival order**,
+     * so item order must match the manifest array. Object entries are pitched
+     * (note-name keys → MIDI). `fetchData` resolves a manifest-relative path to
+     * raw audio bytes; the caller decides between local disk and streaming.
+     * Returns the number of samples registered.
+     */
+    async loadManifestBank(
+        bankName: string,
+        value: ManifestBankValue,
+        fetchData: (path: string) => Promise<ArrayBuffer>,
+    ): Promise<number> {
+        const items: Array<{path: string; midiNote: number}> =
+            typeof value === 'string'
+                ? [{path: value, midiNote: UNPITCHED}]
+                : Array.isArray(value)
+                    ? value.map((path) => ({path, midiNote: UNPITCHED}))
+                    : Object.entries(value).map(([note, path]) => ({
+                        path,
+                        midiNote: parseNoteNameToMidi(note),
+                    }));
+
+        const decoded = await Promise.all(
+            items.map(async ({path, midiNote}): Promise<DecodedSample | null> => {
+                try {
+                    const data = await fetchData(path);
+                    const audioBuffer = await this.audioContext.decodeAudioData(data);
+                    return {
+                        name: bankName,
+                        audioBuffer,
+                        midiNote,
+                        sampleIdx: 0,
+                        loopStart: UNPITCHED,
+                        loopEnd: 0,
+                        keyRangeLow: 255,
+                        keyRangeHigh: 255,
+                        baseDetuneCents: NaN,
+                    };
+                } catch (e) {
+                    console.warn(`[SampleLoader] manifest "${bankName}" ${path} failed`, e);
+                    return null;
+                }
+            }),
+        );
+
+        const valid = decoded.filter((x): x is DecodedSample => x !== null);
+        if (valid.length === 0) return 0;
+        this.audioManager.sendSampleBatch(valid);
+        console.log(`[SampleLoader] manifest bank "${bankName}": ${valid.length}/${items.length} samples`);
         return valid.length;
     }
 

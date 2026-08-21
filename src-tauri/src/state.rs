@@ -33,6 +33,12 @@ pub struct AppState {
     /// Sample bank names the frontend has loaded from the user's disk (so the
     /// agent's `list_sounds` tool can report which custom sounds are playable).
     pub loaded_sample_banks: Mutex<Vec<String>>,
+    /// Banks of the active downloadable sample set, split pitched vs
+    /// one-shots (empty when the bundled set is active or the active set
+    /// isn't downloaded). Layered into the agent's sound catalog. Populated
+    /// at startup and kept fresh by the `sample_sets` download/remove
+    /// commands + settings changes.
+    pub active_set_banks: Mutex<crate::sample_sets::ActiveSetBanks>,
     /// Genre recipes loaded from `<corpus>/genres/*.md` — the knowledge base
     /// behind the `genre_recipe` tool.
     pub recipes: Mutex<Vec<Recipe>>,
@@ -98,6 +104,7 @@ impl AppState {
             app_data_dir: Mutex::new(None),
             last_autosave: Mutex::new(None),
             loaded_sample_banks: Mutex::new(Vec::new()),
+            active_set_banks: Mutex::new(crate::sample_sets::ActiveSetBanks::default()),
             recipes: Mutex::new(Vec::new()),
             read_budget: Mutex::new((0, 0)),
             agent_write: Mutex::new(AgentWriteState::default()),

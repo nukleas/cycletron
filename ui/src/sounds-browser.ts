@@ -8,6 +8,7 @@
 
 import {invoke, isTauri} from './tauri.js';
 import {escapeHtml} from './html.js';
+import {samplesModal} from './samples-modal.js';
 
 
 interface DrumMachine {
@@ -16,13 +17,23 @@ interface DrumMachine {
     banks: string[];
 }
 
+/**
+ * Two shapes, depending on the active sample set (Samples manager):
+ * the bundled set fills drums/percussion/instruments/drum_machines; a
+ * downloaded set replaces those with `sample_set_banks` (+ its id).
+ */
 interface SoundCatalog {
     synths: string[];
     wavetables: string[];
-    drums: string[];
+    drums?: string[];
     percussion?: string[];
     instruments?: string[];
-    drum_machines: DrumMachine[];
+    drum_machines?: DrumMachine[];
+    active_sample_set?: string;
+    /** Note-mapped banks — note(…) repitches properly. */
+    sample_set_pitched?: string[];
+    /** Indexed one-shots — note(…) rate-repitches from a C3 root; :n variants. */
+    sample_set_one_shots?: string[];
     gm_instruments: string[];
     gm_note?: string;
     user_sample_banks: string[];
@@ -47,6 +58,9 @@ export class SoundsBrowser {
 
         // The user loading a sample folder adds banks — refresh when notified.
         document.addEventListener('sounds:changed', () => void this.refresh());
+        document.getElementById('soundsManage')?.addEventListener('click', () => {
+            void samplesModal.open();
+        });
 
         await this.refresh();
     }
@@ -67,24 +81,44 @@ export class SoundsBrowser {
 
     private render(cat: SoundCatalog): void {
         if (!this.listEl) return;
+        const setPitched = cat.sample_set_pitched ?? [];
+        const setOneShots = cat.sample_set_one_shots ?? [];
         const total =
-            cat.synths.length + cat.drums.length + (cat.percussion?.length ?? 0) +
-            (cat.instruments?.length ?? 0) +
+            cat.synths.length + (cat.drums?.length ?? 0) + (cat.percussion?.length ?? 0) +
+            (cat.instruments?.length ?? 0) + setPitched.length + setOneShots.length +
             cat.gm_instruments.length + cat.user_sample_banks.length;
         if (this.countEl) this.countEl.textContent = String(total);
 
-        // Drum machines: one collapsible group per machine
-        const machineGroups = (cat.drum_machines ?? []).map(m =>
-            this.group(m.display, m.banks, 'machine'),
-        );
+        // Bundled-set groups (absent when a downloaded sample set is active).
+        const bundledGroups = [
+            cat.drums?.length ? this.group('Drums', cat.drums, 'drum') : '',
+            cat.percussion?.length ? this.group('Percussion & Textures', cat.percussion, 'sample', 'perc/metal/east/hand/industrial · space/arpy · tabla/jvbass') : '',
+            cat.instruments?.length ? this.group('Melodic & Speech', cat.instruments, 'sample', 'flbass/uke/cpluck/cbow · speech · s("flbass:2") for variants') : '',
+            // Drum machines: one collapsible group per machine
+            ...(cat.drum_machines ?? []).map(m => this.group(m.display, m.banks, 'machine')),
+        ];
+
+        // Downloaded-set groups, split by how note(…) behaves on them.
+        const setName = cat.active_sample_set ?? '';
+        const setGroups = [
+            setPitched.length
+                ? this.group(`${setName}: Pitched`, setPitched, 'gm', 'note-mapped — note(…) repitches')
+                : '',
+            setOneShots.length
+                ? this.group(
+                    `${setName}: One-shots`,
+                    setOneShots,
+                    'sample',
+                    'note(…) repitches from C3 root · :n for variants · load on first use',
+                )
+                : '',
+        ];
 
         this.listEl.innerHTML = [
             this.group('Synths', cat.synths, 'synth'),
             this.group('Wavetables', cat.wavetables ?? [], 'synth', 'use with note(…).s("wt_…")'),
-            this.group('Drums', cat.drums, 'drum'),
-            this.group('Percussion & Textures', cat.percussion ?? [], 'sample', 'perc/metal/east/hand/industrial · space/arpy · tabla/jvbass'),
-            this.group('Melodic & Speech', cat.instruments ?? [], 'sample', 'flbass/uke/cpluck/cbow · speech · s("flbass:2") for variants'),
-            ...machineGroups,
+            ...bundledGroups,
+            ...setGroups,
             this.group('GM Instruments', cat.gm_instruments, 'gm', '+ any gm_* name'),
             this.group(
                 'Your Samples',

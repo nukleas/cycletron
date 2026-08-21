@@ -149,6 +149,41 @@ export interface MetronomeSettings {
     volume: number;
 }
 
+/** Which sample set live playback + export resolve sounds from — a set id
+ *  from the `sample_sets` registry ('cycletron' = bundled default). */
+export interface SampleSetSettings {
+    active: string;
+}
+
+/** Mirror of `sample_sets::SetStatus` (one registry entry + download state). */
+export interface SampleSetStatus {
+    id: string;
+    label: string;
+    builtin: boolean;
+    ready: boolean;
+    files: number;
+    bytes: number;
+    /** Manifest sources in precedence order (first manifest owning a bank wins). */
+    sources: string[];
+}
+
+/** Payload of the `sample-set-progress` event. */
+export interface SampleSetProgress {
+    set: string;
+    source: string;
+    done: number;
+    total: number;
+}
+
+/** One source of the active downloaded set (`get_active_sample_set_manifests`). */
+export interface SampleSourceManifest {
+    id: string;
+    /** Directory the manifest's relative paths resolve against. */
+    dir: string;
+    /** strudel.json contents: bank → files (array), note-map, or single path. */
+    manifest: Record<string, string | string[] | Record<string, string>>;
+}
+
 export interface EditorSettings {
     assist_enabled: boolean;
 }
@@ -191,6 +226,7 @@ export interface UserSettings {
     metronome: MetronomeSettings;
     editor: EditorSettings;
     midi_input: MidiInputSettings;
+    samples: SampleSetSettings;
     first_run_done: boolean;
     /** User has explicitly turned the AI assistant on. Off by default. */
     ai_consent: boolean;

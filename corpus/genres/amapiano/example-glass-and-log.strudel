@@ -1,0 +1,26 @@
+// Glass And Log — amapiano essentials · F# minor · 112 BPM
+setbpm(112);
+
+stack(
+  s("~ ~ ~ lt ~ ~ lt ~ ~ ~ lt ~ ~ ~ lt ~").lpf(900).gain(0.5),
+  s("hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").hpf(5200).gain(0.13),
+  s("~ ~ ~ ~ cp ~ ~ ~ ~ ~ ~ ~ cp ~ ~ ~").room(0.2).gain(0.28),
+  note("<f#1 ~ c#2 e2 f#1 ~ a1 c#2>")
+    .s("sine")
+    .penv(10)
+    .pdecay(0.12)
+    .release(0.35)
+    .gain(0.38),
+  note("<[f#3,a3,c#4,e4] [b3,d4,f#4,a4] [c#4,e4,g#4,b4] [b3,d4,f#4,a4]>")
+    .struct("~ 1 ~ 1")
+    .s("gm_epiano1")
+    .release(0.3)
+    .room(0.38)
+    .gain(0.25)
+    .pan(0.42),
+  note("<c#5 ~ f#5 ~ e5 ~ c#5 ~>")
+    .s("wt_pluck")
+    .delay(0.2)
+    .gain(0.16)
+    .pan(0.68)
+)

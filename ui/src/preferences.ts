@@ -10,6 +10,8 @@
 import {invoke, isTauri} from './tauri.js';
 import {errorDialog, openPathDialog} from './dialog.js';
 import type {UserSettings, PadAssignment, LlmSettings} from './types/tauri-commands.js';
+import {samplesModal} from './samples-modal.js';
+import {fileExplorer} from './file-explorer.js';
 import {presetById, presetProfile, defaultLlmSettings, normalizeLlm} from './providers.js';
 import {dismissibleModal} from './modal-utils.js';
 import {setNotificationsEnabled} from './notifications.js';
@@ -103,6 +105,10 @@ export class PreferencesModal {
         midiPads.onLearned = () => this.renderPads();
 
         document.getElementById('prefsSave')?.addEventListener('click', () => void this.save());
+        document.getElementById('prefsManageSamples')?.addEventListener('click', () => {
+            this.close();
+            void samplesModal.open();
+        });
         document.getElementById('prefsChangeLibrary')?.addEventListener('click', () => void this.changeLibrary());
         document.getElementById('prefsGrokSignIn')?.addEventListener('click', () => void this.grokOAuthSignIn());
         document.getElementById('prefsGrokImport')?.addEventListener('click', () => void this.grokOAuthImport());
@@ -511,6 +517,10 @@ export class PreferencesModal {
                 monitor_gain: monitorGainPct != null ? Math.max(0, Math.min(1, monitorGainPct / 100)) : (baseMidi?.monitor_gain ?? 0.8),
                 pad_assignments: midiPads.getAssignments(),
             },
+            // Managed in the Samples modal, not here — pass through unchanged.
+            samples: {
+                active: this.loaded?.samples?.active ?? 'cycletron',
+            },
             first_run_done: firstRunDone,
             ai_consent: this.aiConsent ? !!this.aiConsent.checked : (this.loaded?.ai_consent ?? false),
         };
@@ -670,7 +680,13 @@ export class PreferencesModal {
                 await invoke<void>('set_provider_key', {provider: this.currentProviderId, key: typedKey});
                 if (this.apiKey) this.apiKey.value = '';
             }
+            const prevSampleSet = this.loaded?.samples?.active ?? 'cycletron';
             await invoke<void>('set_user_settings', {settings: next});
+            if (next.samples.active !== prevSampleSet) {
+                // Reload the audio stack so live playback picks up the new
+                // set right away (export already follows the setting).
+                void window.strudelApp?.reloadSampleSet?.();
+            }
             await this.refreshKeyStatus(this.currentProviderId);
             // Let the AI panel wire/unwire itself to match the consent flag.
             document.dispatchEvent(new CustomEvent('ai-consent:changed'));
@@ -695,11 +711,9 @@ export class PreferencesModal {
         if (!isTauri) return;
         const path = await openPathDialog({directory: true});
         if (!path) return;
-        try {
-            await invoke('set_library_root', {path});
-            if (this.libraryRoot) this.libraryRoot.textContent = path;
-        } catch (e: any) {
-            console.warn('[prefs] set_library_root failed:', e);
+        // Shared write path: persists, refreshes the Files tree, error-dialogs.
+        if (await fileExplorer.setLibraryRoot(path) && this.libraryRoot) {
+            this.libraryRoot.textContent = path;
         }
     }
 

@@ -1,0 +1,197 @@
+{
+  "bd": [
+    "samples/bd/BD0050.WAV"
+  ],
+  "sd": [
+    "samples/sd/SD5050.WAV"
+  ],
+  "sn": [
+    "samples/sn/SD0075.WAV"
+  ],
+  "hh": [
+    "samples/hh/CH.WAV"
+  ],
+  "cp": [
+    "samples/cp/CP.WAV"
+  ],
+  "oh": [
+    "samples/oh/OH00.WAV"
+  ],
+  "ht": [
+    "samples/ht/HT50.WAV"
+  ],
+  "mt": [
+    "samples/mt/MT50.WAV"
+  ],
+  "lt": [
+    "samples/lt/LT50.WAV"
+  ],
+  "cr": [
+    "samples/cr/CY0050.WAV"
+  ],
+  "cb": [
+    "samples/cb/CB.WAV"
+  ],
+  "rs": [
+    "samples/rs/RS.WAV"
+  ],
+  "perc": [
+    "samples/perc/Cajon_hit1_fff_rr1.wav"
+  ],
+  "click": [
+    "samples/click/claves_ff.wav"
+  ],
+  "metal": [
+    "samples/metal/Anvil_Hit1_v3_rr1_Mid.wav"
+  ],
+  "east": [
+    "samples/east/wood_click_ff.wav"
+  ],
+  "hand": [
+    "samples/hand/Conga_HitN_v3_rr1_Sum.wav"
+  ],
+  "industrial": [
+    "samples/industrial/BrakeDrum1_Hammer_v3_rr1_Mid.wav"
+  ],
+  "space": [
+    "samples/space/glass3_Asharp4_Fast_1_Main.wav"
+  ],
+  "arpy": [
+    "samples/arpy/Clavisynth_C4_vl3.wav"
+  ],
+  "tabla": [
+    "samples/tabla/Darbuka_1_hit_vl2_rr1.wav"
+  ],
+  "jvbass": [
+    "samples/jvbass/FMPiano_C1_vl3.wav"
+  ],
+  "flbass": [
+    "samples/flbass/c2_finger_short.wav",
+    "samples/flbass/c3_finger_short.wav",
+    "samples/flbass/c2_palm_mute.wav",
+    "samples/flbass/c3_pick_short.wav"
+  ],
+  "uke": [
+    "samples/uke/c3_short_soft.wav",
+    "samples/uke/c3_short_hard.wav",
+    "samples/uke/c4_soft.wav",
+    "samples/uke/c4_harmonic.wav"
+  ],
+  "cpluck": [
+    "samples/cpluck/c2_short.wav",
+    "samples/cpluck/c3_short.wav",
+    "samples/cpluck/c4_pluck.wav",
+    "samples/cpluck/body_low.wav"
+  ],
+  "cbow": [
+    "samples/cbow/c2_short.wav",
+    "samples/cbow/c3_short.wav",
+    "samples/cbow/c4_short.wav",
+    "samples/cbow/c5_short.wav"
+  ],
+  "speech": [
+    "samples/speech/a.wav",
+    "samples/speech/b.wav",
+    "samples/speech/c.wav",
+    "samples/speech/d.wav",
+    "samples/speech/e.wav",
+    "samples/speech/f.wav",
+    "samples/speech/g.wav"
+  ],
+  "RolandTR808_bd": [
+    "machines/RolandTR808_bd.wav"
+  ],
+  "RolandTR808_sd": [
+    "machines/RolandTR808_sd.wav"
+  ],
+  "RolandTR808_hh": [
+    "machines/RolandTR808_hh.wav"
+  ],
+  "RolandTR808_oh": [
+    "machines/RolandTR808_oh.wav"
+  ],
+  "RolandTR808_cp": [
+    "machines/RolandTR808_cp.wav"
+  ],
+  "RolandTR808_rim": [
+    "machines/RolandTR808_rim.wav"
+  ],
+  "RolandTR808_lt": [
+    "machines/RolandTR808_lt.wav"
+  ],
+  "RolandTR808_mt": [
+    "machines/RolandTR808_mt.wav"
+  ],
+  "RolandTR808_ht": [
+    "machines/RolandTR808_ht.wav"
+  ],
+  "RolandTR808_cb": [
+    "machines/RolandTR808_cb.wav"
+  ],
+  "RolandTR909_bd": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-bd/Bassdrum-01.wav"
+  ],
+  "RolandTR909_sd": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-sd/naredrum.wav"
+  ],
+  "RolandTR909_hh": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-hh/hh01.wav"
+  ],
+  "RolandTR909_oh": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-oh/Hat%20Open.wav"
+  ],
+  "RolandTR909_cp": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-cp/Clap.wav"
+  ],
+  "RolandTR909_rd": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-rd/Ride.wav"
+  ],
+  "RolandTR909_rim": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-rim/Rimhot.wav"
+  ],
+  "RolandTR707_bd": [
+    "machines/RolandTR707_bd.wav"
+  ],
+  "RolandTR707_sd": [
+    "machines/RolandTR707_sd.wav"
+  ],
+  "RolandTR707_hh": [
+    "machines/RolandTR707_hh.wav"
+  ],
+  "RolandTR707_oh": [
+    "machines/RolandTR707_oh.wav"
+  ],
+  "RolandTR707_cp": [
+    "machines/RolandTR707_cp.wav"
+  ],
+  "RolandTR707_lt": [
+    "machines/RolandTR707_lt.wav"
+  ],
+  "RolandTR707_ht": [
+    "machines/RolandTR707_ht.wav"
+  ],
+  "LinnDrum_bd": [
+    "machines/LinnDrum_bd.wav"
+  ],
+  "LinnDrum_sd": [
+    "machines/LinnDrum_sd.wav"
+  ],
+  "LinnDrum_hh": [
+    "machines/LinnDrum_hh.wav"
+  ],
+  "LinnDrum_cp": [
+    "machines/LinnDrum_cp.wav"
+  ],
+  "BossDR55_bd": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/BossDR55/bossdr55-bd/Bassdrum-01.wav"
+  ],
+  "BossDR55_sd": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/BossDR55/bossdr55-sd/Snaredrum-01.wav"
+  ],
+  "BossDR55_hh": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/BossDR55/bossdr55-hh/Hihat1.wav"
+  ],
+  "BossDR55_rim": [
+    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/BossDR55/bossdr55-rim/Rimshot.wav"
+  ]
+}

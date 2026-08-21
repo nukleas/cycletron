@@ -22,6 +22,31 @@ import type {UserSettings} from './types/tauri-commands.js';
 // listeners in place and simply hides the chat behind the Enable CTA.
 let chatWired = false;
 
+/** Toggle the AI panel — the one implementation behind the arrow button,
+ *  View menu, and command palette. */
+export function toggleAiPanel(): void {
+    document.getElementById('aiPanel')?.classList.toggle('collapsed');
+}
+
+/** Chat-UI reset hook, assigned once the chat is wired (its DOM helpers are
+ *  closure-scoped inside the init). No-op before consent — there's no chat. */
+let resetChatUi: (() => void) | null = null;
+
+/**
+ * Clear the AI session everywhere: backend history, the chat transcript, and
+ * dependents (title bar, editor empty state) via `session:cleared`. Single
+ * implementation behind the chat "New" button, Edit menu, and palette.
+ */
+export async function clearSession(): Promise<void> {
+    try {
+        await ipc('clear_session');
+    } catch (e) {
+        console.warn('[ai-bridge] clear_session failed:', e);
+    }
+    resetChatUi?.();
+    document.dispatchEvent(new CustomEvent('session:cleared'));
+}
+
 // --- Main Init ---
 
 async function initAiBridge() {
@@ -69,7 +94,7 @@ function wirePanelToggle(): void {
     if (!panel || !toggleBtn) return;
     // A collapsed panel is `display:none`, so the arrow is only ever visible
     // while expanded (where it means "collapse") — no glyph swap needed.
-    toggleBtn.addEventListener('click', () => panel.classList.toggle('collapsed'));
+    toggleBtn.addEventListener('click', () => toggleAiPanel());
 }
 
 /** Wire the chat form, quick prompts, and agent-event stream. Runs once. */
@@ -176,15 +201,11 @@ async function wireAiChat() {
 
     // --- Clear / New Song ---
 
-    clearBtn.addEventListener('click', async () => {
-        try {
-            await invoke('clear_session');
-        } catch (_e) { /* ok */ }
-
-        // Clear chat UI
+    resetChatUi = () => {
         messagesEl.innerHTML = '';
         addMessage('assistant', 'Fresh start! Describe what you want to create.');
-    });
+    };
+    clearBtn.addEventListener('click', () => void clearSession());
 
     // --- Form Submit ---
 
@@ -291,15 +312,8 @@ async function wireAiChat() {
     }
 
     function setTempo(bpm: number) {
-        const app = getApp();
-        if (!app) return;
-        try {
-            const slider = document.getElementById('bpmSlider') as HTMLInputElement;
-            const value = document.getElementById('bpmValue') as HTMLInputElement;
-            if (slider) slider.value = String(Math.round(bpm));
-            if (value) value.value = String(Math.round(bpm));
-            app.applyBpm?.(bpm);
-        } catch (_e) { /* ok */ }
+        // applyBpm is the sole writer — it updates every BPM display itself.
+        try { getApp()?.applyBpm?.(bpm); } catch (_e) { /* ok */ }
     }
 
     // --- Welcome ---

@@ -21,7 +21,11 @@ import {invoke, isTauri} from './tauri.js';
 import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
 import {aboutModal} from './about-modal.js';
-import {packsModal} from './packs-modal.js';
+import {samplesModal, switchSampleSet} from './samples-modal.js';
+import {adjustBpm} from './bpm.js';
+import {basename} from './paths.js';
+import {clearSession, toggleAiPanel} from './ai-bridge.js';
+import {fileExplorer} from './file-explorer.js';
 import {helpModal} from './help-modal.js';
 import {preferencesModal, persistEditorAssist} from './preferences.js';
 import {midiLab} from './midi-lab.js';
@@ -30,6 +34,7 @@ import {checkForUpdates} from './updater.js';
 import {dismissibleModal} from './modal-utils.js';
 import {logsModal} from './logs-modal.js';
 import {errorDialog} from './dialog.js';
+import type {SampleSetStatus, UserSettings} from './types/tauri-commands.js';
 
 
 interface Item {
@@ -202,8 +207,8 @@ const COMMANDS: Item[] = [
     {id: 'cmd.export_midi', title: 'Export MIDI…',          section: 'Commands',                 run: () => fileManager.exportMidi()},
     {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => midiLab.openEmpty()},
     {id: 'cmd.load_samples',title: 'Load Sample Folder…',   section: 'Commands',                 run: () => requireApp().loadSampleFolder()},
-    {id: 'cmd.sample_packs',title: 'Sample Packs…',         section: 'Commands',                 run: () => packsModal.open()},
-    {id: 'cmd.install_pack',title: 'Install Sample Pack…',  section: 'Commands',                 run: () => packsModal.installFromFolder()},
+    {id: 'cmd.samples',     title: 'Samples… (sets & packs)', section: 'Commands',               run: () => samplesModal.open()},
+    {id: 'cmd.install_pack',title: 'Install Sample Pack…',  section: 'Commands',                 run: () => samplesModal.installFromFolder()},
     {id: 'cmd.preferences', title: 'Preferences…',          section: 'Commands', hint: '⌘,',     run: () => preferencesModal.open()},
     {id: 'cmd.examples',    title: 'Browse Examples…',      section: 'Commands',                 run: () => requireEl('browseExamples', 'The examples browser').click()},
     {id: 'cmd.help_guide',  title: 'User Guide…',           section: 'Commands',                 run: () => helpModal.open('guide')},
@@ -212,21 +217,48 @@ const COMMANDS: Item[] = [
     {id: 'cmd.about',       title: 'About Cycletron',       section: 'Commands',                 run: () => aboutModal.open()},
     {id: 'cmd.updates',     title: 'Check for Updates',     section: 'Commands',                 run: () => checkForUpdates(true)},
     {id: 'cmd.logs',        title: 'Show Logs…',            section: 'Commands',                 run: () => logsModal.open()},
-    {id: 'cmd.toggle_ai',   title: 'Toggle AI Panel',       section: 'Commands',                 run: () => { requireEl('aiPanel', 'The AI panel').classList.toggle('collapsed'); }},
-    {id: 'cmd.toggle_files',title: 'Toggle Files Panel',    section: 'Commands',                 run: () => { requireEl('filesPanel', 'The files panel').classList.toggle('collapsed'); }},
+    {id: 'cmd.toggle_ai',   title: 'Toggle AI Panel',       section: 'Commands',                 run: () => { toggleAiPanel(); }},
+    {id: 'cmd.toggle_files',title: 'Toggle Files Panel',    section: 'Commands',                 run: () => { fileExplorer.toggleCollapsed(); }},
     {id: 'cmd.toggle_assist',title: 'Toggle Editor Autocomplete', section: 'Commands',            run: async () => { const e = requireApp().editor; if (!e) throw new Error('The editor is still loading — try again in a moment.'); const on = !e.isAssistEnabled(); e.setAssistEnabled(on); await persistEditorAssist(on); }},
     {id: 'cmd.tempo_up',    title: 'Tempo +1 BPM',          section: 'Commands',                 run: () => adjustBpm(1)},
     {id: 'cmd.tempo_down',  title: 'Tempo −1 BPM',          section: 'Commands',                 run: () => adjustBpm(-1)},
-    {id: 'cmd.clear_session', title: 'Clear AI Session',    section: 'Commands',                 run: async () => {
-        await invoke('clear_session');
-        document.dispatchEvent(new CustomEvent('session:cleared'));
-    }},
+    {id: 'cmd.clear_session', title: 'Clear AI Session',    section: 'Commands',                 run: () => clearSession()},
 ];
 
 async function collectItems(): Promise<Item[]> {
     const out: Item[] = [...COMMANDS];
 
     if (!isTauri) return out;
+
+    // Sample sets: one switch entry per downloaded set, a download entry for
+    // the rest (the download UI with progress lives in Preferences).
+    try {
+        const [sets, settings] = await Promise.all([
+            invoke<SampleSetStatus[]>('list_sample_sets'),
+            invoke<UserSettings>('get_user_settings'),
+        ]);
+        const active = settings.samples?.active ?? 'cycletron';
+        for (const set of sets) {
+            if (set.ready) {
+                out.push({
+                    id: `sampleset:${set.id}`,
+                    title: `Sample Set: ${set.label}`,
+                    subtitle: set.id === active ? 'active' : 'switch — reloads the audio engine',
+                    section: 'Commands',
+                    run: () => switchSampleSet(set.id),
+                });
+            } else {
+                out.push({
+                    id: `sampleset:${set.id}`,
+                    title: `Sample Set: Download ${set.label}…`,
+                    section: 'Commands',
+                    run: () => samplesModal.open(),
+                });
+            }
+        }
+    } catch (e) {
+        console.debug('[command-palette] list_sample_sets failed:', e);
+    }
 
     // Recent files first (most recently opened on top).
     try {
@@ -313,12 +345,6 @@ function iconFor(section: Item['section']): string {
     return section === 'Commands' ? '⚡' : section === 'Files' ? '▤' : '↻';
 }
 
-function adjustBpm(delta: number): void {
-    const slider = requireEl('bpmSlider', 'The tempo control') as HTMLInputElement;
-    const next = Math.max(30, Math.min(300, parseInt(slider.value, 10) + delta));
-    requireApp().applyBpm(next);
-}
-
 // ------------------------------------------------------------------
 // Failure surfacing — a command throws, we tell the user
 // ------------------------------------------------------------------
@@ -343,10 +369,6 @@ async function reportActionError(title: string, e: unknown): Promise<void> {
     await errorDialog(`Couldn't run "${title}".\n\n${detail}`);
 }
 
-function basename(path: string): string {
-    const parts = path.split(/[\\/]/);
-    return parts[parts.length - 1] || path;
-}
 
 export const commandPalette = new CommandPalette();
 window.commandPalette = commandPalette;

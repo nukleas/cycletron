@@ -13,6 +13,8 @@ import {invoke, isTauri} from './tauri.js';
 import {notify} from './notifications.js';
 import {addTask, removeTask} from './dock-badge.js';
 import {warnDialog, saveFileDialog} from './dialog.js';
+import {basename} from './paths.js';
+import {currentBpm} from './bpm.js';
 
 
 type RecorderState = 'idle' | 'recording' | 'finalizing';
@@ -265,22 +267,11 @@ function pickSupportedMimeType(): string | null {
     return null;
 }
 
-function currentBpm(): number {
-    const el = document.getElementById('bpmSlider') as HTMLInputElement | null;
-    const v = el ? parseFloat(el.value) : NaN;
-    return Number.isFinite(v) ? v : 120;
-}
-
 function defaultFileName(): string {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
     return `cycletron-${stamp}.wav`;
-}
-
-function basename(path: string): string {
-    const parts = path.split(/[\\/]/);
-    return parts[parts.length - 1] || path;
 }
 
 export const audioRecorder = new AudioRecorder();

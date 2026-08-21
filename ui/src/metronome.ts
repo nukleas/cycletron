@@ -6,6 +6,8 @@
  * reflected on the next click.
  */
 
+import {currentBpm} from './bpm.js';
+
 const LOOK_AHEAD_MS = 25;       // scheduler tick rate
 const SCHEDULE_AHEAD = 0.1;     // seconds of look-ahead
 
@@ -102,12 +104,6 @@ class Metronome {
         this.btn.classList.toggle('is-on', this.enabled);
         this.btn.setAttribute('data-tooltip', this.enabled ? 'Metronome on' : 'Metronome off');
     }
-}
-
-function currentBpm(): number {
-    const el = document.getElementById('bpmSlider') as HTMLInputElement | null;
-    const v = el ? parseFloat(el.value) : NaN;
-    return Number.isFinite(v) && v > 0 ? v : 120;
 }
 
 export const metronome = new Metronome();

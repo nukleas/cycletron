@@ -4,6 +4,7 @@
  * lockstep with `ui/songs/` and `corpus/` without hand-copying code.
  */
 
+import {basename} from './paths.js';
 import type {Example, ExampleSection} from './examples-data.js';
 
 // Vite raw imports — bundled into the UI so demos work offline / without the
@@ -23,7 +24,7 @@ const techniqueModules = import.meta.glob(
     },
 ) as Record<string, string>;
 
-const genreModules = import.meta.glob('../../corpus/genres/*/generated-*.strudel', {
+const genreModules = import.meta.glob('../../corpus/genres/*/*.strudel', {
     query: '?raw',
     import: 'default',
     eager: true,
@@ -49,10 +50,6 @@ const showcaseModules = import.meta.glob('../../corpus/showcase/*.strudel', {
     eager: true,
 }) as Record<string, string>;
 
-function basename(path: string): string {
-    const parts = path.replace(/\\/g, '/').split('/');
-    return parts[parts.length - 1] ?? path;
-}
 
 function stripExt(name: string): string {
     return name.replace(/\.strudel$/i, '');
@@ -122,7 +119,7 @@ function entryFromModule(
     titlePrefix?: string,
 ): Example {
     const file = stripExt(basename(path));
-    let title = humanize(file.replace(/^generated-/, ''));
+    let title = humanize(file.replace(/^(?:generated|example)-/, ''));
     if (titlePrefix) title = `${titlePrefix} · ${title}`;
     // Agency: keep track number in title for album order.
     if (path.includes('/agency/')) {
@@ -227,7 +224,10 @@ export function loadGenreExamples(): Example[] {
         if (typeof code !== 'string' || !code.trim()) continue;
         // Skip draft folders if any slip through.
         if (path.includes('/_')) continue;
-        out.push(entryFromModule(path, code, 'genres'));
+        const file = stripExt(basename(path));
+        const slug = path.match(/\/genres\/([^/]+)\//)?.[1];
+        const prefix = !file.startsWith('generated-') && slug ? humanize(slug) : undefined;
+        out.push(entryFromModule(path, code, 'genres', prefix));
     }
     return out.sort((a, b) => a.title.localeCompare(b.title));
 }

@@ -18,6 +18,8 @@
  *     chord `[c4,e4,g4]`.
  */
 
+import {currentBpm} from './bpm.js';
+
 /** Strudel pitch-class spelling — matches `PC_LOWER` in the gen crate. */
 const NOTE_NAMES = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
 
@@ -41,11 +43,6 @@ export function midiToNoteName(midi: number): string {
     return `${name}${octave}`;
 }
 
-function currentBpm(): number {
-    const el = document.getElementById('bpmSlider') as HTMLInputElement | null;
-    const v = el ? parseFloat(el.value) : NaN;
-    return Number.isFinite(v) && v > 0 ? v : 120;
-}
 
 type Slot = {kind: 'note' | 'hold' | 'rest'; tok: string};
 

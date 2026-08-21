@@ -14,6 +14,7 @@
  */
 
 import {FullscreenVisualizer, FullscreenVizMode, MODE_COUNT} from './fullscreen-viz.js';
+import {currentBpm} from './bpm.js';
 
 export const MODE_NAMES: Record<FullscreenVizMode, string> = {
     [FullscreenVizMode.NeonCircuit]: 'NEON CIRCUIT',
@@ -201,8 +202,6 @@ export class AmbientViz {
         document.getElementById('fsVizAuto')?.addEventListener('click', () => this.toggleAutoCycle());
         this.updateAutoButton();
 
-        document.getElementById('bpmSlider')?.addEventListener('input', () => this.updateHudBpm());
-
         document.addEventListener('keydown', (e: KeyboardEvent) => {
             // Ctrl/Cmd+Shift+V toggles the viz anywhere.
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'V' || e.key === 'v')) {
@@ -241,8 +240,7 @@ export class AmbientViz {
 
     private updateHudBpm(): void {
         const el = document.getElementById('fsBpm');
-        const slider = document.getElementById('bpmSlider') as HTMLInputElement | null;
-        if (el && slider) el.textContent = slider.value;
+        if (el) el.textContent = String(currentBpm());
     }
 
     /** Reveal the HUD briefly, then auto-hide. */

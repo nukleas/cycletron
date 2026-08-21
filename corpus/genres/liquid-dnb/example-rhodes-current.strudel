@@ -1,0 +1,25 @@
+// Rhodes Current — liquid drum & bass essentials · E minor · 174 BPM
+setbpm(174);
+
+stack(
+  s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~")
+    .gain(0.72),
+  s("hh*16").hpf(5600).gain("[0.16 0.09]*8").pan(0.58),
+  note("<e1 ~ e1 b1 c2 ~ b1 g1>")
+    .s("sine")
+    .release(0.3)
+    .gain(0.46),
+  note("<[e3,g3,b3,d4] [a3,c4,e4,g4] [c4,e4,g4,b4] [b3,d4,f#4,a4]>")
+    .s("gm_epiano1")
+    .release(0.42)
+    .lpf(2400)
+    .room(0.45)
+    .gain(0.26)
+    .pan(0.4),
+  note("<b4 ~ e5 ~ g5 ~ f#5 ~>")
+    .s("wt_flute")
+    .delay(0.25)
+    .room(0.4)
+    .gain(0.17)
+    .pan(0.68)
+)

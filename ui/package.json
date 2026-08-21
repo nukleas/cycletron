@@ -6,9 +6,10 @@
   "type": "module",
   "scripts": {
     "gen:dsl": "node scripts/gen-dsl-surface.mjs",
-    "predev": "npm run gen:dsl",
+    "gen:manifest": "node scripts/gen-sample-manifest.mjs",
+    "predev": "npm run gen:dsl && npm run gen:manifest",
     "dev": "vite --port 5173",
-    "prebuild": "npm run gen:dsl",
+    "prebuild": "npm run gen:dsl && npm run gen:manifest",
     "build": "vite build",
     "preview": "vite preview --port 5173",
     "comment:build:wasm": "The prebuilt engine WASM is committed under ui/pkg (built from the pinned strudel-rs main rev). Only rerun build:wasm to bump the engine; it needs a strudel-rs checkout at that rev + nightly. Then commit ui/pkg.",

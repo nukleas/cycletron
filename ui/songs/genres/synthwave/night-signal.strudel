@@ -1,0 +1,54 @@
+// Night Signal — cinematic synthwave · A minor · 102 BPM · 28-bar arrangement
+setbpm(102);
+
+"<intro verse build chorus bridge chorus outro>".slow(4).pickRestart({
+  intro: stack(
+    s("bd ~ ~ ~").lpf(850).room(0.3).gain(0.52),
+    note("<a1 f1 c2 g1>").s("sawtooth").lpf(480).release(0.5).gain(0.34),
+    note("<[a4 c5 e5 c5] [f4 a4 c5 a4] [c5 e5 g5 e5] [g4 b4 d5 b4]>")
+      .fast(2).s("pulse").decay(0.12).sustain(0.04)
+      .delay(0.2).delaytime(0.375).room(0.3).gain(0.16).pan(0.68)
+  ),
+  verse: stack(
+    s("bd ~ ~ ~ bd ~ ~ ~, ~ ~ sd ~ ~ ~ sd ~").room(0.34).gain(0.66),
+    s("hh ~ hh ~ hh ~ hh ~").hpf(5200).gain(0.13).pan(0.58),
+    note("<[a1 ~ a2 ~] [f1 ~ f2 ~] [c2 ~ c3 ~] [g1 ~ g2 ~]>")
+      .s("sawtooth").lpf(580).decay(0.18).sustain(0.16).gain(0.38),
+    note("<[a3,c4,e4] [f3,a3,c4] [c4,e4,g4] [g3,b3,d4]>")
+      .s("wt_pad").attack(0.42).release(0.9).lpf(1350).chorus(0.32).room(0.44).gain(0.2).pan(0.4)
+  ),
+  build: stack(
+    s("bd ~ ~ ~ bd ~ ~ ~, ~ ~ sd ~ ~ ~ sd ~").room(0.38).gain(0.68),
+    s("hh*8").hpf(5600).gain("[0.14 0.08]*4").pan(0.6),
+    s("~ ~ ~ sd*4").room(0.4).gain(0.22),
+    note("<[a1 a2 a1 a2] [f1 f2 f1 f2] [c2 c3 c2 c3] [g1 g2 g1 g2]>")
+      .s("sawtooth").lpf(saw.range(520, 980).slow(4)).gain(0.38),
+    note("<[a3,c4,e4] [f3,a3,c4] [c4,e4,g4] [g3,b3,d4]>")
+      .s("supersaw").attack(0.3).release(0.8).lpf(saw.range(1100, 1900).slow(4))
+      .chorus(0.35).room(0.42).gain(0.2).pan(0.4)
+  ),
+  chorus: stack(
+    s("bd ~ ~ ~ bd ~ ~ ~, ~ ~ sd ~ ~ ~ sd ~").room(0.4).gain(0.72),
+    s("hh*8, ~ oh ~ oh").hpf(5000).gain(0.16).pan(0.6),
+    note("<[a1 a2 a1 e2] [f1 f2 f1 c2] [c2 c3 c2 g2] [g1 g2 g1 d2]>")
+      .s("sawtooth").lpf(720).decay(0.16).sustain(0.2).gain(0.4),
+    note("<[a3,c4,e4] [f3,a3,c4] [c4,e4,g4] [g3,b3,d4]>")
+      .s("supersaw").attack(0.28).release(0.85).lpf(1750)
+      .chorus(0.38).room(0.46).gain(0.22).pan(0.38),
+    note("<[e5 e5 d5 c5] [c5 c5 a4 c5] [g5 g5 e5 d5] [d5 d5 b4 a4]>")
+      .s("wt_lead").release(0.22).delay(0.18).room(0.28).gain(0.18).pan(0.7)
+  ),
+  bridge: stack(
+    s("bd ~ ~ ~").lpf(620).room(0.45).gain(0.48),
+    note("<a1 f1 c2 g1>").s("sine").attack(0.05).release(1.0).gain(0.34),
+    note("<[a3,c4,e4] [f3,a3,c4] [c4,e4,g4] [g3,b3,d4]>")
+      .s("wt_pad").attack(0.8).release(1.7).lpf(1000).chorus(0.35).room(0.62).gain(0.2).pan(0.42),
+    note("<e5 ~ c5 ~ g5 ~ d5 ~>").s("wt_bell").delay(0.28).room(0.55).gain(0.11).pan(0.68)
+  ),
+  outro: stack(
+    s("bd ~ ~ ~").lpf(isaw.range(420, 900).slow(4)).room(0.4).gain(0.46),
+    note("<a1 f1 c2 g1>").s("sawtooth").lpf(isaw.range(340, 650).slow(4)).release(0.7).gain(0.3),
+    note("<[a4 c5 e5 c5] [f4 a4 c5 a4] [c5 e5 g5 e5] [g4 b4 d5 b4]>")
+      .fast(2).s("pulse").decay(0.14).sustain(0.04).delay(0.2).room(0.42).gain(0.12).pan(0.68)
+  )
+})

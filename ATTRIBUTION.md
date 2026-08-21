@@ -98,6 +98,28 @@ for each release is printed in the release workflow's `fix-appimage` job; the
 GPL-incompatible "ugly" plugin set is excluded. The `.deb`/`.rpm` packages
 bundle no GStreamer — they use the host's.
 
+## Optional download: the strudel-rs sample set (not bundled)
+
+Preferences → Sample set can download the default strudel-rs/strudio sample
+set so Cycletron sounds identical to strudel-rs. **None of these files ship
+with Cycletron or are redistributed by us** — the user's machine fetches them
+from the upstream repositories (the same sources the strudel-rs engine
+streams from) into the local app cache.
+
+- **Salamander Grand Piano** by **Alexander Holm** — **CC-BY-3.0**
+  (<http://creativecommons.org/licenses/by/3.0/>). Fetched as the
+  dough-samples `piano.json` renderings
+  (https://github.com/felixroos/dough-samples); original recording:
+  https://archive.org/details/SalamanderGrandPianoV3.
+- **uzu drumkit** (https://github.com/tidalcycles/uzu-drumkit) — **Unlicense**.
+  Supplies the default `bd`/`sd`/`hh`/… voices, matching strudel-rs.
+- **uzu wavetables** (https://github.com/tidalcycles/uzu-wavetables) — mixed:
+  the AKWF-derived `wt_vgame` tables are CC0; `wt_digital` (Glossing) carries
+  no SPDX license. Downloaded from upstream at user request only.
+- **Dirt-Samples** (https://github.com/tidalcycles/Dirt-Samples) — the classic
+  SuperDirt pack; **no license file, mixed provenance**. Downloaded from
+  upstream at user request only, never mirrored or redistributed.
+
 ## Trademarks
 
 Roland, TR-808, TR-909, TR-707, and Boss DR-55 are trademarks of Roland

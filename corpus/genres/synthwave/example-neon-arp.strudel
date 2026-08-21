@@ -1,0 +1,31 @@
+// Neon Arp — synthwave essentials · A minor · 102 BPM
+setbpm(102);
+
+stack(
+  s("bd ~ ~ ~ bd ~ ~ ~, ~ ~ sd ~ ~ ~ sd ~").room(0.28).gain(0.68),
+  s("hh ~ hh ~ hh ~ hh ~").hpf(5200).gain(0.16).pan(0.62),
+  note("<a1 a2 f1 f2 c2 c3 g1 g2>")
+    .s("sawtooth")
+    .lpf(620)
+    .decay(0.16)
+    .sustain(0.18)
+    .gain(0.4),
+  note("<[a3,c4,e4] [f3,a3,c4] [c4,e4,g4] [g3,b3,d4]>")
+    .s("supersaw")
+    .attack(0.35)
+    .release(0.8)
+    .lpf(1500)
+    .chorus(0.35)
+    .room(0.45)
+    .gain(0.22)
+    .pan(0.4),
+  note("<a4 c5 e5 c5 f4 a4 c5 a4 c5 e5 g5 e5 g4 b4 d5 b4>")
+    .fast(2)
+    .s("pulse")
+    .decay(0.1)
+    .sustain(0.05)
+    .delay(0.2)
+    .delaytime(0.375)
+    .gain(0.18)
+    .pan(0.7)
+)

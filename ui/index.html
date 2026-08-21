@@ -247,7 +247,7 @@
             </div>
 
             <div class="sidebar-section" id="soundsPanel">
-                <h3>Sounds <span id="soundsCount" class="section-count"></span></h3>
+                <h3>Sounds <span id="soundsCount" class="section-count"></span> <button id="soundsManage" class="prefs-inline-btn sounds-manage-btn" type="button" data-tooltip="Manage sample sets &amp; packs">Manage…</button></h3>
                 <div id="soundsList" class="sounds-list"></div>
             </div>
 
@@ -436,16 +436,21 @@
         </div>
     </div>
 
-    <!-- Sample packs -->
-    <div id="packsModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="packsTitle">
+    <!-- Samples manager: sample sets (base sound world) + packs (additive banks) -->
+    <div id="samplesModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="samplesTitle">
         <div class="app-modal-backdrop" data-dismiss></div>
         <div class="app-modal-window" role="document">
             <div class="app-modal-header">
-                <span id="packsTitle">Sample Packs</span>
+                <span id="samplesTitle">Samples</span>
                 <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
             </div>
             <div class="packs-modal-body">
-                <p class="packs-intro">Optional sample packs live in your library under <code>Packs/</code>. Enable a pack to load its banks for <code>s("…")</code>.</p>
+                <h4 class="samples-heading">Sample set</h4>
+                <p class="packs-intro">The active set is the base sound world for playback <em>and</em> export — switching reloads the audio engine. The <strong>strudel-rs</strong> set (Salamander Grand Piano by Alexander Holm CC-BY-3.0, uzu drumkit, uzu wavetables, Dirt-Samples, ~300 MB) is fetched from the upstream repos; define more sets in <code>sample-sets.json</code> in the app data folder.</p>
+                <div id="samplesSetList" class="packs-list"></div>
+                <progress id="samplesSetProgress" max="1" value="0" hidden></progress>
+                <h4 class="samples-heading">Packs</h4>
+                <p class="packs-intro">Optional sample packs live in your library under <code>Packs/</code>. Enabled packs add their banks on top of the active set.</p>
                 <div id="packsList" class="packs-list"></div>
                 <div id="packsEmpty" class="packs-empty" hidden></div>
             </div>
@@ -573,6 +578,16 @@
                         <span>Metronome volume</span>
                         <input type="range" id="prefsMetronomeVolume" min="0" max="100" step="1" value="40">
                     </label>
+                </section>
+                <section class="prefs-section">
+                    <h4>Samples</h4>
+                    <div class="prefs-field prefs-field-wide">
+                        <div class="prefs-row">
+                            <span>Sample sets &amp; packs</span>
+                            <button id="prefsManageSamples" class="prefs-inline-btn" type="button">Manage…</button>
+                        </div>
+                        <p class="prefs-note">The active sample set is the base sound world for playback and export; packs add extra banks on top.</p>
+                    </div>
                 </section>
                 <section class="prefs-section">
                     <h4>MIDI Input</h4>

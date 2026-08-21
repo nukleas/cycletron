@@ -225,7 +225,7 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "file.save" => "menu:save",
         "file.save_as" => "menu:save_as",
         "file.import_midi" => "menu:import_midi",
-        "file.export_audio" | "file.export_wav" => "menu:export_audio",
+        "file.export_audio" => "menu:export_audio",
         "file.export_midi" => "menu:export_midi",
         "edit.undo" => "menu:undo",
         "edit.redo" => "menu:redo",

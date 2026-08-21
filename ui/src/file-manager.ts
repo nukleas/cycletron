@@ -10,6 +10,8 @@ import {invoke, isTauri} from './tauri.js';
 import {notify} from './notifications.js';
 import {addTask, removeTask} from './dock-badge.js';
 import {confirmDialog, errorDialog, infoDialog, openPathDialog, saveFileDialog} from './dialog.js';
+import {basename} from './paths.js';
+import {currentBpm} from './bpm.js';
 import type {
     FileDoc,
     CurrentFile,
@@ -105,8 +107,6 @@ export class FileManager {
 
     async openFile(): Promise<void> {
         if (!isTauri) return;
-        if (!(await this.confirmDiscardIfDirty())) return;
-
         const path = await openPathDialog({
             directory: false,
             filters: [STRUDEL_FILTER],
@@ -115,7 +115,14 @@ export class FileManager {
         await this.openPath(path);
     }
 
-    async openPath(path: string): Promise<void> {
+    /**
+     * Open a file into the editor. Guards unsaved changes with a confirm —
+     * every entry point (dialog, tree, drag-drop, recents, Finder) funnels
+     * through here, so none can silently discard work. `force` skips the
+     * guard for flows that already confirmed (external-change reload).
+     */
+    async openPath(path: string, opts?: {force?: boolean}): Promise<void> {
+        if (!opts?.force && !(await this.confirmDiscardIfDirty())) return;
         try {
             const doc = await invoke<FileDoc>('open_file', {path});
             this.setEditorCode(doc.code);
@@ -153,7 +160,7 @@ export class FileManager {
 
     private async writeTo(path: string): Promise<boolean> {
         const code = this.getEditorCode();
-        const bpm = this.currentBpm();
+        const bpm = currentBpm();
         try {
             if (path === this.currentPath) {
                 await invoke<string>('save_current', {code, bpm});
@@ -173,18 +180,13 @@ export class FileManager {
         }
     }
 
-    async importMidiDialog(): Promise<void> {
-        if (!isTauri) return;
-        if (!(await this.confirmDiscardIfDirty())) return;
-        const path = await openPathDialog({
-            directory: false,
-            filters: [MIDI_FILTER],
-        });
-        if (!path) return;
-        await this.importMidiPath(path);
-    }
-
+    /**
+     * Convert a `.mid` file and replace the editor buffer with the result.
+     * Guards unsaved changes here (the choke point) so drag-drop and the
+     * MIDI Lab's "Open in Editor" can't silently discard work.
+     */
     async importMidiPath(path: string, options?: ImportMidiOptions): Promise<void> {
+        if (!(await this.confirmDiscardIfDirty())) return;
         try {
             const result = await invoke<MidiImport>('import_midi', {path, options});
             const app = window.strudelApp;
@@ -228,7 +230,7 @@ export class FileManager {
             return;
         }
 
-        const bpm = this.currentBpm() ?? 120;
+        const bpm = currentBpm();
         const opts = await promptExportAudioOptions(bpm, code);
         if (!opts) return;
 
@@ -291,11 +293,6 @@ export class FileManager {
         }
     }
 
-    /** @deprecated use exportAudio */
-    async exportWav(): Promise<void> {
-        return this.exportAudio();
-    }
-
     /**
      * Export the current pattern as a Standard MIDI File (notes + drums).
      */
@@ -307,7 +304,7 @@ export class FileManager {
             return;
         }
 
-        const bpm = this.currentBpm() ?? 120;
+        const bpm = currentBpm();
         const opts = await promptExportMidiOptions(bpm, code);
         if (!opts) return;
 
@@ -389,12 +386,6 @@ export class FileManager {
         }
     }
 
-    private currentBpm(): number | undefined {
-        const el = document.getElementById('bpmSlider') as HTMLInputElement | null;
-        const v = el ? parseInt(el.value, 10) : NaN;
-        return isNaN(v) ? undefined : v;
-    }
-
     private emitChanged(): void {
         document.dispatchEvent(new CustomEvent('file:changed', {
             detail: {
@@ -404,11 +395,6 @@ export class FileManager {
             },
         }));
     }
-}
-
-function basename(path: string): string {
-    const parts = path.split(/[\\/]/);
-    return parts[parts.length - 1] || path;
 }
 
 interface ExportAudioOptions {
@@ -475,6 +461,143 @@ async function detectLength(code: string): Promise<DetectedLength> {
     return {bars: null, seconds: null, kind: null};
 }
 
+/** Per-caller configuration for the shared export-options modal. */
+interface ExportPromptConfig<T> {
+    title: string;
+    helpHtml: string;
+    /** Label for the length field, e.g. 'Bars' or 'Cycles'. */
+    fieldLabel: string;
+    /** Unit word in the auto/custom radio labels, e.g. 'bars' or 'cycles'. */
+    unit: string;
+    defaultLength: number;
+    parseLength: (raw: string) => number;
+    /** Text under the fields; re-rendered whenever the chosen length changes. */
+    metaText: (length: number) => string;
+    extraFieldsHtml?: string;
+    readExtras: (root: HTMLElement) => T;
+}
+
+const MAX_EXPORT_LENGTH = 1024;
+
+/**
+ * Shared modal skeleton for both export flows: auto/custom length radio
+ * (custom field enabled only in custom mode), Escape cancels — swallowing
+ * the key so the editor doesn't see it — Enter confirms, and clicking the
+ * backdrop dismisses.
+ */
+async function promptExportOptions<T>(
+    bpm: number,
+    code: string,
+    cfg: ExportPromptConfig<T>,
+): Promise<{length: number; extras: T} | null> {
+    const detected = await detectLength(code);
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'picker-overlay';
+        const autoAvail = detected.bars != null;
+        const autoLength = detected.bars ?? cfg.defaultLength;
+        const autoSecs = detected.seconds ?? (autoLength * 4 * 60) / bpm;
+        const kindHint =
+            detected.kind === 'pickrestart' ? 'form'
+            : detected.kind === 'content_end' ? 'to end'
+            : detected.kind === 'loop' ? 'loop'
+            : '';
+        const autoLabel = autoAvail
+            ? `Full ${kindHint || 'length'} — ${autoLength} ${cfg.unit} ≈ ${fmtMinSec(autoSecs)}`
+            : 'Full length (could not detect)';
+        overlay.innerHTML = `
+            <div class="picker-modal export-modal">
+                <div class="picker-header">
+                    <span class="picker-title">${cfg.title}</span>
+                    <button class="picker-close" type="button" aria-label="Close">&times;</button>
+                </div>
+                <p class="export-modal-help">${cfg.helpHtml}</p>
+                <div class="export-modal-field export-length-modes">
+                    <span>Length</span>
+                    <div class="export-length-choices">
+                        <label><input type="radio" name="lenMode" value="auto" ${autoAvail ? 'checked' : 'disabled'}> ${autoLabel}</label>
+                        <label><input type="radio" name="lenMode" value="custom" ${autoAvail ? '' : 'checked'}> Custom ${cfg.unit}</label>
+                    </div>
+                </div>
+                <label class="export-modal-field">
+                    <span>${cfg.fieldLabel}</span>
+                    <input id="exportLength" type="number" min="1" max="${MAX_EXPORT_LENGTH}" step="1" value="${autoAvail ? autoLength : cfg.defaultLength}" ${autoAvail ? 'disabled' : ''}>
+                </label>
+                ${cfg.extraFieldsHtml ?? ''}
+                <p class="export-modal-meta" id="exportMeta"></p>
+                <div class="export-modal-actions">
+                    <button type="button" class="export-cancel">Cancel</button>
+                    <button type="button" class="export-confirm primary">Export…</button>
+                </div>
+            </div>
+        `;
+
+        const lengthInput = () => overlay.querySelector<HTMLInputElement>('#exportLength')!;
+        const meta = () => overlay.querySelector<HTMLElement>('#exportMeta')!;
+        const isAuto = () =>
+            overlay.querySelector<HTMLInputElement>('input[name="lenMode"][value="auto"]')?.checked ?? false;
+        const chosenLength = () =>
+            isAuto()
+                ? autoLength
+                : Math.max(1, Math.min(MAX_EXPORT_LENGTH, cfg.parseLength(lengthInput().value) || cfg.defaultLength));
+
+        const updateMeta = () => {
+            meta().textContent = cfg.metaText(chosenLength());
+        };
+
+        const onModeChange = () => {
+            const auto = isAuto();
+            lengthInput().disabled = auto;
+            if (auto) lengthInput().value = String(autoLength);
+            else lengthInput().focus();
+            updateMeta();
+        };
+
+        const close = (value: {length: number; extras: T} | null) => {
+            document.removeEventListener('keydown', onKey);
+            overlay.remove();
+            resolve(value);
+        };
+
+        const confirm = () => {
+            close({length: chosenLength(), extras: cfg.readExtras(overlay)});
+        };
+
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                close(null);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                confirm();
+            }
+        };
+
+        overlay.addEventListener('click', (e) => {
+            const t = e.target as HTMLElement;
+            if (t === overlay || t.classList.contains('picker-close') || t.classList.contains('export-cancel')) {
+                close(null);
+            } else if (t.classList.contains('export-confirm')) {
+                confirm();
+            }
+        });
+        lengthInput().addEventListener('input', updateMeta);
+        overlay.querySelectorAll<HTMLInputElement>('input[name="lenMode"]').forEach((r) =>
+            r.addEventListener('change', onModeChange),
+        );
+        updateMeta();
+        document.addEventListener('keydown', onKey);
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => {
+            // Focus the length field only when it's the active choice.
+            if (!lengthInput().disabled) {
+                lengthInput().focus();
+                lengthInput().select();
+            }
+        });
+    });
+}
+
 /**
  * Modal: length (auto full-loop or custom bars) + format (WAV/MP3/both) + stems.
  * Seconds derived from BPM (4 beats/bar, matching the live recorder). The auto
@@ -484,243 +607,60 @@ async function promptExportAudioOptions(
     bpm: number,
     code: string,
 ): Promise<ExportAudioOptions | null> {
-    const detected = await detectLength(code);
-    return new Promise((resolve) => {
-        const overlay = document.createElement('div');
-        overlay.className = 'picker-overlay';
-        const est = (bars: number) => ((bars * 4 * 60) / bpm).toFixed(1);
-        const MAX_BARS = 1024;
-        const autoAvail = detected.bars != null;
-        const autoBars = detected.bars ?? DEFAULT_EXPORT_BARS;
-        const autoSecs = detected.seconds ?? (autoBars * 4 * 60) / bpm;
-        const kindHint =
-            detected.kind === 'pickrestart' ? 'form'
-            : detected.kind === 'content_end' ? 'to end'
-            : detected.kind === 'loop' ? 'loop'
-            : '';
-        const autoLabel = autoAvail
-            ? `Full ${kindHint || 'length'} — ${autoBars} bars ≈ ${fmtMinSec(autoSecs)}`
-            : 'Full length (could not detect)';
-        const initialBars = autoAvail ? autoBars : DEFAULT_EXPORT_BARS;
-        overlay.innerHTML = `
-            <div class="picker-modal export-modal">
-                <div class="picker-header">
-                    <span class="picker-title">Export Audio</span>
-                    <button class="picker-close" type="button" aria-label="Close">&times;</button>
-                </div>
-                <p class="export-modal-help">
-                    Offline bake via the Rust DSP engine (faster than realtime).
-                    MP3 needs <code>ffmpeg</code> on PATH. Stems split
-                    <code>$:</code> tracks or a top-level <code>stack(...)</code>.
-                </p>
-                <div class="export-modal-field export-length-modes">
-                    <span>Length</span>
-                    <div class="export-length-choices">
-                        <label><input type="radio" name="lenMode" value="auto" ${autoAvail ? 'checked' : 'disabled'}> ${autoLabel}</label>
-                        <label><input type="radio" name="lenMode" value="custom" ${autoAvail ? '' : 'checked'}> Custom bars</label>
-                    </div>
-                </div>
-                <label class="export-modal-field">
-                    <span>Bars</span>
-                    <input id="exportBars" type="number" min="1" max="${MAX_BARS}" step="1" value="${initialBars}" ${autoAvail ? 'disabled' : ''}>
-                </label>
-                <label class="export-modal-field">
-                    <span>Format</span>
-                    <select id="exportFormat">
-                        <option value="wav" selected>WAV</option>
-                        <option value="mp3">MP3 (320k)</option>
-                        <option value="both">WAV + MP3</option>
-                    </select>
-                </label>
-                <label class="export-modal-check">
-                    <input id="exportStems" type="checkbox">
-                    <span>Also export stems (multi-track / stack layers)</span>
-                </label>
-                <p class="export-modal-meta" id="exportMeta">
-                    ≈ ${est(initialBars)}s at ${Math.round(bpm)} BPM
-                </p>
-                <div class="export-modal-actions">
-                    <button type="button" class="export-cancel">Cancel</button>
-                    <button type="button" class="export-confirm primary">Export…</button>
-                </div>
-            </div>
-        `;
-
-        const barsInput = () => overlay.querySelector<HTMLInputElement>('#exportBars')!;
-        const formatSelect = () => overlay.querySelector<HTMLSelectElement>('#exportFormat')!;
-        const stemsInput = () => overlay.querySelector<HTMLInputElement>('#exportStems')!;
-        const meta = () => overlay.querySelector<HTMLElement>('#exportMeta')!;
-        const isAuto = () =>
-            overlay.querySelector<HTMLInputElement>('input[name="lenMode"][value="auto"]')?.checked ?? false;
-        const chosenBars = () =>
-            isAuto()
-                ? autoBars
-                : Math.max(1, Math.min(MAX_BARS, parseFloat(barsInput().value) || DEFAULT_EXPORT_BARS));
-
-        const updateMeta = () => {
-            meta().textContent = `≈ ${est(chosenBars())}s at ${Math.round(bpm)} BPM`;
-        };
-
-        const onModeChange = () => {
-            const auto = isAuto();
-            barsInput().disabled = auto;
-            if (auto) barsInput().value = String(autoBars);
-            else barsInput().focus();
-            updateMeta();
-        };
-
-        const close = (value: ExportAudioOptions | null) => {
-            document.removeEventListener('keydown', onKey);
-            overlay.remove();
-            resolve(value);
-        };
-
-        const confirm = () => {
-            const bars = chosenBars();
-            const durationSecs = (bars * 4 * 60) / bpm;
-            const format = (formatSelect().value || 'wav') as ExportAudioOptions['format'];
-            close({durationSecs, bars, format, stems: stemsInput().checked});
-        };
-
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.stopPropagation();
-                close(null);
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                confirm();
-            }
-        };
-
-        overlay.addEventListener('click', (e) => {
-            const t = e.target as HTMLElement;
-            if (t === overlay || t.classList.contains('picker-close') || t.classList.contains('export-cancel')) {
-                close(null);
-            } else if (t.classList.contains('export-confirm')) {
-                confirm();
-            }
-        });
-        barsInput().addEventListener('input', updateMeta);
-        overlay.querySelectorAll<HTMLInputElement>('input[name="lenMode"]').forEach((r) =>
-            r.addEventListener('change', onModeChange),
-        );
-        document.addEventListener('keydown', onKey);
-        document.body.appendChild(overlay);
-        requestAnimationFrame(() => {
-            // Focus the bars field only when it's the active choice.
-            if (!barsInput().disabled) {
-                barsInput().focus();
-                barsInput().select();
-            }
-        });
+    const result = await promptExportOptions(bpm, code, {
+        title: 'Export Audio',
+        helpHtml: `
+            Offline bake via the Rust DSP engine (faster than realtime).
+            MP3 needs <code>ffmpeg</code> on PATH. Stems split
+            <code>$:</code> tracks or a top-level <code>stack(...)</code>.
+        `,
+        fieldLabel: 'Bars',
+        unit: 'bars',
+        defaultLength: DEFAULT_EXPORT_BARS,
+        parseLength: parseFloat,
+        metaText: (bars) => `≈ ${((bars * 4 * 60) / bpm).toFixed(1)}s at ${Math.round(bpm)} BPM`,
+        extraFieldsHtml: `
+            <label class="export-modal-field">
+                <span>Format</span>
+                <select id="exportFormat">
+                    <option value="wav" selected>WAV</option>
+                    <option value="mp3">MP3 (320k)</option>
+                    <option value="both">WAV + MP3</option>
+                </select>
+            </label>
+            <label class="export-modal-check">
+                <input id="exportStems" type="checkbox">
+                <span>Also export stems (multi-track / stack layers)</span>
+            </label>
+        `,
+        readExtras: (root) => ({
+            format: (root.querySelector<HTMLSelectElement>('#exportFormat')!.value || 'wav') as ExportAudioOptions['format'],
+            stems: root.querySelector<HTMLInputElement>('#exportStems')!.checked,
+        }),
     });
+    if (!result) return null;
+    const bars = result.length;
+    return {durationSecs: (bars * 4 * 60) / bpm, bars, ...result.extras};
 }
 
 async function promptExportMidiOptions(
     bpm: number,
     code: string,
 ): Promise<ExportMidiOptions | null> {
-    const detected = await detectLength(code);
-    return new Promise((resolve) => {
-        const overlay = document.createElement('div');
-        overlay.className = 'picker-overlay';
-        const MAX_CYCLES = 1024;
-        const autoAvail = detected.bars != null;
-        const autoCycles = detected.bars ?? DEFAULT_MIDI_CYCLES;
-        const autoSecs = detected.seconds ?? (autoCycles * 4 * 60) / bpm;
-        const kindHint =
-            detected.kind === 'pickrestart' ? 'form'
-            : detected.kind === 'content_end' ? 'to end'
-            : detected.kind === 'loop' ? 'loop'
-            : '';
-        const autoLabel = autoAvail
-            ? `Full ${kindHint || 'length'} — ${autoCycles} cycles ≈ ${fmtMinSec(autoSecs)}`
-            : 'Full length (could not detect)';
-        overlay.innerHTML = `
-            <div class="picker-modal export-modal">
-                <div class="picker-header">
-                    <span class="picker-title">Export MIDI</span>
-                    <button class="picker-close" type="button" aria-label="Close">&times;</button>
-                </div>
-                <p class="export-modal-help">
-                    Convert the pattern to a Standard MIDI File (notes + GM drums).
-                    Tempo: ${Math.round(bpm)} BPM (overridden by setcpm/setbpm in code).
-                </p>
-                <div class="export-modal-field export-length-modes">
-                    <span>Length</span>
-                    <div class="export-length-choices">
-                        <label><input type="radio" name="midiLenMode" value="auto" ${autoAvail ? 'checked' : 'disabled'}> ${autoLabel}</label>
-                        <label><input type="radio" name="midiLenMode" value="custom" ${autoAvail ? '' : 'checked'}> Custom cycles</label>
-                    </div>
-                </div>
-                <label class="export-modal-field">
-                    <span>Cycles</span>
-                    <input id="exportCycles" type="number" min="1" max="${MAX_CYCLES}" step="1" value="${autoAvail ? autoCycles : DEFAULT_MIDI_CYCLES}" ${autoAvail ? 'disabled' : ''}>
-                </label>
-                <p class="export-modal-meta">
-                    1 cycle ≈ 1 bar (4 beats) at current tempo
-                </p>
-                <div class="export-modal-actions">
-                    <button type="button" class="export-cancel">Cancel</button>
-                    <button type="button" class="export-confirm primary">Export…</button>
-                </div>
-            </div>
-        `;
-
-        const cyclesInput = () => overlay.querySelector<HTMLInputElement>('#exportCycles')!;
-        const isAuto = () =>
-            overlay.querySelector<HTMLInputElement>('input[name="midiLenMode"][value="auto"]')?.checked ?? false;
-
-        const onModeChange = () => {
-            const auto = isAuto();
-            cyclesInput().disabled = auto;
-            if (auto) cyclesInput().value = String(autoCycles);
-            else cyclesInput().focus();
-        };
-
-        const close = (value: ExportMidiOptions | null) => {
-            document.removeEventListener('keydown', onKey);
-            overlay.remove();
-            resolve(value);
-        };
-
-        const confirm = () => {
-            const cycles = isAuto()
-                ? autoCycles
-                : Math.max(1, Math.min(MAX_CYCLES, parseInt(cyclesInput().value, 10) || DEFAULT_MIDI_CYCLES));
-            close({cycles});
-        };
-
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.stopPropagation();
-                close(null);
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                confirm();
-            }
-        };
-
-        overlay.addEventListener('click', (e) => {
-            const t = e.target as HTMLElement;
-            if (t === overlay || t.classList.contains('picker-close') || t.classList.contains('export-cancel')) {
-                close(null);
-            } else if (t.classList.contains('export-confirm')) {
-                confirm();
-            }
-        });
-        overlay.querySelectorAll<HTMLInputElement>('input[name="midiLenMode"]').forEach((r) =>
-            r.addEventListener('change', onModeChange),
-        );
-        document.addEventListener('keydown', onKey);
-        document.body.appendChild(overlay);
-        requestAnimationFrame(() => {
-            if (!cyclesInput().disabled) {
-                cyclesInput().focus();
-                cyclesInput().select();
-            }
-        });
+    const result = await promptExportOptions(bpm, code, {
+        title: 'Export MIDI',
+        helpHtml: `
+            Convert the pattern to a Standard MIDI File (notes + GM drums).
+            Tempo: ${Math.round(bpm)} BPM (overridden by setcpm/setbpm in code).
+        `,
+        fieldLabel: 'Cycles',
+        unit: 'cycles',
+        defaultLength: DEFAULT_MIDI_CYCLES,
+        parseLength: (raw) => parseInt(raw, 10),
+        metaText: () => '1 cycle ≈ 1 bar (4 beats) at current tempo',
+        readExtras: () => null,
     });
+    return result ? {cycles: result.length} : null;
 }
 
 // Singleton — the app expects one instance.

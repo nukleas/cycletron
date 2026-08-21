@@ -1,0 +1,31 @@
+// Noir Pocket — trip-hop essentials · C# minor · 88 BPM
+setbpm(88);
+
+stack(
+  s("bd ~ ~ ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~")
+    .crush(10)
+    .gain(0.62),
+  s("~ ~ hh ~ ~ ~ hh ~ ~ ~ hh ~ ~ ~ hh ~")
+    .late(0.022)
+    .hpf(4300)
+    .crush(9)
+    .gain(0.16)
+    .pan(0.62),
+  note("<c#1 ~ c#1 g#1 a1 ~ f#1 g#1>")
+    .s("sine")
+    .release(0.5)
+    .gain(0.42),
+  note("<[c#3,e3,g#3,b3] [a2,c#3,e3,g#3] [f#3,a3,c#4,e4] [g#2,b2,d#3,f#3]>")
+    .s("gm_epiano1")
+    .release(0.45)
+    .lpf(1900)
+    .room(0.42)
+    .gain(0.25)
+    .pan(0.4),
+  note("<g#4 ~ b4 ~ f#4 ~ e4 ~>")
+    .s("wt_flute")
+    .delay(0.24)
+    .room(0.45)
+    .gain(0.16)
+    .pan(0.68)
+)

@@ -1,0 +1,45 @@
+// Slow Constellations — luminous ambient · C Lydian · 58 BPM · 28-bar arrangement
+setbpm(58);
+
+"<intro drift lift climax breakdown climax outro>".slow(4).pickRestart({
+  intro: stack(
+    note("<c2 g1 a1 f1>").s("sine").attack(2.8).release(5.0).gain(0.3),
+    note("<[c3,e3,g3,b3] [g2,b2,d3,f#3] [a2,c3,e3,g3] [f2,a2,c3,e3]>")
+      .s("wt_pad").attack(2.0).release(4.0).lpf(760).room(0.78).gain(0.18).pan(0.42)
+  ),
+  drift: stack(
+    note("<c2 g1 a1 f1>").s("sine").attack(2.6).release(4.8).gain(0.3),
+    note("<[c3,e3,g3,b3] [g2,b2,d3,f#3] [a2,c3,e3,g3] [f2,a2,c3,e3]>")
+      .s("wt_pad").attack(1.8).release(3.8).lpf(900).room(0.8).gain(0.2).pan(0.42),
+    note("<e5 ~ ~ b4 ~ ~ d5 ~ g4 ~ ~ a4 ~ ~ e5 ~>")
+      .slow(2).s("wt_bell").release(1.2).delay(0.3).room(0.72).gain(0.1).pan(0.68)
+  ),
+  lift: stack(
+    note("<c2 g1 a1 f1>").s("sine").attack(2.4).release(4.5).gain(0.31),
+    note("<[c3,e3,g3,b3] [g2,b2,d3,f#3] [a2,c3,e3,g3] [f2,a2,c3,e3]>")
+      .s("wt_pad").attack(1.6).release(3.5).lpf(saw.range(850, 1350).slow(4)).room(0.8).gain(0.21).pan(0.4),
+    note("<[e4 g4 b4] [d4 f#4 b4] [e4 a4 c5] [c4 e4 a4]>")
+      .s("wt_choir").attack(1.0).release(2.4).lpf(1700).room(0.72).gain(0.13).pan(0.62),
+    note("<e5 ~ b4 d5 g4 ~ a4 e5>").s("wt_bell").release(1.0).delay(0.28).room(0.68).gain(0.1).pan(0.72)
+  ),
+  climax: stack(
+    note("<c2 g1 a1 f1>").s("sine").attack(2.2).release(4.2).gain(0.32),
+    note("<[c3,e3,g3,b3] [g2,b2,d3,f#3] [a2,c3,e3,g3] [f2,a2,c3,e3]>")
+      .s("wt_pad").attack(1.4).release(3.2).lpf(1450).chorus(0.28).room(0.82).gain(0.22).pan(0.38),
+    note("<[e4,g4,b4] [d4,f#4,b4] [e4,a4,c5] [c4,e4,a4]>")
+      .s("wt_choir").attack(0.9).release(2.2).lpf(1900).room(0.75).gain(0.14).pan(0.62),
+    note("<[e5 ~ b4 d5] [f#5 ~ d5 b4] [e5 a5 ~ c5] [c5 ~ a4 e5]>")
+      .s("wt_bell").release(1.1).delay(0.3).room(0.7).gain(0.11).pan(0.72),
+    s("cr ~ ~ ~").hpf(3800).attack(0.5).release(2.0).room(0.8).gain(0.08).pan(0.55)
+  ),
+  breakdown: stack(
+    note("<c2 g1 a1 f1>").s("sine").attack(3.0).release(5.2).gain(0.28),
+    note("<g4 ~ f#4 ~ e4 ~ c4 ~>").s("wt_flute").attack(0.4).release(1.8).room(0.78).gain(0.1).pan(0.65)
+  ),
+  outro: stack(
+    note("<c2 g1 a1 c2>").s("sine").attack(3.0).release(5.5).gain(0.27),
+    note("<[c3,e3,g3,b3] [g2,b2,d3,f#3] [a2,c3,e3,g3] [c3,e3,g3,b3]>")
+      .s("wt_pad").attack(2.1).release(4.5).lpf(isaw.range(560, 900).slow(4)).room(0.82).gain(0.16).pan(0.42),
+    note("<e5 ~ ~ b4 ~ ~ g4 ~>").s("wt_bell").slow(2).release(1.4).delay(0.32).room(0.75).gain(0.07).pan(0.68)
+  )
+})

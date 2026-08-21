@@ -96,9 +96,55 @@ and enables the pack.
 - Caps: 8000 files, 768 MB (thin large libraries first)
 - Source path is recorded in `pack.json` for provenance; audio is **copied**, not linked
 
+## Sample sets (Samples manager)
+
+Separate from Packs: downloadable **sample sets**, registry-style. A set is an
+ordered list of `strudel.json` manifest sources; the order is the mapping —
+the first manifest owning a bank name wins, exactly strudio's registration
+semantics. The active set drives **both live playback and audio export**, so
+they always sound the same.
+
+Built in:
+
+- **cycletron** (default) — the bundled set. Export renders it via
+  `ui/public/cycletron.strudel.json`, generated from `ui/sample-tables.ts`,
+  so export always matches live playback.
+- **strudel** — the exact sources `strudio play`/`render` registers
+  (dough-samples piano, uzu drumkit, uzu wavetables, Dirt-Samples), fetched
+  from upstream into `{app_cache}/sample-sets/strudel/`. Active, Cycletron
+  sounds identical to strudel-rs.
+
+Define your own sets in `{app_data}/sample-sets.json`:
+
+```json
+[
+  {
+    "id": "my-breaks",
+    "label": "My breaks",
+    "sources": [
+      "github:user/breaks-pack",
+      "https://example.com/kits/strudel.json"
+    ]
+  }
+]
+```
+
+`github:user/repo[/branch]` resolves to the repo's `strudel.json` on
+raw.githubusercontent.com, like the engine's `samples()` shortcut. Sets appear
+in the Samples manager (⌘⇧P → "Samples…", the Sounds panel's Manage button,
+or Preferences → Samples → Manage) with their own Download/Delete buttons; a
+set must be fully downloaded before it can be activated. Downloads resume
+(finished files are kept). Switching sets — from the manager or the command
+palette's "Sample Set: …" entries — reloads the audio engine with the new
+set immediately (export always follows the setting). The manager also holds
+the Packs list, so all sample management lives in one place.
+
+Known gaps (all sets): enabled Packs are live-only — export does not load
+them; GM soundfonts stream from the WebAudioFont data during export.
+
 ## Not yet
 
-- Remote download
+- Remote download of Packs (sample sets above have their own downloader)
 - Agent `list_packs` / `enable_pack` tools
 - Pitched multisample metadata
 

@@ -18,7 +18,7 @@ import {soundsBrowser} from './sounds-browser.js';
 import {fileExplorer} from './file-explorer.js';
 import {midiLab} from './midi-lab.js';
 import {aboutModal} from './about-modal.js';
-import {packsModal} from './packs-modal.js';
+import {samplesModal} from './samples-modal.js';
 import {helpModal} from './help-modal.js';
 import {preferencesModal} from './preferences.js';
 import {audioRecorder} from './audio-recorder.js';
@@ -35,6 +35,8 @@ import {initShortcutBridge} from './shortcut-bridge.js';
 import {diag} from './diagnostics.js';
 import {fileMenuButton} from './file-menu-button.js';
 import {editorEmptyState} from './editor-empty-state.js';
+import {basename} from './paths.js';
+import {currentBpm} from './bpm.js';
 import type {SessionSnapshot, UserSettings} from './types/tauri-commands.js';
 
 
@@ -141,7 +143,7 @@ async function boot(): Promise<void> {
     // parallel init below completes.
     midiLab.init();
     aboutModal.init();
-    packsModal.init();
+    samplesModal.init();
     helpModal.init();
     preferencesModal.init();
     audioRecorder.init();
@@ -191,9 +193,6 @@ function setupMidiLabTriggers(): void {
     document.getElementById('historyBtn')?.addEventListener('click', () => {
         void historyModal.open();
     });
-    // About modal delegates "Check for Updates" through a custom event so
-    // the modal doesn't need to import the updater.
-    document.addEventListener('updater:check', () => { void checkForUpdates(true); });
     // Allow keyboard shortcut Cmd+, for Preferences alongside the menu.
     document.addEventListener('keydown', (e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === ',') {
@@ -242,14 +241,14 @@ function setupExternalChangeListener(): void {
         }
 
         if (!fileManager.isDirty) {
-            await fileManager.openPath(path);
+            await fileManager.openPath(path, {force: true});
             return;
         }
         const reload = await confirmDialog(
             `"${basename(path)}" changed on disk. Discard your unsaved changes and reload?`,
             {kind: 'warning'},
         );
-        if (reload) await fileManager.openPath(path);
+        if (reload) await fileManager.openPath(path, {force: true});
     });
 }
 
@@ -360,9 +359,7 @@ function setupAutosave(): void {
         setTimeout(async () => {
             scheduled = false;
             const code = window.strudelApp?.editor?.getCode?.() ?? '';
-            const bpm = parseFloat(
-                (document.getElementById('bpmSlider') as HTMLInputElement | null)?.value ?? '120',
-            );
+            const bpm = currentBpm();
             try {
                 await invoke('autosave_session', {code, bpm});
             } catch (e) {
@@ -377,9 +374,4 @@ function setupAutosave(): void {
 
     // Autosave on window blur so the most recent state is always on disk.
     window.addEventListener('blur', trigger);
-}
-
-function basename(path: string): string {
-    const parts = path.split(/[\\/]/);
-    return parts[parts.length - 1] || path;
 }

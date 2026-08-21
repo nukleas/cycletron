@@ -13,6 +13,7 @@ mod oauth;
 mod oauth_store;
 mod packs;
 mod persistence;
+mod sample_sets;
 mod secrets;
 mod settings;
 mod shortcuts;
@@ -173,6 +174,10 @@ pub fn run() {
                 tracing::error!("initialization failed: {e}");
             }
 
+            // Seed the strudel sample-set bank names for the agent's sound
+            // catalog (no-op when the set isn't downloaded).
+            sample_sets::refresh_bank_names(app.handle());
+
             // Native menu — emits `menu:<action>` events consumed by the frontend.
             let recents = app.state::<AppState>().recents.lock().entries.clone();
             let menu = menu::build_app_menu(app.handle(), &recents)?;
@@ -311,7 +316,6 @@ pub fn run() {
             commands::get_app_info,
             commands::write_binary_file,
             commands::export_audio,
-            commands::export_wav,
             commands::export_midi,
             commands::list_snapshots,
             commands::read_snapshot,
@@ -324,6 +328,10 @@ pub fn run() {
             sounds::read_audio_file,
             sounds::register_sound_banks,
             sounds::list_sounds,
+            sample_sets::list_sample_sets,
+            sample_sets::download_sample_set,
+            sample_sets::remove_sample_set,
+            sample_sets::get_active_sample_set_manifests,
             packs::list_packs,
             packs::enable_pack,
             packs::disable_pack,

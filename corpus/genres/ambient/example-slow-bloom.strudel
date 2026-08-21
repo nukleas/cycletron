@@ -1,0 +1,26 @@
+// Slow Bloom — ambient essentials · C Lydian · 58 BPM
+setbpm(58);
+
+stack(
+  note("<c2 g1 a1 f1>")
+    .s("sine")
+    .attack(2.5)
+    .release(4.5)
+    .gain(0.34),
+  note("<[c3,e3,g3,b3] [g2,b2,d3,f#3] [a2,c3,e3,g3] [f2,a2,c3,e3]>/2")
+    .s("wt_pad")
+    .attack(1.8)
+    .release(3.5)
+    .lpf(sine.range(700, 1400).slow(8))
+    .room(0.78)
+    .gain(0.24)
+    .pan(0.42),
+  note("<e5 ~ ~ b4 ~ ~ d5 ~ g4 ~ ~ a4 ~ ~ e5 ~>")
+    .s("wt_bell")
+    .slow(2)
+    .release(1.2)
+    .delay(0.32)
+    .room(0.72)
+    .gain(0.13)
+    .pan(0.68)
+)
