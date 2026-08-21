@@ -114,14 +114,24 @@ fn source_slug(url: &str) -> String {
         .trim_end_matches(".json");
     let mut slug: String = trimmed
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .split('-')
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("-");
     slug.truncate(48);
-    if slug.is_empty() { "source".into() } else { slug }
+    if slug.is_empty() {
+        "source".into()
+    } else {
+        slug
+    }
 }
 
 /// The built-in downloadable set: what `strudio play`/`render` registers, in
@@ -288,12 +298,10 @@ pub fn get_active_sample_set_manifests(
     let mut out = Vec::with_capacity(dirs.len());
     for (dir, url) in dirs.iter().zip(&def.sources) {
         let raw = std::fs::read_to_string(dir.join(LOCAL_MANIFEST)).map_err(|_| {
-            format!(
-                "sample set '{active}' is not downloaded — download it in the Samples manager"
-            )
+            format!("sample set '{active}' is not downloaded — download it in the Samples manager")
         })?;
-        let manifest = serde_json::from_str(&raw)
-            .map_err(|e| format!("corrupt manifest for '{url}': {e}"))?;
+        let manifest =
+            serde_json::from_str(&raw).map_err(|e| format!("corrupt manifest for '{url}': {e}"))?;
         out.push(SourceManifest {
             id: source_slug(url),
             dir: dir.to_string_lossy().into_owned(),
@@ -405,7 +413,9 @@ pub fn active_set_banks(app: &tauri::AppHandle) -> ActiveSetBanks {
 /// Refresh [`crate::state::AppState::active_set_banks`] from disk.
 pub fn refresh_bank_names(app: &tauri::AppHandle) {
     let banks = active_set_banks(app);
-    *app.state::<crate::state::AppState>().active_set_banks.lock() = banks;
+    *app.state::<crate::state::AppState>()
+        .active_set_banks
+        .lock() = banks;
 }
 
 async fn download_all(app: &tauri::AppHandle, set_id: &str) -> Result<(), String> {
@@ -695,7 +705,13 @@ mod tests {
         paths.sort();
         assert_eq!(
             paths,
-            vec!["bd/a.wav", "bd/b.wav", "one.wav", "piano/c4.mp3", "piano/e4.mp3"]
+            vec![
+                "bd/a.wav",
+                "bd/b.wav",
+                "one.wav",
+                "piano/c4.mp3",
+                "piano/e4.mp3"
+            ]
         );
     }
 
@@ -752,7 +768,9 @@ mod tests {
             "tidalcycles-uzu-drumkit"
         );
         assert_eq!(
-            source_slug("https://raw.githubusercontent.com/felixroos/dough-samples/main/piano.json"),
+            source_slug(
+                "https://raw.githubusercontent.com/felixroos/dough-samples/main/piano.json"
+            ),
             "raw-githubusercontent-com-felixroos-dough-sample"
         );
         assert!(!source_slug("///").is_empty());

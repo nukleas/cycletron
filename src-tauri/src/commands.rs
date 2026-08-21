@@ -1076,7 +1076,10 @@ fn active_sample_set(app: &tauri::AppHandle) -> Result<crate::export::SampleSetP
     if active == crate::sample_sets::BUNDLED_SET_ID {
         let manifest = app
             .path()
-            .resolve("cycletron.strudel.json", tauri::path::BaseDirectory::Resource)
+            .resolve(
+                "cycletron.strudel.json",
+                tauri::path::BaseDirectory::Resource,
+            )
             .map_err(|e| format!("could not resolve bundled sample manifest: {e}"))?;
         if !manifest.is_file() {
             return Err(format!(
