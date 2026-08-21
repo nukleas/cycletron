@@ -1433,12 +1433,17 @@ export class StrudelApp {
         bpm = Math.max(30, Math.min(300, bpm));
         if (isNaN(bpm)) return;
         const value = String(bpm);
-        localStorage.setItem('bpm', value);
-        this.elements.bpmSlider.value = value;
-        this.elements.bpmValue.value = value;
-        this.elements.bpmDisplay.textContent = value;
-        const fsBpm = document.getElementById('fsBpm');
-        if (fsBpm) fsBpm.textContent = value;
+        // Runs on every evaluate (each live-coding keystroke) — skip the DOM
+        // and localStorage churn when the tempo didn't change. The scheduler
+        // still gets the call; it no-ops internally on an unchanged BPM.
+        if (value !== this.elements.bpmSlider.value) {
+            localStorage.setItem('bpm', value);
+            this.elements.bpmSlider.value = value;
+            this.elements.bpmValue.value = value;
+            this.elements.bpmDisplay.textContent = value;
+            const fsBpm = document.getElementById('fsBpm');
+            if (fsBpm) fsBpm.textContent = value;
+        }
         if (this.scheduler) {
             this.scheduler.setBpm(bpm);
         }

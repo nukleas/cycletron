@@ -161,9 +161,17 @@ export class PatternScheduler {
      * Changing BPM invalidates the current scheduledTo position (cycle-space
      * is coupled to cps), so we reset to the current cycle and hush stale
      * queued events on the worklet engine.
+     *
+     * An unchanged BPM is a strict no-op. Every evaluate applies the tempo,
+     * so this runs on each live-coding keystroke — flushing the lookahead
+     * buffer here when nothing changed silences ~300ms of queued audio and
+     * skips any onsets that pass before the next tick (an audible stumble on
+     * every edit).
      */
     setBpm(bpm: number): void {
-        this.bpm = Math.max(30, Math.min(300, bpm));
+        const clamped = Math.max(30, Math.min(300, bpm));
+        if (clamped === this.bpm) return;
+        this.bpm = clamped;
         if (this.running) {
             // Snapshot cycle position with the old cps before changing it
             const currentCycle = this._liveCurrentCycle();
@@ -179,6 +187,12 @@ export class PatternScheduler {
             this.scheduledTo = currentCycle;
             // BPM change invalidates pre-scheduled events in the worklet engine.
             this.audioManager?.sendFlushPending();
+            // Refill right after the worklet has consumed the flush flag. The
+            // render block drains newly-published events BEFORE applying the
+            // flush, so a synchronous requery here could be wiped along with
+            // the stale queue — one block (~3ms) later is deterministic, and
+            // beats waiting up to SCHEDULE_MS for the next tick.
+            setTimeout(() => this.kickSchedule(), 8);
         } else {
             this.cps = this.bpm * INV_240;
         }
