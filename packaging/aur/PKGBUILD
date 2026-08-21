@@ -8,8 +8,8 @@
 # pkgver 0.1.0alpha.N; _tag keeps the real tag for the download URL.
 
 pkgname=cycletron-bin
-_tag=0.1.0-alpha.14
-pkgver=0.1.0alpha.14
+_tag=0.1.0-alpha.15
+pkgver=0.1.0alpha.15
 pkgrel=1
 pkgdesc="Live coding for music, built on Rust — fast native desktop instrument"
 arch=('x86_64')
