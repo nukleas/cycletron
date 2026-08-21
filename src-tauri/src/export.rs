@@ -99,6 +99,7 @@ pub enum SampleSetPaths {
 }
 
 /// Parse `code`, offline-render audio, optionally encode MP3 and/or stems.
+#[allow(clippy::too_many_arguments)]
 pub fn export_audio(
     code: &str,
     path: impl AsRef<Path>,

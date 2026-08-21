@@ -490,7 +490,7 @@ async fn download_source(
             let _permit = sem.acquire().await;
             let result = fetch_file(&client, &url, &dest).await;
             let n = done.fetch_add(1, Ordering::SeqCst) + 1;
-            if n % 10 == 0 || n == total {
+            if n.is_multiple_of(10) || n == total {
                 let _ = app.emit(
                     "sample-set-progress",
                     DownloadProgress {

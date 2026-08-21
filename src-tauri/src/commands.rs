@@ -1044,6 +1044,7 @@ pub fn write_binary_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
 /// `format` is `"wav"`, `"mp3"`, or `"both"`. MP3 requires `ffmpeg` on PATH.
 /// `stems` splits `$:` tracks or a top-level `stack(...)` into separate files.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn export_audio(
     code: String,
     path: String,
