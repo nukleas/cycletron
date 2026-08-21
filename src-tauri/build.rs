@@ -6,6 +6,8 @@
 // invoke handler via capability permissions.
 const COMMANDS: &[&str] = &[
     "send_message",
+    "updater_install_kind",
+    "relaunch_app",
     "validate_pattern",
     "inspect_pattern",
     "analyze_arrangement",
