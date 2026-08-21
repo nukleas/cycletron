@@ -167,14 +167,19 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
             return;
         }
         showToast('Restarting…', null);
-        // Plugin will trigger a relaunch on macOS/Windows automatically once
-        // installation completes; on Linux some bundles require explicit
-        // relaunch.
+        // The bundle on disk has been swapped; the *running* old app was
+        // moved to a temp backup, so anything that resolves the current
+        // executable now (plugin-process relaunch, Tauri restart) boots the
+        // stale copy. relaunch_app re-opens the install path captured at
+        // startup instead. Windows never reaches this — the NSIS installer
+        // restarts the app itself.
         try {
-            const {relaunch} = await import('@tauri-apps/plugin-process');
-            await relaunch();
-        } catch {
-            // No-op — relaunch isn't critical if the updater handles it.
+            await invoke('relaunch_app');
+        } catch (e) {
+            console.warn('[updater] relaunch failed:', e);
+            await infoDialog(
+                'Update installed. Please quit and reopen Cycletron to finish.',
+            );
         }
     } catch (e: any) {
         console.warn('[updater] check failed:', e);

@@ -139,6 +139,10 @@ pub fn run() {
         .with(logs::InMemoryLayer)
         .init();
 
+    // Must run before the updater can move the live bundle aside — see
+    // commands::relaunch_app.
+    commands::capture_installed_app_path();
+
     let app_state = AppState::new();
 
     tauri::Builder::default()
@@ -266,6 +270,7 @@ pub fn run() {
             commands::send_message,
             commands::validate_pattern,
             commands::updater_install_kind,
+            commands::relaunch_app,
             commands::inspect_pattern,
             commands::analyze_arrangement,
             commands::detect_pattern_length,

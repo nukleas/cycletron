@@ -1195,6 +1195,74 @@ pub fn handle_second_instance(app: &tauri::AppHandle, args: Vec<String>) {
     }
 }
 
+/// Installed-app path captured at startup. After an update installs, the
+/// running executable has been *moved* to a temp backup (macOS: the updater
+/// renames the live bundle to `$TMPDIR/tauri_current_app*` before dropping
+/// the new one into place), so resolving `current_exe()` at relaunch time
+/// points at the stale copy and boots the old version. Capturing before any
+/// update can run pins the true install location.
+static INSTALLED_APP: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+/// Call once, early in `run()`, before the updater could possibly fire.
+pub fn capture_installed_app_path() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    // macOS: relaunch the .app bundle, not the inner binary.
+    #[cfg(target_os = "macos")]
+    let path = exe
+        .ancestors()
+        .find(|p| p.extension().is_some_and(|e| e == "app"))
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or(exe);
+    #[cfg(not(target_os = "macos"))]
+    let path = exe;
+    let _ = INSTALLED_APP.set(path);
+}
+
+/// Relaunch into the *installed* app after an update, then exit.
+///
+/// Spawns a detached, slightly delayed launcher so this process is fully
+/// gone before the new one starts — otherwise the single-instance plugin
+/// forwards the fresh launch to the dying process and nothing comes up.
+/// (`@tauri-apps/plugin-process` `relaunch()` is not used: the plugin was
+/// never registered, and Tauri's restart resolves the moved executable —
+/// the exact bug this replaces.)
+#[tauri::command]
+pub fn relaunch_app(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let installed = INSTALLED_APP
+        .get()
+        .ok_or("install path was not captured at startup")?;
+
+    #[cfg(target_os = "macos")]
+    let spawned = std::process::Command::new("/bin/sh")
+        .args(["-c", r#"sleep 1; /usr/bin/open -n "$0""#])
+        .arg(installed)
+        .spawn();
+    #[cfg(target_os = "linux")]
+    let spawned = {
+        // AppImage runs from a mount point; $APPIMAGE is the real file.
+        let target = std::env::var("APPIMAGE")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| installed.clone());
+        std::process::Command::new("/bin/sh")
+            .args(["-c", r#"sleep 1; exec "$0""#])
+            .arg(target)
+            .spawn()
+    };
+    // Windows normally never gets here — the NSIS installer restarts the
+    // app itself — but keep a best-effort fallback.
+    #[cfg(target_os = "windows")]
+    let spawned = std::process::Command::new("cmd")
+        .args(["/C", "ping -n 2 127.0.0.1 >nul & start \"\" "])
+        .arg(installed)
+        .spawn();
+
+    spawned.map_err(|e| format!("failed to spawn relauncher: {e}"))?;
+    app_handle.exit(0);
+    Ok(())
+}
+
 /// How this install can receive updates. The Tauri updater can only truly
 /// self-update native bundles (macOS/Windows) and Linux AppImages; deb/rpm/
 /// pacman installs are owned by the system package manager, and the plugin's

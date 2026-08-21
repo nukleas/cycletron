@@ -28,6 +28,8 @@
     "notification:default",
     "store:default",
     "allow-send-message",
+    "allow-updater-install-kind",
+    "allow-relaunch-app",
     "allow-validate-pattern",
     "allow-inspect-pattern",
     "allow-analyze-arrangement",

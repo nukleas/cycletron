@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-updater-install-kind"
+description = "Enables the updater_install_kind command without any pre-configured scope."
+commands.allow = ["updater_install_kind"]
+
+[[permission]]
+identifier = "deny-updater-install-kind"
+description = "Denies the updater_install_kind command without any pre-configured scope."
+commands.deny = ["updater_install_kind"]
