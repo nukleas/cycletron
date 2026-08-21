@@ -7,7 +7,7 @@
 //! Content is embedded at compile time from:
 //! - `ui/songs/**` — full tracks + Agency OST
 //! - `corpus/{rhythm,melody,harmony,form,timbre,motion}/**` — curated techniques
-//! - `corpus/genres/**/generated-*.strudel` — one playable sketch per genre
+//! - `corpus/genres/**/*.strudel` — generated skeletons + curated genre examples
 //!
 //! Seeding is idempotent (marker file) and never overwrites files the user
 //! already has, so re-running after an app upgrade only fills gaps.
@@ -90,21 +90,31 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
             continue;
         }
 
-        // Genres: genres/<slug>/generated-*.strudel → Demos/Genres/<Title>.strudel
+        // Genres: keep the original flat generated skeleton for compatibility,
+        // then place additional curated examples in a per-genre folder.
         if let Some(rest) = rel.strip_prefix("genres/") {
             let parts: Vec<&str> = rest.split('/').collect();
-            if parts.len() == 2
-                && parts[1].starts_with("generated-")
-                && parts[1].ends_with(".strudel")
-            {
+            if parts.len() == 2 && parts[1].ends_with(".strudel") {
                 let slug = parts[0];
                 // Skip drafts / template dirs.
                 if slug.starts_with('_') {
                     continue;
                 }
-                let dest = demos
-                    .join("Genres")
-                    .join(format!("{}.strudel", title_case_kebab(slug)));
+                let filename = parts[1];
+                let dest = if filename.starts_with("generated-") {
+                    demos
+                        .join("Genres")
+                        .join(format!("{}.strudel", title_case_kebab(slug)))
+                } else {
+                    let example = filename
+                        .trim_end_matches(".strudel")
+                        .strip_prefix("example-")
+                        .unwrap_or_else(|| filename.trim_end_matches(".strudel"));
+                    demos
+                        .join("Genres")
+                        .join(title_case_kebab(slug))
+                        .join(format!("{}.strudel", title_case_kebab(example)))
+                };
                 if write_if_missing(
                     &dest,
                     CorpusAssets::get(path.as_ref())
@@ -128,7 +138,7 @@ Cycletron demo library
 
 Songs/       Full tracks and covers (plus the Agency OST album).
 Techniques/  Short curated patterns by musical idea (rhythm, melody, …).
-Genres/      One playable sketch per genre recipe.
+Genres/      Generated skeletons plus concise, curated genre examples.
 
 Open any file in the File Explorer, press Play (⌘↩), and remix.
 These files were seeded for you — edit freely; Cycletron will not overwrite
@@ -265,6 +275,10 @@ mod tests {
         assert!(dir.join("Demos/Songs").is_dir());
         assert!(dir.join("Demos/Techniques").is_dir());
         assert!(dir.join("Demos/Genres").is_dir());
+        assert!(
+            dir.join("Demos/Genres/Acid House/Warehouse Squelch.strudel")
+                .is_file()
+        );
         assert!(dir.join("Demos").join(SEED_MARKER).is_file());
         // Second seed should not rewrite.
         let report2 = seed_into_library(&dir).expect("re-seed");

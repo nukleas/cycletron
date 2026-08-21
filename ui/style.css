@@ -4587,6 +4587,26 @@ body.immersive-viz-active #editor .cm-gutters {
     line-height: 1.45;
     color: var(--text-dim, #9aa);
 }
+.samples-heading {
+    margin: 14px 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim, #9aa);
+}
+.samples-heading:first-child {
+    margin-top: 0;
+}
+#samplesSetProgress {
+    width: 100%;
+    margin: 6px 0 4px;
+}
+.sounds-manage-btn {
+    float: right;
+    font-weight: 400;
+    text-transform: none;
+}
 .packs-intro code {
     font-size: 11px;
 }

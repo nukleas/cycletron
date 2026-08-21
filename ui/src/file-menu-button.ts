@@ -10,6 +10,7 @@
 import {fileManager} from './file-manager.js';
 import {midiLab} from './midi-lab.js';
 import {diag} from './diagnostics.js';
+import {basename} from './paths.js';
 
 interface MenuItem {
     label: string;
@@ -171,7 +172,7 @@ class FileMenuButton {
             {label: 'Save', hint: '⌘S', run: () => { void fileManager.saveCurrent(); }},
             {label: 'Save As…', hint: '⌘⇧S', run: () => { void fileManager.saveAs(); }},
             {separator: true, label: ''},
-            {label: 'Import MIDI…', run: () => { void fileManager.importMidiDialog(); }},
+            {label: 'Import MIDI…', run: () => { void midiLab.openWithPicker(); }},
             {label: 'Export Audio…', hint: '⌘⇧E', run: () => { void fileManager.exportAudio(); }},
             {label: 'Export MIDI…', run: () => { void fileManager.exportMidi(); }},
             {label: 'Open MIDI Lab…', run: () => { void midiLab.openEmpty(); }},
@@ -207,10 +208,6 @@ class FileMenuButton {
     }
 }
 
-function basename(path: string): string {
-    const parts = path.split(/[\\/]/);
-    return parts[parts.length - 1] || path;
-}
 
 function shortDir(path: string): string {
     const parts = path.split(/[\\/]/).filter(Boolean);

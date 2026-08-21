@@ -55,6 +55,11 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
+    "resources": {
+      "../ui/public/cycletron.strudel.json": "cycletron.strudel.json",
+      "../ui/public/samples/": "samples/",
+      "../ui/public/machines/": "machines/"
+    },
     "category": "Music",
     "license": "AGPL-3.0-or-later",
     "licenseFile": "../LICENSE",

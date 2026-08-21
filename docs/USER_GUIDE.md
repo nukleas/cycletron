@@ -86,7 +86,7 @@ Open **View → Browse Examples** (or the empty-state Examples button). Sections
 3. **Showcase** — fuller groove sketches.
 4. **Techniques** — curated corpus (rhythm, melody, harmony, form, timbre, motion).
 5. **Songs & albums** — full original tracks, including the Agency OST.
-6. **Genres** — one playable sketch per genre recipe.
+6. **Genres** — generated skeletons plus concise, curated style examples.
 
 Use the filter box to search by title, tag, or description. Always **Play
 first**, then load an example so audio is already armed.
@@ -100,7 +100,7 @@ root in the welcome wizard / Preferences), Cycletron seeds a **Demos/** folder:
 |--------|----------|
 | `Demos/Songs/` | Full tracks + `Agency/` album |
 | `Demos/Techniques/` | Curated short patterns by category |
-| `Demos/Genres/` | One sketch per genre |
+| `Demos/Genres/` | Generated skeletons + curated examples by genre |
 
 Browse them in the File System panel, open any `.strudel`, and remix. Existing
 files are never overwritten on upgrade — only missing demos are filled in.
@@ -153,6 +153,21 @@ For more sounds:
 | Manage packs (enable/disable each, open the folder) | Command palette → **Sample Packs…** |
 
 Packs live under `{library}/Packs/`. Format: [SAMPLE_PACKS.md](./SAMPLE_PACKS.md).
+
+### Sample sets — sounding like strudel-rs (and beyond)
+
+The **Samples** manager (⌘⇧P → "Samples…", or the Sounds panel's Manage
+button) is the one place for sample sources: **sample sets** on top,
+**packs** below. The built-in **strudel-rs** set fetches strudio's default
+sounds (Salamander piano, uzu drumkit, uzu wavetables, Dirt-Samples — from
+their upstream repos, ~300 MB); activate it and live playback *and* audio
+export resolve from that set, so what you hear and export matches
+strudel-rs / `strudio` exactly. The default **Cycletron** set keeps the
+bundled offline kit. Whatever set is active, export uses the same samples as
+live playback, and switching reloads the audio engine immediately (also via
+the palette's "Sample Set: …" entries). Define additional sets (each an
+ordered list of `strudel.json` manifest URLs) in `sample-sets.json` in the
+app data folder — see [SAMPLE_PACKS.md](./SAMPLE_PACKS.md).
 
 ---
 

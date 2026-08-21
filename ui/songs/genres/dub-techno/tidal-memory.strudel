@@ -1,0 +1,67 @@
+// Tidal Memory — deep dub techno · C minor · 120 BPM · 28-bar arrangement
+setbpm(120);
+
+"<intro groove lift drop breakdown drop outro>".slow(4).pickRestart({
+  intro: stack(
+    s("bd*4").bank("RolandTR909").lpf(700).gain(0.6),
+    note("<c1 g1 g#1 f1>").s("sine").attack(0.08).release(1.1).gain(0.34),
+    note("<[c3,d#3,g3,a#3] [g2,a#2,d3,f3] [g#2,c3,d#3,g3] [f2,g#2,c3,d#3]>")
+      .struct("~ 1 ~ ~").s("sawtooth").attack(0.03).release(0.5)
+      .lpf(620).delay(0.38).delayfeedback(0.5).room(0.7).gain(0.2).pan(0.62)
+  ),
+  groove: stack(
+    stack(
+      s("bd*4").gain(0.72),
+      s("[~ hh]*4").hpf(5600).gain(0.14),
+      s("~ ~ ~ cp").room(0.25).gain(0.22)
+    ).bank("RolandTR909"),
+    note("<[c1 ~ c1 g1] [g1 ~ d2 g1] [g#1 ~ d#2 g#1] [f1 ~ c2 g1]>")
+      .s("sine").release(0.6).gain(0.38),
+    note("<[c3,d#3,g3,a#3] [g2,a#2,d3,f3] [g#2,c3,d#3,g3] [f2,g#2,c3,d#3]>")
+      .struct("~ 1 ~ ~").s("sawtooth").release(0.46).lpf(760)
+      .delay(0.42).delaytime(0.375).delayfeedback(0.48).room(0.68).gain(0.22).pan(0.62)
+  ),
+  lift: stack(
+    stack(
+      s("bd*4").gain(0.74),
+      s("hh*8").hpf(5900).gain("[0.14 0.08]*4"),
+      s("~ ~ cp ~").room(0.3).gain(0.24)
+    ).bank("RolandTR909"),
+    s("~ ~ ~ RolandTR909_rd").hpf(4200).gain(0.12),
+    note("<[c1 ~ c1 g1] [g1 ~ d2 g1] [g#1 ~ d#2 g#1] [f1 ~ c2 g1]>")
+      .s("sine").release(0.6).gain(0.38),
+    note("<[c3,d#3,g3,a#3] [g2,a#2,d3,f3] [g#2,c3,d#3,g3] [f2,g#2,c3,d#3]>")
+      .struct("~ 1 ~ 1").s("sawtooth").release(0.42)
+      .lpf(saw.range(700, 1250).slow(4)).delay(0.42).delayfeedback(0.48).room(0.7).gain(0.22).pan(0.62)
+  ),
+  drop: stack(
+    stack(
+      s("bd*4").gain(0.78),
+      s("hh*8").hpf(6100).gain("[0.16 0.09]*4"),
+      s("~ cp ~ cp").room(0.28).gain(0.25),
+      s("~ oh ~ oh").gain(0.18)
+    ).bank("RolandTR909"),
+    note("<[c1 ~ c1 g1] [g1 ~ d2 g1] [g#1 ~ d#2 c2] [f1 ~ c2 g1]>")
+      .s("sine").release(0.55).gain(0.4),
+    note("<[c3,d#3,g3,a#3] [g2,a#2,d3,f3] [g#2,c3,d#3,g3] [f2,g#2,c3,d#3]>")
+      .struct("~ 1 ~ 1").s("supersaw").release(0.38).lpf(1050)
+      .delay(0.38).delaytime(0.375).delayfeedback(0.46).room(0.66).gain(0.2).pan(0.64),
+    note("<g4 ~ d#5 ~ f4 ~ c5 ~>").s("wt_bell").delay(0.3).room(0.58).gain(0.11).pan(0.3)
+  ),
+  breakdown: stack(
+    s("bd ~ ~ ~").bank("RolandTR909").lpf(520).room(0.45).gain(0.48),
+    note("<c1 g1 g#1 f1>").s("sine").attack(0.1).release(1.4).gain(0.34),
+    note("<[c3,d#3,g3] [g2,a#2,d3] [g#2,c3,d#3] [f2,g#2,c3]>")
+      .s("wt_pad").attack(0.8).release(1.7).lpf(680).room(0.78).gain(0.18).pan(0.58)
+  ),
+  outro: stack(
+    stack(
+      s("bd*4").lpf(isaw.range(450, 1100).slow(4)).gain(0.58),
+      s("[~ hh]*4").hpf(5400).gain(0.1)
+    ).bank("RolandTR909"),
+    note("<c1 g1 g#1 f1>").s("sine").release(0.9).gain(0.32),
+    note("<[c3,d#3,g3,a#3] [g2,a#2,d3,f3] [g#2,c3,d#3,g3] [f2,g#2,c3,d#3]>")
+      .struct("~ 1 ~ ~").s("sawtooth").release(0.55)
+      .lpf(isaw.range(480, 850).slow(4)).delay(0.35).room(0.72).gain(0.18).pan(0.62)
+  )
+})

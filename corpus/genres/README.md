@@ -5,6 +5,13 @@ strudel-rs terms**. One markdown file per genre (kebab-case filename, e.g.
 `acid-techno.md`). Surfaced to the agent via the `genre_recipe` tool and to the
 UI/CLIs via the `genre_recipe` IPC command.
 
+Each `genres/<slug>/` directory may also contain playable `.strudel` files.
+`generated-<slug>.strudel` is the spec-generated baseline; hand-curated,
+single-idea sketches use `example-<name>.strudel`. Both are validated by
+`corpus-check`, shown in the Examples browser, and seeded into the starter
+library. Keep curated examples short, readable, and easy to remix; full
+multi-section arrangements belong in `ui/songs/genres/<slug>/`.
+
 `README.md` and `_`-prefixed files are ignored by the loader.
 
 ## The trust anchor

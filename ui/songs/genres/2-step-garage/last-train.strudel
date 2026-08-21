@@ -1,0 +1,58 @@
+// Last Train — late-night 2-step garage · G minor · 130 BPM · 28-bar arrangement
+setbpm(130);
+
+"<intro verse build drop breakdown drop outro>".slow(4).pickRestart({
+  intro: stack(
+    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").lpf(720).gain(0.54),
+    s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh")
+      .late(0.018).hpf(5200).gain(0.1).pan(0.62),
+    note("<g1 d2 a#1 f1>").s("sine").release(0.7).gain(0.34),
+    note("<[g3,a#3,d4,f4] [c4,d#4,g4,a#4] [d4,f4,a4,c5] [c4,d#4,g4,a#4]>")
+      .struct("~ 1 ~ ~").s("gm_epiano1").release(0.24).room(0.38).gain(0.2).pan(0.4)
+  ),
+  verse: stack(
+    s("bd ~ ~ ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~")
+      .gain(0.67),
+    s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh")
+      .late(0.018).hpf(5400).gain(0.15).pan(0.62),
+    note("<[g1 ~ g1 d2] [d2 ~ a#1 d2] [a#1 ~ f1 a#1] [f1 ~ c2 d2]>")
+      .s("sine").release(0.3).gain(0.4),
+    note("<[g3,a#3,d4,f4] [c4,d#4,g4,a#4] [d4,f4,a4,c5] [c4,d#4,g4,a#4]>")
+      .struct("~ 1 ~ 1").s("gm_epiano1").release(0.16).hpf(260).room(0.28).gain(0.24).pan(0.4)
+  ),
+  build: stack(
+    s("bd ~ ~ ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ sd sd")
+      .gain(0.69),
+    s("hh*16").late(0.012).hpf(5800).gain("[0.13 0.07]*8").pan(0.62),
+    note("<[g1 ~ g1 d2] [d2 ~ a#1 d2] [a#1 ~ f1 a#1] [f1 ~ c2 d2]>")
+      .s("sine").release(0.28).gain(0.4),
+    note("<[g3,a#3,d4,f4] [c4,d#4,g4,a#4] [d4,f4,a4,c5] [c4,d#4,g4,a#4]>")
+      .struct("~ 1 ~ 1").s("gm_epiano1").release(0.14).hpf(280).room(0.25).gain(0.25).pan(0.4),
+    note("<d5 ~ g5 ~ f5 ~ d5 ~>").s("wt_pluck").delay(0.22).delaytime(0.375).gain(0.13).pan(0.7)
+  ),
+  drop: stack(
+    s("bd ~ ~ ~ ~ ~ bd ~ ~ ~ bd ~ ~ bd ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~")
+      .gain(0.72),
+    s("hh*16, ~ ~ ~ oh ~ ~ ~ oh").late(0.012).hpf(5400).gain(0.16).pan(0.6),
+    note("<[g1 ~ g1 d2] [d2 ~ a#1 f2] [a#1 ~ f1 c2] [f1 ~ c2 d2]>")
+      .s("sine").release(0.26).gain(0.42),
+    note("<[g3,a#3,d4,f4] [c4,d#4,g4,a#4] [d4,f4,a4,c5] [c4,d#4,g4,a#4]>")
+      .struct("~ 1 ~ 1").s("gm_epiano1").release(0.14).hpf(300).room(0.28).gain(0.25).pan(0.38),
+    note("<[d5 ~ g5 ~] [f5 ~ d5 ~] [a#4 ~ d5 ~] [c5 ~ d5 ~]>")
+      .s("wt_pluck").delay(0.2).delaytime(0.375).room(0.28).gain(0.15).pan(0.72)
+  ),
+  breakdown: stack(
+    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~").lpf(580).room(0.4).gain(0.45),
+    note("<g1 d2 a#1 f1>").s("sine").attack(0.04).release(0.9).gain(0.34),
+    note("<[g3,a#3,d4] [c4,d#4,g4] [d4,f4,a4] [c4,d#4,g4]>")
+      .s("wt_pad").attack(0.7).release(1.4).lpf(1100).room(0.62).gain(0.19).pan(0.42)
+  ),
+  outro: stack(
+    s("bd ~ ~ ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~").lpf(isaw.range(500, 1000).slow(4)).gain(0.5),
+    s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh")
+      .late(0.018).hpf(5200).gain(0.09).pan(0.62),
+    note("<g1 d2 a#1 f1>").s("sine").release(0.7).gain(0.3),
+    note("<[g3,a#3,d4,f4] [c4,d#4,g4,a#4] [d4,f4,a4,c5] [c4,d#4,g4,a#4]>")
+      .struct("~ 1 ~ ~").s("gm_epiano1").release(0.22).room(0.42).gain(0.17).pan(0.4)
+  )
+})

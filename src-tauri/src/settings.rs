@@ -36,6 +36,9 @@ pub struct UserSettings {
     pub editor: EditorSettings,
     #[serde(default)]
     pub midi_input: MidiInputSettings,
+    /// Which sample set live playback and export resolve sounds from.
+    #[serde(default)]
+    pub samples: SampleSetSettings,
     /// First-run welcome modal has been dismissed. Defaults to false so a
     /// fresh install sees the onboarding flow.
     #[serde(default)]
@@ -45,6 +48,31 @@ pub struct UserSettings {
     /// opts in via the AI panel's consent dialog. See `build_agent_client`.
     #[serde(default)]
     pub ai_consent: bool,
+}
+
+/// Sample-set selection. One active set governs BOTH live playback and
+/// export — they always consume the same manifests, so they cannot drift
+/// apart. `active` is a set id from the `sample_sets` registry: the bundled
+/// `"cycletron"` set (default), the built-in `"strudel"` set (strudio's
+/// defaults, downloaded from upstream), or a user-defined set from
+/// `{app_data}/sample-sets.json`. Non-bundled sets must be fully downloaded
+/// before they can be activated (enforced by `set_user_settings`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SampleSetSettings {
+    #[serde(default = "default_sample_set")]
+    pub active: String,
+}
+
+impl Default for SampleSetSettings {
+    fn default() -> Self {
+        Self {
+            active: default_sample_set(),
+        }
+    }
+}
+
+fn default_sample_set() -> String {
+    "cycletron".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

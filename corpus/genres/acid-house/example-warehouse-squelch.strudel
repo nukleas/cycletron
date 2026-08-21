@@ -1,0 +1,26 @@
+// Warehouse Squelch — acid house essentials · A minor · 125 BPM
+setbpm(125);
+
+stack(
+  stack(
+    s("bd*4").gain(0.82),
+    s("~ cp ~ cp").gain(0.48),
+    s("[~ hh]*4").gain(0.22),
+    s("~ oh ~ oh").gain(0.25)
+  ).bank("RolandTR909"),
+  note("<a2 c3 e3 g3 a2 e3 d3 c3>")
+    .fast(2)
+    .s("sawtooth")
+    .lpf(sine.range(420, 1900).slow(4))
+    .resonance(17)
+    .decay(0.12)
+    .sustain(0.08)
+    .gain(0.38),
+  note("<[a3,c4,e4] [g3,b3,d4]>")
+    .struct("~ ~ 1 ~")
+    .s("sawtooth")
+    .release(0.12)
+    .lpf(1500)
+    .room(0.25)
+    .gain(0.22)
+)

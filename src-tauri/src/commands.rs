@@ -726,7 +726,19 @@ pub fn get_user_settings(state: State<'_, AppState>) -> UserSettings {
 /// API keys are NOT part of `settings` — they go through `set_provider_key`
 /// into the OS keychain.
 #[tauri::command]
-pub fn set_user_settings(settings: UserSettings, state: State<'_, AppState>) -> Result<(), String> {
+pub fn set_user_settings(
+    settings: UserSettings,
+    state: State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    // A non-bundled sample set is only meaningful once it's on disk.
+    if !crate::sample_sets::is_ready(&app_handle, &settings.samples.active) {
+        return Err(format!(
+            "Sample set '{}' is not downloaded — download it first (Samples manager).",
+            settings.samples.active
+        ));
+    }
+
     // Apply to the in-memory config so the rest of the app sees the change.
     {
         let mut config = state.config.lock();
@@ -742,6 +754,8 @@ pub fn set_user_settings(settings: UserSettings, state: State<'_, AppState>) -> 
             current.save(&dir).map_err(|e| e.to_string())?;
         }
     }
+    // The agent's sound catalog follows the active sample set.
+    crate::sample_sets::refresh_bank_names(&app_handle);
     state.rebuild_agent_client();
     Ok(())
 }
@@ -1038,29 +1052,47 @@ pub async fn export_audio(
     gain: Option<f32>,
     format: String,
     stems: bool,
+    app_handle: tauri::AppHandle,
 ) -> Result<crate::export::ExportAudioResult, String> {
     let fmt = crate::export::AudioFormat::parse(&format)?;
+    let samples = active_sample_set(&app_handle)?;
     tauri::async_runtime::spawn_blocking(move || {
-        crate::export::export_audio(&code, &path, duration_secs, bpm, gain, fmt, stems)
+        crate::export::export_audio(&code, &path, duration_secs, bpm, gain, fmt, stems, &samples)
     })
     .await
     .map_err(|e| format!("export task failed: {e}"))?
 }
 
-/// Backward-compatible WAV-only export.
-#[tauri::command]
-pub async fn export_wav(
-    code: String,
-    path: String,
-    duration_secs: f64,
-    bpm: Option<f64>,
-    gain: Option<f32>,
-) -> Result<crate::export::ExportAudioResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        crate::export::export_wav(&code, &path, duration_secs, bpm, gain)
-    })
-    .await
-    .map_err(|e| format!("export task failed: {e}"))?
+/// Resolve the sample-set manifests the active set renders exports from —
+/// the same set live playback loads, so the two cannot drift apart.
+fn active_sample_set(app: &tauri::AppHandle) -> Result<crate::export::SampleSetPaths, String> {
+    let active = app
+        .state::<AppState>()
+        .user_settings
+        .lock()
+        .samples
+        .active
+        .clone();
+    if active == crate::sample_sets::BUNDLED_SET_ID {
+        let manifest = app
+            .path()
+            .resolve("cycletron.strudel.json", tauri::path::BaseDirectory::Resource)
+            .map_err(|e| format!("could not resolve bundled sample manifest: {e}"))?;
+        if !manifest.is_file() {
+            return Err(format!(
+                "bundled sample manifest missing: {}",
+                manifest.display()
+            ));
+        }
+        return Ok(crate::export::SampleSetPaths::Cycletron { manifest });
+    }
+    let manifests = crate::sample_sets::manifest_paths(app, &active)?;
+    if manifests.iter().any(|m| !m.is_file()) {
+        return Err(format!(
+            "sample set '{active}' is not downloaded — download it in the Samples manager"
+        ));
+    }
+    Ok(crate::export::SampleSetPaths::Strudel { manifests })
 }
 
 /// Convert the current pattern to a Standard MIDI File (`strudio to-midi`).

@@ -1,0 +1,27 @@
+// Fog Chords — dub techno essentials · C minor · 120 BPM
+setbpm(120);
+
+stack(
+  stack(
+    s("bd*4").gain(0.74),
+    s("[~ hh]*4").hpf(5600).gain(0.16),
+    s("~ ~ ~ cp").room(0.35).gain(0.24)
+  ).bank("RolandTR909"),
+  note("<c1 ~ c1 g1>")
+    .s("sine")
+    .attack(0.03)
+    .release(0.65)
+    .gain(0.42),
+  note("<[c3,d#3,g3,a#3] [g#2,c3,d#3,g3]>")
+    .struct("~ 1 ~ ~")
+    .s("sawtooth")
+    .attack(0.02)
+    .release(0.48)
+    .lpf(sine.range(650, 1200).slow(8))
+    .delay(0.42)
+    .delaytime(0.375)
+    .delayfeedback(0.48)
+    .room(0.62)
+    .gain(0.26)
+    .pan(0.62)
+)

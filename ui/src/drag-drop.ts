@@ -11,6 +11,7 @@ import {isTauri} from './tauri.js';
 import {fileManager} from './file-manager.js';
 import {midiLab} from './midi-lab.js';
 import {diag} from './diagnostics.js';
+import {basename} from './paths.js';
 
 const STRUDEL_EXT = /\.(strudel|js)$/i;
 const MIDI_EXT = /\.(mid|midi)$/i;
@@ -82,10 +83,6 @@ function handleDrop(paths: string[]): void {
     flash(`Unsupported file. Drop .strudel, .js, or .mid.`);
 }
 
-function basename(path: string): string {
-    const parts = path.split(/[\\/]/);
-    return parts[parts.length - 1] || path;
-}
 
 /** Quick status toast via the existing status bar. */
 function flash(message: string): void {

@@ -9,6 +9,7 @@
 import {invoke, isTauri} from './tauri.js';
 import {dismissibleModal} from './modal-utils.js';
 import {openPathDialog} from './dialog.js';
+import {fileExplorer} from './file-explorer.js';
 import type {UserSettings} from './types/tauri-commands.js';
 const STEP_COUNT = 4;
 
@@ -112,11 +113,9 @@ class WelcomeModal {
         if (!isTauri) return;
         const path = await openPathDialog({directory: true});
         if (!path) return;
-        try {
-            await invoke('set_library_root', {path});
-            if (this.libraryRoot) this.libraryRoot.textContent = path;
-        } catch (e) {
-            console.warn('[welcome] set_library_root failed:', e);
+        // Shared write path: persists, refreshes the Files tree, error-dialogs.
+        if (await fileExplorer.setLibraryRoot(path) && this.libraryRoot) {
+            this.libraryRoot.textContent = path;
         }
     }
 }

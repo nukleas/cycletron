@@ -1,0 +1,30 @@
+// Pocket Shuffle — 2-step garage essentials · G minor · 130 BPM
+setbpm(130);
+
+stack(
+  s("bd ~ ~ ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~, ~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~")
+    .gain(0.72),
+  s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh")
+    .late(0.018)
+    .hpf(5200)
+    .gain(0.2)
+    .pan(0.58),
+  note("<g1 ~ g1 d2 a#1 ~ f1 d2>")
+    .s("sine")
+    .release(0.22)
+    .gain(0.46),
+  note("<[g3,a#3,d4,f4] [c4,d#4,g4,a#4] [d4,f4,a4,c5] [c4,d#4,g4,a#4]>")
+    .struct("~ 1 ~ 1")
+    .s("gm_epiano1")
+    .release(0.16)
+    .hpf(250)
+    .room(0.25)
+    .gain(0.28)
+    .pan(0.4),
+  note("<d5 ~ g5 ~ f5 ~ d5 ~>")
+    .s("wt_pluck")
+    .delay(0.22)
+    .delaytime(0.375)
+    .gain(0.18)
+    .pan(0.7)
+)

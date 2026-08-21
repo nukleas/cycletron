@@ -1,7 +1,9 @@
-/**
- * Shared HTML helpers. Centralizing escaping means any future hardening
- * (e.g. escaping quotes for attribute contexts) lands in one place.
- */
+/** Shared HTML escaping — safe for text content and quoted attribute values. */
 export function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }

@@ -94,6 +94,8 @@ export async function refreshAssistSounds(): Promise<void> {
             gm_instruments?: string[];
             user_sample_banks?: string[];
             drum_machines?: {banks?: string[]}[];
+            sample_set_pitched?: string[];
+            sample_set_one_shots?: string[];
         }>('list_sounds');
         setAssistSounds([
             ...(cat.synths ?? []),
@@ -104,6 +106,8 @@ export async function refreshAssistSounds(): Promise<void> {
             ...(cat.gm_instruments ?? []),
             ...(cat.user_sample_banks ?? []),
             ...(cat.drum_machines ?? []).flatMap((m) => m.banks ?? []),
+            ...(cat.sample_set_pitched ?? []),
+            ...(cat.sample_set_one_shots ?? []),
         ]);
     } catch {
         /* not under Tauri / engine not ready — static synths still complete */

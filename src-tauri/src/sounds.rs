@@ -231,17 +231,56 @@ pub use cycletron_analysis::sounds::{
     SYNTHS, WAVETABLES,
 };
 
+/// True when a downloadable sample set is active AND on disk — the state in
+/// which live playback + export resolve from that set's manifests instead of
+/// the bundled Cycletron banks. (`active_set_banks` is only populated for a
+/// ready non-bundled active set.)
+fn manifest_set_active(state: &AppState) -> bool {
+    !state.active_set_banks.lock().is_empty()
+}
+
 /// Everything currently playable, for the UI and the agent's `list_sounds` tool.
 /// Flat set of every sound name that resolves today: the built-in catalog plus
-/// user-loaded banks. `gm_*` names are NOT enumerated here (any GM name streams
+/// user-loaded banks — plus the strudel-rs set's banks when that mode is
+/// active. `gm_*` names are NOT enumerated here (any GM name streams
 /// on demand) — callers should treat the `gm_` prefix as known. Used by the
-/// silence linter.
+/// silence linter. (In strudel mode a handful of bundled-only names, e.g.
+/// `flbass`, stay in the set even though they no longer resolve — the linter
+/// errs permissive rather than flagging sounds that mostly do exist.)
 pub fn known_sound_set(state: &AppState) -> cycletron_analysis::sounds::SoundSet {
-    cycletron_analysis::sounds::SoundSet::with_user_banks(state.loaded_sample_banks.lock().clone())
+    let mut banks = state.loaded_sample_banks.lock().clone();
+    {
+        let set = state.active_set_banks.lock();
+        banks.extend(set.pitched.iter().cloned());
+        banks.extend(set.one_shots.iter().cloned());
+    }
+    cycletron_analysis::sounds::SoundSet::with_user_banks(banks)
 }
 
 pub fn sound_catalog(state: &AppState) -> serde_json::Value {
     let user_banks = state.loaded_sample_banks.lock().clone();
+
+    // A downloadable sample set is active: the drum/percussion/instrument
+    // sections below describe the bundled Cycletron banks, which are not
+    // loaded in this state — report the active set's banks instead.
+    if manifest_set_active(state) {
+        let active = state.user_settings.lock().samples.active.clone();
+        let set = state.active_set_banks.lock();
+        return serde_json::json!({
+            "synths": SYNTHS,
+            "wavetables": WAVETABLES,
+            "active_sample_set": active,
+            "sample_set_pitched": set.pitched.clone(),
+            "sample_set_pitched_note": "Note-mapped instruments: note(\"c3 e3 g3\").s(\"<bank>\") repitches properly (nearest recorded note). Use these for melodies and chords.",
+            "sample_set_one_shots": set.one_shots.clone(),
+            "sample_set_one_shots_note": "Indexed one-shots: note() repitches by playback rate from an assumed C3 root (like web strudel) — timbre stretches at extreme intervals, so keep melodies within ~an octave of C3. s(\"<bank>:n\") selects variants; .speed(r) is the raw rate control. For high-fidelity melodies prefer the pitched banks, gm_*, wt_*, or synths.",
+            "sample_set_note": "A downloaded sample set is active (Samples manager) — these banks replace the bundled drum/percussion/instrument catalog. For the built-in 'strudel' set, defaults like bd/sd/hh come from the uzu drumkit and the rest (arpy, casio, breaks165, …) from Dirt-Samples. Banks load lazily — the first cycle of a new bank may be silent.",
+            "gm_instruments": GM_INSTRUMENTS,
+            "gm_note": "Any General MIDI name (gm_*) works; streams in on first use, first cycle may be silent.",
+            "user_sample_banks": user_banks,
+        });
+    }
+
     let machines: Vec<serde_json::Value> = MACHINE_KITS
         .iter()
         .map(|(machine, display, voices)| {

@@ -6,6 +6,7 @@
  */
 
 import {EXAMPLES, SECTION_LABELS, SECTION_ORDER, type Example} from './examples-data.js';
+import {escapeHtml} from './html.js';
 
 type LoadCodeFn = (code: string) => void;
 
@@ -113,7 +114,7 @@ export class ExamplesBrowser {
             const cards = entries.map(({ex, idx}) => this.cardHtml(ex, idx)).join('');
             return `
                 <div class="ex-section">
-                    <div class="ex-section-label">${this.esc(SECTION_LABELS[section])}
+                    <div class="ex-section-label">${escapeHtml(SECTION_LABELS[section])}
                       <span class="ex-section-count">${entries.length}</span>
                     </div>
                     ${cards}
@@ -121,7 +122,7 @@ export class ExamplesBrowser {
             `;
         }).join('');
 
-        grid.innerHTML = sectionsHtml || `<p class="ex-empty">No examples match “${this.esc(q)}”.</p>`;
+        grid.innerHTML = sectionsHtml || `<p class="ex-empty">No examples match “${escapeHtml(q)}”.</p>`;
         filterCount.textContent = q
             ? `${visible} of ${EXAMPLES.length}`
             : `${EXAMPLES.length} total`;
@@ -129,7 +130,7 @@ export class ExamplesBrowser {
 
     private cardHtml(ex: Example, idx: number): string {
         const tagsHtml = ex.tags.slice(0, 3)
-            .map((t) => `<span class="ex-tag">${this.esc(t)}</span>`)
+            .map((t) => `<span class="ex-tag">${escapeHtml(t)}</span>`)
             .join('');
         const lessonBadge = ex.lesson != null
             ? `<span class="ex-lesson">L${ex.lesson}</span>`
@@ -139,19 +140,15 @@ export class ExamplesBrowser {
             : ex.title;
 
         return `
-            <button class="ex-card" type="button" data-idx="${idx}" data-tooltip="${this.esc(ex.blurb ?? ex.title)}">
+            <button class="ex-card" type="button" data-idx="${idx}" data-tooltip="${escapeHtml(ex.blurb ?? ex.title)}">
                 ${lessonBadge}
-                <span class="ex-card-title">${this.esc(title)}</span>
-                <span class="ex-complexity">${this.esc(ex.complexity)}</span>
+                <span class="ex-card-title">${escapeHtml(title)}</span>
+                <span class="ex-complexity">${escapeHtml(ex.complexity)}</span>
                 <div class="ex-card-meta">
                     ${tagsHtml}
                     ${ex.tempo ? `<span class="ex-tempo">${ex.tempo} bpm</span>` : ''}
                 </div>
             </button>
         `;
-    }
-
-    private esc(s: string): string {
-        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 }

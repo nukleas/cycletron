@@ -14,7 +14,7 @@ use midly::{
 };
 use rustc_hash::FxHashMap;
 use serde::Serialize;
-use strudel_audio::{OfflineRenderer, default_sources};
+use strudel_audio::OfflineRenderer;
 use strudel_core::{ContextKey, Hap, Pattern, Value, stack};
 use strudel_dsl::{
     Directive, EvalContext, Expr, Tempo, evaluate_in_context, evaluate_in_context_with_tempo,
@@ -81,6 +81,23 @@ impl AudioFormat {
 // Audio export
 // ---------------------------------------------------------------------------
 
+/// Which sample set an offline render resolves sounds from.
+///
+/// Mirrors the user's sample-set mode: live playback and export must consume
+/// the same manifests for the active mode, or the two drift audibly apart
+/// (the original bug: live played the bundled TR-808 `bd` while export
+/// fetched uzu-drumkit's).
+#[derive(Debug, Clone)]
+pub enum SampleSetPaths {
+    /// The bundled Cycletron set: one manifest (`cycletron.strudel.json`,
+    /// generated from `ui/sample-tables.ts`) describing the shipped files.
+    Cycletron { manifest: PathBuf },
+    /// The downloaded strudel-rs set: localized manifests registered in
+    /// strudio order (piano, uzu-drumkit, uzu-wavetables, dirt-samples) so
+    /// first-manifest-wins resolves identically to `strudio render`.
+    Strudel { manifests: Vec<PathBuf> },
+}
+
 /// Parse `code`, offline-render audio, optionally encode MP3 and/or stems.
 pub fn export_audio(
     code: &str,
@@ -90,6 +107,7 @@ pub fn export_audio(
     gain: Option<f32>,
     format: AudioFormat,
     stems: bool,
+    samples: &SampleSetPaths,
 ) -> Result<ExportAudioResult, String> {
     let path = path.as_ref();
     validate_code_and_duration(code, duration_secs)?;
@@ -121,7 +139,7 @@ pub fn export_audio(
         stack(stem_patterns.iter().map(|(_, p)| p.clone()).collect())
     };
 
-    clipped += render_pattern_to_wav(&mix_pattern, tempo, gain, duration_secs, &mix_wav)?;
+    clipped += render_pattern_to_wav(&mix_pattern, tempo, gain, duration_secs, &mix_wav, samples)?;
 
     let mut paths = Vec::new();
     let mut stem_paths = Vec::new();
@@ -166,7 +184,8 @@ pub fn export_audio(
             for (i, (name, pattern)) in stem_patterns.iter().enumerate() {
                 let safe = cycletron_core::text::slug::filename(name, "stem", None);
                 let stem_wav = stem_dir.join(format!("{:02}-{safe}.wav", i + 1));
-                clipped += render_pattern_to_wav(pattern, tempo, gain, duration_secs, &stem_wav)?;
+                clipped +=
+                    render_pattern_to_wav(pattern, tempo, gain, duration_secs, &stem_wav, samples)?;
 
                 match format {
                     AudioFormat::Wav => {
@@ -200,34 +219,16 @@ pub fn export_audio(
     })
 }
 
-/// Backward-compatible thin wrapper used by the original command.
-pub fn export_wav(
-    code: &str,
-    path: impl AsRef<Path>,
-    duration_secs: f64,
-    bpm: Option<f64>,
-    gain: Option<f32>,
-) -> Result<ExportAudioResult, String> {
-    export_audio(
-        code,
-        path,
-        duration_secs,
-        bpm,
-        gain,
-        AudioFormat::Wav,
-        false,
-    )
-}
-
 fn render_pattern_to_wav(
     pattern: &Pattern,
     tempo: f64,
     gain: f32,
     duration_secs: f64,
     path: &Path,
+    samples: &SampleSetPaths,
 ) -> Result<u64, String> {
     let mut renderer = OfflineRenderer::new(tempo, SAMPLE_RATE, gain);
-    register_sample_manifests(&mut renderer);
+    register_sample_manifests(&mut renderer, samples);
     renderer.set_pattern(pattern.clone());
 
     if let Some(parent) = path.parent() {
@@ -820,17 +821,21 @@ fn stem_dir_for(mix_wav: &Path) -> PathBuf {
         .join(format!("{stem}-stems"))
 }
 
-fn register_sample_manifests(renderer: &mut OfflineRenderer) {
+fn register_sample_manifests(renderer: &mut OfflineRenderer, samples: &SampleSetPaths) {
     let mut urls: Vec<String> = Vec::new();
-    if let Some(local) = find_local_samples_manifest() {
-        urls.push(local.to_string_lossy().into_owned());
+    // Explicit dev/test override: a strudel.json (or a dir containing one)
+    // registered ahead of the mode's manifests, so it wins name collisions.
+    if let Some(over) = env_override_manifest() {
+        urls.push(over.to_string_lossy().into_owned());
     }
-    urls.extend([
-        default_sources::PIANO.to_string(),
-        default_sources::UZU_DRUMKIT.to_string(),
-        default_sources::UZU_WAVETABLES.to_string(),
-        default_sources::DIRT_SAMPLES.to_string(),
-    ]);
+    match samples {
+        SampleSetPaths::Cycletron { manifest } => {
+            urls.push(manifest.to_string_lossy().into_owned());
+        }
+        SampleSetPaths::Strudel { manifests } => {
+            urls.extend(manifests.iter().map(|m| m.to_string_lossy().into_owned()));
+        }
+    }
 
     for url in &urls {
         if let Err(e) = renderer.register_manifest_url(url) {
@@ -844,23 +849,14 @@ fn register_sample_manifests(renderer: &mut OfflineRenderer) {
     }
 }
 
-fn find_local_samples_manifest() -> Option<PathBuf> {
-    if let Ok(env) = std::env::var("CYCLETRON_SAMPLES") {
-        let p = PathBuf::from(env);
-        if p.is_file() {
-            return Some(p);
-        }
-        let joined = p.join("strudel.json");
-        if joined.is_file() {
-            return Some(joined);
-        }
+fn env_override_manifest() -> Option<PathBuf> {
+    let env = std::env::var("CYCLETRON_SAMPLES").ok()?;
+    let p = PathBuf::from(env);
+    if p.is_file() {
+        return Some(p);
     }
-    let candidates = [
-        PathBuf::from("samples/strudel.json"),
-        PathBuf::from("../strudel-rs/samples/strudel.json"),
-        PathBuf::from("../../strudel-rs/samples/strudel.json"),
-    ];
-    candidates.into_iter().find(|c| c.is_file())
+    let joined = p.join("strudel.json");
+    joined.is_file().then_some(joined)
 }
 
 fn sample_to_i16(s: f32, clip_count: &mut u64) -> i16 {
@@ -893,11 +889,37 @@ mod tests {
         std::env::temp_dir().join(format!("cycletron-{prefix}-{stamp}.{ext}"))
     }
 
+    /// The repo's generated bundled-set manifest (what the packaged app
+    /// resolves from its resource dir).
+    fn cycletron_set() -> SampleSetPaths {
+        SampleSetPaths::Cycletron {
+            manifest: Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../ui/public/cycletron.strudel.json"),
+        }
+    }
+
+    fn export_wav_simple(
+        code: &str,
+        path: &Path,
+        duration_secs: f64,
+    ) -> Result<ExportAudioResult, String> {
+        export_audio(
+            code,
+            path,
+            duration_secs,
+            Some(120.0),
+            Some(0.7),
+            AudioFormat::Wav,
+            false,
+            &cycletron_set(),
+        )
+    }
+
     #[test]
     fn export_sine_phrase_writes_wav() {
         let path = tmp("export", "wav");
         let code = r#"note("c4 e4 g4 c5").s("sine").gain(0.5)"#;
-        let result = export_wav(code, &path, 1.0, Some(120.0), Some(0.7)).expect("export");
+        let result = export_wav_simple(code, &path, 1.0).expect("export");
         assert!(path.is_file());
         assert!(path.metadata().unwrap().len() > 1000);
         assert!((result.duration_secs - 1.0).abs() < f64::EPSILON);
@@ -906,8 +928,97 @@ mod tests {
 
     #[test]
     fn empty_code_errors() {
-        let err = export_wav("  ", "/tmp/nope.wav", 1.0, None, None).unwrap_err();
+        let err = export_wav_simple("  ", Path::new("/tmp/nope.wav"), 1.0).unwrap_err();
         assert!(err.contains("empty"));
+    }
+
+    /// The bundled TR-808 `bd` must come out of the manifest audibly — this is
+    /// the live/export parity contract for the default sample set (works
+    /// offline: the manifest resolves to local files in `ui/public/`).
+    #[test]
+    fn export_bd_from_bundled_manifest_is_audible() {
+        let path = tmp("bd", "wav");
+        export_wav_simple(r#"s("bd*4")"#, &path, 1.0).expect("bd export");
+        let peak = wav_peak(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(
+            peak > 1000,
+            "expected audible bd from bundled manifest, peak={peak}"
+        );
+    }
+
+    fn wav_peak(path: &Path) -> i32 {
+        let mut reader = hound::WavReader::open(path).expect("open wav");
+        reader
+            .samples::<i16>()
+            .filter_map(Result::ok)
+            .map(|s| i32::from(s).abs())
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// Strudel-mode export: local manifests registered in order, first
+    /// manifest owning a bank wins (the strudio-parity contract). Two temp
+    /// manifests both define `bd` — one with a real kick, one with silence;
+    /// whichever is registered first must be what renders.
+    #[test]
+    fn strudel_mode_manifests_first_wins() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("cycletron-strudel-set-{stamp}"));
+
+        // Manifest A: bd → the bundled TR-808 kick (audible).
+        let a = root.join("a");
+        std::fs::create_dir_all(a.join("bd")).unwrap();
+        let kick = Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/public/samples/bd/BD0050.WAV");
+        std::fs::copy(&kick, a.join("bd/kick.wav")).expect("copy bundled kick");
+        std::fs::write(a.join("strudel.json"), r#"{"bd": ["bd/kick.wav"]}"#).unwrap();
+
+        // Manifest B: bd → digital silence.
+        let b = root.join("b");
+        std::fs::create_dir_all(&b).unwrap();
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 44_100,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut w = hound::WavWriter::create(b.join("silence.wav"), spec).unwrap();
+        for _ in 0..4410 {
+            w.write_sample(0_i16).unwrap();
+        }
+        w.finalize().unwrap();
+        std::fs::write(b.join("strudel.json"), r#"{"bd": ["silence.wav"]}"#).unwrap();
+
+        let render = |manifests: Vec<PathBuf>| -> i32 {
+            let path = tmp("strudel-order", "wav");
+            export_audio(
+                r#"s("bd*4")"#,
+                &path,
+                1.0,
+                Some(120.0),
+                Some(0.7),
+                AudioFormat::Wav,
+                false,
+                &SampleSetPaths::Strudel { manifests },
+            )
+            .expect("strudel-mode export");
+            let peak = wav_peak(&path);
+            let _ = std::fs::remove_file(&path);
+            peak
+        };
+
+        let kick_first = render(vec![a.join("strudel.json"), b.join("strudel.json")]);
+        let silence_first = render(vec![b.join("strudel.json"), a.join("strudel.json")]);
+        let _ = std::fs::remove_dir_all(&root);
+
+        assert!(kick_first > 1000, "kick manifest first: peak={kick_first}");
+        assert!(
+            silence_first < 50,
+            "silence manifest first must win: peak={silence_first}"
+        );
     }
 
     #[test]
@@ -928,6 +1039,7 @@ $: s("hh*8").gain(0.3)
             Some(0.7),
             AudioFormat::Wav,
             true,
+            &cycletron_set(),
         )
         .expect("stems export");
         assert_eq!(
@@ -960,6 +1072,7 @@ $: s("hh*8").gain(0.3)
             Some(0.7),
             AudioFormat::Wav,
             true,
+            &cycletron_set(),
         )
         .expect("stack stems");
         assert!(
@@ -1007,6 +1120,7 @@ $: s("hh*8").gain(0.3)
             Some(0.7),
             AudioFormat::Mp3,
             false,
+            &cycletron_set(),
         )
         .expect("mp3");
         assert_eq!(result.paths.len(), 1);

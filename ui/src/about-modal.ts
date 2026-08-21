@@ -1,9 +1,10 @@
 /**
  * About modal — shows app metadata fetched from the Rust `get_app_info`
- * command. Triggered by Help → About and the `ui:about` custom event.
+ * command. Triggered by Help → About and the palette's "About Cycletron".
  */
 
 import {invoke, isTauri} from './tauri.js';
+import {checkForUpdates} from './updater.js';
 import type {AppInfo} from './types/tauri-commands.js';
 import {dismissibleModal} from './modal-utils.js';
 import {openExternal} from './external-link.js';
@@ -39,7 +40,7 @@ export class AboutModal {
         });
         document.getElementById('aboutCheckUpdates')?.addEventListener('click', () => {
             this.close();
-            document.dispatchEvent(new CustomEvent('updater:check'));
+            void checkForUpdates(true);
         });
         this.inited = true;
     }

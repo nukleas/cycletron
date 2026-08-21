@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-remove-sample-set"
+description = "Enables the remove_sample_set command without any pre-configured scope."
+commands.allow = ["remove_sample_set"]
+
+[[permission]]
+identifier = "deny-remove-sample-set"
+description = "Denies the remove_sample_set command without any pre-configured scope."
+commands.deny = ["remove_sample_set"]

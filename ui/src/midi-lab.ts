@@ -18,6 +18,7 @@ import {escapeHtml} from './html.js';
 import {dismissibleModal} from './modal-utils.js';
 import {fileManager} from './file-manager.js';
 import {errorDialog, openPathDialog} from './dialog.js';
+import {basename} from './paths.js';
 import type {
     ImportMidiOptions,
     MidiImport,
@@ -101,6 +102,12 @@ export class MidiLab {
         this.reset();
         this.show();
         await this.loadFile(path);
+    }
+
+    /** "Import MIDI…" everywhere: open the Lab and go straight to the picker. */
+    async openWithPicker(): Promise<void> {
+        await this.openEmpty();
+        await this.browse();
     }
 
     // ------------------------------------------------------------------
@@ -375,10 +382,6 @@ export class MidiLab {
 // Helpers
 // ------------------------------------------------------------------
 
-function basename(path: string): string {
-    const parts = path.split(/[\\/]/);
-    return parts[parts.length - 1] || path;
-}
 
 function deriveFileName(path: string): string {
     const stem = basename(path).replace(/\.(mid|midi)$/i, '');

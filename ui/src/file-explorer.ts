@@ -13,6 +13,8 @@ import {invoke, isTauri} from './tauri.js';
 import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
 import {confirmDialog, errorDialog, openPathDialog} from './dialog.js';
+import {basename} from './paths.js';
+import {currentBpm} from './bpm.js';
 
 interface DirEntry {
     name: string;
@@ -410,13 +412,25 @@ export class FileExplorer {
             defaultPath: this.root,
         });
         if (!path) return;
+        await this.setLibraryRoot(path);
+    }
+
+    /**
+     * Persist a new library root and refresh the tree — the one write path
+     * for every surface that changes the root (tree header, Preferences,
+     * Welcome), so none can leave the Files panel pointing at the old
+     * directory. Returns false when the backend rejected the change.
+     */
+    async setLibraryRoot(path: string): Promise<boolean> {
         try {
             await invoke('set_library_root', {path});
             this.expanded.clear();
             this.persistExpanded();
             await this.refreshRoot();
+            return true;
         } catch (e: any) {
             await errorDialog(`Could not change library:\n${e}`);
+            return false;
         }
     }
 
@@ -576,7 +590,9 @@ export class FileExplorer {
         this.panel.classList.toggle('collapsed', collapsed);
     }
 
-    private toggleCollapsed(): void {
+    /** Toggle the panel and persist the state — the one implementation
+     *  behind the collapse arrow and the command palette. */
+    toggleCollapsed(): void {
         if (!this.panel) return;
         const collapsed = !this.panel.classList.contains('collapsed');
         this.panel.classList.toggle('collapsed', collapsed);
@@ -664,17 +680,6 @@ function depthFromRoot(path: string, root: string): number {
     if (!root || path === root) return 0;
     const rel = path.startsWith(root) ? path.slice(root.length) : path;
     return rel.split(/[\\/]/).filter(Boolean).length;
-}
-
-function currentBpm(): number | undefined {
-    const el = document.getElementById('bpmSlider') as HTMLInputElement | null;
-    const v = el ? parseInt(el.value, 10) : NaN;
-    return Number.isNaN(v) ? undefined : v;
-}
-
-function basename(path: string): string {
-    const parts = path.split(/[\\/]/);
-    return parts[parts.length - 1] || path;
 }
 
 function folderSvg(): string {

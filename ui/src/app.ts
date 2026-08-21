@@ -19,8 +19,12 @@ import {visualsMenu} from './visuals-menu.js';
 import {ExamplesBrowser} from './examples.js';
 import {notify} from './notifications.js';
 import {invoke, isTauri} from './tauri.js';
+import type {SampleSourceManifest} from './types/tauri-commands.js';
 import {openPathDialog} from './dialog.js';
 import {initTooltips} from './tooltip.js';
+
+/** Decodes bank names out of the missing-manifest-banks ring. */
+const MANIFEST_NAME_DECODER = new TextDecoder();
 
 /** How many cycles the ⏮/⏭ transport buttons jump. */
 const SKIP_CYCLES = 5;
@@ -119,6 +123,14 @@ export class StrudelApp {
     private gmSampleBitsView: Uint32Array | null;
     /** De-dupe key `(instrumentIndex << 16) | sampleIdx` for in-flight/loaded soundfonts. */
     private _loadedSoundfonts: Set<number>;
+    /** Missing-manifest-bank ring the engine fills: u32 count + 32×32-byte name slots. */
+    private manifestBuf: Uint8Array | null;
+    private manifestCountView: Uint32Array | null;
+    /** Active downloadable sample set: bank name → owning source (first
+     *  source wins, matching strudio's first-manifest-wins registration order). */
+    private _bankToSetSource: Map<string, SampleSourceManifest>;
+    /** Manifest banks loaded or in flight (name is the de-dupe key). */
+    private _loadedManifestBanks: Set<string>;
     private _suppressNextCodeChange: boolean;
     /** Cached byte→char offset map for the current code. */
     private _byteToChar: Uint32Array | null;
@@ -155,6 +167,10 @@ export class StrudelApp {
         this.gmBitsView = null;
         this.gmSampleBitsView = null;
         this._loadedSoundfonts = new Set();
+        this.manifestBuf = null;
+        this.manifestCountView = null;
+        this._bankToSetSource = new Map();
+        this._loadedManifestBanks = new Set();
         this._suppressNextCodeChange = false;
         this._byteToChar = null;
         this._byteToCharCode = '';
@@ -478,8 +494,11 @@ export class StrudelApp {
         };
 
         const onGlobalKeydown = async (e: KeyboardEvent) => {
-            // Ctrl+Enter anywhere to play/pause/resume
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            // Ctrl+Enter anywhere to play/pause/resume — unless the editor's
+            // own keymap already handled it as "evaluate" (it preventDefaults).
+            // Without this guard the same keystroke used to evaluate AND then
+            // immediately pause.
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !e.defaultPrevented) {
                 e.preventDefault();
                 await this.togglePlayPause();
             }
@@ -762,6 +781,14 @@ export class StrudelApp {
         this.gmBitsView = new Uint32Array(this._wasmMemory.buffer, wasmModule.getMissingGMBitsPtr(), 4);
         this.gmSampleBitsView = new Uint32Array(this._wasmMemory.buffer, wasmModule.getMissingGMSampleBitsPtr(), 128);
 
+        // Missing-manifest-bank ring (u32 count + 32 name slots of 32 bytes),
+        // populated by queryMissingBanks with referenced-but-unloaded bank
+        // names. The trigger only acts on names the strudel sample set owns,
+        // so this stays inert in Cycletron mode.
+        const missingManifestBufPtr = wasmModule.getMissingManifestBanksBufPtr();
+        this.manifestBuf = new Uint8Array(this._wasmMemory.buffer, missingManifestBufPtr, 4 + 32 * 32);
+        this.manifestCountView = new Uint32Array(this._wasmMemory.buffer, missingManifestBufPtr, 1);
+
         this.hideError();
         this.isInitialized = true;
 
@@ -778,28 +805,32 @@ export class StrudelApp {
 
         try {
             this.elements.sampleCount.textContent = 'Loading...';
-            const drums = await this.sampleLoader!.loadEssentialDrums();
-            if (!this.isInitialized) return;
-
-            // Load bundled kits + colors + melodic/speech expansion banks,
-            // then library packs the user enabled.
-            void Promise.all([
-                this.sampleLoader!.loadMachineKits(),
-                this.sampleLoader!.loadPercussionColors(),
-                this.sampleLoader!.loadInstrumentBanks(),
-                this.loadEnabledPacks(),
-            ]).then(([machineCount, colorNames, instrumentNames, packSamples]) => {
+            if (await this._initActiveSampleSet()) {
+                // A downloaded sample set is active; banks come from its manifests.
+            } else {
+                const drums = await this.sampleLoader!.loadEssentialDrums();
                 if (!this.isInitialized) return;
-                const extraBanks = [...colorNames, ...instrumentNames];
-                const total = drums + machineCount + extraBanks.length + packSamples;
-                this.elements.sampleCount.textContent = `${total}`;
-                if (extraBanks.length && isTauri) {
-                    void invoke('register_sound_banks', {names: extraBanks}).catch(() => {});
-                }
-                document.dispatchEvent(new CustomEvent('sounds:changed'));
-            });
 
-            this.elements.sampleCount.textContent = `${drums} drums`;
+                // Load bundled kits + colors + melodic/speech expansion banks,
+                // then library packs the user enabled.
+                void Promise.all([
+                    this.sampleLoader!.loadMachineKits(),
+                    this.sampleLoader!.loadPercussionColors(),
+                    this.sampleLoader!.loadInstrumentBanks(),
+                    this.loadEnabledPacks(),
+                ]).then(([machineCount, colorNames, instrumentNames, packSamples]) => {
+                    if (!this.isInitialized) return;
+                    const extraBanks = [...colorNames, ...instrumentNames];
+                    const total = drums + machineCount + extraBanks.length + packSamples;
+                    this.elements.sampleCount.textContent = `${total}`;
+                    if (extraBanks.length && isTauri) {
+                        void invoke('register_sound_banks', {names: extraBanks}).catch(() => {});
+                    }
+                    document.dispatchEvent(new CustomEvent('sounds:changed'));
+                });
+
+                this.elements.sampleCount.textContent = `${drums} drums`;
+            }
         } catch (e) {
             if (!this.isInitialized) return;
             this.elements.sampleCount.textContent = 'Failed';
@@ -820,9 +851,76 @@ export class StrudelApp {
     }
 
     /**
+     * Downloaded-sample-set boot: build the bank → source map from the active
+     * set's localized manifests (first source wins, mirroring strudio's
+     * registration order), eager-load the default drum voices so the first
+     * `s("bd sd hh")` isn't silent, and load the user's enabled packs.
+     * Everything else loads lazily via [`_loadMissingBanks`]. Returns false
+     * when the bundled set is active (or the active set isn't usable) — the
+     * caller then loads the bundled banks.
+     */
+    private async _initActiveSampleSet(): Promise<boolean> {
+        if (!isTauri) return false;
+        let sources: SampleSourceManifest[] | null;
+        try {
+            sources = await invoke<SampleSourceManifest[] | null>('get_active_sample_set_manifests');
+        } catch (e) {
+            console.warn('[App] active sample set unavailable, using bundled set:', e);
+            return false;
+        }
+        if (!sources) return false; // bundled set active
+        for (const source of sources) {
+            for (const key of Object.keys(source.manifest)) {
+                if (key.startsWith('_') || this._bankToSetSource.has(key)) continue;
+                this._bankToSetSource.set(key, source);
+            }
+        }
+
+        const eager = ['bd', 'sd', 'hh', 'cp', 'oh', 'rim', 'lt', 'mt', 'ht', 'cr', 'rd'];
+        await Promise.all(eager.map((name) => this._triggerLoadManifestBank(name)));
+        await this.loadEnabledPacks();
+        if (!this.isInitialized) return true;
+
+        this.elements.sampleCount.textContent = `sample set (${this._bankToSetSource.size} banks)`;
+        document.dispatchEvent(new CustomEvent('sounds:changed'));
+        return true;
+    }
+
+    /**
+     * Load one bank from the strudel set, de-duped by name. Local files are
+     * read through the Tauri side (`read_audio_file`) — no CSP exemption
+     * needed; the rare absolute-URL entry streams like the engine would.
+     * On failure the de-dupe key is cleared so a later tick can retry.
+     */
+    private async _triggerLoadManifestBank(bankName: string): Promise<void> {
+        if (this._loadedManifestBanks.has(bankName)) return;
+        const source = this._bankToSetSource.get(bankName);
+        if (!source || !this.sampleLoader) return;
+        const value = source.manifest[bankName];
+        if (value === undefined) return;
+        this._loadedManifestBanks.add(bankName);
+
+        const dir = source.dir;
+        try {
+            await this.sampleLoader.loadManifestBank(bankName, value, (path) =>
+                path.startsWith('http://') || path.startsWith('https://')
+                    ? fetch(path, {mode: 'cors'}).then((r) => {
+                        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                        return r.arrayBuffer();
+                    })
+                    : invoke<ArrayBuffer>('read_audio_file', {path: `${dir}/${path}`}),
+            );
+        } catch (e) {
+            this._loadedManifestBanks.delete(bankName);
+            console.warn(`[App] manifest bank load failed for '${bankName}':`, e);
+        }
+    }
+
+    /**
      * Scheduler callback: read the missing-GM-instrument bitsets the engine
      * populated via `queryMissingBanks`, and kick off a soundfont load for each
      * referenced (instrument, variant) that isn't already loaded/in-flight.
+     * Also drains the missing-manifest-banks ring (strudel sample-set mode).
      */
     private _loadMissingBanks(): void {
         if (!this.sampleLoader || !this.gmBitsView || !this.gmSampleBitsView) return;
@@ -837,6 +935,19 @@ export class StrudelApp {
                 if ((needed >> s) & 1) {
                     this._triggerLoadByInstrumentAndSampleIdx(i, s);
                 }
+            }
+        }
+
+        if (this.manifestBuf && this.manifestCountView && this._bankToSetSource.size > 0) {
+            const count = this.manifestCountView[0];
+            for (let i = 0; i < count; i++) {
+                const off = 4 + i * 32;
+                const len = this.manifestBuf[off];
+                if (len === 0) continue;
+                // .slice() copies out of the shared WASM memory — TextDecoder
+                // can't read a SharedArrayBuffer-backed view directly.
+                const name = MANIFEST_NAME_DECODER.decode(this.manifestBuf.slice(off + 1, off + 1 + len));
+                void this._triggerLoadManifestBank(name);
             }
         }
     }
@@ -1228,6 +1339,29 @@ export class StrudelApp {
     }
 
     /**
+     * Tear down and re-init the audio stack so sample loading re-runs against
+     * the (possibly changed) active sample set — same machinery as crash
+     * recovery. Resumes playback if something was playing; a no-op before
+     * first audio init (that init will already use the new set).
+     */
+    async reloadSampleSet(): Promise<void> {
+        if (!this.isInitialized || this._recoveringFromCrash || this._initInProgress) return;
+        this._recoveringFromCrash = true;
+        const wasPlaying = this.playbackState === PlaybackState.Playing;
+        try {
+            await this.dispose();
+            this.hideError();
+            if (wasPlaying) {
+                await this._initAndPlay();
+            } else {
+                await this.ensureAudioInitialized();
+            }
+        } finally {
+            this._recoveringFromCrash = false;
+        }
+    }
+
+    /**
      * Initialize audio on first interaction, then play immediately.
      *
      * A requestAnimationFrame barrier before play() gives the AudioWorklet one
@@ -1292,6 +1426,9 @@ export class StrudelApp {
         this.visualizer!.render();
     }
 
+    /** The sole tempo writer: every display of the BPM (transport slider,
+     *  value box, stats readout, immersive HUD) updates here, so no surface
+     *  can go stale regardless of what triggered the change. */
     applyBpm(bpm: number): void {
         bpm = Math.max(30, Math.min(300, bpm));
         if (isNaN(bpm)) return;
@@ -1300,6 +1437,8 @@ export class StrudelApp {
         this.elements.bpmSlider.value = value;
         this.elements.bpmValue.value = value;
         this.elements.bpmDisplay.textContent = value;
+        const fsBpm = document.getElementById('fsBpm');
+        if (fsBpm) fsBpm.textContent = value;
         if (this.scheduler) {
             this.scheduler.setBpm(bpm);
         }
@@ -1478,10 +1617,14 @@ export class StrudelApp {
         this.sampleLoader = null;
 
         // Views point into WASM memory that's about to be dropped; clear them
-        // and the soundfont de-dupe set so a re-init reloads into a fresh arena.
+        // and the de-dupe sets so a re-init reloads into a fresh arena.
         this.gmBitsView = null;
         this.gmSampleBitsView = null;
+        this.manifestBuf = null;
+        this.manifestCountView = null;
         this._loadedSoundfonts.clear();
+        this._loadedManifestBanks.clear();
+        this._bankToSetSource.clear();
 
         // Force the ES module to drop the memory
         this.wasm?.__drop_wasm();

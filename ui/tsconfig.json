@@ -25,6 +25,7 @@
     "audio-manager.ts",
     "scheduler.ts",
     "sample-loader.ts",
+    "sample-tables.ts",
     "polyfills.ts",
     "query-profiler.ts",
     "soundfont-tables.ts",
