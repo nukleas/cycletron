@@ -14,6 +14,7 @@
  */
 
 import {FullscreenVisualizer, FullscreenVizMode, MODE_COUNT} from './fullscreen-viz.js';
+import type {PatternSource} from './fullscreen-viz.js';
 
 export const MODE_NAMES: Record<FullscreenVizMode, string> = {
     [FullscreenVizMode.NeonCircuit]: 'NEON CIRCUIT',
@@ -28,6 +29,7 @@ export const MODE_NAMES: Record<FullscreenVizMode, string> = {
     [FullscreenVizMode.Kaleidoscope]: 'KALEIDOSCOPE',
     [FullscreenVizMode.AsciiArt]: 'ASCII SCOPE',
     [FullscreenVizMode.MatrixRain]: 'MATRIX RAIN',
+    [FullscreenVizMode.IsoCity]: 'ISO CITY',
 };
 
 const AUTO_CYCLE_KEY = 'viz-auto-cycle';
@@ -57,8 +59,12 @@ export class AmbientViz {
     /** Fired after any enabled/mode/auto-cycle change so UI (menu) can refresh. */
     onStateChange: (() => void) | null = null;
 
-    /** Called after (each) audio init with a live analyser. */
-    attach(analyser: AnalyserNode): void {
+    /**
+     * Called after (each) audio init with a live analyser, plus pattern-data
+     * access for the schedule-driven modes (ISO CITY). Re-attaching after an
+     * engine re-init refreshes both.
+     */
+    attach(analyser: AnalyserNode, patternSource?: PatternSource): void {
         this.container = document.getElementById('fullscreenViz') as HTMLDivElement | null;
         if (!this.container) return;
 
@@ -67,6 +73,7 @@ export class AmbientViz {
             this.viz.setMode(loadPersistedMode());
         }
         this.viz.setAnalyser(analyser);
+        if (patternSource) this.viz.setPatternSource(patternSource);
 
         if (!this.wired) {
             this.wired = true;

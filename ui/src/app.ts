@@ -738,8 +738,13 @@ export class StrudelApp {
 
         // Ambient music-reactive visualization — lives behind #editor in the
         // pattern console pane. Auto-starts and stays on by default; safe to
-        // call again after a worklet-crash re-init, it just swaps analysers.
-        ambientViz.attach(analyser);
+        // call again after a worklet-crash re-init, it just swaps analysers
+        // (and refreshes the pattern-source memory reference).
+        ambientViz.attach(analyser, {
+            scheduler: this.scheduler,
+            memory: this.audioManager.getWasmMemory()!,
+            cycleViewPtr: wasmModule.getCycleViewBufPtr(),
+        });
 
         // Capture pointers for active-note highlighting
         this._activeLocsBufPtr = wasmModule.getActiveLocsBufPtr();
