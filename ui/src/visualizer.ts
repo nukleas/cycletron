@@ -66,6 +66,9 @@ export class PatternVisualizer {
     private pianoRectsBuf: Float32Array | null;
     private _lastStartCycle: number;
     private _detectedPeriod: number;
+    /** Header fields cached at query time — see the shared-buffer note in renderCycleView. */
+    private _trackCount: number;
+    private _effectiveCycles: number;
 
     /**
      * Flat array cache for track name resolution.
@@ -155,6 +158,8 @@ export class PatternVisualizer {
         this.pianoRectsBuf = null;
         this._lastStartCycle = -1;
         this._detectedPeriod = 0;
+        this._trackCount = 0;
+        this._effectiveCycles = this.cycles;
 
         // Flat array sized to MAX_TRACKS. Direct index lookup, no hashing.
         // Cleared when registry_version in the cycle-view header changes.
@@ -387,34 +392,39 @@ export class PatternVisualizer {
             : cycles;
         const startCycle = Math.floor(currentCycle / snapUnit) * snapUnit;
 
-        if (startCycle !== this._lastStartCycle) {
+        // The cycle-view buffer is a single static shared with every other
+        // queryCycleViewData caller (the fullscreen ISO CITY mode also queries
+        // it). All reads must happen synchronously after our own query — never
+        // interpret whatever a foreign caller left behind. _staticDirty forces
+        // a requery too, because _renderCycleStatic below iterates the buffer.
+        if (startCycle !== this._lastStartCycle || this._staticDirty) {
             // Query uses detected period if known - avoids over-allocating in Rust
             measure('queryCycleViewData', currentCycle, () =>
                 pattern.queryCycleViewData(Math.floor(startCycle), snapUnit));
             this._lastStartCycle = startCycle;
             this._staticDirty = true;
+
+            const data = this.cycleViewBuf!;
+            this._trackCount = data[0];
+            const maxDataEnd = data[1];
+            const registryVersion = data[2];
+
+            // If the Rust registry was purged (overflow of MAX_TRACKS distinct names),
+            // the version increments and we clear the cache. In normal use this never fires.
+            if (registryVersion !== this.lastRegistryVersion) {
+                this.trackNameCache.fill(undefined);
+                this.lastRegistryVersion = registryVersion;
+            }
+
+            const detectedPeriod = maxDataEnd > 0.01 ? Math.round(maxDataEnd) : cycles;
+            if (detectedPeriod < cycles) {
+                this._detectedPeriod = detectedPeriod;
+            }
+            this._effectiveCycles = detectedPeriod < cycles ? detectedPeriod : cycles;
         }
 
-        const data = this.cycleViewBuf!;
-
-        const trackCount = data[0];
-        const maxDataEnd = data[1];
-        const registryVersion = data[2];
-
-        // If the Rust registry was purged (overflow of MAX_TRACKS distinct names),
-        // the version increments and we clear the cache. In normal use this never fires.
-        if (registryVersion !== this.lastRegistryVersion) {
-            this.trackNameCache.fill(undefined);
-            this.lastRegistryVersion = registryVersion;
-            this._staticDirty = true;
-        }
-
-        const detectedPeriod = maxDataEnd > 0.01 ? Math.round(maxDataEnd) : cycles;
-        if (detectedPeriod < cycles) {
-            this._detectedPeriod = detectedPeriod;
-        }
-
-        const effectiveCycles = detectedPeriod < cycles ? detectedPeriod : cycles;
+        const trackCount = this._trackCount;
+        const effectiveCycles = this._effectiveCycles;
         // Guard against pathological patterns (e.g. note("c*2048")) that produce
         // so many haps that maxDataEnd rounds to 0 and effectiveCycles bottoms out.
         if (effectiveCycles <= 0) {
