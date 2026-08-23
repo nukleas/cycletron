@@ -307,7 +307,10 @@ export class StrudelApp {
         this.setupUI();
 
         this.editor = new StrudelEditor(this.elements.editor, {
-            onChange: this.onCodeChange,
+            // Dispatch through the property, not a captured reference: boot's
+            // dirty/autosave hook and the editor empty-state both wrap
+            // app.onCodeChange after construction and must see every change.
+            onChange: (code) => this.onCodeChange(code),
             onEvaluate: (code) => this.evaluate(code),
             onStop: () => this.stop(),
         });
