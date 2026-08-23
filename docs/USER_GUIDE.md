@@ -191,7 +191,7 @@ them.
 ## Immersive visualizer
 
 **⌘⇧V** (or Visuals ▾ → Immersive) takes the music-reactive visualization
-fullscreen: 12 modes, **⌘⇧]** or the on-screen HUD to switch, AUTO to cycle
+fullscreen: 15 modes, **⌘⇧]** or the on-screen HUD to switch, AUTO to cycle
 them, HIDE to drop the HUD. The Visuals menu also has a **Readable mode**
 toggle that calms the ambient background for readability.
 

@@ -10,9 +10,9 @@
  * with an open menu.
  */
 
-import {ambientViz, MODE_NAMES} from './ambient-viz.js';
+import {ambientViz} from './ambient-viz.js';
 import {attachDropdown} from './dropdown.js';
-import type {FullscreenVizMode} from './fullscreen-viz.js';
+import {VIZ_MODES} from './viz/registry.js';
 import {VizMode} from './types/visualizer.js';
 
 const GRID_MODE_KEY = 'visualizer-mode';
@@ -148,14 +148,13 @@ class VisualsMenu {
 
         menu.appendChild(this.section('Ambient Mode'));
         this.modeItems = [];
-        for (const [key, name] of Object.entries(MODE_NAMES)) {
-            const mode = Number(key) as FullscreenVizMode;
-            const b = this.item(name, 'menuitemradio', () => {
+        VIZ_MODES.forEach((def, mode) => {
+            const b = this.item(def.name, 'menuitemradio', () => {
                 ambientViz.setMode(mode);
             });
             this.modeItems[mode] = b;
             menu.appendChild(b);
-        }
+        });
 
         this.refresh();
     }

@@ -13,25 +13,10 @@
  * flag (same pattern as the metronome) and attach() honors it.
  */
 
-import {FullscreenVisualizer, FullscreenVizMode, MODE_COUNT} from './fullscreen-viz.js';
-import type {PatternSource} from './fullscreen-viz.js';
+import {FullscreenVisualizer} from './fullscreen-viz.js';
+import {VIZ_MODES, modeIndexById} from './viz/registry.js';
+import type {PatternSource} from './viz/types.js';
 import {currentBpm} from './bpm.js';
-
-export const MODE_NAMES: Record<FullscreenVizMode, string> = {
-    [FullscreenVizMode.NeonCircuit]: 'NEON CIRCUIT',
-    [FullscreenVizMode.MarbleCore]: 'MARBLE CORE',
-    [FullscreenVizMode.MarbleDrop]: 'MARBLE DROP',
-    [FullscreenVizMode.FlameGraph]: 'FLAME GRAPH',
-    [FullscreenVizMode.Lissajous]: 'LISSAJOUS SCOPE',
-    [FullscreenVizMode.WaveTerrain]: 'WAVE TERRAIN',
-    [FullscreenVizMode.Tunnel]: 'TUNNEL',
-    [FullscreenVizMode.StrangeAttractor]: 'STRANGE ATTRACTOR',
-    [FullscreenVizMode.Plasma]: 'PLASMA',
-    [FullscreenVizMode.Kaleidoscope]: 'KALEIDOSCOPE',
-    [FullscreenVizMode.AsciiArt]: 'ASCII SCOPE',
-    [FullscreenVizMode.MatrixRain]: 'MATRIX RAIN',
-    [FullscreenVizMode.IsoCity]: 'ISO CITY',
-};
 
 const AUTO_CYCLE_KEY = 'viz-auto-cycle';
 const ENABLED_KEY = 'ambient-viz-enabled';
@@ -39,11 +24,13 @@ const MODE_KEY = 'ambient-viz-mode';
 /** Pattern cycles between automatic mode switches (~30s at 120 BPM). */
 const AUTO_CYCLE_EVERY = 16;
 
-function loadPersistedMode(): FullscreenVizMode {
-    const m = parseInt(localStorage.getItem(MODE_KEY) ?? '', 10);
-    return Number.isInteger(m) && m >= 0 && m < MODE_COUNT
-        ? (m as FullscreenVizMode)
-        : FullscreenVizMode.NeonCircuit;
+/** Modes persist by stable id; unknown/stale values fall back to mode 0. */
+function loadPersistedMode(): number {
+    return modeIndexById(localStorage.getItem(MODE_KEY));
+}
+
+function persistMode(index: number): void {
+    localStorage.setItem(MODE_KEY, VIZ_MODES[index].id);
 }
 
 export class AmbientViz {
@@ -112,12 +99,12 @@ export class AmbientViz {
         return this.viz !== null;
     }
 
-    getMode(): FullscreenVizMode {
+    getMode(): number {
         return this.viz ? this.viz.getMode() : loadPersistedMode();
     }
 
-    setMode(mode: FullscreenVizMode): void {
-        localStorage.setItem(MODE_KEY, String(mode));
+    setMode(mode: number): void {
+        persistMode(((mode % VIZ_MODES.length) + VIZ_MODES.length) % VIZ_MODES.length);
         this.lastSwitchCycle = this.latestCycle;
         if (this.viz) {
             this.viz.setMode(mode);
@@ -196,7 +183,7 @@ export class AmbientViz {
         // Manual or automatic, a switch restarts the auto-cycle countdown.
         this.lastSwitchCycle = this.latestCycle;
         const mode = this.viz.cycleMode(delta);
-        localStorage.setItem(MODE_KEY, String(mode));
+        persistMode(mode);
         this.updateHudLabel();
         this.flashHud();
         this.onStateChange?.();
@@ -242,7 +229,7 @@ export class AmbientViz {
 
     private updateHudLabel(): void {
         const label = document.getElementById('fsVizModeLabel');
-        if (label && this.viz) label.textContent = MODE_NAMES[this.viz.getMode()] ?? '';
+        if (label && this.viz) label.textContent = VIZ_MODES[this.viz.getMode()]?.name ?? '';
     }
 
     private updateHudBpm(): void {
