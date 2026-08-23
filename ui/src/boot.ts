@@ -25,6 +25,7 @@ import {audioRecorder} from './audio-recorder.js';
 import {commandPalette} from './command-palette.js';
 import {historyModal} from './history-modal.js';
 import {metronome} from './metronome.js';
+import {stage} from './stage.js';
 import {midiInput} from './midi-input.js';
 import {welcomeModal} from './welcome-modal.js';
 import {logsModal} from './logs-modal.js';
@@ -50,6 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setupTitleBar();
     setupAppShortcuts();
+    // Outside boot(): Stage Mode is pure frontend — it needs neither Tauri nor
+    // audio, and boot() returns early without a Tauri shell. Wiring it here
+    // means ⌘⇧F works from the moment the page is up, including in a browser.
+    stage.init();
     void boot();
 });
 

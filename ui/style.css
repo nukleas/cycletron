@@ -4213,6 +4213,44 @@ body.immersive-viz-active #editor .cm-gutters {
 }
 
 /* =========================================================
+   STAGE MODE — the performance view.
+
+   Everything on stage is drawn inside the canvas, so this block is almost
+   entirely about *suppressing* DOM rather than adding it: on-screen chrome
+   that doesn't survive into a capture would make the preview a lie.
+
+   Deliberately a distinct class rather than a promoted .fullscreen-viz, so
+   that container's ::after scanline overlay doesn't apply here.
+   ========================================================= */
+.stage-root {
+    position: fixed;
+    inset: 0;
+    /* Above body::before/::after (9998/9999) and the ambient HUD (10000). */
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* The letterbox bars — the canvas is contain-fit inside this box. */
+    background: #000;
+    overflow: hidden;
+    /* pointer-events stays auto on purpose: the overlay must swallow clicks.
+       Letting them fall through to an invisible UI is worse than eating them. */
+}
+
+.stage-root[hidden] { display: none; }
+
+.stage-root canvas { display: block; }
+
+/* The app's global CRT chrome is fixed-position DOM sitting above everything:
+   it would tint the stage on screen without appearing in a capture. The host's
+   own drawScanlines() carries the look inside the frame instead. */
+body.stage-active::before,
+body.stage-active::after { display: none; }
+
+/* Same reasoning — the ambient HUD is DOM; the stage draws its own readout. */
+body.stage-active #fullscreenVizHUD { display: none; }
+
+/* =========================================================
    VISUALS MENU — header "Visuals ▾" dropdown, ported from
    strudio (visuals-menu.ts / ambient-viz.ts / dropdown.ts).
    Additive: does not touch the existing .file-menu-* rules.

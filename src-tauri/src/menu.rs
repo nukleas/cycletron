@@ -132,6 +132,12 @@ pub fn build_app_menu<R: Runtime>(
                 .accelerator("CmdOrCtrl+Shift+]")
                 .build(app)?,
         )
+        .separator()
+        .item(
+            &MenuItemBuilder::with_id("view.stage_mode", "Stage Mode")
+                .accelerator("CmdOrCtrl+Shift+F")
+                .build(app)?,
+        )
         .item(&PredefinedMenuItem::fullscreen(app, None)?)
         .build()?;
 
@@ -235,6 +241,7 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "view.reload_corpus" => "menu:reload_corpus",
         "view.immersive_viz" => "menu:immersive_viz",
         "view.next_viz" => "menu:next_viz",
+        "view.stage_mode" => "menu:stage_mode",
         "playback.toggle" => "menu:play_pause",
         "playback.stop" => "menu:stop",
         "playback.tempo_up" => "menu:tempo_up",

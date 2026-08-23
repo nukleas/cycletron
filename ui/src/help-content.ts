@@ -29,6 +29,7 @@ export const SHORTCUTS: ShortcutRow[] = [
     {group: 'Editor', keys: '⌘F', action: 'Find (panel includes Replace)'},
     {group: 'View', keys: '⌘⇧V', action: 'Toggle immersive visualization'},
     {group: 'View', keys: '⌘⇧]', action: 'Next visualization mode'},
+    {group: 'View', keys: '⌘⇧F', action: 'Stage Mode (fullscreen performance view)'},
 ];
 
 export const QUICKSTART: string[] = [

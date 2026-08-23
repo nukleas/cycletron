@@ -70,6 +70,7 @@ export async function initMenuEvents(): Promise<void> {
         'menu:welcome': () => { void welcomeModal.openExplicit(); },
         'menu:immersive_viz': () => { void window.strudelApp?.toggleImmersiveViz?.(); },
         'menu:next_viz': () => { void window.strudelApp?.cycleImmersiveVizMode?.(); },
+        'menu:stage_mode': () => { void window.strudelApp?.toggleStageMode?.(); },
     };
 
     for (const [topic, handler] of Object.entries(simple)) {
