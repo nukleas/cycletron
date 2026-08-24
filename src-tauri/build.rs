@@ -39,6 +39,7 @@ const COMMANDS: &[&str] = &[
     "autosave_session",
     "restore_session",
     "set_playback_state",
+    "get_desktop_theme",
     "import_midi",
     "inspect_midi",
     "save_midi_to_library",

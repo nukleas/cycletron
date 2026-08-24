@@ -62,6 +62,7 @@
     "allow-autosave-session",
     "allow-restore-session",
     "allow-set-playback-state",
+    "allow-get-desktop-theme",
     "allow-import-midi",
     "allow-inspect-midi",
     "allow-save-midi-to-library",

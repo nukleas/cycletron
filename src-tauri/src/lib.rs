@@ -2,6 +2,7 @@ mod agent_loop;
 mod codex_oauth;
 mod commands;
 mod demos;
+mod desktop_theme;
 mod export;
 mod files;
 mod library;
@@ -203,6 +204,9 @@ pub fn run() {
                 Err(e) => tracing::warn!("tray setup failed: {e}"),
             }
 
+            // Follow the desktop palette when the user asks us to.
+            desktop_theme::spawn_watcher(app.handle().clone());
+
             // MPRIS: media keys and every desktop now-playing surface.
             #[cfg(target_os = "linux")]
             mpris::init(app.handle().clone());
@@ -336,6 +340,7 @@ pub fn run() {
             commands::log_diagnostic,
             commands::diagnostic_dump,
             commands::set_dock_badge,
+            desktop_theme::get_desktop_theme,
             sounds::scan_sample_folder,
             sounds::read_audio_file,
             sounds::register_sound_banks,
@@ -358,10 +363,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
-            // Leave the transport marked stopped on the way out, so anything
-            // watching the state file doesn't keep reporting a live session.
+            // Take the state file with us, so anything watching it doesn't
+            // keep reporting a session that has ended.
             if let tauri::RunEvent::Exit = event {
-                playback::clear_state_file(app);
+                playback::remove_state_file(app);
             }
         });
 }
