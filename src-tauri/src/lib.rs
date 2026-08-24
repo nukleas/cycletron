@@ -13,6 +13,7 @@ mod oauth;
 mod oauth_store;
 mod packs;
 mod persistence;
+mod playback;
 mod sample_sets;
 mod secrets;
 mod settings;
@@ -301,7 +302,7 @@ pub fn run() {
             commands::reveal_in_os,
             persistence::autosave_session,
             persistence::restore_session,
-            tray::tray_set_playback,
+            playback::set_playback_state,
             commands::import_midi,
             commands::inspect_midi,
             commands::save_midi_to_library,
@@ -348,6 +349,13 @@ pub fn run() {
             midi_input::stop_midi_input_listening,
             midi_input::get_midi_input_status,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // Leave the transport marked stopped on the way out, so anything
+            // watching the state file doesn't keep reporting a live session.
+            if let tauri::RunEvent::Exit = event {
+                playback::clear_state_file(app);
+            }
+        });
 }

@@ -86,7 +86,25 @@ export class StrudelApp {
     sampleLoader: SampleLoader | null;
     processor: MainThreadProcessor | null;
 
-    playbackState: PlaybackState;
+    private _playbackState: PlaybackState = PlaybackState.Stopped;
+    private playbackListeners: Array<(state: PlaybackState) => void> = [];
+
+    get playbackState(): PlaybackState {
+        return this._playbackState;
+    }
+
+    /** Assigning transport state notifies everything outside the app that
+     *  tracks it — the tray, the state file, MPRIS — from one place. */
+    set playbackState(next: PlaybackState) {
+        if (next === this._playbackState) return;
+        this._playbackState = next;
+        for (const listener of this.playbackListeners) listener(next);
+    }
+
+    onPlaybackStateChange(listener: (state: PlaybackState) => void): void {
+        this.playbackListeners.push(listener);
+    }
+
     isInitialized: boolean;
 
     // WASM modules (loaded dynamically)
@@ -148,7 +166,6 @@ export class StrudelApp {
         this.sampleLoader = null;
         this.processor = null;
 
-        this.playbackState = PlaybackState.Stopped;
         this.isInitialized = false;
 
         // WASM modules (loaded dynamically)

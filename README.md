@@ -58,6 +58,25 @@ Grab the latest build from [**Releases**](https://github.com/nukleas/cycletron/r
 
 Or build from source (below).
 
+### Driving the transport from outside
+
+A running Cycletron answers to its own binary, so a hotkey, a status-bar
+widget, or a script can steer it without stealing focus:
+
+```bash
+cycletron toggle          # play / pause
+cycletron play            # play, if not already
+cycletron pause
+cycletron hush            # a.k.a. stop
+cycletron tempo 128       # set BPM
+cycletron take.strudel    # open a file (this one does raise the window)
+```
+
+While it runs, Cycletron reports what it is doing to a small JSON file —
+`$XDG_RUNTIME_DIR/cycletron/state.json` on Linux, `state.json` in the app data
+directory elsewhere — carrying transport state, tempo, cycle position, and the
+open file. Watch that file to put Cycletron in a status bar.
+
 ---
 
 ## Requirements (dev)

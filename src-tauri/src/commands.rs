@@ -1170,26 +1170,55 @@ pub fn spawn_external_change_watcher(app_handle: tauri::AppHandle) {
 }
 
 // ---------------------------------------------------------------------------
-// Single-instance hand-off (file associations)
+// Single-instance hand-off (file associations + CLI verbs)
 // ---------------------------------------------------------------------------
 
-/// Called by the single-instance plugin when a second launch happens — e.g.
-/// the user double-clicks a `.strudel` or `.mid` file in Finder. We refocus
-/// the existing window and forward any file paths to the frontend.
+/// Called by the single-instance plugin when a second launch happens — either
+/// the user opened a `.strudel`/`.mid` file from the file manager, or ran
+/// `cycletron <verb>` to drive the transport from a keybind or a bar widget.
+///
+/// A transport verb deliberately does *not* raise the window: the whole point
+/// of `cycletron toggle` on a hotkey is to keep playing whatever you were
+/// looking at. Opening a file, or a bare relaunch, still brings us forward.
 pub fn handle_second_instance(app: &tauri::AppHandle, args: Vec<String>) {
-    // Bring the main window forward.
-    if let Some(window) = app.get_webview_window("main") {
+    let mut paths: Vec<String> = Vec::new();
+    let mut verbs: Vec<&str> = Vec::new();
+    let mut tempo: Option<f64> = None;
+
+    let rest: Vec<String> = args.into_iter().skip(1).collect();
+    let mut it = rest.iter().peekable();
+    while let Some(arg) = it.next() {
+        match arg.as_str() {
+            "play" => verbs.push(crate::playback::topic::PLAY),
+            "pause" => verbs.push(crate::playback::topic::PAUSE),
+            "toggle" => verbs.push(crate::playback::topic::PLAY_PAUSE),
+            // "hush" is what a live coder reaches for; it is our stop.
+            "stop" | "hush" => verbs.push(crate::playback::topic::STOP),
+            "tempo" => {
+                tempo = it.next().and_then(|v| v.parse::<f64>().ok());
+                if tempo.is_none() {
+                    tracing::warn!("`cycletron tempo` needs a BPM value, e.g. `tempo 128`");
+                }
+            }
+            other if !other.starts_with('-') && std::path::Path::new(other).exists() => {
+                paths.push(other.to_string());
+            }
+            other => tracing::warn!("ignoring unrecognized argument: {other}"),
+        }
+    }
+
+    let should_raise = !paths.is_empty() || (verbs.is_empty() && tempo.is_none());
+    if should_raise && let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
 
-    // Filter out flags / the binary path; keep things that look like file paths.
-    let paths: Vec<String> = args
-        .into_iter()
-        .skip(1)
-        .filter(|a| !a.starts_with('-') && std::path::Path::new(a).exists())
-        .collect();
-
+    for t in verbs {
+        let _ = app.emit(t, ());
+    }
+    if let Some(bpm) = tempo {
+        let _ = app.emit(crate::playback::topic::TEMPO, bpm);
+    }
     if !paths.is_empty() {
         let _ = app.emit("open-files", paths);
     }

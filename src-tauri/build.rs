@@ -38,7 +38,7 @@ const COMMANDS: &[&str] = &[
     "reveal_in_os",
     "autosave_session",
     "restore_session",
-    "tray_set_playback",
+    "set_playback_state",
     "import_midi",
     "inspect_midi",
     "save_midi_to_library",

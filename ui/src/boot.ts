@@ -31,8 +31,7 @@ import {welcomeModal} from './welcome-modal.js';
 import {logsModal} from './logs-modal.js';
 import {checkForUpdates} from './updater.js';
 import {notify} from './notifications.js';
-import {initTrayBridge} from './tray-bridge.js';
-import {initShortcutBridge} from './shortcut-bridge.js';
+import {initPlaybackBridge} from './playback-bridge.js';
 import {diag} from './diagnostics.js';
 import {fileMenuButton} from './file-menu-button.js';
 import {editorEmptyState} from './editor-empty-state.js';
@@ -172,8 +171,7 @@ async function boot(): Promise<void> {
         soundsBrowser.init(),
         fileManager.init(),
         fileExplorer.init(),
-        initTrayBridge(),
-        initShortcutBridge(),
+        initPlaybackBridge(),
         restoreIfAny(),
     ]);
 

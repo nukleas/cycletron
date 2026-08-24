@@ -1,9 +1,10 @@
 //! System tray icon with a minimal transport menu.
 //!
-//! The tray reflects playback state via its tooltip + the Play/Pause label.
-//! The frontend updates state by invoking `tray_set_playback`.
-//! Clicking the tray icon toggles window visibility.
+//! The tray reflects playback state via its tooltip + the Play/Pause label,
+//! fed by `playback::set_playback_state`. Clicking the tray icon toggles
+//! window visibility.
 
+use crate::playback::{PlaybackSnapshot, topic};
 use tauri::menu::{Menu, MenuBuilder, MenuEvent, MenuItem, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
@@ -73,10 +74,10 @@ fn handle_tray_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
             }
         }
         "tray.play_pause" => {
-            let _ = app.emit("tray:play_pause", ());
+            let _ = app.emit(topic::PLAY_PAUSE, ());
         }
         "tray.stop" => {
-            let _ = app.emit("tray:stop", ());
+            let _ = app.emit(topic::STOP, ());
         }
         "tray.quit" => {
             app.exit(0);
@@ -85,19 +86,10 @@ fn handle_tray_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     }
 }
 
-/// Command invoked by the frontend whenever playback state changes so the
-/// tray tooltip + Play/Pause label stay in sync.
-#[tauri::command]
-pub fn tray_set_playback(
-    state: String,
-    app: AppHandle,
-    tray_state: tauri::State<'_, TrayStateHolder>,
-) -> Result<(), String> {
-    let label = match state.as_str() {
-        "playing" => "Pause",
-        _ => "Play",
-    };
-    let tooltip = match state.as_str() {
+/// Keep the tray tooltip + Play/Pause label in sync with playback state.
+pub fn apply_playback(app: &AppHandle, tray_state: &TrayStateHolder, snap: &PlaybackSnapshot) {
+    let label = if snap.is_playing() { "Pause" } else { "Play" };
+    let tooltip = match snap.state.as_str() {
         "playing" => "Cycletron — playing",
         "paused" => "Cycletron — paused",
         _ => "Cycletron — stopped",
@@ -109,7 +101,6 @@ pub fn tray_set_playback(
     if let Some(tray) = app.tray_by_id("cycletron-tray") {
         let _ = tray.set_tooltip(Some(tooltip));
     }
-    Ok(())
 }
 
 /// Holds references to tray menu items that need to be mutated at runtime.
