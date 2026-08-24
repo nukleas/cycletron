@@ -192,6 +192,20 @@ interface EditorCallbacks {
     onStop: () => void;
 }
 
+/**
+ * Everything an out-of-view renderer needs to draw the document itself.
+ *
+ * Stage Mode paints the code onto the visualizer canvas, so it needs the text
+ * and caret but must never read back from CodeMirror's DOM — the editor stays
+ * the single source of truth and pushes, rather than being polled.
+ */
+export interface EditorSnapshot {
+    code: string;
+    cursor: number;
+    selFrom: number;
+    selTo: number;
+}
+
 export class StrudelEditor {
     private readonly container: HTMLDivElement;
     private readonly onChange: (code: string) => void;
@@ -207,6 +221,12 @@ export class StrudelEditor {
 
     /** True after a full-document setCode until evaluate succeeds. */
     replaced = false;
+
+    /** Set by Stage Mode while it is drawing the document; null otherwise. */
+    onSnapshot: ((snapshot: EditorSnapshot) => void) | null = null;
+
+    /** Mirrors {@link flashBlock} so an external renderer can flash in step. */
+    onFlash: ((from: number, to: number) => void) | null = null;
 
     view: EditorView;
 
@@ -345,6 +365,9 @@ export class StrudelEditor {
                     if (update.docChanged) {
                         this.onChange(this.getCode());
                     }
+                    if (this.onSnapshot && (update.docChanged || update.selectionSet)) {
+                        this.emitSnapshot(update.state);
+                    }
                 }),
 
                 // Styling
@@ -378,6 +401,39 @@ export class StrudelEditor {
             effects: this.assistCompartment.reconfigure(
                 on ? strudelAssistExtensions() : []
             ),
+        });
+    }
+
+    /**
+     * Temporarily silence autocomplete and hover docs without touching the
+     * user's preference.
+     *
+     * Stage Mode occludes the editor with an opaque canvas, so CodeMirror's
+     * tooltips would render invisibly behind it while you type. Deliberately
+     * does *not* call setAssistEnabledPref — otherwise leaving the stage would
+     * strand autocomplete permanently off.
+     */
+    suspendAssist(on: boolean): void {
+        closeCompletion(this.view);
+        this.view.dispatch({
+            effects: this.assistCompartment.reconfigure(
+                on || !isAssistEnabled() ? [] : strudelAssistExtensions()
+            ),
+        });
+    }
+
+    /** Push the current document to {@link onSnapshot} out of band. */
+    pushSnapshotNow(): void {
+        if (this.onSnapshot) this.emitSnapshot(this.view.state);
+    }
+
+    private emitSnapshot(state: EditorState): void {
+        const sel = state.selection.main;
+        this.onSnapshot?.({
+            code: state.doc.toString(),
+            cursor: sel.head,
+            selFrom: sel.from,
+            selTo: sel.to,
         });
     }
 
@@ -556,6 +612,7 @@ export class StrudelEditor {
 
         // Apply the highlight decoration via the StateField.
         this.view.dispatch({effects: setFlash.of({from, to})});
+        this.onFlash?.(from, to);
 
         // Remove it after the CSS transition has had time to run (~500 ms).
         this._flashTimer = setTimeout(() => {

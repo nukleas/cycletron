@@ -15,6 +15,7 @@ import {PlaybackState} from "./types/app.js";
 import {StrudelEditor} from './editor.js';
 import {PatternVisualizer, ScopeVisualizer, VizMode} from './visualizer.js';
 import {ambientViz} from './ambient-viz.js';
+import {stage} from './stage.js';
 import {audioRecorder} from './audio-recorder.js';
 import {visualsMenu} from './visuals-menu.js';
 import {ExamplesBrowser} from './examples.js';
@@ -116,6 +117,8 @@ export class StrudelApp {
     private _recoveringFromCrash: boolean;
     private _resizeMoveRafId: number | null;
     private _activeLocsBufPtr: number;
+    /** Whether any active-note highlight is currently lit. See applyActiveNotes. */
+    private _activeNotesLit = false;
     private _wasmMemory: WebAssembly.Memory | null;
     private bpmView: Float64Array | null;
     /** 128-bit set (4×u32) of GM instruments referenced but not yet loaded. */
@@ -220,12 +223,35 @@ export class StrudelApp {
         return map;
     }
 
+    /**
+     * Route highlight ranges to every renderer that draws the document: the
+     * editor, and Stage Mode's canvas code layer.
+     *
+     * Tracks whether anything is currently lit so a clear dispatches once
+     * instead of on every cycle update, and so a full-buffer replace can't
+     * strand the previous pattern's spans lit.
+     */
+    private applyActiveNotes(ranges: { from: number; to: number }[] | null): void {
+        if (ranges && ranges.length > 0) {
+            this.editor?.setActiveNotes(ranges);
+            stage.setActiveRanges(ranges);
+            this._activeNotesLit = true;
+        } else if (this._activeNotesLit) {
+            this.editor?.clearActiveNotes();
+            stage.clearActiveRanges();
+            this._activeNotesLit = false;
+        }
+    }
+
     private updateActiveNotes(cycle: number): void {
         if (!this.scheduler?.pattern || !this.editor || !this._wasmMemory) return;
         // Full-buffer replace (file open / examples) until the new code
         // actually evaluates — otherwise old-pattern byte spans light up
         // the wrong tokens in the new document.
-        if (this.editor.replaced) return;
+        if (this.editor.replaced) {
+            this.applyActiveNotes(null);
+            return;
+        }
 
         // queryActiveLocations(now, lookahead) — the 2nd arg is a RELATIVE
         // duration (Rust queries [now, now + lookahead]), not an absolute end.
@@ -237,7 +263,7 @@ export class StrudelApp {
             this.scheduler!.pattern!.queryActiveLocations(cycle, 0.5));
 
         if (count === 0) {
-            this.editor.clearActiveNotes();
+            this.applyActiveNotes(null);
             return;
         }
 
@@ -270,11 +296,7 @@ export class StrudelApp {
             }
         }
 
-        if (ranges.length > 0) {
-            this.editor.setActiveNotes(ranges);
-        } else {
-            this.editor.clearActiveNotes();
-        }
+        this.applyActiveNotes(ranges);
     }
 
     handleCycleUpdate = (cycle: number): void => {
@@ -1420,7 +1442,7 @@ export class StrudelApp {
 
         this.elements.cycleCount.textContent = '0.00';
         this.editor?.clearInspect();
-        this.editor?.clearActiveNotes();
+        this.applyActiveNotes(null);
         this.scope!.stopAnimation();
         this.visualizer!.stopAnimation();
         this.audioManager?.stopAnalyserWatchdog();
@@ -1469,7 +1491,7 @@ export class StrudelApp {
         this.elements.error.textContent = message;
         this.elements.error.classList.add('error--visible');
         this.editor?.clearInspect();
-        this.editor?.clearActiveNotes();
+        this.applyActiveNotes(null);
         if (this.editor) this.editor.replaced = true;
 
         if (decorate && this.editor) {
@@ -1569,6 +1591,11 @@ export class StrudelApp {
     /** Cycle to the next ambient viz mode. Fired from the View menu. */
     cycleImmersiveVizMode(): void {
         ambientViz.next();
+    }
+
+    /** Enter/leave the fullscreen performance view. Fired from the View menu. */
+    toggleStageMode(): void {
+        void stage.toggle();
     }
 
     /**

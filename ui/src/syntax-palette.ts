@@ -40,3 +40,41 @@ export const syntaxTagMap: SyntaxTagEntry[] = [
     {tag: tags.invalid, key: 'invalid'},
     {tag: tags.null, key: 'null'},
 ];
+
+/** Token key used for text no highlighter rule claimed. */
+export const DEFAULT_TOKEN_KEY = 'variable';
+
+/**
+ * Resolve each token key to a concrete CSS color string.
+ *
+ * Canvas cannot resolve `var(--magenta)` — assigning one to `fillStyle` fails
+ * silently and paints black — so a canvas renderer needs real values. Rather
+ * than keep a third copy of the palette (theme.ts has one, the `.ai-tok-*`
+ * rules in style.css have another), probe the live stylesheet through those
+ * same classes. That way the stage tracks theme changes for free and can never
+ * drift from the editor.
+ *
+ * Costs one layout pass over ~18 throwaway spans; call it from `layout()`,
+ * not per frame.
+ */
+export function resolveSyntaxColors(): Record<string, string> {
+    const keys = [...new Set(syntaxTagMap.map((entry) => entry.key))];
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute; visibility:hidden; pointer-events:none;';
+
+    const spans = keys.map((key) => {
+        const span = document.createElement('span');
+        span.className = `ai-tok-${key}`;
+        probe.appendChild(span);
+        return span;
+    });
+
+    document.body.appendChild(probe);
+    const colors: Record<string, string> = {};
+    keys.forEach((key, i) => {
+        colors[key] = getComputedStyle(spans[i]).color;
+    });
+    probe.remove();
+
+    return colors;
+}

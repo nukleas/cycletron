@@ -86,6 +86,16 @@ export interface VizMode {
     render(ctx: CanvasRenderingContext2D, s: VizServices): void;
 }
 
+/**
+ * An overlay composited on top of the active mode, into the *same* canvas,
+ * after the host's vignette. Identical lifecycle contract to {@link VizMode}.
+ *
+ * Stage Mode's code and readout are layers rather than DOM because the stage
+ * is meant to be captured: a DOM overlay would appear on screen but be absent
+ * from anything reading the canvas, so preview and capture would disagree.
+ */
+export type VizLayer = VizMode;
+
 export interface VizModeDef {
     /** Stable id — persistence key; never reuse or rename casually. */
     id: string;
