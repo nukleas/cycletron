@@ -10,7 +10,7 @@
 
 import {invoke, isTauri, listen} from './tauri.js';
 import {PlaybackState} from './types/app.js';
-import {currentBpm} from './bpm.js';
+import {adjustBpm, currentBpm} from './bpm.js';
 import {diag} from './diagnostics.js';
 import {fileManager} from './file-manager.js';
 
@@ -52,6 +52,9 @@ export async function initPlaybackBridge(): Promise<void> {
     });
     await listen<number>('transport:tempo', ({payload}) => {
         if (Number.isFinite(payload)) window.strudelApp?.applyBpm?.(payload);
+    });
+    await listen<number>('transport:tempo_nudge', ({payload}) => {
+        if (Number.isFinite(payload)) adjustBpm(payload);
     });
 
     // App → world.

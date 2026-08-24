@@ -1181,23 +1181,30 @@ pub fn spawn_external_change_watcher(app_handle: tauri::AppHandle) {
 /// of `cycletron toggle` on a hotkey is to keep playing whatever you were
 /// looking at. Opening a file, or a bare relaunch, still brings us forward.
 pub fn handle_second_instance(app: &tauri::AppHandle, args: Vec<String>) {
+    use crate::playback::topic;
+
     let mut paths: Vec<String> = Vec::new();
     let mut verbs: Vec<&str> = Vec::new();
-    let mut tempo: Option<f64> = None;
+    let mut tempo: Option<(&str, f64)> = None;
 
     let rest: Vec<String> = args.into_iter().skip(1).collect();
-    let mut it = rest.iter().peekable();
+    let mut it = rest.iter();
     while let Some(arg) = it.next() {
         match arg.as_str() {
-            "play" => verbs.push(crate::playback::topic::PLAY),
-            "pause" => verbs.push(crate::playback::topic::PAUSE),
-            "toggle" => verbs.push(crate::playback::topic::PLAY_PAUSE),
+            "play" => verbs.push(topic::PLAY),
+            "pause" => verbs.push(topic::PAUSE),
+            "toggle" => verbs.push(topic::PLAY_PAUSE),
             // "hush" is what a live coder reaches for; it is our stop.
-            "stop" | "hush" => verbs.push(crate::playback::topic::STOP),
-            "tempo" => {
-                tempo = it.next().and_then(|v| v.parse::<f64>().ok());
-                if tempo.is_none() {
-                    tracing::warn!("`cycletron tempo` needs a BPM value, e.g. `tempo 128`");
+            "stop" | "hush" => verbs.push(topic::STOP),
+            verb @ ("tempo" | "tempo-nudge") => {
+                // The value is consumed here, so a negative nudge never
+                // reaches the flag check below.
+                match it.next().and_then(|v| v.parse::<f64>().ok()) {
+                    Some(value) if verb == "tempo" => tempo = Some((topic::TEMPO, value)),
+                    Some(value) => tempo = Some((topic::TEMPO_NUDGE, value)),
+                    None => tracing::warn!(
+                        "`cycletron {verb}` needs a number, e.g. `tempo 128` or `tempo-nudge -2`"
+                    ),
                 }
             }
             other if !other.starts_with('-') && std::path::Path::new(other).exists() => {
@@ -1216,8 +1223,8 @@ pub fn handle_second_instance(app: &tauri::AppHandle, args: Vec<String>) {
     for t in verbs {
         let _ = app.emit(t, ());
     }
-    if let Some(bpm) = tempo {
-        let _ = app.emit(crate::playback::topic::TEMPO, bpm);
+    if let Some((t, value)) = tempo {
+        let _ = app.emit(t, value);
     }
     if !paths.is_empty() {
         let _ = app.emit("open-files", paths);

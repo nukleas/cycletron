@@ -18,6 +18,9 @@ pub mod topic {
     pub const PAUSE: &str = "transport:pause";
     pub const STOP: &str = "transport:stop";
     pub const TEMPO: &str = "transport:tempo";
+    /// Relative tempo change. A keybind can't read the current BPM to add to
+    /// it, so the app does the arithmetic.
+    pub const TEMPO_NUDGE: &str = "transport:tempo_nudge";
 }
 
 /// What the frontend reports whenever transport state changes.
@@ -39,19 +42,6 @@ pub struct PlaybackSnapshot {
 impl PlaybackSnapshot {
     pub fn is_playing(&self) -> bool {
         self.state == "playing"
-    }
-
-    /// The snapshot written on shutdown so watchers don't keep showing a
-    /// transport that no longer exists.
-    fn stopped() -> Self {
-        Self {
-            state: "stopped".to_string(),
-            bpm: 0.0,
-            cps: 0.0,
-            cycle: 0.0,
-            file: String::new(),
-            path: None,
-        }
     }
 }
 
@@ -79,10 +69,14 @@ pub fn set_playback_state(
     Ok(())
 }
 
-/// Mark the transport stopped on the way out, so a bar widget doesn't sit
-/// there claiming Cycletron is playing after the window is gone.
-pub fn clear_state_file(app: &AppHandle) {
-    write_state_file(app, &PlaybackSnapshot::stopped());
+/// Take the state file away on the way out. Presence of the file is how a
+/// watcher answers "is there a session?", so leaving a stopped snapshot behind
+/// would be a lie about a window that no longer exists.
+pub fn remove_state_file(app: &AppHandle) {
+    let Some(dir) = state_file_path(app) else {
+        return;
+    };
+    let _ = std::fs::remove_file(dir.join("state.json"));
 }
 
 /// Volatile per-session state belongs on the runtime tmpfs, which is also
