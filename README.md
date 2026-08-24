@@ -75,7 +75,10 @@ cycletron take.strudel    # open a file (this one does raise the window)
 While it runs, Cycletron reports what it is doing to a small JSON file —
 `$XDG_RUNTIME_DIR/cycletron/state.json` on Linux, `state.json` in the app data
 directory elsewhere — carrying transport state, tempo, cycle position, and the
-open file. Watch that file to put Cycletron in a status bar.
+open file. The file exists exactly as long as the session does, so watching it
+is enough to put Cycletron in a status bar. On Linux the transport is also
+announced over MPRIS, which is all the media keys and most desktop
+now-playing widgets need.
 
 ---
 
