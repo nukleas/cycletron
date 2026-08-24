@@ -300,6 +300,11 @@
         </div>
     </div>
 
+    <!-- Stage Mode — the fixed-resolution composed scene (visuals + code on one
+         canvas). Opaque overlay: the app stays mounted and focused underneath,
+         so CodeMirror keeps working while its pixels are hidden. -->
+    <div id="stageRoot" class="stage-root" hidden aria-hidden="true"></div>
+
     <!-- Welcome (first-run) modal -->
     <div id="welcomeModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
         <div class="app-modal-backdrop" data-dismiss></div>

@@ -37,6 +37,7 @@ interface Window {
     midiMonitor: typeof import('./src/midi-monitor.js').midiMonitor;
     midiPads: typeof import('./src/midi-pads.js').midiPads;
     preferencesModal: typeof import('./src/preferences.js').preferencesModal;
+    stage: typeof import('./src/stage.js').stage;
     welcomeModal: typeof import('./src/welcome-modal.js').welcomeModal;
 }
 

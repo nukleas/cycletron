@@ -48,6 +48,7 @@ The curated corpus is no longer a panel — the AI searches it directly
 | Find (panel includes Replace) | **⌘F** |
 | Toggle AI panel | **⌘⇧A** |
 | Immersive visualizer / next mode | **⌘⇧V** / **⌘⇧]** |
+| Stage Mode (performance view) | **⌘⇧F** |
 | Undo / Redo *pattern* (distinct from text undo) | **⌘⌥Z** / **⌘⌥⇧Z** |
 | Tempo ±1 | Playback menu or command palette |
 
@@ -194,6 +195,27 @@ them.
 fullscreen: 15 modes, **⌘⇧]** or the on-screen HUD to switch, AUTO to cycle
 them, HIDE to drop the HUD. The Visuals menu also has a **Readable mode**
 toggle that calms the ambient background for readability.
+
+---
+
+## Stage Mode
+
+**⌘⇧F** (or Visuals ▾ → Stage Mode) is the performance view: the visualizer
+full-bleed with your code drawn on top of it, and nothing else — no header,
+no panels, no status bar. Notes glow in the code as they fire. Press **⌘⇧F**
+again to leave; the hint stays on screen for the first few seconds.
+
+You keep typing normally the whole time. The editor is still there and still
+focused, just hidden behind the stage — evaluate, undo, and every other
+shortcut work as usual. **Escape** still stops playback rather than exiting.
+
+Everything on stage is drawn into a single canvas at a fixed output size
+(1080p by default; 1440p and 4K in the Visuals menu), letterboxed to fit the
+window. That matters for capture: resizing the window changes only the black
+bars, never the frame, so **a screen or window recording stays a clean, stable
+16:9** — point OBS or Loom at it and you get the performance with none of the
+app chrome. The higher presets are worth it if you capture the window
+directly on a HiDPI display and want a 1:1 match.
 
 ---
 

@@ -43,6 +43,8 @@ export class AmbientViz {
     private enabled = localStorage.getItem(ENABLED_KEY) !== '0';
     private lastSwitchCycle = 0;
     private latestCycle = 0;
+    /** True while Stage Mode has borrowed the shared visualizer. */
+    private borrowed = false;
 
     /** Fired after any enabled/mode/auto-cycle change so UI (menu) can refresh. */
     onStateChange: (() => void) | null = null;
@@ -53,23 +55,67 @@ export class AmbientViz {
      * engine re-init refreshes both.
      */
     attach(analyser: AnalyserNode, patternSource?: PatternSource): void {
-        this.container = document.getElementById('fullscreenViz') as HTMLDivElement | null;
-        if (!this.container) return;
+        const viz = this.ensureVisualizer();
+        if (!viz) return;
 
-        if (!this.viz) {
-            this.viz = new FullscreenVisualizer(this.container);
-            this.viz.setMode(loadPersistedMode());
-        }
-        this.viz.setAnalyser(analyser);
-        if (patternSource) this.viz.setPatternSource(patternSource);
+        viz.setAnalyser(analyser);
+        if (patternSource) viz.setPatternSource(patternSource);
 
         if (!this.wired) {
             this.wired = true;
             this.wireHud();
             if (this.enabled) this.start();
-        } else if (this.enabled && !this.container.hasAttribute('hidden')) {
-            this.viz.start();
+        } else if (this.enabled && this.vizVisible()) {
+            viz.start();
         }
+    }
+
+    /**
+     * Construct the visualizer without requiring audio.
+     *
+     * `attach()` used to be the only construction site, so nothing visual
+     * existed until the first Play. Stage Mode can be entered before that;
+     * `updateAudioFeatures()` already no-ops without an analyser.
+     */
+    ensureVisualizer(): FullscreenVisualizer | null {
+        this.container ??= document.getElementById('fullscreenViz') as HTMLDivElement | null;
+        if (!this.container) return null;
+
+        if (!this.viz) {
+            this.viz = new FullscreenVisualizer(this.container);
+            this.viz.setMode(loadPersistedMode());
+        }
+        return this.viz;
+    }
+
+    /** The ambient visualizer's own container, for Stage Mode to hand it back to. */
+    homeContainer(): HTMLDivElement | null {
+        return this.container;
+    }
+
+    /**
+     * Mark the visualizer as on loan to Stage Mode.
+     *
+     * There is one visualizer instance, so an ambient toggle while on stage
+     * would otherwise stop the shared rAF loop and blank the frame. While
+     * borrowed, enable/disable still records the preference but leaves the
+     * canvas alone; `reapply()` settles it on exit.
+     */
+    setBorrowed(on: boolean): void {
+        this.borrowed = on;
+    }
+
+    /** Whether the visualizer is currently painting somewhere the user can see. */
+    private vizVisible(): boolean {
+        return this.borrowed || (!!this.container && !this.container.hasAttribute('hidden'));
+    }
+
+    /**
+     * Re-apply the persisted enabled state. Stage Mode calls this on exit, once
+     * it has returned the canvas, so ambient resumes exactly as the user left it.
+     */
+    reapply(): void {
+        this.setEnabled(this.enabled);
     }
 
     updateCycle(cycle: number): void {
@@ -80,7 +126,7 @@ export class AmbientViz {
         if (cycle < this.lastSwitchCycle) this.lastSwitchCycle = cycle;
 
         if (this.autoCycle
-            && this.container && !this.container.hasAttribute('hidden')
+            && this.vizVisible()
             && cycle - this.lastSwitchCycle >= AUTO_CYCLE_EVERY) {
             this.switchMode(+1);
         }
@@ -155,7 +201,8 @@ export class AmbientViz {
         this.enabled = true;
         localStorage.setItem(ENABLED_KEY, '1');
         // Pre-audio: just arm the flag; attach() will start the viz.
-        if (this.container && this.viz) {
+        // On loan to the stage: arm it too, and let reapply() settle it on exit.
+        if (!this.borrowed && this.container && this.viz) {
             this.container.removeAttribute('hidden');
             document.body.classList.add('immersive-viz-active');
             this.viz.start();
@@ -169,7 +216,7 @@ export class AmbientViz {
     private stop(): void {
         this.enabled = false;
         localStorage.setItem(ENABLED_KEY, '0');
-        if (this.container) {
+        if (!this.borrowed && this.container) {
             this.viz?.stop();
             this.container.setAttribute('hidden', '');
             document.body.classList.remove('immersive-viz-active');

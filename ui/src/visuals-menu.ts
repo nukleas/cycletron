@@ -11,6 +11,7 @@
  */
 
 import {ambientViz} from './ambient-viz.js';
+import {stage, STAGE_PRESETS} from './stage.js';
 import {attachDropdown} from './dropdown.js';
 import {VIZ_MODES} from './viz/registry.js';
 import {VizMode} from './types/visualizer.js';
@@ -42,6 +43,10 @@ class VisualsMenu {
     private readableItem: HTMLButtonElement | null = null;
     private scanlinesItem: HTMLButtonElement | null = null;
     private modeItems: HTMLButtonElement[] = [];
+    private stageToggleItem: HTMLButtonElement | null = null;
+    private stageHudItem: HTMLButtonElement | null = null;
+    private stageFullscreenItem: HTMLButtonElement | null = null;
+    private stageResItems: HTMLButtonElement[] = [];
 
     init(opts: VisualsMenuOptions): void {
         this.opts = opts;
@@ -61,6 +66,7 @@ class VisualsMenu {
         });
 
         ambientViz.onStateChange = () => this.refresh();
+        stage.onStateChange = () => this.refresh();
     }
 
     // ---- construction -------------------------------------------------
@@ -125,6 +131,39 @@ class VisualsMenu {
 
         menu.appendChild(document.createElement('hr'));
 
+        menu.appendChild(this.section('Stage'));
+        this.stageToggleItem = this.item('Stage Mode', 'menuitemcheckbox', () => {
+            void stage.toggle();
+        });
+        this.stageToggleItem.appendChild(this.hint('⌘⇧F'));
+        menu.appendChild(this.stageToggleItem);
+
+        this.stageHudItem = this.item('Stage Readout', 'menuitemcheckbox', () => {
+            stage.setHudVisible(!stage.isHudVisible());
+            this.refresh();
+        });
+        this.stageHudItem.appendChild(this.hint('mode, BPM, cycle'));
+        menu.appendChild(this.stageHudItem);
+
+        this.stageFullscreenItem = this.item('Enter Fullscreen on Stage', 'menuitemcheckbox', () => {
+            stage.setOsFullscreenPref(!stage.isOsFullscreen());
+            this.refresh();
+        });
+        menu.appendChild(this.stageFullscreenItem);
+
+        // Output resolution is what a recorder or an OBS window capture gets,
+        // so it belongs next to the stage toggle rather than buried in prefs.
+        this.stageResItems = STAGE_PRESETS.map((preset) => {
+            const b = this.item(preset.label, 'menuitemradio', () => {
+                stage.setResolution(preset.id);
+                this.refresh();
+            });
+            menu.appendChild(b);
+            return b;
+        });
+
+        menu.appendChild(document.createElement('hr'));
+
         menu.appendChild(this.section('Display'));
         this.readableItem = this.item('Readable Mode', 'menuitemcheckbox', () => {
             const on = !(localStorage.getItem(READABLE_KEY) === '1');
@@ -179,6 +218,13 @@ class VisualsMenu {
         this.autoCycleItem?.setAttribute('aria-checked', String(ambientViz.isAutoCycle()));
         this.readableItem?.setAttribute('aria-checked', String(localStorage.getItem(READABLE_KEY) === '1'));
         this.scanlinesItem?.setAttribute('aria-checked', String(localStorage.getItem(SCANLINES_KEY) !== '0'));
+
+        this.stageToggleItem?.setAttribute('aria-checked', String(stage.isActive()));
+        this.stageHudItem?.setAttribute('aria-checked', String(stage.isHudVisible()));
+        this.stageFullscreenItem?.setAttribute('aria-checked', String(stage.isOsFullscreen()));
+        const resolutionId = stage.resolution().id;
+        this.stageResItems.forEach((b, i) =>
+            b.setAttribute('aria-checked', String(STAGE_PRESETS[i].id === resolutionId)));
 
         const ambientMode = ambientViz.getMode();
         this.modeItems.forEach((b, i) => b?.setAttribute('aria-checked', String(i === ambientMode)));

@@ -18,12 +18,18 @@
 import {pauseWhileHidden} from './viz-visibility.js';
 import {VIZ_MODES} from './viz/registry.js';
 import {defaultTheme, readTheme} from './viz/theme.js';
-import type {PatternSource, VizMode, VizServices} from './viz/types.js';
+import type {PatternSource, VizLayer, VizMode, VizServices} from './viz/types.js';
 
 type MutableServices = { -readonly [K in keyof VizServices]: VizServices[K] };
 
+/** A locked output size for Stage Mode. See {@link FullscreenVisualizer.setFixedResolution}. */
+export interface FixedResolution {
+    width: number;
+    height: number;
+}
+
 export class FullscreenVisualizer {
-    private readonly container: HTMLDivElement;
+    private container: HTMLDivElement;
     private readonly canvas: HTMLCanvasElement;
     private readonly ctx: CanvasRenderingContext2D;
 
@@ -52,6 +58,10 @@ export class FullscreenVisualizer {
     private animationId: number | null = null;
     private lastFrame = 0;
     private scanlineOffset = 0;
+
+    /** Non-null in Stage Mode: bitmap is locked to this size and letterboxed. */
+    private fixed: FixedResolution | null = null;
+    private layers: readonly VizLayer[] = [];
 
     private resizeObserver: ResizeObserver | null = null;
     private resizeRaf: number | null = null;
@@ -107,6 +117,46 @@ export class FullscreenVisualizer {
         this.services.patternSource = source;
     }
 
+    /**
+     * Move the canvas to a different container and re-measure.
+     *
+     * Stage Mode reparents the one existing instance rather than creating a
+     * second: two instances would mean two rAF loops, two FFT reads per frame,
+     * and a mode that visibly restarts every time you go on stage.
+     */
+    reparent(next: HTMLDivElement): void {
+        if (next === this.container) return;
+        // Unobserve first — observing both would thrash handleResize.
+        this.resizeObserver?.unobserve(this.container);
+        this.container = next;
+        next.appendChild(this.canvas); // appendChild moves an attached node
+        this.resizeObserver?.observe(next);
+        if (this.running) this.handleResize();
+    }
+
+    /**
+     * Lock the bitmap to a fixed output size, letterboxed inside the container
+     * by CSS; `null` restores container-derived, DPR-scaled sizing.
+     *
+     * A locked size is what makes the stage recordable: `captureStream()` reads
+     * the bitmap, so the output stays 1920×1080 no matter how the window is
+     * resized. `dpr` is forced to 1 so modes author in output pixels.
+     */
+    setFixedResolution(size: FixedResolution | null): void {
+        this.fixed = size;
+        if (!size) this.canvas.style.cssText = 'display:block; width:100%; height:100%;';
+        this.handleResize();
+    }
+
+    /** Overlays composited on top of the active mode, into the same canvas. */
+    setLayers(layers: readonly VizLayer[]): void {
+        this.layers = layers;
+        if (this.services.width > 0) {
+            for (const layer of layers) layer.layout(this.services);
+        }
+    }
+
+
     /** Called from the app's cycle-update callback so motion locks to musical time. */
     updateCycle(cycle: number): void {
         this.services.cycle = cycle;
@@ -158,16 +208,39 @@ export class FullscreenVisualizer {
         const rect = this.container.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
 
-        const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = Math.floor(rect.width * dpr);
-        this.canvas.height = Math.floor(rect.height * dpr);
-        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        if (this.fixed) {
+            const {width: fw, height: fh} = this.fixed;
+            // Assigning canvas.width CLEARS the bitmap and renegotiates any live
+            // captureStream() track, so only touch it when the value actually
+            // changed — a window drag must move the letterbox, not the output.
+            if (this.canvas.width !== fw) this.canvas.width = fw;
+            if (this.canvas.height !== fh) this.canvas.height = fh;
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-        this.services.width = rect.width;
-        this.services.height = rect.height;
-        this.services.dpr = dpr;
+            this.services.width = fw;
+            this.services.height = fh;
+            // dpr 1: modes author stroke weights in output pixels. Only
+            // matrix-rain and ascii-scope read dpr, both to size offscreen
+            // layers, which become 1:1 here.
+            this.services.dpr = 1;
+
+            // Contain-fit; the container's flex centering supplies the bars.
+            const scale = Math.min(rect.width / fw, rect.height / fh);
+            this.canvas.style.cssText =
+                `display:block; width:${fw * scale}px; height:${fh * scale}px;`;
+        } else {
+            const dpr = window.devicePixelRatio || 1;
+            this.canvas.width = Math.floor(rect.width * dpr);
+            this.canvas.height = Math.floor(rect.height * dpr);
+            this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            this.services.width = rect.width;
+            this.services.height = rect.height;
+            this.services.dpr = dpr;
+        }
 
         this.modeImpl.layout(this.services);
+        for (const layer of this.layers) layer.layout(this.services);
     };
 
     private readonly draw = (now: number): void => {
@@ -178,6 +251,7 @@ export class FullscreenVisualizer {
 
         this.updateAudioFeatures();
         this.modeImpl.update(dt, this.services);
+        for (const layer of this.layers) layer.update(dt, this.services);
         this.scanlineOffset = (this.scanlineOffset + dt * 18) % 4;
         this.render();
 
@@ -227,6 +301,9 @@ export class FullscreenVisualizer {
         this.drawScanlines(ctx, w, h);
         this.modeImpl.render(ctx, s);
         this.drawVignette(ctx, w, h);
+        // Layers last: the vignette is a frame around the *visuals*, and
+        // dimming Stage Mode's code at the edges would hurt legibility.
+        for (const layer of this.layers) layer.render(ctx, s);
     }
 
     private drawScanlines(ctx: CanvasRenderingContext2D, w: number, h: number): void {
