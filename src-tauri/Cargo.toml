@@ -60,6 +60,11 @@ hyper = { version = "1", features = ["full"] }
 http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
 
+# MPRIS is how a Linux desktop discovers and drives a media player: media
+# keys, the GNOME/KDE now-playing popovers, waybar, Omarchy's media widget.
+[target.'cfg(target_os = "linux")'.dependencies]
+mpris-server = { version = "0.10", features = ["tokio"] }
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

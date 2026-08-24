@@ -74,6 +74,8 @@ pub fn set_playback_state(
 ) -> Result<(), String> {
     crate::tray::apply_playback(&app, &tray_state, &snapshot);
     write_state_file(&app, &snapshot);
+    #[cfg(target_os = "linux")]
+    crate::mpris::update(&snapshot);
     Ok(())
 }
 

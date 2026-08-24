@@ -9,6 +9,8 @@ mod library_index;
 mod logs;
 mod menu;
 mod midi_input;
+#[cfg(target_os = "linux")]
+mod mpris;
 mod oauth;
 mod oauth_store;
 mod packs;
@@ -200,6 +202,10 @@ pub fn run() {
                 }
                 Err(e) => tracing::warn!("tray setup failed: {e}"),
             }
+
+            // MPRIS: media keys and every desktop now-playing surface.
+            #[cfg(target_os = "linux")]
+            mpris::init(app.handle().clone());
 
             // System-wide shortcuts (Cmd+Shift+Space, etc.).
             if let Err(e) = shortcuts::register_defaults(app.handle()) {
