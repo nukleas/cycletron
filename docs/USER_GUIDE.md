@@ -72,8 +72,11 @@ library files, not just commands.
   pattern has multiple `$:` tracks) via the Rust DSP engine — faster than
   realtime. MP3 export requires `ffmpeg` on your PATH.
 - **File → Export MIDI…** writes a Standard MIDI File from the current pattern.
-- The **Record** button (editor header) captures the live mix in realtime when
-  you want that instead.
+- The **Record** button (editor header) captures the live performance in
+  realtime to a lossless 32-bit float WAV, streamed straight to disk — a take is
+  limited by free space, not memory. It records the mix at unity, so turning
+  your monitors up or down never changes the file, and the metronome click
+  stays out of it. Leave "bars" empty to stop by hand.
 - Every save keeps a **snapshot** — the History button (editor header) lets
   you browse and restore up to 50 per file.
 

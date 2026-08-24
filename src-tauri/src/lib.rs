@@ -13,6 +13,7 @@ mod oauth;
 mod oauth_store;
 mod packs;
 mod persistence;
+mod recording;
 mod sample_sets;
 mod secrets;
 mod settings;
@@ -162,6 +163,7 @@ pub fn run() {
         .manage(app_state)
         .manage(tray::TrayStateHolder::new())
         .manage(midi_input::MidiInputState::new())
+        .manage(recording::RecordingState::new())
         .setup(|app| {
             // Resolve the app data dir (e.g. ~/Library/Application Support/com.nukleas.cycletron)
             // and hand it to AppState so recents + session snapshots can persist.
@@ -319,7 +321,6 @@ pub fn run() {
             commands::codex_oauth_login,
             commands::codex_oauth_logout,
             commands::get_app_info,
-            commands::write_binary_file,
             commands::export_audio,
             commands::export_midi,
             commands::list_snapshots,
@@ -347,7 +348,22 @@ pub fn run() {
             midi_input::start_midi_input_listening,
             midi_input::stop_midi_input_listening,
             midi_input::get_midi_input_status,
+            recording::recording_open,
+            recording::recording_write,
+            recording::recording_close,
+            recording::recording_orphans,
+            recording::recording_recover,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app, event| {
+            // Commit any in-flight take before we go, so quitting mid-recording
+            // still leaves a playable file rather than an orphaned .part.
+            if matches!(
+                event,
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+            ) {
+                app.state::<recording::RecordingState>().commit_all();
+            }
+        });
 }

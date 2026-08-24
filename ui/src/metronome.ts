@@ -11,6 +11,15 @@ import {currentBpm} from './bpm.js';
 const LOOK_AHEAD_MS = 25;       // scheduler tick rate
 const SCHEDULE_AHEAD = 0.1;     // seconds of look-ahead
 
+/**
+ * The click is a personal cue, not part of the performance, so it joins the
+ * master bus *after* the capture tap — audible, and never in a recording.
+ * Falls back to the destination if the bus isn't up yet.
+ */
+function cueOutput(ctx: AudioContext): AudioNode {
+    return window.strudelApp?.audioManager?.getCueBus?.() ?? ctx.destination;
+}
+
 class Metronome {
     private enabled = false;
     private volume = 0.4;
@@ -94,7 +103,7 @@ class Metronome {
         gain.gain.linearRampToValueAtTime(this.volume, when + 0.001);
         gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(cueOutput(ctx));
         osc.start(when);
         osc.stop(when + 0.06);
     }

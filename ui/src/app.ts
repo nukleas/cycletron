@@ -15,6 +15,7 @@ import {PlaybackState} from "./types/app.js";
 import {StrudelEditor} from './editor.js';
 import {PatternVisualizer, ScopeVisualizer, VizMode} from './visualizer.js';
 import {ambientViz} from './ambient-viz.js';
+import {audioRecorder} from './audio-recorder.js';
 import {visualsMenu} from './visuals-menu.js';
 import {ExamplesBrowser} from './examples.js';
 import {notify} from './notifications.js';
@@ -465,13 +466,13 @@ export class StrudelApp {
         const onGainInput = (e: Event) => {
             const pct = parseInt((e.target as HTMLInputElement).value, 10);
             this.elements.gainValue.textContent = `${pct}%`;
-            this.audioManager?.sendMasterGain(pct / 100);
+            this.audioManager?.setMonitorGain(pct / 100);
         };
 
         const resetGain = () => {
             this.elements.gainSlider.value = "100";
             this.elements.gainValue.textContent = '100%';
-            this.audioManager?.sendMasterGain(1.0);
+            this.audioManager?.setMonitorGain(1.0);
         };
 
         const onGainWheel = (e: WheelEvent) => {
@@ -482,7 +483,7 @@ export class StrudelApp {
             const next = Math.max(0, Math.min(200, current + delta * step));
             this.elements.gainSlider.value = String(next);
             this.elements.gainValue.textContent = `${next}%`;
-            this.audioManager?.sendMasterGain(next / 100);
+            this.audioManager?.setMonitorGain(next / 100);
         };
 
         const onCopyCode = async () => {
@@ -1588,6 +1589,11 @@ export class StrudelApp {
     }
 
     async dispose(): Promise<void> {
+        // The capture tap lives on the graph we are about to tear down. Commit
+        // first so a crash, a sample-set reload, or a quit mid-take still leaves
+        // the audio on disk rather than an orphaned partial file.
+        await audioRecorder.salvage();
+
         this.isInitialized = false;
         this.playbackState = PlaybackState.Stopped;
         this.latestCycle = 0;
