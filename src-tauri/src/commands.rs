@@ -1173,6 +1173,27 @@ pub fn spawn_external_change_watcher(app_handle: tauri::AppHandle) {
 // Single-instance hand-off (file associations + CLI verbs)
 // ---------------------------------------------------------------------------
 
+/// Bring the main window forward. `set_focus` is a no-op for a background
+/// client on Wayland, so on Hyprland (Omarchy) we also ask the compositor.
+pub fn raise_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let pid = std::process::id();
+        let _ = std::process::Command::new("hyprctl")
+            .args(["dispatch", "focuswindow", &format!("pid:{pid}")])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+    }
+}
+
 /// Called by the single-instance plugin when a second launch happens — either
 /// the user opened a `.strudel`/`.mid` file from the file manager, or ran
 /// `cycletron <verb>` to drive the transport from a keybind or a bar widget.
@@ -1196,10 +1217,26 @@ pub fn handle_second_instance(app: &tauri::AppHandle, args: Vec<String>) {
             "toggle" => verbs.push(topic::PLAY_PAUSE),
             // "hush" is what a live coder reaches for; it is our stop.
             "stop" | "hush" => verbs.push(topic::STOP),
+            // Combined form (`tempo-nudge=-6`) survives GTK eating a bare `-6`
+            // as an unknown option on the second-instance process.
+            arg if arg.starts_with("tempo-nudge=") || arg.starts_with("tempo=") => {
+                let (verb, raw) = arg.split_once('=').unwrap();
+                match raw.parse::<f64>() {
+                    Ok(value) if verb == "tempo" => tempo = Some((topic::TEMPO, value)),
+                    Ok(value) => tempo = Some((topic::TEMPO_NUDGE, value)),
+                    Err(_) => tracing::warn!(
+                        "`cycletron {verb}` needs a number, e.g. `tempo 128` or `tempo-nudge -2`"
+                    ),
+                }
+            }
             verb @ ("tempo" | "tempo-nudge") => {
-                // The value is consumed here, so a negative nudge never
-                // reaches the flag check below.
-                match it.next().and_then(|v| v.parse::<f64>().ok()) {
+                // `--` lets a negative nudge pass through GTK/glib option
+                // parsing on the second process (`tempo-nudge -- -6`).
+                let mut raw = it.next().map(String::as_str);
+                if raw == Some("--") {
+                    raw = it.next().map(String::as_str);
+                }
+                match raw.and_then(|v| v.parse::<f64>().ok()) {
                     Some(value) if verb == "tempo" => tempo = Some((topic::TEMPO, value)),
                     Some(value) => tempo = Some((topic::TEMPO_NUDGE, value)),
                     None => tracing::warn!(
@@ -1207,6 +1244,7 @@ pub fn handle_second_instance(app: &tauri::AppHandle, args: Vec<String>) {
                     ),
                 }
             }
+            "--" => {}
             other if !other.starts_with('-') && std::path::Path::new(other).exists() => {
                 paths.push(other.to_string());
             }
@@ -1215,9 +1253,8 @@ pub fn handle_second_instance(app: &tauri::AppHandle, args: Vec<String>) {
     }
 
     let should_raise = !paths.is_empty() || (verbs.is_empty() && tempo.is_none());
-    if should_raise && let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.set_focus();
+    if should_raise {
+        raise_main_window(app);
     }
 
     for t in verbs {

@@ -1474,7 +1474,9 @@ export class StrudelApp {
     applyBpm(bpm: number): void {
         bpm = Math.max(30, Math.min(300, bpm));
         if (isNaN(bpm)) return;
-        const value = String(bpm);
+        // The BPM control is a range input with step 1; a fractional string
+        // is rejected by the DOM and the slider stays put.
+        const value = String(Math.round(bpm));
         // Runs on every evaluate (each live-coding keystroke) — skip the DOM
         // and localStorage churn when the tempo didn't change. The scheduler
         // still gets the call; it no-ops internally on an unchanged BPM.

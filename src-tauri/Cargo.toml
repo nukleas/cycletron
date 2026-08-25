@@ -70,6 +70,12 @@ tauri-build = { version = "2", features = [] }
 
 [lib]
 # The _lib suffix keeps the lib's artifacts (.pdb/.lib) from colliding with the
-# cycletron-app bin target on Windows MSVC, which flattens both to cycletron_app.*
+# bin target on Windows MSVC, which flattens both to the same stem.
 name = "cycletron_app_lib"
 crate-type = ["lib", "staticlib", "cdylib"]
+
+# The CLI, the Omarchy plugin, and the transport bindings all invoke `cycletron`.
+# Cargo would otherwise name this binary after the package (`cycletron-app`).
+[[bin]]
+name = "cycletron"
+path = "src/main.rs"

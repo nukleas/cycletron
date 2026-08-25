@@ -12,7 +12,7 @@
 use crate::playback::{PlaybackSnapshot, topic};
 use mpris_server::{Metadata, PlaybackStatus, Player, TrackId};
 use std::sync::OnceLock;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 static TX: OnceLock<UnboundedSender<PlaybackSnapshot>> = OnceLock::new();
@@ -93,11 +93,7 @@ async fn serve(app: AppHandle, mut rx: UnboundedReceiver<PlaybackSnapshot>) {
     });
     let handle = app.clone();
     player.connect_raise(move |_| {
-        if let Some(window) = handle.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.unminimize();
-            let _ = window.set_focus();
-        }
+        crate::commands::raise_main_window(&handle);
     });
 
     let pump = async {

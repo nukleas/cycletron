@@ -79,6 +79,18 @@ pub fn remove_state_file(app: &AppHandle) {
     let _ = std::fs::remove_file(dir.join("state.json"));
 }
 
+/// Linux-only: unlink the runtime state file without an `AppHandle`, so a
+/// SIGTERM handler can do it. No-op on other OSes (the file lives in app
+/// data there, and we only know that path from Tauri).
+pub fn remove_runtime_state_file() {
+    #[cfg(target_os = "linux")]
+    if let Some(runtime_dir) = std::env::var_os("XDG_RUNTIME_DIR") {
+        let _ = std::fs::remove_file(
+            std::path::PathBuf::from(runtime_dir).join("cycletron/state.json"),
+        );
+    }
+}
+
 /// Volatile per-session state belongs on the runtime tmpfs, which is also
 /// where a Linux desktop widget expects to find it. Everywhere else there is
 /// no such directory, so it sits beside the rest of the app data.

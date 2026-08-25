@@ -211,6 +211,29 @@ pub fn run() {
             #[cfg(target_os = "linux")]
             mpris::init(app.handle().clone());
 
+            // SIGTERM/SIGINT skip Tauri's Exit event. Unlink the state file
+            // anyway, or a widget keeps reporting a session that is gone.
+            #[cfg(unix)]
+            {
+                tauri::async_runtime::spawn(async {
+                    let term = tokio::signal::unix::signal(
+                        tokio::signal::unix::SignalKind::terminate(),
+                    );
+                    let int = tokio::signal::unix::signal(
+                        tokio::signal::unix::SignalKind::interrupt(),
+                    );
+                    let (Ok(mut term), Ok(mut int)) = (term, int) else {
+                        return;
+                    };
+                    tokio::select! {
+                        _ = term.recv() => {}
+                        _ = int.recv() => {}
+                    }
+                    crate::playback::remove_runtime_state_file();
+                    std::process::exit(0);
+                });
+            }
+
             // System-wide shortcuts (Cmd+Shift+Space, etc.).
             if let Err(e) = shortcuts::register_defaults(app.handle()) {
                 tracing::warn!("global shortcuts setup failed: {e}");
@@ -365,8 +388,11 @@ pub fn run() {
         .run(|app, event| {
             // Take the state file with us, so anything watching it doesn't
             // keep reporting a session that has ended.
-            if let tauri::RunEvent::Exit = event {
-                playback::remove_state_file(app);
+            match event {
+                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. } => {
+                    playback::remove_state_file(app);
+                }
+                _ => {}
             }
         });
 }

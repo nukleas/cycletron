@@ -2,6 +2,7 @@
   "productName": "Cycletron",
   "version": "0.1.0",
   "identifier": "com.nukleas.cycletron",
+  "mainBinaryName": "cycletron",
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:5173",

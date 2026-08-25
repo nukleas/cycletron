@@ -74,12 +74,17 @@ function snapshot(): PlaybackSnapshot {
               ? 'paused'
               : 'stopped';
 
+    // Prefer the scheduler's own tempo: the slider is a range input with
+    // step 1, and a non-integer WASM value is silently ignored by the DOM,
+    // which left MPRIS and the state file stuck at 120 while the audio
+    // clock was elsewhere.
+    const tempo = app?.scheduler?.tempo;
     return {
         state,
-        bpm: currentBpm(),
+        bpm: tempo?.bpm ?? currentBpm(),
         // Zero until the audio graph exists — there is no cycle rate to report
         // before the scheduler is built.
-        cps: app?.scheduler?.tempo.cps ?? 0,
+        cps: tempo?.cps ?? 0,
         cycle: state === 'stopped' ? 0 : (app?.scheduler?.cycle ?? 0),
         file: fileManager.fileName,
         path: fileManager.filePath,

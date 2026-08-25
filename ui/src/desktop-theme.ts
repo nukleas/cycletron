@@ -67,7 +67,7 @@ function apply(theme: DesktopTheme | null): void {
         return null;
     };
 
-    const accent = pick('accent', 'blue', 'cyan');
+    const accent = pick('accent', 'blue', 'cyan', 'color4');
     const background = pick('background');
     const foreground = pick('foreground');
     if (!accent || !background || !foreground) {
@@ -83,40 +83,53 @@ function apply(theme: DesktopTheme | null): void {
 
     // Surfaces, darkest first, the way style.css orders them.
     set('--bg', background);
-    set('--bg-light', pick('lighter_background', 'selection'));
-    set('--bg-lighter', pick('selection', 'muted'));
-    set('--border', pick('muted', 'dark_foreground'));
-    set('--surface-glass', alpha(pick('dark_background') ?? background, 0.94));
+    set('--bg-light', pick('lighter_background', 'selection', 'color8', 'color0'));
+    set('--bg-lighter', pick('selection', 'muted', 'color8'));
+    set('--border', pick('muted', 'dark_foreground', 'color8'));
+    set('--surface-glass', alpha(pick('dark_background', 'color0') ?? background, 0.94));
 
-    set('--text', pick('bright_foreground', 'light_foreground') ?? foreground);
+    set('--text', pick('bright_foreground', 'light_foreground', 'color15') ?? foreground);
     set('--text-secondary', foreground);
-    set('--text-muted', pick('dark_foreground', 'muted'));
+    set('--text-muted', pick('dark_foreground', 'muted', 'color8'));
 
     set('--accent', accent);
     set('--accent-subtle', alpha(accent, 0.12));
     set('--selection', alpha(accent, 0.24));
 
-    set('--red', pick('red'));
-    set('--red-subtle', alpha(pick('red') ?? accent, 0.12));
-    set('--danger-hover', pick('bright_red', 'red'));
-    set('--orange', pick('orange', 'yellow'));
-    set('--orange-bright', pick('bright_yellow', 'yellow'));
-    set('--orange-dark', pick('brown', 'orange'));
-    set('--yellow', pick('yellow'));
-    set('--green-bright', pick('bright_green', 'green'));
+    // Named colours are the Omarchy 4 table. Older themes only publish the
+    // 16 terminal slots (color0–color15), which map the same way.
+    const red = pick('red', 'color1');
+    const yellow = pick('yellow', 'color3');
+    const orange = pick('orange', 'yellow', 'color3');
+    const green = pick('green', 'color2');
+    const cyan = pick('cyan', 'blue', 'color6');
+    const magenta = pick('magenta', 'color5');
+    const brightRed = pick('bright_red', 'color9', 'red', 'color1');
+    const brightYellow = pick('bright_yellow', 'color11', 'yellow', 'color3');
+    const brightGreen = pick('bright_green', 'color10', 'green', 'color2');
+    const brightMagenta = pick('bright_magenta', 'color13', 'magenta', 'color5');
+
+    set('--red', red);
+    set('--red-subtle', alpha(red ?? accent, 0.12));
+    set('--danger-hover', brightRed);
+    set('--orange', orange);
+    set('--orange-bright', brightYellow);
+    set('--orange-dark', pick('brown', 'orange', 'color3'));
+    set('--yellow', yellow);
+    set('--green-bright', brightGreen);
     // The dark green is a fill behind bright green text, not a text colour.
-    set('--green', mix(pick('green') ?? accent, background, 0.78));
-    set('--cyan', pick('cyan', 'blue'));
-    set('--magenta', pick('magenta'));
-    set('--pink', pick('bright_magenta', 'magenta'));
-    set('--purple', pick('magenta', 'blue'));
-    set('--violet', pick('bright_magenta', 'magenta'));
-    set('--rust', pick('bright_red', 'red'));
+    set('--green', mix(green ?? accent, background, 0.78));
+    set('--cyan', cyan);
+    set('--magenta', magenta);
+    set('--pink', brightMagenta);
+    set('--purple', pick('magenta', 'blue', 'color5', 'color4'));
+    set('--violet', brightMagenta);
+    set('--rust', brightRed);
 
     // The neon layer: glows and hairlines derived from the two colours the
     // theme considers loudest, so the CRT look survives a palette it has
     // never seen.
-    const secondary = pick('magenta', 'bright_magenta', 'red') ?? accent;
+    const secondary = pick('magenta', 'bright_magenta', 'red', 'color5', 'color1') ?? accent;
     set('--neon', accent);
     set('--neon-bright', mix(accent, '#ffffff', 0.55));
     set('--neon-subtle', alpha(accent, 0.2));

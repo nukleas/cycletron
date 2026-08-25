@@ -30,8 +30,19 @@ pub struct DesktopTheme {
 }
 
 fn colors_path() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME")?;
-    Some(PathBuf::from(home).join(".local/state/omarchy/current/theme/colors.toml"))
+    let home = PathBuf::from(std::env::var_os("HOME")?);
+    // Omarchy 4 publishes the live palette under ~/.local/state. Earlier
+    // releases kept the same file under ~/.config, and either path is a
+    // `key = "#rrggbb"` table, so we accept both.
+    let quattro = home.join(".local/state/omarchy/current/theme/colors.toml");
+    if quattro.exists() {
+        return Some(quattro);
+    }
+    let legacy = home.join(".config/omarchy/current/theme/colors.toml");
+    if legacy.exists() {
+        return Some(legacy);
+    }
+    Some(quattro)
 }
 
 /// The current desktop palette, or `None` where no desktop publishes one.
@@ -78,20 +89,19 @@ fn parse(body: &str) -> DesktopTheme {
 }
 
 /// Watch for theme switches. Polls, because the whole theme directory is
-/// replaced on every switch.
+/// replaced on every switch. Re-resolves the path each tick so a later
+/// Omarchy upgrade (or a fallback file appearing) is picked up without a
+/// restart.
 pub fn spawn_watcher(app: AppHandle) {
     std::thread::spawn(move || {
-        let Some(path) = colors_path() else {
-            return;
-        };
-        let mut last_seen: Option<SystemTime> = std::fs::metadata(&path)
-            .ok()
+        let mut last_seen: Option<SystemTime> = colors_path()
+            .and_then(|path| std::fs::metadata(path).ok())
             .and_then(|meta| meta.modified().ok());
 
         loop {
             std::thread::sleep(POLL_INTERVAL);
-            let modified = std::fs::metadata(&path)
-                .ok()
+            let modified = colors_path()
+                .and_then(|path| std::fs::metadata(path).ok())
                 .and_then(|meta| meta.modified().ok());
             if modified == last_seen {
                 continue;
