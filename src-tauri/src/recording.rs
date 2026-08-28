@@ -28,6 +28,24 @@ const MIN_FREE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 /// Reject absurd single chunks rather than letting a bad caller exhaust memory.
 const MAX_CHUNK_BYTES: usize = 64 * 1024 * 1024;
 
+// --- WAV header layout ------------------------------------------------------
+// Mirrors the header written by `ui/src/wav-capture.ts`: 18-byte fmt plus a
+// fact chunk, which is what the spec requires for non-PCM formats. The three
+// length fields cannot be known when the header goes out, so they are written
+// as zero and patched here once the take ends.
+//
+// Patching lives on this side rather than in the frontend because `written` is
+// the only honest count of what reached the disk. A take ended by a quit, a
+// crash or a failed chunk never gets to run frontend cleanup, and a WAV whose
+// `data` size still reads zero opens as a zero-length file in every DAW even
+// though all of its audio is present.
+const WAV_HEADER_BYTES: u64 = 58;
+const OFFSET_RIFF_SIZE: u64 = 4;
+const OFFSET_FACT_FRAMES: u64 = 46;
+const OFFSET_DATA_SIZE: u64 = 54;
+/// 32-bit float, matching `wav-capture.ts`.
+const WAV_BYTES_PER_SAMPLE: u64 = 4;
+
 /// What a sink is capturing. Written to the `.part` sidecar so an interrupted
 /// take can be identified without parsing the media itself.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,6 +67,8 @@ struct Sink {
     final_path: PathBuf,
     /// Bytes appended, excluding in-place header patches.
     written: u64,
+    /// What is being captured, so a commit can finalize the container.
+    meta: RecMeta,
 }
 
 #[derive(Default)]
@@ -106,14 +126,81 @@ fn free_bytes(dir: &Path) -> u64 {
     fs4::available_space(dir).unwrap_or(u64::MAX)
 }
 
+/// Narrow a length to the `u32` a RIFF field can hold.
+///
+/// A float WAV passes 4 GiB after about 3 h 06 min at 48 kHz stereo, and the
+/// field simply cannot describe that. Saturating leaves a file whose header
+/// understates a long take; wrapping — which is what a plain `as u32` does —
+/// leaves one that is unreadable. Neither is good, so say so out loud. RF64 is
+/// the real fix if takes are ever expected to run that long.
+fn riff_u32(value: u64, what: &str) -> u32 {
+    u32::try_from(value).unwrap_or_else(|_| {
+        tracing::warn!(
+            "recording: {what} is {value} bytes, past the 4 GiB RIFF limit — \
+             the header will understate the file's length"
+        );
+        u32::MAX
+    })
+}
+
+/// Fill in the three RIFF length fields, given the total bytes on disk.
+///
+/// Idempotent, and derived purely from the file's own size, so it is equally
+/// correct at a normal close, at a commit-on-exit, and on a `.part` recovered
+/// from a previous run.
+fn patch_wav_sizes<F: Write + Seek>(
+    file: &mut F,
+    meta: &RecMeta,
+    total_bytes: u64,
+) -> std::io::Result<()> {
+    let data_bytes = total_bytes.saturating_sub(WAV_HEADER_BYTES);
+    let mut put = |offset: u64, value: u32| -> std::io::Result<()> {
+        file.seek(SeekFrom::Start(offset))?;
+        file.write_all(&value.to_le_bytes())
+    };
+
+    put(
+        OFFSET_RIFF_SIZE,
+        riff_u32(total_bytes - 8, "the RIFF chunk"),
+    )?;
+    put(OFFSET_DATA_SIZE, riff_u32(data_bytes, "the data chunk"))?;
+
+    // The frame count needs the channel layout; without it the other two fields
+    // are still worth writing, and players fall back to the data size anyway.
+    if let Some(channels) = meta.channels.filter(|c| *c > 0) {
+        let frames = data_bytes / (u64::from(channels) * WAV_BYTES_PER_SAMPLE);
+        put(OFFSET_FACT_FRAMES, riff_u32(frames, "the frame count"))?;
+    }
+
+    Ok(())
+}
+
+/// True for a take whose container needs a length written before it is playable.
+fn is_wav(meta: &RecMeta) -> bool {
+    meta.kind.eq_ignore_ascii_case("wav")
+}
+
 /// Flush, commit or discard, and clean up the sidecar.
+///
+/// Committing finalizes the container first, so the file is playable at
+/// whatever length it actually reached — the caller does not have to have run
+/// any cleanup of its own.
 fn finish(sink: Sink, commit: bool) -> Result<CloseResult, String> {
     let Sink {
         mut file,
         part,
         final_path,
         written,
+        meta,
     } = sink;
+
+    // A WAV holding nothing but its header is not a recording; committing one
+    // would leave a file that opens as silence. Treat it as an empty take.
+    let commit = commit && !(is_wav(&meta) && written <= WAV_HEADER_BYTES);
+
+    if commit && is_wav(&meta) {
+        patch_wav_sizes(&mut file, &meta, written).map_err(|e| format!("patch wav header: {e}"))?;
+    }
 
     file.flush().map_err(|e| format!("flush: {e}"))?;
     // fsync before the rename: a rename that lands before the data would leave
@@ -180,6 +267,7 @@ pub fn recording_open(
             part,
             final_path,
             written: 0,
+            meta,
         },
     );
 
@@ -189,15 +277,12 @@ pub fn recording_open(
     })
 }
 
-/// Append a chunk, or patch bytes at a fixed offset.
+/// Append a chunk to an open sink.
 ///
 /// The payload is the raw request body — a top-level `ArrayBuffer` from the
 /// frontend, which Tauri delivers as [`tauri::ipc::InvokeBody::Raw`]. Passing a
 /// buffer nested inside an args object would instead JSON-encode it as a number
 /// array, which is exactly the cost this module exists to avoid.
-///
-/// `x-rec-offset` rewrites in place without advancing the append position; the
-/// WAV writer uses it to patch the RIFF size fields once the length is known.
 #[tauri::command]
 pub fn recording_write(
     request: tauri::ipc::Request<'_>,
@@ -210,38 +295,22 @@ pub fn recording_write(
         return Err(format!("chunk of {} bytes is too large", bytes.len()));
     }
 
-    let header = |key: &str| request.headers().get(key).and_then(|v| v.to_str().ok());
-    let id: u32 = header("x-rec-id")
+    let id: u32 = request
+        .headers()
+        .get("x-rec-id")
+        .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse().ok())
         .ok_or("missing or invalid x-rec-id header")?;
-    let offset: Option<u64> = header("x-rec-offset").and_then(|s| s.parse().ok());
 
     let mut sinks = state.sinks.lock();
     let sink = sinks
         .get_mut(&id)
         .ok_or_else(|| format!("unknown recording id {id}"))?;
 
-    match offset {
-        Some(at) => {
-            // Seeking a BufWriter flushes it, so the append position is exactly
-            // `written` and is safe to restore afterwards.
-            sink.file
-                .seek(SeekFrom::Start(at))
-                .map_err(|e| format!("seek {at}: {e}"))?;
-            sink.file
-                .write_all(bytes)
-                .map_err(|e| format!("patch at {at}: {e}"))?;
-            sink.file
-                .seek(SeekFrom::Start(sink.written))
-                .map_err(|e| format!("seek back: {e}"))?;
-        }
-        None => {
-            sink.file
-                .write_all(bytes)
-                .map_err(|e| format!("write: {e}"))?;
-            sink.written += bytes.len() as u64;
-        }
-    }
+    sink.file
+        .write_all(bytes)
+        .map_err(|e| format!("write: {e}"))?;
+    sink.written += bytes.len() as u64;
 
     Ok(sink.written)
 }
@@ -313,6 +382,10 @@ pub fn recording_orphans(dir: String) -> Result<Vec<Orphan>, String> {
 }
 
 /// Promote a recovered `.part` to its final name, or delete it.
+///
+/// A `.part` left by a hard crash never had its container finalized, so this
+/// patches the header from the file's own size before promoting it — otherwise
+/// the recovered take reports zero length despite holding all of its audio.
 #[tauri::command]
 pub fn recording_recover(part_path: String, keep: bool) -> Result<Option<String>, String> {
     let part = PathBuf::from(&part_path);
@@ -320,10 +393,31 @@ pub fn recording_recover(part_path: String, keep: bool) -> Result<Option<String>
         return Err(format!("not a partial recording: {part_path}"));
     }
 
+    // Read before unlinking: the sidecar carries the channel layout the header
+    // patch needs.
+    let meta = std::fs::read(sidecar_path(&part))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<RecMeta>(&b).ok());
     let _ = std::fs::remove_file(sidecar_path(&part));
+
     if !keep {
         std::fs::remove_file(&part).map_err(|e| format!("remove {part_path}: {e}"))?;
         return Ok(None);
+    }
+
+    if let Some(meta) = meta.filter(is_wav) {
+        let total = std::fs::metadata(&part)
+            .map_err(|e| format!("stat {part_path}: {e}"))?
+            .len();
+        if total > WAV_HEADER_BYTES {
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .open(&part)
+                .map_err(|e| format!("open {part_path}: {e}"))?;
+            patch_wav_sizes(&mut file, &meta, total)
+                .map_err(|e| format!("patch wav header: {e}"))?;
+            file.sync_all().map_err(|e| format!("sync: {e}"))?;
+        }
     }
 
     let final_path = part.with_extension("");
@@ -335,12 +429,43 @@ pub fn recording_recover(part_path: String, keep: bool) -> Result<Option<String>
 mod tests {
     use super::*;
 
+    /// Stereo 32-bit float, matching what `wav-capture.ts` writes.
+    const FRAME_BYTES: u64 = 2 * WAV_BYTES_PER_SAMPLE;
+
     fn meta() -> RecMeta {
         RecMeta {
             kind: "wav".into(),
             sample_rate: Some(48_000),
             channels: Some(2),
             started_at: None,
+        }
+    }
+
+    /// A header with its length fields still zero, plus `frames` of silence —
+    /// exactly the state the frontend leaves a `.part` in mid-take.
+    fn unfinished_wav(frames: u64) -> Vec<u8> {
+        let mut bytes = vec![0u8; WAV_HEADER_BYTES as usize];
+        bytes[0..4].copy_from_slice(b"RIFF");
+        bytes[8..12].copy_from_slice(b"WAVE");
+        bytes[50..54].copy_from_slice(b"data");
+        bytes.resize(bytes.len() + (frames * FRAME_BYTES) as usize, 0);
+        bytes
+    }
+
+    fn field(bytes: &[u8], at: u64) -> u32 {
+        let at = at as usize;
+        u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap())
+    }
+
+    fn sink_holding(part: &Path, target: &Path, body: &[u8]) -> Sink {
+        let mut file = BufWriter::new(File::create(part).unwrap());
+        file.write_all(body).unwrap();
+        Sink {
+            file,
+            part: part.to_path_buf(),
+            final_path: target.to_path_buf(),
+            written: body.len() as u64,
+            meta: meta(),
         }
     }
 
@@ -352,13 +477,7 @@ mod tests {
         let state = RecordingState::new();
 
         let part = part_path(&target);
-        let file = File::create(&part).unwrap();
-        let sink = Sink {
-            file: BufWriter::new(file),
-            part: part.clone(),
-            final_path: target.clone(),
-            written: 0,
-        };
+        let sink = sink_holding(&part, &target, &unfinished_wav(64));
         state.sinks.lock().insert(0, sink);
 
         assert!(part.exists());
@@ -380,12 +499,7 @@ mod tests {
         let part = part_path(&target);
         std::fs::write(sidecar_path(&part), b"{}").unwrap();
 
-        let sink = Sink {
-            file: BufWriter::new(File::create(&part).unwrap()),
-            part: part.clone(),
-            final_path: target.clone(),
-            written: 0,
-        };
+        let sink = sink_holding(&part, &target, &unfinished_wav(64));
         finish(sink, false).unwrap();
 
         assert!(!part.exists());
@@ -393,31 +507,45 @@ mod tests {
         assert!(!target.exists());
     }
 
-    /// An offset write patches in place and does not disturb the append position.
+    /// Committing finalizes the container, so the file states its real length
+    /// even though the frontend never patched anything. This is what a quit or
+    /// a crash mid-take relies on.
     #[test]
-    fn offset_patch_preserves_append_position() {
+    fn commit_patches_the_wav_length_fields() {
         let dir = tempfile::tempdir().unwrap();
         let target = dir.path().join("take.wav");
         let part = part_path(&target);
 
-        let mut sink = Sink {
-            file: BufWriter::new(File::create(&part).unwrap()),
-            part: part.clone(),
-            final_path: target.clone(),
-            written: 0,
-        };
-
-        sink.file.write_all(b"SIZE----rest").unwrap();
-        sink.written = 12;
-
-        sink.file.seek(SeekFrom::Start(4)).unwrap();
-        sink.file.write_all(b"9999").unwrap();
-        sink.file.seek(SeekFrom::Start(sink.written)).unwrap();
-        sink.file.write_all(b"!").unwrap();
-        sink.written += 1;
-
+        let frames = 1_000;
+        let sink = sink_holding(&part, &target, &unfinished_wav(frames));
         finish(sink, true).unwrap();
-        assert_eq!(std::fs::read(&target).unwrap(), b"SIZE9999rest!");
+
+        let out = std::fs::read(&target).unwrap();
+        let data_bytes = frames * FRAME_BYTES;
+        assert_eq!(field(&out, OFFSET_DATA_SIZE) as u64, data_bytes);
+        assert_eq!(field(&out, OFFSET_FACT_FRAMES) as u64, frames);
+        assert_eq!(
+            field(&out, OFFSET_RIFF_SIZE) as u64,
+            WAV_HEADER_BYTES + data_bytes - 8
+        );
+        // The audio itself is untouched.
+        assert_eq!(out.len() as u64, WAV_HEADER_BYTES + data_bytes);
+    }
+
+    /// A take that captured no audio is not worth committing: a header-only WAV
+    /// opens as silence, which reads as a successful empty recording.
+    #[test]
+    fn commit_discards_a_header_only_take() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("take.wav");
+        let part = part_path(&target);
+
+        let sink = sink_holding(&part, &target, &unfinished_wav(0));
+        let result = finish(sink, true).unwrap();
+
+        assert!(!target.exists());
+        assert!(!part.exists());
+        assert_eq!(result.path, "");
     }
 
     /// Empty leftovers are swept, non-empty ones reported with their metadata.
@@ -458,5 +586,25 @@ mod tests {
             dir.path().join("take.wav").to_string_lossy()
         );
         assert!(!part.exists());
+    }
+
+    /// A `.part` from a hard crash was never finalized, so recovery has to fill
+    /// in the length fields from the file's own size — otherwise the salvaged
+    /// take opens as zero seconds.
+    #[test]
+    fn recover_patches_the_wav_length_fields() {
+        let dir = tempfile::tempdir().unwrap();
+        let part = dir.path().join("take.wav.part");
+        let frames = 500;
+        std::fs::write(&part, unfinished_wav(frames)).unwrap();
+        std::fs::write(sidecar_path(&part), serde_json::to_vec(&meta()).unwrap()).unwrap();
+
+        let recovered = recording_recover(part.to_string_lossy().into_owned(), true).unwrap();
+
+        let out = std::fs::read(recovered.unwrap()).unwrap();
+        let data_bytes = frames * FRAME_BYTES;
+        assert_eq!(field(&out, OFFSET_DATA_SIZE) as u64, data_bytes);
+        assert_eq!(field(&out, OFFSET_FACT_FRAMES) as u64, frames);
+        assert!(!sidecar_path(&part).exists());
     }
 }

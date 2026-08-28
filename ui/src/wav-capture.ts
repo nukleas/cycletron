@@ -34,8 +34,11 @@ const HEADER_BYTES = 16;
 
 // --- WAV header layout ------------------------------------------------------
 // fmt is the 18-byte form and a fact chunk is present, which is what the spec
-// requires for non-PCM formats. Sizes that aren't known until the end are
-// patched in place at close.
+// requires for non-PCM formats. The three length fields aren't known until the
+// take ends, so they go out as zero and the Rust sink patches them when it
+// commits — see `src-tauri/src/recording.rs`. Doing it there rather than here
+// is what makes a take survive a quit or a crash: those paths never reach any
+// cleanup on this side.
 const WAV_HEADER_BYTES = 58;
 const OFFSET_RIFF_SIZE = 4;
 const OFFSET_FACT_FRAMES = 46;
@@ -51,7 +54,7 @@ function wavHeader(sampleRate: number): Uint8Array {
     const blockAlign = CHANNELS * BYTES_PER_SAMPLE;
 
     ascii(view, 0, 'RIFF');
-    view.setUint32(OFFSET_RIFF_SIZE, 0, true); // patched at close
+    view.setUint32(OFFSET_RIFF_SIZE, 0, true); // patched by the sink at commit
     ascii(view, 8, 'WAVE');
 
     ascii(view, 12, 'fmt ');
@@ -66,10 +69,10 @@ function wavHeader(sampleRate: number): Uint8Array {
 
     ascii(view, 38, 'fact');
     view.setUint32(42, 4, true);
-    view.setUint32(OFFSET_FACT_FRAMES, 0, true); // patched at close
+    view.setUint32(OFFSET_FACT_FRAMES, 0, true); // patched by the sink at commit
 
     ascii(view, 50, 'data');
-    view.setUint32(OFFSET_DATA_SIZE, 0, true); // patched at close
+    view.setUint32(OFFSET_DATA_SIZE, 0, true); // patched by the sink at commit
 
     return bytes;
 }
@@ -81,6 +84,11 @@ export interface CaptureResult {
     sampleRate: number;
     /** Blocks the audio thread had to drop because the drain fell behind. */
     overruns: number;
+    /**
+     * Why the take ended early, or null if it ran to its intended end. The file
+     * is still saved and playable — it just stops here.
+     */
+    truncated: string | null;
 }
 
 /** Loaded once per context; the module registration is not idempotent. */
@@ -90,7 +98,14 @@ function ensureWorklet(ctx: AudioContext): Promise<void> {
     let ready = registered.get(ctx);
     if (!ready) {
         ready = import('../wav-tap-worklet.ts?worker&url')
-            .then((m) => ctx.audioWorklet.addModule(m.default));
+            .then((m) => ctx.audioWorklet.addModule(m.default))
+            .catch((e: unknown) => {
+                // Never cache a rejection: the context outlives a transient
+                // failure, and a cached one would disable recording until the
+                // app restarts.
+                registered.delete(ctx);
+                throw e;
+            });
         registered.set(ctx, ready);
     }
     return ready;
@@ -110,6 +125,14 @@ export class WavCapture {
     /** Serializes writes so chunks can't reach the sink out of order. */
     private tail: Promise<unknown> = Promise.resolve();
     private failure: string | null = null;
+
+    /**
+     * Called once, as soon as a write fails, so the owner can wind the take up
+     * and say so. Without it a failed write is invisible until the next manual
+     * Stop: the drain gives up, the frame count stops advancing, and both the
+     * elapsed readout and "stop after N bars" quietly stall.
+     */
+    onFailure: ((reason: string) => void) | null = null;
 
     isActive(): boolean {
         return this.sinkId !== null;
@@ -156,21 +179,31 @@ export class WavCapture {
         );
         this.sinkId = id;
 
-        await this.write(wavHeader(this.sampleRate));
+        // Past this point the sink is open in Rust, so anything that throws has
+        // to close it. Leaving it open would strand a `.part` on disk and latch
+        // this recorder into "already recording" until the app restarts.
+        try {
+            await this.write(wavHeader(this.sampleRate));
+            if (this.failure !== null) throw new Error(this.failure);
 
-        this.node = new AudioWorkletNode(ctx, 'wav-tap', {
-            numberOfInputs: 1,
-            // A sink: zero outputs, pulled purely by having a connected input,
-            // so the tap can never colour what you hear.
-            numberOfOutputs: 0,
-            channelCount: CHANNELS,
-            channelCountMode: 'explicit',
-            channelInterpretation: 'speakers',
-            processorOptions: {ring, capacity: this.capacity},
-        });
+            this.node = new AudioWorkletNode(ctx, 'wav-tap', {
+                numberOfInputs: 1,
+                // A sink: zero outputs, pulled purely by having a connected
+                // input, so the tap can never colour what you hear.
+                numberOfOutputs: 0,
+                channelCount: CHANNELS,
+                channelCountMode: 'explicit',
+                channelInterpretation: 'speakers',
+                processorOptions: {ring, capacity: this.capacity},
+            });
 
-        this.source = source;
-        source.connect(this.node);
+            this.source = source;
+            source.connect(this.node);
+        } catch (e) {
+            await invoke('recording_close', {id, commit: false}).catch(() => {});
+            this.reset();
+            throw e;
+        }
 
         this.timer = setInterval(() => void this.drain(), DRAIN_MS);
         return free_bytes;
@@ -181,6 +214,10 @@ export class WavCapture {
      *
      * Always tears the graph down, even if the last writes fail — leaving a tap
      * connected would keep the ring filling with nowhere to go.
+     *
+     * A write failure mid-take truncates the recording; it does not void it.
+     * Whatever reached the disk is committed and reported as `truncated`, because
+     * a set cannot be performed again and fifty good minutes beat nothing.
      */
     async stop(commit = true): Promise<CaptureResult | null> {
         const id = this.sinkId;
@@ -199,33 +236,39 @@ export class WavCapture {
 
         const overruns = this.ctrl ? Atomics.load(this.ctrl, CTRL_OVERRUNS) : 0;
 
-        // One last pass so the tail of the take isn't lost in the ring.
-        await this.drain();
-        await this.tail;
+        try {
+            // One last pass so the tail of the take isn't lost in the ring.
+            await this.drain();
+            await this.tail;
 
-        if (this.failure === null && this.frames > 0) await this.patchSizes();
+            const {frames, sampleRate, failure} = this;
+            const keep = commit && frames > 0;
 
-        const keep = commit && this.failure === null && this.frames > 0;
-        const closed = await invoke<{path: string; bytes: number}>('recording_close', {
-            id,
-            commit: keep,
-        });
+            // The sink patches the header from the bytes that actually landed,
+            // so nothing here needs to be right about the length.
+            const closed = await invoke<{path: string; bytes: number}>(
+                'recording_close',
+                {id, commit: keep},
+            );
 
-        const frames = this.frames;
-        const sampleRate = this.sampleRate;
-        const failure = this.failure;
-        this.reset();
+            if (!keep) {
+                if (failure !== null) throw new Error(failure);
+                return null;
+            }
 
-        if (failure !== null) throw new Error(failure);
-        if (!keep) return null;
-
-        return {
-            path: closed.path,
-            frames,
-            seconds: frames / sampleRate,
-            sampleRate,
-            overruns,
-        };
+            return {
+                path: closed.path,
+                frames,
+                seconds: frames / sampleRate,
+                sampleRate,
+                overruns,
+                truncated: failure,
+            };
+        } finally {
+            // Unconditional: an IPC failure here must not leave the recorder
+            // believing a take is still open, or Rec never works again.
+            this.reset();
+        }
     }
 
     private reset(): void {
@@ -268,36 +311,24 @@ export class WavCapture {
     }
 
     /** Queue a chunk behind whatever is already in flight. */
-    private write(bytes: Uint8Array, offset?: number): Promise<unknown> {
+    private write(bytes: Uint8Array): Promise<unknown> {
         const id = this.sinkId;
         if (id === null) return this.tail;
 
-        const headers: Record<string, string> = {'x-rec-id': String(id)};
-        if (offset !== undefined) headers['x-rec-offset'] = String(offset);
-
         this.tail = this.tail
-            .then(() => invokeRaw<number>('recording_write', bytes, headers))
+            .then(() => invokeRaw<number>('recording_write', bytes, {'x-rec-id': String(id)}))
             .catch((e: unknown) => {
-                // Record the first failure and stop writing; stop() reports it.
-                this.failure ??= e instanceof Error ? e.message : String(e);
+                // Record the first failure and stop writing. Announce it rather
+                // than waiting to be asked: from here the take is frozen, and
+                // the sooner it is wound up the less of the set is lost.
+                if (this.failure !== null) return;
+                const reason = e instanceof Error ? e.message : String(e);
+                this.failure = reason;
+                // Deferred by a tick: the handler will call stop(), which awaits
+                // this very chain.
+                queueMicrotask(() => this.onFailure?.(reason));
             });
         return this.tail;
-    }
-
-    /** Fill in the three length fields the header couldn't know up front. */
-    private async patchSizes(): Promise<void> {
-        const dataBytes = this.frames * CHANNELS * BYTES_PER_SAMPLE;
-
-        const u32 = (value: number) => {
-            const buf = new Uint8Array(4);
-            new DataView(buf.buffer).setUint32(0, value, true);
-            return buf;
-        };
-
-        await this.write(u32(WAV_HEADER_BYTES - 8 + dataBytes), OFFSET_RIFF_SIZE);
-        await this.write(u32(this.frames), OFFSET_FACT_FRAMES);
-        await this.write(u32(dataBytes), OFFSET_DATA_SIZE);
-        await this.tail;
     }
 }
 

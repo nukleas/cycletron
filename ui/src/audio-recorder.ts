@@ -97,6 +97,7 @@ class AudioRecorder {
         if (!path) return;
 
         this.stopAfterSeconds = this.barLimitSeconds();
+        wavCapture.onFailure = (reason) => { void this.endEarly(reason); };
 
         try {
             const free = await wavCapture.start(ctx, tap, path);
@@ -124,7 +125,13 @@ class AudioRecorder {
             const duration = result.seconds.toFixed(1);
             this.flash(`Saved (${duration}s)`);
             void notify('Recording saved', `${basename(result.path)} · ${duration}s`);
-            if (result.overruns > 0) {
+            if (result.truncated !== null) {
+                await warnDialog(
+                    `Recording stopped early after ${duration}s and was saved to ` +
+                    `${basename(result.path)}.\n\nWriting to disk failed:\n` +
+                    `${result.truncated}`,
+                );
+            } else if (result.overruns > 0) {
                 await warnDialog(
                     `The recording saved, but ${result.overruns} audio block(s) were ` +
                     `dropped because the disk could not keep up. The file will have ` +
@@ -134,6 +141,20 @@ class AudioRecorder {
         } catch (e) {
             await warnDialog(`Could not save the recording:\n${e}`);
         }
+    }
+
+    /**
+     * Wind up a take whose writes have started failing.
+     *
+     * The capture is already frozen at this point, so the only question is how
+     * much of the set survives. Committing immediately keeps everything written
+     * before the failure; waiting for the user to notice the clock has stopped
+     * keeps exactly the same audio, just later and with more confusion.
+     */
+    private async endEarly(reason: string): Promise<void> {
+        if (this.state !== 'recording') return;
+        console.warn('[recorder] write failed, ending the take:', reason);
+        await this.stop();
     }
 
     /** Shared teardown for both the normal stop and the salvage path. */
