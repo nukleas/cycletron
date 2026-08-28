@@ -216,12 +216,10 @@ pub fn run() {
             #[cfg(unix)]
             {
                 tauri::async_runtime::spawn(async {
-                    let term = tokio::signal::unix::signal(
-                        tokio::signal::unix::SignalKind::terminate(),
-                    );
-                    let int = tokio::signal::unix::signal(
-                        tokio::signal::unix::SignalKind::interrupt(),
-                    );
+                    let term =
+                        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate());
+                    let int =
+                        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt());
                     let (Ok(mut term), Ok(mut int)) = (term, int) else {
                         return;
                     };

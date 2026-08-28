@@ -30,15 +30,17 @@ pub fn init(app: AppHandle) {
 
     let spawned = std::thread::Builder::new()
         .name("mpris".to_string())
-        .spawn(move || match tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-        {
-            Ok(rt) => {
-                let local = tokio::task::LocalSet::new();
-                local.block_on(&rt, serve(app, rx));
+        .spawn(move || {
+            match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => {
+                    let local = tokio::task::LocalSet::new();
+                    local.block_on(&rt, serve(app, rx));
+                }
+                Err(e) => tracing::warn!("could not start the MPRIS runtime: {e}"),
             }
-            Err(e) => tracing::warn!("could not start the MPRIS runtime: {e}"),
         });
 
     if let Err(e) = spawned {
@@ -132,4 +134,3 @@ async fn apply(player: &Player, snapshot: &PlaybackSnapshot) {
         tracing::warn!("MPRIS metadata update failed: {e}");
     }
 }
-

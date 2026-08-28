@@ -130,6 +130,9 @@ fn write_state_file(app: &AppHandle, snapshot: &PlaybackSnapshot) {
         .and_then(|_| std::fs::rename(&tmp, &target));
 
     if let Err(e) = write {
-        tracing::warn!("could not write playback state to {}: {e}", target.display());
+        tracing::warn!(
+            "could not write playback state to {}: {e}",
+            target.display()
+        );
     }
 }
