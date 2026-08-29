@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-recording-recover"
+description = "Enables the recording_recover command without any pre-configured scope."
+commands.allow = ["recording_recover"]
+
+[[permission]]
+identifier = "deny-recording-recover"
+description = "Denies the recording_recover command without any pre-configured scope."
+commands.deny = ["recording_recover"]

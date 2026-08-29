@@ -4,7 +4,13 @@
  *  Injected by the Tauri shell; absent in a plain browser (hence optional). */
 interface TauriGlobal {
     core: {
-        invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T>;
+        /** `args` may be a raw ArrayBufferView, which Tauri passes through as a
+         *  binary body rather than JSON; `options.headers` carries the scalars. */
+        invoke<T = unknown>(
+            cmd: string,
+            args?: Record<string, unknown> | ArrayBufferView,
+            options?: {headers?: Record<string, string>},
+        ): Promise<T>;
     };
     event: {
         listen<T = unknown>(event: string, handler: (event: {payload: T}) => void): Promise<() => void>;
