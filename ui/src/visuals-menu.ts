@@ -11,7 +11,7 @@
  */
 
 import {ambientViz} from './ambient-viz.js';
-import {stage, STAGE_PRESETS, STAGE_TEXT_SIZES} from './stage.js';
+import {stage, STAGE_FOLLOW, STAGE_PRESETS, STAGE_TEXT_SIZES} from './stage.js';
 import {attachDropdown} from './dropdown.js';
 import {VIZ_MODES} from './viz/registry.js';
 import {VizMode} from './types/visualizer.js';
@@ -48,6 +48,7 @@ class VisualsMenu {
     private stageFullscreenItem: HTMLButtonElement | null = null;
     private stageResItems: HTMLButtonElement[] = [];
     private stageTextItems: HTMLButtonElement[] = [];
+    private stageFollowItems: HTMLButtonElement[] = [];
 
     init(opts: VisualsMenuOptions): void {
         this.opts = opts;
@@ -165,6 +166,19 @@ class VisualsMenu {
             return b;
         });
 
+        // A song form (pickRestart, arrange) is long; the audience wants the
+        // section that is sounding, and the performer wants to stop scrolling
+        // to it. Two ways to show it, so they can be compared live.
+        this.stageFollowItems = STAGE_FOLLOW.map((option) => {
+            const b = this.item(`Follow: ${option.label}`, 'menuitemradio', () => {
+                stage.setFollow(option.id);
+                this.refresh();
+            });
+            b.appendChild(this.hint(option.hint));
+            menu.appendChild(b);
+            return b;
+        });
+
         // Output resolution is what a recorder or an OBS window capture gets,
         // so it belongs next to the stage toggle rather than buried in prefs.
         this.stageResItems = STAGE_PRESETS.map((preset) => {
@@ -242,6 +256,9 @@ class VisualsMenu {
         const textSizeId = stage.textSize().id;
         this.stageTextItems.forEach((b, i) =>
             b.setAttribute('aria-checked', String(STAGE_TEXT_SIZES[i].id === textSizeId)));
+        const followId = stage.follow().id;
+        this.stageFollowItems.forEach((b, i) =>
+            b.setAttribute('aria-checked', String(STAGE_FOLLOW[i].id === followId)));
 
         const ambientMode = ambientViz.getMode();
         this.modeItems.forEach((b, i) => b?.setAttribute('aria-checked', String(i === ambientMode)));

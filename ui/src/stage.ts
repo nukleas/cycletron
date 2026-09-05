@@ -21,7 +21,7 @@ import {ambientViz} from './ambient-viz.js';
 import {diag} from './diagnostics.js';
 import {isTauri} from './tauri.js';
 import type {FixedResolution, FullscreenVisualizer} from './fullscreen-viz.js';
-import {DEFAULT_FONT_PX, StageCodeLayer} from './viz/stage/code-layer.js';
+import {DEFAULT_FONT_PX, StageCodeLayer, type StageFollow} from './viz/stage/code-layer.js';
 import {StageHudLayer} from './viz/stage/hud-layer.js';
 
 export interface StagePreset extends FixedResolution {
@@ -49,6 +49,24 @@ export const STAGE_TEXT_SIZES: readonly StageTextSize[] = [
     {id: 'l', label: 'Large', px: 36},
 ];
 
+export interface StageFollowOption {
+    id: StageFollow;
+    label: string;
+    hint: string;
+}
+
+/**
+ * What the stage does with a song form (`pickRestart`, `arrange`) while it
+ * plays. The playing section is found from the notes sounding right now, so
+ * the code on screen is the code the audience is hearing — without the
+ * performer scrolling to it.
+ */
+export const STAGE_FOLLOW: readonly StageFollowOption[] = [
+    {id: 'off', label: 'Whole Pattern', hint: 'as written'},
+    {id: 'fold', label: 'Fold Idle Sections', hint: 'one row each'},
+    {id: 'solo', label: 'Playing Section Only', hint: 'with a breadcrumb'},
+];
+
 /**
  * Output presets. 1080p is the default; the higher ones exist because a 1080p
  * bitmap upscaled onto a Retina display looks soft *in the preview* (a capture
@@ -65,6 +83,7 @@ const RESOLUTION_KEY = 'stage-resolution';
 const HUD_KEY = 'stage-hud';
 const OS_FULLSCREEN_KEY = 'stage-os-fullscreen';
 const TEXT_SIZE_KEY = 'stage-text-size';
+const FOLLOW_KEY = 'stage-follow';
 
 const IS_MAC = /Mac|iPhone|iPad/i.test(navigator.userAgent);
 const EXIT_HINT = IS_MAC ? '⌘⇧F' : 'Ctrl+Shift+F';
@@ -94,6 +113,7 @@ export class Stage {
         this.root = document.getElementById('stageRoot') as HTMLDivElement | null;
         this.hudLayer.setVisible(this.isHudVisible());
         this.codeLayer.setBaseFontPx(this.textSize().px);
+        this.codeLayer.setFollow(this.follow().id);
 
         // Capture phase: CodeMirror has focus on stage, and its keymap would
         // otherwise see the event first.
@@ -238,6 +258,27 @@ export class Stage {
         const at = STAGE_TEXT_SIZES.indexOf(this.textSize());
         const next = Math.min(Math.max(at + delta, 0), STAGE_TEXT_SIZES.length - 1);
         this.setTextSize(STAGE_TEXT_SIZES[next].id);
+    }
+
+    follow(): StageFollowOption {
+        const id = localStorage.getItem(FOLLOW_KEY);
+        return STAGE_FOLLOW.find((option) => option.id === id) ?? STAGE_FOLLOW[0];
+    }
+
+    setFollow(id: string): void {
+        const option = STAGE_FOLLOW.find((entry) => entry.id === id);
+        if (!option) return;
+        localStorage.setItem(FOLLOW_KEY, option.id);
+        this.codeLayer.setFollow(option.id);
+        this.onStateChange?.();
+    }
+
+    /** Off → fold → solo → off, for a single command to cycle through. */
+    cycleFollow(): StageFollowOption {
+        const at = STAGE_FOLLOW.indexOf(this.follow());
+        const next = STAGE_FOLLOW[(at + 1) % STAGE_FOLLOW.length];
+        this.setFollow(next.id);
+        return next;
     }
 
     isHudVisible(): boolean {
