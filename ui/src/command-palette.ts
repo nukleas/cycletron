@@ -221,6 +221,7 @@ const COMMANDS: Item[] = [
     {id: 'cmd.updates',     title: 'Check for Updates',     section: 'Commands',                 run: () => checkForUpdates(true)},
     {id: 'cmd.logs',        title: 'Show Logs…',            section: 'Commands',                 run: () => logsModal.open()},
     {id: 'cmd.stage',       title: 'Stage Mode',            section: 'Commands', hint: '⌘⇧F',   run: () => { void stage.toggle(); }},
+    {id: 'cmd.stage_follow',title: 'Stage: Follow the Music', section: 'Commands', hint: 'cycle',  run: () => { stage.cycleFollow(); }},
     {id: 'cmd.toggle_ai',   title: 'Toggle AI Panel',       section: 'Commands',                 run: () => { toggleAiPanel(); }},
     {id: 'cmd.toggle_files',title: 'Toggle Files Panel',    section: 'Commands',                 run: () => { fileExplorer.toggleCollapsed(); }},
     {id: 'cmd.toggle_assist',title: 'Toggle Editor Autocomplete', section: 'Commands',            run: async () => { const e = requireApp().editor; if (!e) throw new Error('The editor is still loading — try again in a moment.'); const on = !e.isAssistEnabled(); e.setAssistEnabled(on); await persistEditorAssist(on); }},
