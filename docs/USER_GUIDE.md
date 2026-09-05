@@ -223,12 +223,15 @@ Packs live under `{library}/Packs/`. Format: [SAMPLE_PACKS.md](./SAMPLE_PACKS.md
 
 The **Samples** manager (⌘⇧P → "Samples…", or the Sounds panel's Manage
 button) is the one place for sample sources: **sample sets** on top,
-**packs** below. The built-in **strudel-rs** set fetches strudio's default
-sounds (Salamander piano, uzu drumkit, uzu wavetables, Dirt-Samples — from
-their upstream repos, ~300 MB); activate it and live playback *and* audio
-export resolve from that set, so what you hear and export matches
-strudel-rs / `strudio` exactly. The default **Cycletron** set keeps the
-bundled offline kit. Whatever set is active, export uses the same samples as
+**packs** below. Built-in downloadable sets: **strudel-rs** (strudio's
+defaults — Salamander piano, uzu drumkit, uzu wavetables, Dirt-Samples, ~300
+MB), **strudel.cc** (the website's startup palette: piano, VCSL, 71 drum
+machines, uzu, mridangam, Dirt), and the single packs those are built from —
+**Drum machines**, **VCSL orchestral & world** (CC0), **Mridangam** — so you
+can fetch just the drum boxes without all of Dirt. Downloads are shared
+between sets. Activate a set and live playback *and* audio export resolve
+from it, so what you hear and export match. The default **Cycletron** set
+keeps the bundled offline kit. Whatever set is active, export uses the same samples as
 live playback, and switching reloads the audio engine immediately (also via
 the palette's "Sample Set: …" entries). Define additional sets (each an
 ordered list of `strudel.json` manifest URLs) in `sample-sets.json` in the

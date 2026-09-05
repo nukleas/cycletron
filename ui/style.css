@@ -4898,3 +4898,10 @@ body.stage-active #fullscreenVizHUD { display: none; }
     border-color: var(--neon);
     box-shadow: 0 0 6px var(--neon-glow);
 }
+
+/* Samples manager: one-line blurb under each sample-set row. */
+.samples-set-blurb {
+    margin: -4px 0 8px 26px;
+    font-size: 11px;
+    line-height: 1.4;
+}

@@ -90,6 +90,10 @@ const ACCEPTS: &[Case] = &[
         code: r#"s("<bd, sd>")"#,
         doc: "prompt: a comma inside < > parses (it just does not stack)",
     },
+    Case {
+        code: r#"note("c3 e3").s("gm_koto").s("gm_steel_drums").s("gm_piano:7")"#,
+        doc: "prompt / list_sounds: all 128 General MIDI voices resolve, incl. gm_piano:n variants",
+    },
 ];
 
 /// Patterns the validator MUST reject (documented as parser gotchas).
