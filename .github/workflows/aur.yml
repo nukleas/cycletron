@@ -1,0 +1,132 @@
+name: AUR
+
+# Publishes packaging/aur/PKGBUILD to the AUR as `cycletron-bin` (#5 part 3),
+# so Arch and Omarchy users get releases through `yay -Syu` — the flow the
+# in-app updater deliberately refuses to fake on package-managed installs.
+#
+# Triggered by a release being PUBLISHED rather than by the tag push that
+# builds it: release.yml leaves a draft for review, and a draft's assets have
+# no working releases/download/<tag>/... URL — the only kind of URL a PKGBUILD
+# can carry. Publishing is the first moment the package would actually build.
+#
+# The AUR key never leaves this workflow's own steps, which is why makepkg runs
+# here in an Arch container instead of going through a third-party deploy
+# action. Until AUR_SSH_PRIVATE_KEY exists the job still stamps and validates
+# the PKGBUILD and skips only the push, so this is safe to merge before the AUR
+# account is set up — see packaging/aur/README.md.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish to the AUR, e.g. v0.1.0-alpha.17'
+        required: true
+
+concurrency:
+  group: aur
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish cycletron-bin
+    runs-on: ubuntu-latest
+    # makepkg and .SRCINFO generation want a real Arch userland.
+    container: archlinux:base-devel
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      # Full upgrade rather than -Sy: a partial upgrade is the one reliable way
+      # to break an Arch container.
+      - name: Arch prerequisites
+        run: pacman -Syu --noconfirm --needed git openssh curl github-cli
+
+      - uses: actions/checkout@v7
+
+      - name: Stamp the PKGBUILD from the published release
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory '*'
+          VER="${TAG#v}"
+          # AUR pkgver forbids hyphens: 0.1.0-alpha.17 -> 0.1.0alpha.17.
+          PKGVER="${VER//-/}"
+          DEB="Cycletron_${VER}_amd64.deb"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${DEB}"
+
+          cd packaging/aur
+          # Fetching it is also the check that the URL a user's makepkg will hit
+          # actually resolves: right tag, right asset name, release published.
+          echo "Fetching $URL"
+          curl -fsSL --retry 3 -o "$DEB" "$URL"
+          SHA=$(sha256sum "$DEB" | cut -d' ' -f1)
+          rm -f "$DEB"
+
+          sed -i \
+            -e "s|^_tag=.*|_tag=${VER}|" \
+            -e "s|^pkgver=.*|pkgver=${PKGVER}|" \
+            -e "s|^pkgrel=.*|pkgrel=1|" \
+            -e "s|^sha256sums=.*|sha256sums=('${SHA}')|" \
+            PKGBUILD
+
+          # makepkg refuses to run as root. --printsrcinfo only parses the
+          # PKGBUILD, so an unprivileged user with no build deps is enough.
+          useradd -m build
+          chown -R build .
+          sudo -u build makepkg --printsrcinfo > .SRCINFO
+
+          echo "PKGVER=${PKGVER}" >> "$GITHUB_ENV"
+          echo "--- PKGBUILD ---"; cat PKGBUILD
+          echo "--- .SRCINFO ---"; cat .SRCINFO
+
+      - name: Push to the AUR
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AUR_SSH_PRIVATE_KEY:-}" ]; then
+            echo "::notice::AUR_SSH_PRIVATE_KEY is not set — stamped and validated the PKGBUILD, skipped the push. See packaging/aur/README.md."
+            exit 0
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t rsa,ed25519 aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null
+          git config --global user.name 'nukleas'
+          git config --global user.email 'nukleas@users.noreply.github.com'
+          # An AUR repo for a package that does not exist yet clones empty; the
+          # first push is what creates it.
+          git clone "ssh://aur@aur.archlinux.org/cycletron-bin.git" aur-repo
+          cp packaging/aur/PKGBUILD packaging/aur/.SRCINFO aur-repo/
+          cd aur-repo
+          git add -A
+          if git diff --cached --quiet; then
+            echo "AUR is already at ${PKGVER} — nothing to push."
+            exit 0
+          fi
+          git commit -m "cycletron-bin ${PKGVER}-1"
+          git push origin HEAD:master
+
+      # Without this the in-repo PKGBUILD drifts a release behind the moment a
+      # version ships, and `cd packaging/aur && makepkg -si` — the documented
+      # way to install without the AUR — builds the wrong version. Uses the
+      # contents API rather than a push so it needs no second checkout of a
+      # branch this job is not on.
+      - name: Sync the stamped PKGBUILD back to master
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          NEW=$(base64 -w0 < packaging/aur/PKGBUILD)
+          CUR=$(gh api "repos/${GITHUB_REPOSITORY}/contents/packaging/aur/PKGBUILD?ref=master" \
+            --jq '.content' | tr -d '\n')
+          if [ "$NEW" = "$CUR" ]; then
+            echo "In-repo PKGBUILD already matches ${PKGVER}."
+            exit 0
+          fi
+          SHA=$(gh api "repos/${GITHUB_REPOSITORY}/contents/packaging/aur/PKGBUILD?ref=master" --jq '.sha')
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/packaging/aur/PKGBUILD" \
+            -f message="chore(packaging): bump AUR PKGBUILD to ${TAG}" \
+            -f content="$NEW" \
+            -f sha="$SHA" \
+            -f branch=master
