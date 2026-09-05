@@ -170,3 +170,146 @@ export const INSTRUMENT_BANKS: Array<[string, string[]]> = [
         'speech/g.wav',
     ]],
 ];
+
+/**
+ * VCSL instruments — a curated slice of the Versilian Community Sample
+ * Library (CC0), bundled so a koto-free orchestra is playable offline. Pitched
+ * banks are note-mapped (the engine picks the nearest recorded note and
+ * repitches, like a downloaded set); one-shot banks index `:n` variants.
+ * Files are trimmed, faded and MP3-encoded by `scripts/vendor-vcsl.mjs`
+ * from the sources in `scripts/vcsl-sources.json`. Must stay in sync with
+ * `VCSL_PITCHED` / `VCSL_ONESHOTS` in `crates/cycletron-analysis/src/sounds.rs`.
+ */
+export const VCSL_PITCHED: Array<[string, Record<string, string>]> = [
+    ['kalimba', {
+        B2: 'kalimba/B2.mp3',
+        Ds3: 'kalimba/Ds3.mp3',
+        Gs3: 'kalimba/Gs3.mp3',
+        Cs4: 'kalimba/Cs4.mp3',
+        Fs4: 'kalimba/Fs4.mp3',
+        B4: 'kalimba/B4.mp3',
+    }],
+    ['marimba', {
+        F1: 'marimba/F1.mp3',
+        G2: 'marimba/G2.mp3',
+        F3: 'marimba/F3.mp3',
+        C4: 'marimba/C4.mp3',
+        B4: 'marimba/B4.mp3',
+        C6: 'marimba/C6.mp3',
+    }],
+    ['vibraphone', {
+        F2: 'vibraphone/F2.mp3',
+        C3: 'vibraphone/C3.mp3',
+        G3: 'vibraphone/G3.mp3',
+        D4: 'vibraphone/D4.mp3',
+        A4: 'vibraphone/A4.mp3',
+        E5: 'vibraphone/E5.mp3',
+    }],
+    ['glockenspiel', {
+        G4: 'glockenspiel/G4.mp3',
+        G5: 'glockenspiel/G5.mp3',
+        C6: 'glockenspiel/C6.mp3',
+        G6: 'glockenspiel/G6.mp3',
+        C7: 'glockenspiel/C7.mp3',
+    }],
+    ['tubularbells', {
+        C3: 'tubularbells/C3.mp3',
+        E3: 'tubularbells/E3.mp3',
+        Gs3: 'tubularbells/Gs3.mp3',
+        C4: 'tubularbells/C4.mp3',
+        E4: 'tubularbells/E4.mp3',
+    }],
+    ['harp', {
+        E1: 'harp/E1.mp3',
+        D2: 'harp/D2.mp3',
+        C3: 'harp/C3.mp3',
+        B3: 'harp/B3.mp3',
+        C5: 'harp/C5.mp3',
+        B5: 'harp/B5.mp3',
+        A6: 'harp/A6.mp3',
+        F7: 'harp/F7.mp3',
+    }],
+    ['ocarina', {
+        A3: 'ocarina/A3.mp3',
+        Cs4: 'ocarina/Cs4.mp3',
+        Fs4: 'ocarina/Fs4.mp3',
+        As4: 'ocarina/As4.mp3',
+        Cs5: 'ocarina/Cs5.mp3',
+    }],
+    ['recorder_alto_sus', {
+        F3: 'recorder_alto_sus/F3.mp3',
+        As3: 'recorder_alto_sus/As3.mp3',
+        D4: 'recorder_alto_sus/D4.mp3',
+        Gs4: 'recorder_alto_sus/Gs4.mp3',
+        C5: 'recorder_alto_sus/C5.mp3',
+        E5: 'recorder_alto_sus/E5.mp3',
+    }],
+    ['balafon', {
+        Cs3: 'balafon/Cs3.mp3',
+        F3: 'balafon/F3.mp3',
+        C4: 'balafon/C4.mp3',
+        F4: 'balafon/F4.mp3',
+        C5: 'balafon/C5.mp3',
+        F5: 'balafon/F5.mp3',
+    }],
+    ['harmonica', {
+        C3: 'harmonica/C3.mp3',
+        C4: 'harmonica/C4.mp3',
+        G4: 'harmonica/G4.mp3',
+        E5: 'harmonica/E5.mp3',
+        C6: 'harmonica/C6.mp3',
+    }],
+    ['steinway', {
+        As0: 'steinway/As0.mp3',
+        Gs1: 'steinway/Gs1.mp3',
+        E2: 'steinway/E2.mp3',
+        D3: 'steinway/D3.mp3',
+        As3: 'steinway/As3.mp3',
+        Gs4: 'steinway/Gs4.mp3',
+        E5: 'steinway/E5.mp3',
+        D6: 'steinway/D6.mp3',
+        As6: 'steinway/As6.mp3',
+        Gs7: 'steinway/Gs7.mp3',
+    }],
+    ['strumstick', {
+        D2: 'strumstick/D2.mp3',
+        G2: 'strumstick/G2.mp3',
+        Cs3: 'strumstick/Cs3.mp3',
+        Fs3: 'strumstick/Fs3.mp3',
+        B3: 'strumstick/B3.mp3',
+        E4: 'strumstick/E4.mp3',
+        A4: 'strumstick/A4.mp3',
+    }],
+    ['psaltery_pluck', {
+        As3: 'psaltery_pluck/As3.mp3',
+        D4: 'psaltery_pluck/D4.mp3',
+        Fs4: 'psaltery_pluck/Fs4.mp3',
+        As4: 'psaltery_pluck/As4.mp3',
+        D5: 'psaltery_pluck/D5.mp3',
+        Fs5: 'psaltery_pluck/Fs5.mp3',
+    }],
+    ['dantranh', {
+        B1: 'dantranh/B1.mp3',
+        Fs2: 'dantranh/Fs2.mp3',
+        B2: 'dantranh/B2.mp3',
+        Ds3: 'dantranh/Ds3.mp3',
+        B3: 'dantranh/B3.mp3',
+        Ds4: 'dantranh/Ds4.mp3',
+        B4: 'dantranh/B4.mp3',
+    }],
+];
+
+export const VCSL_ONESHOTS: Array<[string, string[]]> = [
+    ['gong', ['gong/00.mp3', 'gong/01.mp3', 'gong/02.mp3']],
+    ['timpani', ['timpani/00.mp3', 'timpani/01.mp3', 'timpani/02.mp3', 'timpani/03.mp3']],
+    ['didgeridoo', ['didgeridoo/00.mp3', 'didgeridoo/01.mp3', 'didgeridoo/02.mp3']],
+    ['bongo', ['bongo/00.mp3', 'bongo/01.mp3', 'bongo/02.mp3', 'bongo/03.mp3']],
+    ['shaker_small', ['shaker_small/00.mp3', 'shaker_small/01.mp3', 'shaker_small/02.mp3']],
+    ['tambourine', ['tambourine/00.mp3', 'tambourine/01.mp3', 'tambourine/02.mp3']],
+    ['agogo', ['agogo/00.mp3', 'agogo/01.mp3', 'agogo/02.mp3']],
+    ['guiro', ['guiro/00.mp3', 'guiro/01.mp3']],
+    ['sleighbells', ['sleighbells/00.mp3', 'sleighbells/01.mp3']],
+    ['triangles', ['triangles/00.mp3', 'triangles/01.mp3', 'triangles/02.mp3']],
+    ['framedrum', ['framedrum/00.mp3', 'framedrum/01.mp3', 'framedrum/02.mp3']],
+    ['darbuka', ['darbuka/00.mp3', 'darbuka/01.mp3', 'darbuka/02.mp3', 'darbuka/03.mp3']],
+];

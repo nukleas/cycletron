@@ -1,0 +1,191 @@
+{
+  "_base": "https://raw.githubusercontent.com/sgossner/VCSL/master/",
+  "_license": "CC0-1.0 (licenses/VCSL-LICENSE.txt)",
+  "_caps_seconds": {
+    "gong": 8,
+    "tubularbells": 8,
+    "vibraphone": 6,
+    "harp": 6,
+    "steinway": 6,
+    "timpani": 5
+  },
+  "banks": {
+    "kalimba": {
+      "B2": "Idiophones/Plucked%20Idiophones/Kalimba%2C%20Kenya/Mbira6_Normal_MainSpirit_B2_k8_vl3_rr2.wav",
+      "Ds3": "Idiophones/Plucked%20Idiophones/Kalimba%2C%20Kenya/Mbira6_Normal_MainSpirit_D%233_k9_vl3_rr2.wav",
+      "Gs3": "Idiophones/Plucked%20Idiophones/Kalimba%2C%20Kenya/Mbira6_Normal_MainSpirit_G%233_k4_vl3_rr2.wav",
+      "Cs4": "Idiophones/Plucked%20Idiophones/Kalimba%2C%20Kenya/Mbira6_Normal_MainSpirit_C%234_k2_vl3_rr2.wav",
+      "Fs4": "Idiophones/Plucked%20Idiophones/Kalimba%2C%20Kenya/Mbira6_Normal_MainSpirit_F%234_k14_vl3_rr2.wav",
+      "B4": "Idiophones/Plucked%20Idiophones/Kalimba%2C%20Kenya/Mbira6_Normal_MainSpirit_B4_k15_vl3_rr2.wav"
+    },
+    "marimba": {
+      "F1": "Idiophones/Struck%20Idiophones/Marimba/Marimba_hit_Outrigger_F1_soft_01.wav",
+      "G2": "Idiophones/Struck%20Idiophones/Marimba/Marimba_hit_Outrigger_G2_soft_01.wav",
+      "F3": "Idiophones/Struck%20Idiophones/Marimba/Marimba_hit_Outrigger_F3_soft_01.wav",
+      "C4": "Idiophones/Struck%20Idiophones/Marimba/Marimba_hit_Outrigger_C4_soft_01.wav",
+      "B4": "Idiophones/Struck%20Idiophones/Marimba/Marimba_hit_Outrigger_B4_soft_01.wav",
+      "C6": "Idiophones/Struck%20Idiophones/Marimba/Marimba_hit_Outrigger_C6_soft_01.wav"
+    },
+    "vibraphone": {
+      "F2": "Idiophones/Struck%20Idiophones/Vibraphone/Hard%20Mallets/Vibes_hard_F2_v3_rr1_Main.wav",
+      "C3": "Idiophones/Struck%20Idiophones/Vibraphone/Hard%20Mallets/Vibes_hard_C3_v3_rr1_Main.wav",
+      "G3": "Idiophones/Struck%20Idiophones/Vibraphone/Hard%20Mallets/Vibes_hard_G3_v3_rr1_Main.wav",
+      "D4": "Idiophones/Struck%20Idiophones/Vibraphone/Hard%20Mallets/Vibes_hard_D4_v3_rr1_Main.wav",
+      "A4": "Idiophones/Struck%20Idiophones/Vibraphone/Hard%20Mallets/Vibes_hard_A4_v3_rr1_Main.wav",
+      "E5": "Idiophones/Struck%20Idiophones/Vibraphone/Hard%20Mallets/Vibes_hard_E5_v3_rr1_Main.wav"
+    },
+    "glockenspiel": {
+      "G4": "Idiophones/Struck%20Idiophones/Glockenspiel/glock_soft_G4_01.wav",
+      "G5": "Idiophones/Struck%20Idiophones/Glockenspiel/glock_soft_G5_01.wav",
+      "C6": "Idiophones/Struck%20Idiophones/Glockenspiel/glock_soft_C6_01.wav",
+      "G6": "Idiophones/Struck%20Idiophones/Glockenspiel/glock_soft_G6_01.wav",
+      "C7": "Idiophones/Struck%20Idiophones/Glockenspiel/glock_soft_C7_03.wav"
+    },
+    "tubularbells": {
+      "C3": "Idiophones/Struck%20Idiophones/Tubular%20Bells%201/chimes_C3_pp_rr2.wav",
+      "E3": "Idiophones/Struck%20Idiophones/Tubular%20Bells%201/chimes_E3_pp_rr1.wav",
+      "Gs3": "Idiophones/Struck%20Idiophones/Tubular%20Bells%201/chimes_G%233_p_rr2.wav",
+      "C4": "Idiophones/Struck%20Idiophones/Tubular%20Bells%201/chimes_C4_p_rr1.wav",
+      "E4": "Idiophones/Struck%20Idiophones/Tubular%20Bells%201/chimes_E4_pp_rr3.wav"
+    },
+    "harp": {
+      "E1": "Chordophones/Composite Chordophones/Concert Harp/KSHarp_E1_f1.wav",
+      "D2": "Chordophones/Composite Chordophones/Concert Harp/KSHarp_D2_mf1.wav",
+      "C3": "Chordophones/Composite Chordophones/Concert Harp/KSHarp_C3_mf3.wav",
+      "B3": "Chordophones/Composite Chordophones/Concert Harp/KSHarp_B3_mf1.wav",
+      "C5": "Chordophones/Composite Chordophones/Concert Harp/KSHarp_C5_mf1.wav",
+      "B5": "Chordophones/Composite Chordophones/Concert Harp/KSHarp_B5_mf1.wav",
+      "A6": "Chordophones/Composite Chordophones/Concert Harp/KSHarp_A6_mf1.wav",
+      "F7": "Chordophones/Composite Chordophones/Concert Harp/KSHarp_F7_p1.wav"
+    },
+    "ocarina": {
+      "A3": "Aerophones/Edge-blown%20Aerophones/Ocarina%2C%20Typical/Sustains/Sus/StdOcarina_Sus_A3.wav",
+      "Cs4": "Aerophones/Edge-blown%20Aerophones/Ocarina%2C%20Typical/Sustains/Sus/StdOcarina_Sus_C%234.wav",
+      "Fs4": "Aerophones/Edge-blown%20Aerophones/Ocarina%2C%20Typical/Sustains/Sus/StdOcarina_Sus_F%234.wav",
+      "As4": "Aerophones/Edge-blown%20Aerophones/Ocarina%2C%20Typical/Sustains/Sus/StdOcarina_Sus_A%234.wav",
+      "Cs5": "Aerophones/Edge-blown%20Aerophones/Ocarina%2C%20Typical/Sustains/Sus/StdOcarina_Sus_C%235.wav"
+    },
+    "recorder_alto_sus": {
+      "F3": "Aerophones/Edge-blown%20Aerophones/Baroque%20Alto%20Recorder/Sustain/AltRecorder_Sus_F3_rr1_Main.wav",
+      "As3": "Aerophones/Edge-blown%20Aerophones/Baroque%20Alto%20Recorder/Sustain/AltRecorder_Sus_A%233_rr1_Main.wav",
+      "D4": "Aerophones/Edge-blown%20Aerophones/Baroque%20Alto%20Recorder/Sustain/AltRecorder_Sus_D4_rr1_Main.wav",
+      "Gs4": "Aerophones/Edge-blown%20Aerophones/Baroque%20Alto%20Recorder/Sustain/AltRecorder_Sus_G%234_rr1_Main.wav",
+      "C5": "Aerophones/Edge-blown%20Aerophones/Baroque%20Alto%20Recorder/Sustain/AltRecorder_Sus_C5_rr1_Main.wav",
+      "E5": "Aerophones/Edge-blown%20Aerophones/Baroque%20Alto%20Recorder/Sustain/AltRecorder_Sus_E5_rr1_Main.wav"
+    },
+    "balafon": {
+      "Cs3": "Idiophones/Struck%20Idiophones/Balafon/Traditional%20Mallet/EthnicXylo_tradM_C%233_vl3_rr1_Mid.wav",
+      "F3": "Idiophones/Struck%20Idiophones/Balafon/Traditional%20Mallet/EthnicXylo_tradM_F3_vl3_rr1_Mid.wav",
+      "C4": "Idiophones/Struck%20Idiophones/Balafon/Traditional%20Mallet/EthnicXylo_tradM_C4_vl3_rr1_Mid.wav",
+      "F4": "Idiophones/Struck%20Idiophones/Balafon/Traditional%20Mallet/EthnicXylo_tradM_F4_vl3_rr1_Mid.wav",
+      "C5": "Idiophones/Struck%20Idiophones/Balafon/Traditional%20Mallet/EthnicXylo_tradM_C5_vl3_rr1_Mid.wav",
+      "F5": "Idiophones/Struck%20Idiophones/Balafon/Traditional%20Mallet/EthnicXylo_tradM_F5_vl3_rr1_Mid.wav"
+    },
+    "harmonica": {
+      "C3": "Aerophones/Free%20Aerophones/Harmonica-Hohner-Special20-C/Sustains/Normal/Hohner-Special20_Normal_C3.wav",
+      "C4": "Aerophones/Free%20Aerophones/Harmonica-Hohner-Special20-C/Sustains/Normal/Hohner-Special20_Normal_C4.wav",
+      "G4": "Aerophones/Free%20Aerophones/Harmonica-Hohner-Special20-C/Sustains/Normal/Hohner-Special20_Normal_G4.wav",
+      "E5": "Aerophones/Free%20Aerophones/Harmonica-Hohner-Special20-C/Sustains/Normal/Hohner-Special20_Normal_E5.wav",
+      "C6": "Aerophones/Free%20Aerophones/Harmonica-Hohner-Special20-C/Sustains/Normal/Hohner-Special20_Normal_C6.wav"
+    },
+    "steinway": {
+      "As0": "Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B/Sus/JHPiano_Sus_Close_A%230_vl4_rr1.wav",
+      "Gs1": "Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B/Sus/JHPiano_Sus_Close_G%231_vl4_rr1.wav",
+      "E2": "Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B/Sus/JHPiano_Sus_Close_E2_vl4_rr1.wav",
+      "D3": "Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B/Sus/JHPiano_Sus_Close_D3_vl4_rr1.wav",
+      "As3": "Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B/Sus/JHPiano_Sus_Close_A%233_vl4_rr1.wav",
+      "Gs4": "Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B/Sus/JHPiano_Sus_Close_G%234_vl4_rr1.wav",
+      "E5": "Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B/Sus/JHPiano_Sus_Close_E5_vl4_rr1.wav",
+      "D6": "Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B/Sus/JHPiano_Sus_Close_D6_vl4_rr1.wav",
+      "As6": "Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B/Sus/JHPiano_Sus_Close_A%236_vl4_rr1.wav",
+      "Gs7": "Chordophones/Zithers/Grand%20Piano%2C%20Steinway%20B/Sus/JHPiano_Sus_Close_G%237_vl4_rr1.wav"
+    },
+    "strumstick": {
+      "D2": "Chordophones/Composite%20Chordophones/Strumstick/Finger/Strumstick_Finger_Str1_Main_D2_vl3_rr1.wav",
+      "G2": "Chordophones/Composite%20Chordophones/Strumstick/Finger/Strumstick_Finger_Str1_Main_G2_vl3_rr1.wav",
+      "Cs3": "Chordophones/Composite%20Chordophones/Strumstick/Finger/Strumstick_Finger_Str2_Main_C%233_vl3_rr1.wav",
+      "Fs3": "Chordophones/Composite%20Chordophones/Strumstick/Finger/Strumstick_Finger_Str3_Main_F%233_vl3_rr1.wav",
+      "B3": "Chordophones/Composite%20Chordophones/Strumstick/Finger/Strumstick_Finger_Str3_Main_B3_vl3_rr1.wav",
+      "E4": "Chordophones/Composite%20Chordophones/Strumstick/Finger/Strumstick_Finger_Str3_Main_E4_vl3_rr1.wav",
+      "A4": "Chordophones/Composite%20Chordophones/Strumstick/Finger/Strumstick_Finger_Str3_Main_A4_vl3_rr1.wav"
+    },
+    "psaltery_pluck": {
+      "As3": "Chordophones/Zithers/Psaltery%2C%20Bowed%20and%20Plucked/Pluck/BowedPsaltery_A%233_Main_Pluck_rr1.wav",
+      "D4": "Chordophones/Zithers/Psaltery%2C%20Bowed%20and%20Plucked/Pluck/BowedPsaltery_D4_Main_Pluck_rr1.wav",
+      "Fs4": "Chordophones/Zithers/Psaltery%2C%20Bowed%20and%20Plucked/Pluck/BowedPsaltery_F%234_Main_Pluck_rr1.wav",
+      "As4": "Chordophones/Zithers/Psaltery%2C%20Bowed%20and%20Plucked/Pluck/BowedPsaltery_A%234_Main_Pluck_rr1.wav",
+      "D5": "Chordophones/Zithers/Psaltery%2C%20Bowed%20and%20Plucked/Pluck/BowedPsaltery_D5_Main_Pluck_rr1.wav",
+      "Fs5": "Chordophones/Zithers/Psaltery%2C%20Bowed%20and%20Plucked/Pluck/BowedPsaltery_F%235_Main_Pluck_rr3.wav"
+    },
+    "dantranh": {
+      "B1": "Chordophones/Zithers/Dan%20Tranh/Normal/B1_mf_1.wav",
+      "Fs2": "Chordophones/Zithers/Dan%20Tranh/Normal/F%232_mf_1.wav",
+      "B2": "Chordophones/Zithers/Dan%20Tranh/Normal/B2_ff_1.wav",
+      "Ds3": "Chordophones/Zithers/Dan%20Tranh/Normal/D%233_mf_1.wav",
+      "B3": "Chordophones/Zithers/Dan%20Tranh/Normal/B3_mf_1.wav",
+      "Ds4": "Chordophones/Zithers/Dan%20Tranh/Normal/D%234_mf_1.wav",
+      "B4": "Chordophones/Zithers/Dan%20Tranh/Normal/B4_mf_1.wav"
+    },
+    "gong": [
+      "Idiophones/Struck%20Idiophones/Gong%201/gong_2_f.wav",
+      "Idiophones/Struck%20Idiophones/Gong%201/gong_fff.wav",
+      "Idiophones/Struck%20Idiophones/Gong%201/gong_scrape_mf.wav"
+    ],
+    "timpani": [
+      "Membranophones/Struck%20Membranophones/Timpani%201/Hit/Timpani1_Hit_v2_rr1_Sum.wav",
+      "Membranophones/Struck%20Membranophones/Timpani%201/Hit/Timpani2_Hit_v4_rr1_Sum.wav",
+      "Membranophones/Struck%20Membranophones/Timpani%201/Hit/Timpani4_Hit_v2_rr2_Sum.wav",
+      "Membranophones/Struck%20Membranophones/Timpani%201/Hit/Timpani5_Hit_v4_rr2_Sum.wav"
+    ],
+    "didgeridoo": [
+      "Aerophones/Lip%20Aerophones/Didgeridoo/Didgeridoo1_Bark1_Main_rr3.wav",
+      "Aerophones/Lip%20Aerophones/Didgeridoo/Didgeridoo1_Phrase8_Main.wav",
+      "Aerophones/Lip%20Aerophones/Didgeridoo/Didgeridoo1_Tap1_Main_rr16.wav"
+    ],
+    "bongo": [
+      "Membranophones/Struck%20Membranophones/Bongos/BongoH_Hit1_v1_rr1_Mid.wav",
+      "Membranophones/Struck%20Membranophones/Bongos/BongoH_HitMuted1_v2_rr2_Mid.wav",
+      "Membranophones/Struck%20Membranophones/Bongos/BongoL_Hit1_v3_rr1_Mid.wav",
+      "Membranophones/Struck%20Membranophones/Bongos/BongoL_Roll_v3_rr1_Mid.wav"
+    ],
+    "shaker_small": [
+      "Idiophones/Struck%20Idiophones/Shaker%2C%20Small/Mid_ShakerDouble_Down_rr1.wav",
+      "Idiophones/Struck%20Idiophones/Shaker%2C%20Small/Mid_ShakerLowFaster_Down_rr1.wav",
+      "Idiophones/Struck%20Idiophones/Shaker%2C%20Small/Mid_Shaker_Slap_rr2.wav"
+    ],
+    "tambourine": [
+      "Idiophones/Struck%20Idiophones/Tambourine%201/Tamb1_Hit_v1_rr1_Mid.wav",
+      "Idiophones/Struck%20Idiophones/Tambourine%201/Tamb1_Roll_v2_rr1_Mid.wav",
+      "Idiophones/Struck%20Idiophones/Tambourine%201/Tamb1_Shake_rr2_Mid.wav"
+    ],
+    "agogo": [
+      "Idiophones/Struck%20Idiophones/Agogo%20Bells/Agogo_High_v1_rr1_Mid.wav",
+      "Idiophones/Struck%20Idiophones/Agogo%20Bells/Agogo_High_v3_rr1_Mid.wav",
+      "Idiophones/Struck%20Idiophones/Agogo%20Bells/Agogo_Low_v2_rr1_Mid.wav"
+    ],
+    "guiro": [
+      "Idiophones/Struck%20Idiophones/Guiro/Guiro_Fast_rr1_Mid.wav",
+      "Idiophones/Struck%20Idiophones/Guiro/Guiro_Slow_rr2_Mid.wav"
+    ],
+    "sleighbells": [
+      "Idiophones/Struck%20Idiophones/Sleigh%20Bells/Sleighbells_Hit_rr1_Mid.wav",
+      "Idiophones/Struck%20Idiophones/Sleigh%20Bells/sleighbell2_shake1.wav"
+    ],
+    "triangles": [
+      "Idiophones/Struck%20Idiophones/Triangles/Triangle1_HitFM_v1_rr1_Mid.wav",
+      "Idiophones/Struck%20Idiophones/Triangles/Triangle3_HitM_v2_rr2_Mid.wav",
+      "Idiophones/Struck%20Idiophones/Triangles/Triangle6_Roll_v2_rr1_Mid.wav"
+    ],
+    "framedrum": [
+      "Membranophones/Struck%20Membranophones/Frame%20Drum/HDrumL_Hand_rr1_Sum.wav",
+      "Membranophones/Struck%20Membranophones/Frame%20Drum/HDrumL_Hit_v3_rr2_Sum.wav",
+      "Membranophones/Struck%20Membranophones/Frame%20Drum/HDrumS_Hit_v3_rr2_Sum.wav"
+    ],
+    "darbuka": [
+      "Membranophones/Struck%20Membranophones/Darbuka/Darbuka_1_hit_vl1_rr1.wav",
+      "Membranophones/Struck%20Membranophones/Darbuka/Darbuka_2_hit_vl2_rr1.wav",
+      "Membranophones/Struck%20Membranophones/Darbuka/Darbuka_4_hit_vl1_rr2.wav",
+      "Membranophones/Struck%20Membranophones/Darbuka/Darbuka_5_hit_vl2_rr2.wav"
+    ]
+  }
+}

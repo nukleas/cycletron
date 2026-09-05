@@ -16,6 +16,8 @@ import {
     INSTRUMENT_BANKS,
     MACHINE_KITS,
     PERCUSSION_COLORS,
+    VCSL_ONESHOTS,
+    VCSL_PITCHED,
 } from './sample-tables.js';
 
 /**
@@ -48,13 +50,20 @@ const NOTE_SEMITONES: Record<string, number> = {
     C: 0, Cs: 1, D: 2, Ds: 3, E: 4, F: 5, Fs: 6, G: 7, Gs: 8, A: 9, As: 10, B: 11,
 };
 
-/** Parse `"C3"`, `"Ds4"`, `"Fs5"` → MIDI note number; UNPITCHED on failure. */
+/**
+ * Parse a manifest note key → MIDI note number; UNPITCHED on failure.
+ * Manifests spell sharps three ways (`Ds4`, `D#4`, `d#4`) and VCSL mixes in
+ * flats and lowercase (`Bb3`, `b2`), so all of those resolve — a key that
+ * failed here silently turned a pitched bank into unpitched one-shots.
+ */
 function parseNoteNameToMidi(name: string): number {
-    const m = /^([A-G]s?)(-?\d+)$/.exec(name);
+    const m = /^([A-Ga-g])([#sb]?)(-?\d+)$/.exec(name);
     if (!m) return UNPITCHED;
-    const semi = NOTE_SEMITONES[m[1]];
+    let semi = NOTE_SEMITONES[m[1].toUpperCase()];
     if (semi === undefined) return UNPITCHED;
-    return 12 * (parseInt(m[2], 10) + 1) + semi;
+    if (m[2] === '#' || m[2] === 's') semi += 1;
+    else if (m[2] === 'b') semi -= 1;
+    return 12 * (parseInt(m[3], 10) + 1) + semi;
 }
 
 /** WebAudioFont CDN root — fallback when an instrument isn't bundled locally. */
@@ -267,6 +276,31 @@ export class SampleLoader {
         const {names} = await this._loadKitBatch(samples, 'Instrument Banks');
         // One entry per sample file was returned; unique bank names for the agent.
         return [...new Set(names)];
+    }
+
+    /**
+     * Load the bundled VCSL instruments ([`VCSL_PITCHED`] note-mapped, so
+     * `note("c4 e4").s("kalimba")` plays in tune from the nearest recorded
+     * note; [`VCSL_ONESHOTS`] indexed like the other one-shot banks).
+     * Returns bank names that loaded at least one sample.
+     */
+    async loadVcslBanks(): Promise<string[]> {
+        const names: string[] = [];
+        const fetchLocal = async (path: string): Promise<ArrayBuffer> => {
+            const res = await fetch(LOCAL_SAMPLES_BASE + path);
+            if (!res.ok) throw new Error(`${res.status} ${path}`);
+            return res.arrayBuffer();
+        };
+        await Promise.all(VCSL_PITCHED.map(async ([name, notes]) => {
+            const n = await this.loadManifestBank(name, notes, fetchLocal);
+            if (n > 0) names.push(name);
+        }));
+        const oneShots: Array<{name: string; url: string; sampleIdx: number}> = [];
+        for (const [name, files] of VCSL_ONESHOTS) {
+            files.forEach((sub, i) => oneShots.push({name, url: LOCAL_SAMPLES_BASE + sub, sampleIdx: i}));
+        }
+        const {names: hit} = await this._loadKitBatch(oneShots, 'VCSL Percussion');
+        return [...new Set([...names, ...hit])];
     }
 
     /**

@@ -388,7 +388,12 @@ a default drum kit (`bd sd sn hh cp oh ht mt lt cr cb rs` — see
 `ui/sample-loader.ts`), a curated percussion/texture pack (`perc click metal
 east hand industrial space arpy tabla jvbass`), melodic/speech expansion
 banks (`flbass uke cpluck cbow speech` — multi-variant CC0 Clean-Samples
-slices), and the five drum machine kits. Additional banks load on demand from
+slices), a bundled VCSL slice — note-mapped instruments `kalimba marimba vibraphone
+glockenspiel tubularbells harp ocarina recorder_alto_sus balafon harmonica steinway
+strumstick psaltery_pluck dantranh` (`note("c4 e4").s("kalimba")` plays in tune from
+the nearest recorded note) and indexed percussion `gong timpani didgeridoo bongo
+shaker_small tambourine agogo guiro sleighbells triangles framedrum darbuka` — and
+the five drum machine kits. Additional banks load on demand from
 the configured URL. Sample indices select variants: `bd:3` / `flbass:2` pick
 the Nth sample in that bank. Names are case-insensitive.
 

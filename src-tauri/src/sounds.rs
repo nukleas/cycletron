@@ -227,8 +227,8 @@ pub fn register_sound_banks(names: Vec<String>, state: State<'_, AppState>) -> R
 // Built-in sound catalog lives in the shared analysis crate so CLI tools use
 // the same known-sound set; user-loaded banks are layered on here.
 pub use cycletron_analysis::sounds::{
-    DEFAULT_DRUMS, DRUM_MACHINE_NOTE, INSTRUMENTS, MACHINE_KITS, PERCUSSION, SYNTHS, WAVETABLES,
-    gm_instruments,
+    DEFAULT_DRUMS, DRUM_MACHINE_NOTE, INSTRUMENTS, MACHINE_KITS, PERCUSSION, SYNTHS, VCSL_ONESHOTS,
+    VCSL_PITCHED, WAVETABLES, gm_instruments,
 };
 
 /// True when a downloadable sample set is active AND on disk — the state in
@@ -314,6 +314,16 @@ pub fn sound_catalog(state: &AppState) -> serde_json::Value {
         "percussion_note": "Single one-shot color banks: perc=cajon, click=claves, metal=anvil, east=woodblock, hand=conga, industrial=brake drum — raw fortissimo foley with no :n variants. Sparse genre-appropriate accents only (industrial/EBM/experimental), tamed with low gain + filtering; never default texture or percussion variety. space/arpy = atmosphere & pluck; tabla/jvbass = tonal.",
         "instruments": INSTRUMENTS,
         "instruments_note": "Melodic/speech expansion banks (CC0 Clean-Samples slices). flbass=fretless bass, uke=ukulele, cpluck=cello pluck, cbow=cello bow short, speech=synth speech chops. Multi-variant: s(\"flbass:2\"). Unpitched one-shots — for in-tune melodies prefer gm_* / wt_*.",
+        "vcsl_instruments": VCSL_PITCHED,
+        "vcsl_instruments_note": "Real acoustic instruments (VCSL, CC0), note-mapped: note(\"c4 e4 g4\").s(\"kalimba\") plays in tune. \
+                                  kalimba/marimba/vibraphone/glockenspiel/tubularbells/balafon = mallets & bells; harp, strumstick, \
+                                  psaltery_pluck, dantranh (Vietnamese zither) = plucked strings; ocarina, recorder_alto_sus, harmonica = \
+                                  winds (sustains — add .release()); steinway = grand piano. Prefer these over wt_* when the genre wants a \
+                                  real instrument.",
+        "vcsl_percussion": VCSL_ONESHOTS,
+        "vcsl_percussion_note": "Real percussion one-shots (VCSL, CC0) with :n variants: gong, timpani, didgeridoo, bongo, shaker_small, \
+                                 tambourine, agogo, guiro, sleighbells, triangles, framedrum, darbuka. Use as genre colour on the grid, not \
+                                 as the default kit.",
         "drum_machines": machines,
         "drum_machine_note": DRUM_MACHINE_NOTE,
         "gm_instruments": gm_instruments(),

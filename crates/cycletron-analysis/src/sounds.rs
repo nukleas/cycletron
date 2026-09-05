@@ -78,6 +78,45 @@ pub const PERCUSSION: &[&str] = &[
 /// for in-tune pitched melodies prefer `gm_*` or `wt_*`.
 pub const INSTRUMENTS: &[&str] = &["flbass", "uke", "cpluck", "cbow", "speech"];
 
+/// Bundled VCSL instruments (CC0), note-mapped: `note("c4 e4").s("kalimba")`
+/// plays in tune from the nearest recorded note, like a downloaded set's
+/// pitched banks. See `VCSL_PITCHED` in `ui/sample-tables.ts` (must stay in
+/// sync) and ATTRIBUTION.md.
+pub const VCSL_PITCHED: &[&str] = &[
+    "kalimba",
+    "marimba",
+    "vibraphone",
+    "glockenspiel",
+    "tubularbells",
+    "harp",
+    "ocarina",
+    "recorder_alto_sus",
+    "balafon",
+    "harmonica",
+    "steinway",
+    "strumstick",
+    "psaltery_pluck",
+    "dantranh",
+];
+
+/// Bundled VCSL percussion (CC0): indexed one-shots with `:n` variants
+/// (`s("bongo:2")`), several hits or dynamics per bank. See `VCSL_ONESHOTS`
+/// in `ui/sample-tables.ts` (must stay in sync).
+pub const VCSL_ONESHOTS: &[&str] = &[
+    "gong",
+    "timpani",
+    "didgeridoo",
+    "bongo",
+    "shaker_small",
+    "tambourine",
+    "agogo",
+    "guiro",
+    "sleighbells",
+    "triangles",
+    "framedrum",
+    "darbuka",
+];
+
 /// Single source of truth for how `.bank()` behaves, surfaced to the agent via
 /// `list_sounds` (see `src-tauri/src/sounds.rs`) so the claim lives in exactly
 /// one place. The `.bank()` half of this is verified against the real engine by
@@ -134,6 +173,8 @@ static BUILTIN: std::sync::LazyLock<std::collections::HashSet<String>> =
             .chain(DEFAULT_DRUMS.iter())
             .chain(PERCUSSION.iter())
             .chain(INSTRUMENTS.iter())
+            .chain(VCSL_PITCHED.iter())
+            .chain(VCSL_ONESHOTS.iter())
             .chain(gm_instruments().iter())
             .map(std::string::ToString::to_string)
             .collect();
@@ -216,5 +257,14 @@ mod tests {
         }
         assert!(gm.iter().all(|n| n.starts_with("gm_")));
         assert!(builtin_sound_set().contains("gm_koto"));
+    }
+
+    #[test]
+    fn bundled_vcsl_banks_are_known_sounds() {
+        let set = builtin_sound_set();
+        for name in VCSL_PITCHED.iter().chain(VCSL_ONESHOTS) {
+            assert!(set.contains(*name), "{name}");
+        }
+        assert_eq!(VCSL_PITCHED.len() + VCSL_ONESHOTS.len(), 26);
     }
 }
