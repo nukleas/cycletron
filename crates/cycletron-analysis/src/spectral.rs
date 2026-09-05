@@ -13,15 +13,18 @@
 //! Coarse, but directionally right — enough to warn "the vocal lives in the mid and
 //! three louder voices are on top of it" *before* the pattern ships.
 //!
-//! The model is deliberately falsifiable: the same `export_audio` render path can
-//! produce a real FFT to calibrate these estimates against (see the crate docs).
+//! The model is deliberately falsifiable: the agent's `hear_pattern` tool
+//! (`cycletron_render::hear`) renders the pattern offline, measures the same six
+//! bands with a real FFT (`crate::spectrum`), and prints predicted next to
+//! measured — [`predicted_bands`] is the estimate that comparison uses.
 
 use crate::Finding;
-use strudel_core::ContextKey;
+use strudel_core::{ContextKey, Hap, Value};
 
 /// Perceptual bands (name, low Hz, high Hz), low→high. Coarse octave-ish split
-/// in the language mixers use, not critical-band precision.
-const BANDS: [(&str, f64, f64); 6] = [
+/// in the language mixers use, not critical-band precision. Shared with the
+/// FFT measurement so the two are comparable band for band.
+pub const BANDS: [(&str, f64, f64); 6] = [
     ("sub", 20.0, 60.0),
     ("bass", 60.0, 250.0),
     ("low-mid", 250.0, 800.0),
@@ -29,7 +32,7 @@ const BANDS: [(&str, f64, f64); 6] = [
     ("presence", 2500.0, 6000.0),
     ("air", 6000.0, 20000.0),
 ];
-const NB: usize = BANDS.len();
+pub const NB: usize = BANDS.len();
 
 /// Geometric-mean centre of a band — the representative frequency for filter math.
 fn band_center(i: usize) -> f64 {
@@ -37,7 +40,7 @@ fn band_center(i: usize) -> f64 {
 }
 
 /// Which band a frequency falls in (clamped to the ends).
-fn band_of(hz: f64) -> usize {
+pub fn band_of(hz: f64) -> usize {
     for (i, (_, _, hi)) in BANDS.iter().enumerate() {
         if hz < *hi {
             return i;
@@ -230,48 +233,67 @@ fn hap_fundamental(h: &strudel_core::Hap) -> Option<f64> {
     midi.map(|m| midi_hz(m as f64))
 }
 
+/// Accumulate gain-weighted per-band energy per voice identity over every onset
+/// in `haps`. A voice is a sound plus its filter regime (register varies note to
+/// note, so it is not part of the identity — the energy already reflects it).
+fn accumulate_voices<'a>(haps: impl Iterator<Item = &'a Hap<Value>>) -> Vec<Voice> {
+    use std::collections::BTreeMap;
+    let mut voices: BTreeMap<String, Voice> = BTreeMap::new();
+    for h in haps {
+        if !h.has_onset() {
+            continue;
+        }
+        let Some(sound) = hap_sound(h) else { continue };
+        let cutoff = getf(h, ContextKey::Cutoff);
+        let hpf = getf(h, ContextKey::Hpf);
+        let f0 = hap_fundamental(h);
+        let gain = getf(h, ContextKey::Gain).unwrap_or(1.0);
+
+        let e = event_energy(&sound, f0, cutoff, hpf);
+        let g2 = gain * gain; // power
+
+        let id = format!(
+            "{sound}|{}|{}",
+            cutoff.map(|c| (c / 100.0).round() as i64).unwrap_or(-1),
+            hpf.map(|c| (c / 100.0).round() as i64).unwrap_or(-1),
+        );
+        let v = voices.entry(id).or_insert_with(|| Voice {
+            label: voice_label(&sound, cutoff, hpf),
+            energy: [0.0; NB],
+            hits: 0,
+        });
+        for (slot, energy) in v.energy.iter_mut().zip(e.iter()) {
+            *slot += energy * g2;
+        }
+        v.hits += 1;
+    }
+    voices.into_values().filter(|v| v.hits > 0).collect()
+}
+
+/// The predicted energy share per band for `haps`, integrated over every onset
+/// (a voice that hits eight times a cycle contributes eight times the energy of
+/// one that hits once — the same thing an FFT of the render integrates). This
+/// is what `hear_pattern` prints next to the measured bands. Masking uses
+/// per-hit means instead (see [`spectral_findings`]). None when no hap carries
+/// a sound.
+pub fn predicted_bands(haps: &[Hap<Value>]) -> Option<[f64; NB]> {
+    let voices = accumulate_voices(haps.iter());
+    let mut total = [0.0f64; NB];
+    for v in &voices {
+        for (t, e) in total.iter_mut().zip(v.energy.iter()) {
+            *t += e;
+        }
+    }
+    let grand: f64 = total.iter().sum();
+    (grand > 0.0).then(|| normalize(total))
+}
+
 /// Analyse masking + spectral balance over the loop. Returns findings to fold
 /// into the mix critique (severity "note" — advisory, never blocks the gate).
 pub(crate) fn spectral_findings(ev: &crate::Evaluated, cycles: usize) -> Vec<Finding> {
     let cycles = cycles.clamp(1, 16).min(ev.window());
 
-    // Accumulate energy per voice identity across the loop.
-    use std::collections::BTreeMap;
-    let mut voices: BTreeMap<String, Voice> = BTreeMap::new();
-
-    for cycle_haps in &ev.cycle_haps()[..cycles] {
-        for h in cycle_haps {
-            if !h.has_onset() {
-                continue;
-            }
-            let Some(sound) = hap_sound(h) else { continue };
-            let cutoff = getf(h, ContextKey::Cutoff);
-            let hpf = getf(h, ContextKey::Hpf);
-            let f0 = hap_fundamental(h);
-            let gain = getf(h, ContextKey::Gain).unwrap_or(1.0);
-
-            let e = event_energy(&sound, f0, cutoff, hpf);
-            let g2 = gain * gain; // power
-
-            // Identity groups a part: sound + filter regime (register varies note
-            // to note, so it's not part of identity — energy already reflects it).
-            let id = format!(
-                "{sound}|{}|{}",
-                cutoff.map(|c| (c / 100.0).round() as i64).unwrap_or(-1),
-                hpf.map(|c| (c / 100.0).round() as i64).unwrap_or(-1),
-            );
-            let v = voices.entry(id).or_insert_with(|| Voice {
-                label: voice_label(&sound, cutoff, hpf),
-                energy: [0.0; NB],
-                hits: 0,
-            });
-            for (slot, energy) in v.energy.iter_mut().zip(e.iter()) {
-                *slot += energy * g2;
-            }
-            v.hits += 1;
-        }
-    }
-
+    let mut voices = accumulate_voices(ev.cycle_haps()[..cycles].iter().flatten());
     if voices.len() < 2 {
         return Vec::new(); // masking needs at least two voices
     }
@@ -280,7 +302,6 @@ pub(crate) fn spectral_findings(ev: &crate::Evaluated, cycles: usize) -> Vec<Fin
     // a voice is *when it plays*, so a sparse-but-loud lead (a vocal on 2 notes a
     // bar) must not look quiet next to a busy pad. This treats the loop as if the
     // parts overlap — the worst case for masking, which is what we want to warn on.
-    let mut voices: Vec<Voice> = voices.into_values().filter(|v| v.hits > 0).collect();
     for v in &mut voices {
         for i in 0..NB {
             v.energy[i] /= v.hits as f64;
@@ -292,14 +313,13 @@ pub(crate) fn spectral_findings(ev: &crate::Evaluated, cycles: usize) -> Vec<Fin
             *total += energy;
         }
     }
-    let grand: f64 = band_total.iter().sum();
-    if grand <= 0.0 {
+    if band_total.iter().sum::<f64>() <= 0.0 {
         return Vec::new();
     }
 
     let mut findings = Vec::new();
     findings.extend(masking_findings(&voices, &band_total));
-    findings.extend(balance_findings(&band_total, grand, voices.len()));
+    findings.extend(balance_findings(&band_total, voices.len()));
     findings
 }
 
@@ -386,8 +406,16 @@ fn masking_findings(voices: &[Voice], band_total: &[f64; NB]) -> Vec<Finding> {
 /// mix can be both muddy AND dark), so this returns a Vec:
 ///  - `spectral-balance`: the dominant tilt (mud / harsh / scooped);
 ///  - `dull`: a near-empty top end (no air/definition).
-fn balance_findings(band_total: &[f64; NB], grand: f64, nvoices: usize) -> Vec<Finding> {
-    let f = |i: usize| band_total[i] / grand;
+///
+/// `band_energy` may be raw or normalised — it is read as shares. Also the
+/// verdict `hear_pattern` gives a *measured* spectrum, so the thresholds are
+/// defined once.
+pub fn balance_findings(band_energy: &[f64; NB], nvoices: usize) -> Vec<Finding> {
+    let grand: f64 = band_energy.iter().sum();
+    if grand <= 0.0 {
+        return Vec::new();
+    }
+    let f = |i: usize| band_energy[i] / grand;
     let (bass, lowmid, mid, presence, air) = (f(1), f(2), f(3), f(4), f(5));
     let note = |code: &str, message: String| Finding {
         severity: "note".to_string(),

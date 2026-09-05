@@ -20,6 +20,7 @@ pub mod repair;
 pub mod review;
 pub mod sounds;
 pub mod spectral;
+pub mod spectrum;
 
 pub use arrangement::*;
 pub use critique::*;

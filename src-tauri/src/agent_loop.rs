@@ -325,6 +325,7 @@ async fn execute_tool(
         ToolName::GeneratePattern => tool_generate_pattern(input),
         ToolName::ValidatePattern => tool_validate_pattern(input, state),
         ToolName::ReviewPattern => tool_review_pattern(input, state),
+        ToolName::HearPattern => tool_hear_pattern(input, state).await,
         ToolName::InspectPattern => tool_inspect_pattern(input),
         ToolName::AnalyzeArrangement => tool_analyze_arrangement(input),
         ToolName::CritiquePattern => tool_critique_pattern(input),
@@ -945,6 +946,7 @@ fn infer_write_kind(name: &str, input: &serde_json::Value) -> Option<String> {
         "upsert_section" | "upsert_sections" => Some("section".into()),
         "upsert_binding" => Some("binding".into()),
         "review_pattern" => Some("review".into()),
+        "hear_pattern" => Some("hear".into()),
         "validate_pattern" => Some("validate".into()),
         _ => None,
     }
@@ -1144,6 +1146,95 @@ pub(crate) fn review_code(code: &str, cycles: usize, state: &AppState) -> ToolOu
             ToolOutcome::ok(summary, text).with_warnings(findings(&found))
         }
     }
+}
+
+/// Render the pattern offline and measure it — the agent's ears. The render
+/// is CPU-bound (mix + every stem), so it runs on a blocking thread; the
+/// envelope carries the full report as `data` and its findings as warnings.
+async fn tool_hear_pattern(input: &serde_json::Value, state: &AppState) -> ToolResult {
+    // Explicit code → last reviewed buffer → current editor, like play_pattern.
+    let code = if let Some(c) = input["code"]
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        c.to_string()
+    } else if let Some(c) = state.last_reviewed_code() {
+        c
+    } else {
+        current_document(state).map_err(|_| {
+            ToolErr::precondition(
+                "Nothing to hear: pass `code`, review a pattern first, or play one so it is in \
+                 the editor.",
+            )
+        })?
+    };
+
+    let Some(samples) = state.sample_paths.lock().clone() else {
+        return Err(ToolErr::precondition(
+            "No sample set is resolved for offline rendering yet — the active set is not \
+             downloaded. The user can pick or download one in the Samples manager.",
+        ));
+    };
+
+    {
+        let mut w = state.agent_write.lock();
+        if w.hear_calls >= crate::state::MAX_HEARS_PER_RUN {
+            return Ok(ToolOutcome::failed(
+                ToolCategory::BudgetExhausted,
+                format!(
+                    "Hear budget used ({}/{} this request). Act on the last measurement — fix \
+                     the mix surgically and play it; do not render again.",
+                    crate::state::MAX_HEARS_PER_RUN,
+                    crate::state::MAX_HEARS_PER_RUN,
+                ),
+            ));
+        }
+        w.hear_calls += 1;
+    }
+
+    // Fail as the review would on code that does not evaluate, before paying
+    // for a render.
+    if let Err(e) = strudel::Evaluated::new(&code, 1) {
+        return Ok(ToolOutcome::failed(
+            ToolCategory::InvalidCode,
+            format!(
+                "INVALID: {e}{}\n\nFix the error (review_pattern) before hearing it.",
+                error_context(&code, &e)
+            ),
+        ));
+    }
+
+    let opts = cycletron_render::HearOptions {
+        cycles: input["cycles"].as_u64().map(|n| n as usize),
+        stems: input["stems"].as_bool().unwrap_or(true),
+        bpm: Some(state.session.lock().tempo),
+        ..cycletron_render::HearOptions::default()
+    };
+    let report = tokio::task::spawn_blocking(move || cycletron_render::hear(&code, &samples, opts))
+        .await
+        .map_err(|e| ToolErr::io(format!("render task failed: {e}")))?
+        .map_err(ToolErr::io)?;
+
+    let summary = format!(
+        "mix: {} · {} cycle(s), {:.1} s{} · {} ms",
+        report.verdict,
+        report.cycles,
+        report.seconds,
+        if report.stems.is_empty() {
+            String::new()
+        } else {
+            format!(", {} stems", report.stems.len())
+        },
+        report.render_ms,
+    );
+    let warnings = findings(&report.findings);
+    let data = serde_json::to_value(&report).map_err(ToolErr::io)?;
+    Ok(
+        ToolOutcome::ok(summary, cycletron_render::report_to_text(&report))
+            .with_warnings(warnings)
+            .with_data(data),
+    )
 }
 
 fn tool_inspect_pattern(input: &serde_json::Value) -> ToolResult {

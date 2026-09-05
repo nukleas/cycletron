@@ -1044,47 +1044,21 @@ pub async fn export_audio(
     app_handle: tauri::AppHandle,
 ) -> Result<crate::export::ExportAudioResult, String> {
     let fmt = crate::export::AudioFormat::parse(&format)?;
-    let samples = active_sample_set(&app_handle)?;
+    let samples = app_handle
+        .state::<AppState>()
+        .sample_paths
+        .lock()
+        .clone()
+        .ok_or_else(|| {
+            "no sample set is available for offline rendering — pick or download one in the \
+             Samples manager"
+                .to_string()
+        })?;
     tauri::async_runtime::spawn_blocking(move || {
         crate::export::export_audio(&code, &path, duration_secs, bpm, gain, fmt, stems, &samples)
     })
     .await
     .map_err(|e| format!("export task failed: {e}"))?
-}
-
-/// Resolve the sample-set manifests the active set renders exports from —
-/// the same set live playback loads, so the two cannot drift apart.
-fn active_sample_set(app: &tauri::AppHandle) -> Result<crate::export::SampleSetPaths, String> {
-    let active = app
-        .state::<AppState>()
-        .user_settings
-        .lock()
-        .samples
-        .active
-        .clone();
-    if active == crate::sample_sets::BUNDLED_SET_ID {
-        let manifest = app
-            .path()
-            .resolve(
-                "cycletron.strudel.json",
-                tauri::path::BaseDirectory::Resource,
-            )
-            .map_err(|e| format!("could not resolve bundled sample manifest: {e}"))?;
-        if !manifest.is_file() {
-            return Err(format!(
-                "bundled sample manifest missing: {}",
-                manifest.display()
-            ));
-        }
-        return Ok(crate::export::SampleSetPaths::Cycletron { manifest });
-    }
-    let manifests = crate::sample_sets::manifest_paths(app, &active)?;
-    if manifests.iter().any(|m| !m.is_file()) {
-        return Err(format!(
-            "sample set '{active}' is not downloaded — download it in the Samples manager"
-        ));
-    }
-    Ok(crate::export::SampleSetPaths::Strudel { manifests })
 }
 
 /// Convert the current pattern to a Standard MIDI File (`strudio to-midi`).

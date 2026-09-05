@@ -319,6 +319,37 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: ToolName::HearPattern.as_str().to_string(),
+            description:
+                "Your ears: render the pattern offline through the real engine and MEASURE the \
+                result — an FFT of the mix and of each stem. Reports energy share per band \
+                (sub/bass/low-mid/mid/presence/air) predicted-vs-measured, spectral centroid, \
+                peak/rms/crest, clipping, and a balance verdict, so masking and mud claims are \
+                checked against actual audio instead of the symbolic estimate the review makes. \
+                Costs seconds of CPU (it renders every stem) — use it AFTER a review raised \
+                masking / spectral-balance / clipping notes, or when the user says the mix \
+                sounds off, muddy, harsh, or quiet; not on every edit. Omit `code` to hear the \
+                last reviewed buffer or the current editor. Budget: TWO per user request."
+                    .to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Pattern code to render. Omit to hear the last reviewed buffer, else the editor."
+                    },
+                    "cycles": {
+                        "type": "integer",
+                        "description": "Cycles to render (default: the loop period, 1–8; max 32; at most 60 s of audio)."
+                    },
+                    "stems": {
+                        "type": "boolean",
+                        "description": "Also render and measure each `$:` track / stack layer separately (default true). Set false to hear only the mix, faster."
+                    }
+                }
+            }),
+        },
+        ToolDefinition {
             name: ToolName::InspectPattern.as_str().to_string(),
             description:
                 "Evaluate pattern code and report what it ACTUALLY emits — your ears while \

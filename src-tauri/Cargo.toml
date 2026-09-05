@@ -13,6 +13,7 @@ cycletron-agent = { workspace = true }
 cycletron-corpus = { workspace = true }
 cycletron-gen = { workspace = true }
 cycletron-analysis = { workspace = true }
+cycletron-render = { workspace = true }
 cycletron-doc = { workspace = true }
 cycletron-midi = { workspace = true }
 midi-to-strudel = { workspace = true }

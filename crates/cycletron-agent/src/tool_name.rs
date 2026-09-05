@@ -20,6 +20,7 @@ pub enum ToolName {
     GeneratePattern,
     ValidatePattern,
     ReviewPattern,
+    HearPattern,
     InspectPattern,
     AnalyzeArrangement,
     CritiquePattern,
@@ -40,7 +41,7 @@ pub enum ToolName {
 }
 
 impl ToolName {
-    pub const ALL: [ToolName; 32] = [
+    pub const ALL: [ToolName; 33] = [
         ToolName::SearchCorpus,
         ToolName::GetExample,
         ToolName::ListLibrary,
@@ -56,6 +57,7 @@ impl ToolName {
         ToolName::GeneratePattern,
         ToolName::ValidatePattern,
         ToolName::ReviewPattern,
+        ToolName::HearPattern,
         ToolName::InspectPattern,
         ToolName::AnalyzeArrangement,
         ToolName::CritiquePattern,
@@ -92,6 +94,7 @@ impl ToolName {
             ToolName::GeneratePattern => "generate_pattern",
             ToolName::ValidatePattern => "validate_pattern",
             ToolName::ReviewPattern => "review_pattern",
+            ToolName::HearPattern => "hear_pattern",
             ToolName::InspectPattern => "inspect_pattern",
             ToolName::AnalyzeArrangement => "analyze_arrangement",
             ToolName::CritiquePattern => "critique_pattern",

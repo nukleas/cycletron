@@ -8,23 +8,18 @@ use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use cycletron_render::{
+    SAMPLE_RATE, SampleSetPaths, mix_of, render_pcm, resolve_gain, resolve_patterns, resolve_tempo,
+};
 use midly::{
     Format, Header, MidiMessage, Smf, Timing, Track as MidiTrack, TrackEvent, TrackEventKind,
     num::{u4, u7, u15, u24, u28},
 };
-use rustc_hash::FxHashMap;
 use serde::Serialize;
-use strudel_audio::OfflineRenderer;
-use strudel_core::{ContextKey, Hap, Pattern, Value, stack};
-use strudel_dsl::{
-    Directive, EvalContext, Expr, Tempo, evaluate_in_context, evaluate_in_context_with_tempo,
-    execute, parse as parse_expr, parse_strudel_file,
-};
+use strudel_core::{ContextKey, Hap, Pattern, Value};
+use strudel_dsl::execute;
 use strudel_music_theory::MidiNoteNumber;
 
-const SAMPLE_RATE: u32 = 44_100;
-const DEFAULT_BPM: f64 = 120.0;
-const DEFAULT_GAIN: f32 = 0.7;
 const MAX_DURATION_SECS: f64 = 600.0;
 const DEFAULT_MIDI_PPQ: u16 = 480;
 const DEFAULT_MIDI_VELOCITY: u8 = 100;
@@ -81,23 +76,6 @@ impl AudioFormat {
 // Audio export
 // ---------------------------------------------------------------------------
 
-/// Which sample set an offline render resolves sounds from.
-///
-/// Mirrors the user's sample-set mode: live playback and export must consume
-/// the same manifests for the active mode, or the two drift audibly apart
-/// (the original bug: live played the bundled TR-808 `bd` while export
-/// fetched uzu-drumkit's).
-#[derive(Debug, Clone)]
-pub enum SampleSetPaths {
-    /// The bundled Cycletron set: one manifest (`cycletron.strudel.json`,
-    /// generated from `ui/sample-tables.ts`) describing the shipped files.
-    Cycletron { manifest: PathBuf },
-    /// The downloaded strudel-rs set: localized manifests registered in
-    /// strudio order (piano, uzu-drumkit, uzu-wavetables, dirt-samples) so
-    /// first-manifest-wins resolves identically to `strudio render`.
-    Strudel { manifests: Vec<PathBuf> },
-}
-
 /// Parse `code`, offline-render audio, optionally encode MP3 and/or stems.
 #[allow(clippy::too_many_arguments)]
 pub fn export_audio(
@@ -134,11 +112,7 @@ pub fn export_audio(
     let mut notes = Vec::new();
     let mut clipped = 0_u64;
 
-    let mix_pattern = if stem_patterns.len() == 1 {
-        stem_patterns[0].1.clone()
-    } else {
-        stack(stem_patterns.iter().map(|(_, p)| p.clone()).collect())
-    };
+    let mix_pattern = mix_of(&stem_patterns);
 
     clipped += render_pattern_to_wav(&mix_pattern, tempo, gain, duration_secs, &mix_wav, samples)?;
 
@@ -220,6 +194,8 @@ pub fn export_audio(
     })
 }
 
+/// Render one pattern and write it as 16-bit stereo WAV. Returns the number
+/// of frames that clipped.
 fn render_pattern_to_wav(
     pattern: &Pattern,
     tempo: f64,
@@ -228,9 +204,7 @@ fn render_pattern_to_wav(
     path: &Path,
     samples: &SampleSetPaths,
 ) -> Result<u64, String> {
-    let mut renderer = OfflineRenderer::new(tempo, SAMPLE_RATE, gain);
-    register_sample_manifests(&mut renderer, samples);
-    renderer.set_pattern(pattern.clone());
+    let pcm = render_pcm(pattern, tempo, gain, duration_secs, samples)?;
 
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -239,182 +213,21 @@ fn render_pattern_to_wav(
 
     let spec = hound::WavSpec {
         channels: 2,
-        sample_rate: SAMPLE_RATE,
+        sample_rate: pcm.sample_rate,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
     let mut writer = hound::WavWriter::create(path, spec)
         .map_err(|e| format!("Could not create WAV '{}': {e}", path.display()))?;
-
-    let mut clip_count: u64 = 0;
-    renderer
-        .render(duration_secs, |left, right| {
-            for (&l, &r) in left.iter().zip(right.iter()) {
-                let _ = writer.write_sample(sample_to_i16(l, &mut clip_count));
-                let _ = writer.write_sample(sample_to_i16(r, &mut clip_count));
-            }
-        })
-        .map_err(|e| format!("Render failed: {e}"))?;
-
+    for (&l, &r) in pcm.left.iter().zip(&pcm.right) {
+        let _ = writer.write_sample(sample_to_i16(l));
+        let _ = writer.write_sample(sample_to_i16(r));
+    }
     writer
         .finalize()
         .map_err(|e| format!("Could not finalize WAV '{}': {e}", path.display()))?;
 
-    Ok(clip_count)
-}
-
-// ---------------------------------------------------------------------------
-// Pattern / stem resolution
-// ---------------------------------------------------------------------------
-
-/// Resolve the mix and optional stem patterns from source code.
-///
-/// Stem split priority:
-/// 1. Multiple `$:` tracks (named by id, comment, or index)
-/// 2. Top-level `stack(a, b, …)` arguments
-/// 3. Single layer (full mix)
-type NamedPatterns = (Vec<(String, Pattern)>, Option<Tempo>);
-
-fn resolve_patterns(code: &str, want_stems: bool) -> Result<NamedPatterns, String> {
-    // Multi-track file path
-    if let Ok(file) = parse_strudel_file(code)
-        && !file.is_empty()
-    {
-        let mut tempo: Option<Tempo> = None;
-        for directive in file.directives.iter() {
-            match *directive {
-                Directive::SetCpm(cpm) => tempo = Some(Tempo::from_cpm(cpm)),
-                Directive::SetBpm(bpm) => tempo = Some(Tempo::from_bpm(bpm)),
-            }
-        }
-
-        let mut context = EvalContext::new();
-        for func in &file.functions {
-            context.define_function(func.clone());
-        }
-        for binding in &file.bindings {
-            // Binding parse-error offsets are relative to the binding text.
-            let expr = parse_expr(binding.expr_str)
-                .map_err(|e| format!("Parse error in binding '{}': {e}", binding.name))?;
-            // Mirror evaluate_file: object literals become object bindings.
-            if let Expr::Object {
-                entries, spreads, ..
-            } = &expr
-            {
-                let mut obj = FxHashMap::default();
-                for spread in spreads {
-                    if let Expr::Call { name, args, .. } = spread
-                        && args.is_empty()
-                    {
-                        let Some(spread_obj) = context.get_object(name) else {
-                            return Err(format!(
-                                "Spread variable '{name}' not found or is not an object"
-                            ));
-                        };
-                        for (key, value) in spread_obj {
-                            obj.insert(*key, value.clone());
-                        }
-                    } else {
-                        return Err("Object spreads must be bare object identifiers".into());
-                    }
-                }
-                for (key, value_expr) in entries {
-                    let value_pattern = evaluate_in_context(value_expr, &context)
-                        .map_err(|e| format!("Eval error in object field '{key}': {e}"))?;
-                    obj.insert(*key, value_pattern);
-                }
-                context.bind_object(binding.name, obj);
-            } else {
-                let pattern = evaluate_in_context(&expr, &context)
-                    .map_err(|e| format!("Eval error in binding '{}': {e}", binding.name))?;
-                context.bind(binding.name, pattern);
-            }
-        }
-
-        let mut stems = Vec::new();
-        for (i, track) in file.tracks.iter().enumerate() {
-            let result = evaluate_in_context_with_tempo(&track.expression, &context)
-                .map_err(|e| format!("Eval error in track {}: {e}", i + 1))?;
-            if let Some(t) = result.tempo {
-                tempo = Some(t);
-            }
-            let name = track_stem_name(track.id, track.comment, i);
-            stems.push((name, result.pattern));
-        }
-
-        if stems.is_empty() {
-            return Err("File contains no tracks".into());
-        }
-
-        // Single track: try to peel top-level stack for stem split.
-        if want_stems
-            && stems.len() == 1
-            && let Some(split) = try_split_stack_expr(&file.tracks[0].expression, &context)
-        {
-            return Ok((split, tempo));
-        }
-
-        return Ok((stems, tempo));
-    }
-
-    // Single expression / mini
-    let evaluated = execute(code).map_err(|e| format!("Could not parse pattern: {e}"))?;
-
-    if want_stems
-        && let Ok(expr) = parse_expr(code.trim())
-        && let Some(split) = try_split_stack_expr(&expr, &EvalContext::new())
-    {
-        return Ok((split, evaluated.tempo));
-    }
-
-    Ok((vec![("mix".into(), evaluated.pattern)], evaluated.tempo))
-}
-
-fn track_stem_name(id: &str, comment: Option<&str>, index: usize) -> String {
-    if !id.is_empty() {
-        return id.to_string();
-    }
-    if let Some(c) = comment {
-        let cleaned = c
-            .trim()
-            .trim_start_matches('/')
-            .trim()
-            .trim_start_matches("Track")
-            .trim_start_matches(char::is_numeric)
-            .trim_start_matches([':', '-', ' '])
-            .trim();
-        if !cleaned.is_empty() {
-            return cleaned.to_string();
-        }
-    }
-    format!("stem-{}", index + 1)
-}
-
-/// If `expr` is `stack(a, b, …)`, evaluate each arg as its own stem.
-fn try_split_stack_expr(expr: &Expr, ctx: &EvalContext<'_>) -> Option<Vec<(String, Pattern)>> {
-    let Expr::Call { name, args, .. } = expr else {
-        return None;
-    };
-    if *name != "stack" || args.len() < 2 {
-        return None;
-    }
-    let mut out = Vec::with_capacity(args.len());
-    for (i, arg) in args.iter().enumerate() {
-        let pattern = evaluate_in_context(arg, ctx).ok()?;
-        let label = stack_arg_label(arg, i);
-        out.push((label, pattern));
-    }
-    Some(out)
-}
-
-fn stack_arg_label(expr: &Expr, index: usize) -> String {
-    match expr {
-        Expr::Call { name, .. } if !name.is_empty() => format!("{name}-{}", index + 1),
-        Expr::MethodCall { method, .. } if !method.is_empty() => {
-            format!("{method}-{}", index + 1)
-        }
-        _ => format!("layer-{}", index + 1),
-    }
+    Ok(pcm.clipped)
 }
 
 // ---------------------------------------------------------------------------
@@ -783,20 +596,6 @@ fn validate_code_and_duration(code: &str, duration_secs: f64) -> Result<(), Stri
     Ok(())
 }
 
-fn resolve_tempo(file_tempo: Option<Tempo>, bpm: Option<f64>) -> f64 {
-    file_tempo
-        .map(|t| t.to_bpm())
-        .or(bpm)
-        .filter(|b| b.is_finite() && *b > 0.0)
-        .unwrap_or(DEFAULT_BPM)
-}
-
-fn resolve_gain(gain: Option<f32>) -> f32 {
-    gain.filter(|g| g.is_finite() && *g > 0.0)
-        .unwrap_or(DEFAULT_GAIN)
-        .clamp(0.01, 2.0)
-}
-
 fn ensure_wav_path(path: &Path) -> PathBuf {
     if path
         .extension()
@@ -822,55 +621,8 @@ fn stem_dir_for(mix_wav: &Path) -> PathBuf {
         .join(format!("{stem}-stems"))
 }
 
-fn register_sample_manifests(renderer: &mut OfflineRenderer, samples: &SampleSetPaths) {
-    let mut urls: Vec<String> = Vec::new();
-    // Explicit dev/test override: a strudel.json (or a dir containing one)
-    // registered ahead of the mode's manifests, so it wins name collisions.
-    if let Some(over) = env_override_manifest() {
-        urls.push(over.to_string_lossy().into_owned());
-    }
-    match samples {
-        SampleSetPaths::Cycletron { manifest } => {
-            urls.push(manifest.to_string_lossy().into_owned());
-        }
-        SampleSetPaths::Strudel { manifests } => {
-            urls.extend(manifests.iter().map(|m| m.to_string_lossy().into_owned()));
-        }
-    }
-
-    for url in &urls {
-        if let Err(e) = renderer.register_manifest_url(url) {
-            tracing::warn!(
-                target: "cycletron::export",
-                url,
-                error = %e,
-                "sample manifest skipped"
-            );
-        }
-    }
-}
-
-fn env_override_manifest() -> Option<PathBuf> {
-    let env = std::env::var("CYCLETRON_SAMPLES").ok()?;
-    let p = PathBuf::from(env);
-    if p.is_file() {
-        return Some(p);
-    }
-    let joined = p.join("strudel.json");
-    joined.is_file().then_some(joined)
-}
-
-fn sample_to_i16(s: f32, clip_count: &mut u64) -> i16 {
-    let clamped = if s > 1.0 {
-        *clip_count += 1;
-        1.0
-    } else if s < -1.0 {
-        *clip_count += 1;
-        -1.0
-    } else {
-        s
-    };
-    (clamped * f32::from(i16::MAX)).round() as i16
+fn sample_to_i16(s: f32) -> i16 {
+    (s.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16
 }
 
 // ---------------------------------------------------------------------------
