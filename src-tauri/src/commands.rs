@@ -1022,18 +1022,6 @@ pub fn diagnostic_dump(app_handle: tauri::AppHandle) -> String {
     out
 }
 
-/// Write a binary blob to disk. Used by the recorder to save WAV/WebM
-/// captures. The frontend picks the path via the dialog plugin and hands
-/// us the bytes — no FS-scope plumbing required.
-#[tauri::command]
-pub fn write_binary_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
-    let pb = PathBuf::from(&path);
-    if let Some(parent) = pb.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    std::fs::write(&pb, &bytes).map_err(|e| format!("write {}: {e}", pb.display()))
-}
-
 // ---------------------------------------------------------------------------
 // Offline export (WAV / MP3 / stems / MIDI)
 // ---------------------------------------------------------------------------

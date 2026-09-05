@@ -25,6 +25,15 @@ interface ActiveVoice {
     gain: GainNode;
 }
 
+/**
+ * Playing the keyboard through the monitor *is* part of the performance, so it
+ * joins the master bus before the capture tap — a recording should match what
+ * the room heard. Falls back to the destination if the bus isn't up yet.
+ */
+function performanceOutput(ctx: AudioContext): AudioNode {
+    return window.strudelApp?.audioManager?.getPerformanceBus?.() ?? ctx.destination;
+}
+
 /** Built-in oscillator voices. `[oscType, detune-cents per stacked voice]`. */
 const SYNTH_VOICES: Record<string, {type: OscillatorType; detune: number[]}> = {
     sine: {type: 'sine', detune: [0]},
@@ -148,7 +157,7 @@ class MidiMonitor {
         const headroom = voice.detune.length > 1 ? 0.7 / Math.sqrt(voice.detune.length) : 1;
         gain.gain.setValueAtTime(0, now);
         gain.gain.linearRampToValueAtTime(peak * headroom, now + ATTACK);
-        gain.connect(ctx.destination);
+        gain.connect(performanceOutput(ctx));
 
         const sources: AudioScheduledSourceNode[] = [];
         for (const cents of voice.detune) {
@@ -181,7 +190,7 @@ class MidiMonitor {
         gain.gain.setValueAtTime(0, now);
         gain.gain.linearRampToValueAtTime(peak, now + ATTACK);
         src.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(performanceOutput(ctx));
         src.start(now);
         src.onended = () => {
             try { gain.disconnect(); } catch { /* already gone */ }

@@ -30,6 +30,12 @@ const SCHEDULE_MS = 100;
 const BACKGROUND_LOOKAHEAD_CYCLES = 0.75;
 
 /**
+ * Nudge applied when computing a launch boundary so arming *exactly* on one
+ * targets the next boundary rather than resolving to the current instant.
+ */
+const BOUNDARY_EPS = 1e-6;
+
+/**
  * Dedicated Worker whose `setInterval` keeps firing when the main document is
  * backgrounded. Chromium/WebKit throttle main-thread timers heavily on blur;
  * that starves our ~300ms audio lookahead and causes glitches / catch-up spikes.
@@ -92,7 +98,32 @@ export class PatternScheduler {
     /** When true, skip rAF UI updates (window hidden) but keep audio scheduling. */
     private uiPaused: boolean = false;
 
+    /**
+     * Launch quantization, in cycles. `0` swaps patterns the moment they
+     * evaluate (the classic live-coding behaviour); a positive value holds the
+     * incoming pattern until the transport crosses the next multiple of it, so
+     * edits land musically instead of wherever the keystroke happened to fall.
+     */
+    launchQuantum: number = 0;
+
+    /** Pattern waiting for {@link _pendingBoundary}; owned here until installed. */
+    private _pending: PatternHandle | null = null;
+    /** Absolute cycle the armed swap lands on. Meaningless while `_pending` is null. */
+    private _pendingBoundary: number = 0;
+    /** Tempo carried by the armed pattern's source, applied when it lands. */
+    private _pendingBpm: number | undefined = undefined;
+
     onCycleUpdate: ((cycle: number) => void) | null = null;
+
+    /**
+     * Fired after a quantized swap installs, with the BPM the incoming source
+     * declared (if any). The host applies the deferred side effects here —
+     * tempo and visualizer cache — so they change with the audio, not ahead of it.
+     */
+    onPatternInstalled: ((bpm: number | undefined) => void) | null = null;
+
+    /** Fired when a swap is armed or lands, so the UI can show the countdown. */
+    onLaunchArmed: ((boundary: number | null) => void) | null = null;
 
     /**
      * Called each tick after scanning the lookahead window for sound banks that
@@ -169,6 +200,114 @@ export class PatternScheduler {
     }
 
     /**
+     * Swap in `pattern`, held until the next {@link launchQuantum} boundary.
+     *
+     * Returns `true` if the swap was armed (the caller must defer its own side
+     * effects to {@link onPatternInstalled}), `false` if it applied immediately —
+     * which is the case whenever quantization is off, nothing is playing yet, or
+     * there is no outgoing pattern to hold.
+     *
+     * Re-arming while a swap is already pending replaces the incoming pattern
+     * but keeps the original boundary, so hammering the eval key doesn't push
+     * the landing further away.
+     */
+    setPatternQuantized(pattern: PatternHandle, bpm?: number): boolean {
+        if (this.launchQuantum <= 0 || !this.running || !this.pattern) {
+            this._cancelPending();
+            this.setPattern(pattern, false);
+            this._pendingBpm = undefined;
+            this.onLaunchArmed?.(null);
+            return false;
+        }
+
+        const boundary = this._pending ? this._pendingBoundary : this._nextBoundary();
+        this._cancelPending();
+        this._pending = pattern;
+        this._pendingBoundary = boundary;
+        this._pendingBpm = bpm;
+        this.onLaunchArmed?.(boundary);
+        this.kickSchedule();
+        return true;
+    }
+
+    /**
+     * The cycle an armed swap should land on.
+     *
+     * The lookahead may already have queued the outgoing pattern past that
+     * boundary. Rather than slip a whole quantum — which is exactly what happens
+     * when you hit evaluate just before the downbeat, the most common moment in
+     * a performance — drop the queued events and rewind `scheduledTo` so the
+     * span up to the boundary is re-queried from the outgoing pattern.
+     */
+    private _nextBoundary(): number {
+        const q = this.launchQuantum;
+        const now = this._liveCurrentCycle();
+        const boundary = Math.ceil((now + BOUNDARY_EPS) / q) * q;
+        if (this.scheduledTo > boundary) {
+            this.audioManager?.sendHush(); // pending events only; voices ring out
+            this.scheduledTo = now;
+        }
+        return boundary;
+    }
+
+    /** Drop an armed swap without installing it, freeing its handle. */
+    private _cancelPending(): void {
+        if (this._pending) {
+            this._pending.free();
+            this._pending = null;
+        }
+    }
+
+    /**
+     * Install the armed pattern and refill the lookahead from it in the same
+     * tick, so the boundary is crossed with no gap. Called only once the
+     * outgoing pattern has been queried right up to `_pendingBoundary`.
+     */
+    private _installPending(currentCycle: number, lookahead: number): void {
+        if (!this._pending) return;
+        this._swapInPending();
+
+        const end = currentCycle + lookahead;
+        if (end > this.scheduledTo) {
+            const from = this.scheduledTo;
+            measure('queryEventsPacked', currentCycle, () =>
+                this.processor!.queryEventsPacked(from, end, this.cps));
+            this.scheduledTo = end;
+        }
+
+        this._finishInstall();
+    }
+
+    /**
+     * Install the armed pattern without waiting for its boundary.
+     *
+     * Used when the transport stops caring about the boundary — pause and seek.
+     * A pending swap is the code the performer asked to hear, so it should be
+     * what resumes or what the new position plays, not the pattern it replaced.
+     */
+    private _installPendingNow(): void {
+        if (!this._pending) return;
+        this._swapInPending();
+        this._finishInstall();
+    }
+
+    private _swapInPending(): void {
+        const pattern = this._pending!;
+        this._pending = null;
+        if (this.pattern) this.pattern.free();
+        this.pattern = pattern;
+        this.processor!.setPattern(pattern);
+    }
+
+    private _finishInstall(): void {
+        const bpm = this._pendingBpm;
+        this._pendingBpm = undefined;
+        this.onLaunchArmed?.(null);
+        // Last: the host may change tempo here, which re-anchors the clock.
+        this.onPatternInstalled?.(bpm);
+    }
+
+    /**
      * Set tempo in BPM.
      *
      * Changing BPM invalidates the current scheduledTo position (cycle-space
@@ -230,6 +369,8 @@ export class PatternScheduler {
     /** Seek to an absolute cycle (clamped at 0). See {@link seekBy}. */
     seekTo(cycle: number): void {
         if (!this.pattern) return;
+        // The armed boundary refers to a timeline we are about to leave.
+        this._installPendingNow();
         const target = Math.max(0, cycle);
         if (this.running) {
             this.startTime = this.audioContext.currentTime - target / this.cps;
@@ -275,6 +416,7 @@ export class PatternScheduler {
         if (!this.running) return;
 
         this.running = false;
+        this._installPendingNow();
         this._stopUiLoop();
         this._stopTimerDriver();
 
@@ -314,6 +456,8 @@ export class PatternScheduler {
      */
     stop(): void {
         this.running = false;
+        this._cancelPending();
+        this.onLaunchArmed?.(null);
         this.pausedCycle = 0;
         this._stopUiLoop();
         this._stopTimerDriver();
@@ -359,13 +503,22 @@ export class PatternScheduler {
         const cps = this.cps;
         const elapsed = this.audioContext.currentTime - this.startTime;
         const currentCycle = elapsed * cps;
-        const queryEnd = currentCycle + lookahead;
+
+        // While a swap is armed the outgoing pattern is never queried past the
+        // boundary — everything from there belongs to the incoming one, so the
+        // two meet exactly on the beat with nothing dropped or doubled.
+        const boundary = this._pending ? this._pendingBoundary : Infinity;
+        const queryEnd = Math.min(currentCycle + lookahead, boundary);
 
         if (queryEnd > this.scheduledTo) {
             const from = this.scheduledTo;
             measure('queryEventsPacked', currentCycle, () =>
                 this.processor!.queryEventsPacked(from, queryEnd, cps));
             this.scheduledTo = queryEnd;
+        }
+
+        if (this._pending && this.scheduledTo >= boundary) {
+            this._installPending(currentCycle, lookahead);
         }
 
         // Scan further ahead for sound banks not yet loaded (soundfonts/samples)
@@ -497,6 +650,8 @@ export class PatternScheduler {
         }
         this.onCycleUpdate = null;
         this.onMissingBanks = null;
+        this.onPatternInstalled = null;
+        this.onLaunchArmed = null;
         this.processor = null;
         this.audioManager = null;
     }

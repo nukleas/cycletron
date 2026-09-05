@@ -28,7 +28,7 @@ model is only needed for the AI operator — and only after you enable it.
 | **Editor** (center) | Pattern code. Empty state offers Open / New / Examples. |
 | **AI Operator** (left) | Chat with the model; it writes and rewrites the editor. Off until enabled. |
 | **File System** (left, under AI) | Your library root — patterns, MIDI imports, folders. |
-| **Right sidebar** | **Sequence Grid** (Cycle / Piano Roll / Waveform), **Signal Scope**, runtime stats, the **Sounds** browser, and the Browse Examples button. |
+| **Right sidebar** | **Sequence Grid** (Cycle / Piano Roll / Waveform), the **Mixer**, **Signal Scope**, runtime stats, the **Sounds** browser, and the Browse Examples button. |
 
 The curated corpus is no longer a panel — the AI searches it directly
 (`search_corpus`), and View → Reload Corpus & Recipes refreshes it in dev.
@@ -52,8 +52,8 @@ The curated corpus is no longer a panel — the AI searches it directly
 | Undo / Redo *pattern* (distinct from text undo) | **⌘⌥Z** / **⌘⌥⇧Z** |
 | Tempo ±1 | Playback menu or command palette |
 
-BPM and gain live in the top bar, along with a **metronome** toggle and
-**skip ±5 cycles** buttons. Three fixed global shortcuts work while another
+BPM and gain live in the top bar, along with a **metronome** toggle,
+**skip ±5 cycles** buttons, and the **Q** launch-quantization button (see below). Three fixed global shortcuts work while another
 app is focused: **⌘⇧Space** play/pause, **⌘⇧.** stop, **⌘⇧,** focus the
 window.
 
@@ -73,10 +73,74 @@ library files, not just commands.
   pattern has multiple `$:` tracks) via the Rust DSP engine — faster than
   realtime. MP3 export requires `ffmpeg` on your PATH.
 - **File → Export MIDI…** writes a Standard MIDI File from the current pattern.
-- The **Record** button (editor header) captures the live mix in realtime when
-  you want that instead.
+- The **Record** button (editor header) captures the live performance in
+  realtime to a lossless 32-bit float WAV, streamed straight to disk — a take is
+  limited by free space, not memory. It records the mix at unity, so turning
+  your monitors up or down never changes the file, and the metronome click
+  stays out of it. Leave "bars" empty to stop by hand.
 - Every save keeps a **snapshot** — the History button (editor header) lets
   you browse and restore up to 50 per file.
+
+### Launch quantization
+
+The **Q** button in the top bar decides *when* an evaluate takes effect. Each
+click steps to the next grid:
+
+| Setting | Behaviour |
+|---------|-----------|
+| **Q ·** (Now) | Classic live coding — the swap happens the instant you hit **⌘↩**. |
+| **Q 1 / 2 / 4 / 8** | The new pattern is held and swapped in on the next boundary of that many bars. |
+
+While a swap is parked the button pulses and its label becomes a countdown.
+Evaluating again before it lands replaces what's waiting without pushing the
+landing further out, so you can keep editing right up to the bar line. If you
+evaluate just *before* a boundary — the most common moment in a set — it still
+catches that boundary rather than slipping a whole bar.
+
+The outgoing pattern is scheduled right up to the boundary and the incoming one
+from the boundary onward, so the two meet exactly on the beat with no dropped or
+doubled events. Tempo changes declared by the incoming code (`setbpm(…)`) are
+held back until it lands too. Stop cancels a parked swap; pause and seek apply
+it immediately.
+
+**⌘⇧P → Launch Quantization: Next Grid** does the same as a click, for a
+keyboard or a MIDI pad.
+
+### Mixer
+
+The **Mixer** panel (right sidebar) lists the `$:` tracks in the current buffer
+with **M** (mute) and **S** (solo) per track. It appears only when the buffer
+actually has `$:` tracks.
+
+Track names come from the comment directly above each track, so this names them
+"drums" and "bass":
+
+```
+setbpm(120);
+
+// drums
+$: s("bd*4, ~ sd")
+
+// bass
+$: note("c2 eb2").s("sawtooth")
+```
+
+Without a comment, a track is named after the first sound it plays. **Clear**
+drops every mute and solo at once.
+
+Mixer moves obey the Launch grid, so mutes land on the bar just like an
+evaluate. Toggling while stopped stays stopped.
+
+**Your file is never modified.** Mute/solo is an override applied on the way to
+the audio engine; the buffer, the file on disk, and audio export all still
+reflect exactly what you wrote. Mixer state is per-session and resets when the
+track list changes.
+
+There are deliberately no gain faders. On this engine `.gain()` *replaces*
+rather than scales — `s("bd").gain(0.8).gain(0.5)` is 0.5 — so a fader
+implemented this way would silently throw away whatever gain the pattern set
+for itself. Real faders need per-orbit bus gain in the DSP engine; until that
+exists the mixer only does what it can do exactly.
 
 ### Examples (in-app)
 
@@ -186,6 +250,65 @@ A connected keyboard is captured, not auditioned — incoming notes go to the
 monitor and the capture buffer as a `note(…)` line rather than making sound
 directly. Imported patterns land as `.strudel` in your library after you save
 them.
+
+---
+
+## Ableton Link
+
+Preferences → **Ableton Link** shares tempo and bar phase with Ableton Live,
+Bitwig, Rekordbox and the long tail of Link-enabled apps and hardware. Tick
+**Sync tempo and bar phase over Ableton Link** and save — discovery is automatic,
+so there is no host, port or session to pick. The section reports how many peers
+it can see and the tempo they agree on.
+
+This is how you play alongside someone else's DAW. Link works over the local
+network, so it also spans two machines on the same Wi-Fi with nothing configured
+on either.
+
+Two things change while Link is on:
+
+- **The session owns the tempo.** The BPM slider and a pattern's `setbpm` both
+  defer to it, because a local tempo change would otherwise silently drop you out
+  of sync with everyone else. Turn Link off to get the tempo back.
+- **Play waits for the bar line.** Pressing play mid-bar starts on the session's
+  next downbeat instead, so you come in on the beat rather than wherever you
+  happened to press. The status line says `Waiting for Link bar…` while it holds.
+  Alone in a session there is no phase to wait for, so play starts immediately.
+
+Cycletron follows the session and never changes it: it does not propose its
+tempo to peers, and Link's start/stop sync is not used. Set the tempo on the
+other app.
+
+Once playing, the two apps free-run against different clocks — Cycletron's
+transport is anchored to its audio device, Link's to the system clock — so they
+drift apart by the difference between those two, slowly. Over a long set you may
+need to stop and start again to re-align.
+
+---
+
+## OSC output
+
+Preferences → **OSC Output** streams the transport and every note onset out over
+UDP, so Cycletron can drive the rest of the live-coding ecosystem — Hydra,
+Resolume, TouchDesigner, SuperCollider, or a DMX lighting rig — without either
+side knowing about the other. Tick **Send OSC over UDP**, set a host and port
+(default `127.0.0.1:57120`), and save; the section reports the resolved target
+or the reason it failed.
+
+| Address | Arguments |
+|---------|-----------|
+| `/cycletron/transport` | `state` (`playing` / `paused` / `stopped`), `bpm`, `cps` |
+| `/cycletron/cycle` | `cycle` — absolute transport position, sent continuously |
+| `/cycletron/hap` | `track`, `note` (NaN when unpitched), `dur` in cycles, `index` |
+
+`/cycletron/cycle` and the haps for a frame are sent together in one bundle.
+Track names are the sound names the engine reports (`bd`, `sd`, `sawtooth`), the
+same ones the visualizers colour by.
+
+Onsets are emitted on the animation frame that crosses them (~16 ms), which is
+what visuals and lighting want. It is **not** sample-accurate, so this is not a
+way to drive an external sampler or synth in time — that needs full per-hap
+parameter maps the engine doesn't expose yet.
 
 ---
 

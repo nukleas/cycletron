@@ -7,6 +7,7 @@ mod export;
 mod files;
 mod library;
 mod library_index;
+mod link;
 mod logs;
 mod menu;
 mod midi_input;
@@ -14,9 +15,11 @@ mod midi_input;
 mod mpris;
 mod oauth;
 mod oauth_store;
+mod osc;
 mod packs;
 mod persistence;
 mod playback;
+mod recording;
 mod sample_sets;
 mod secrets;
 mod settings;
@@ -166,6 +169,7 @@ pub fn run() {
         .manage(app_state)
         .manage(tray::TrayStateHolder::new())
         .manage(midi_input::MidiInputState::new())
+        .manage(recording::RecordingState::new())
         .setup(|app| {
             // Resolve the app data dir (e.g. ~/Library/Application Support/com.nukleas.cycletron)
             // and hand it to AppState so recents + session snapshots can persist.
@@ -351,7 +355,6 @@ pub fn run() {
             commands::codex_oauth_login,
             commands::codex_oauth_logout,
             commands::get_app_info,
-            commands::write_binary_file,
             commands::export_audio,
             commands::export_midi,
             commands::list_snapshots,
@@ -362,6 +365,11 @@ pub fn run() {
             commands::diagnostic_dump,
             commands::set_dock_badge,
             desktop_theme::get_desktop_theme,
+            link::link_enable,
+            link::link_snapshot,
+            osc::osc_configure,
+            osc::osc_transport,
+            osc::osc_frame,
             sounds::scan_sample_folder,
             sounds::read_audio_file,
             sounds::register_sound_banks,
@@ -380,17 +388,25 @@ pub fn run() {
             midi_input::start_midi_input_listening,
             midi_input::stop_midi_input_listening,
             midi_input::get_midi_input_status,
+            recording::recording_open,
+            recording::recording_write,
+            recording::recording_close,
+            recording::recording_orphans,
+            recording::recording_recover,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building tauri application")
+        .expect("error while running tauri application")
         .run(|app, event| {
-            // Take the state file with us, so anything watching it doesn't
-            // keep reporting a session that has ended.
-            match event {
-                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. } => {
-                    playback::remove_state_file(app);
-                }
-                _ => {}
+            if matches!(
+                event,
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+            ) {
+                // Commit any in-flight take before we go, so quitting mid-recording
+                // still leaves a playable file rather than an orphaned .part.
+                app.state::<recording::RecordingState>().commit_all();
+                // Take the state file with us, so anything watching it doesn't
+                // keep reporting a session that has ended.
+                playback::remove_state_file(app);
             }
         });
 }

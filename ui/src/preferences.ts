@@ -16,6 +16,8 @@ import {presetById, presetProfile, defaultLlmSettings, normalizeLlm} from './pro
 import {dismissibleModal} from './modal-utils.js';
 import {setNotificationsEnabled} from './notifications.js';
 import {setFollowDesktopTheme} from './desktop-theme.js';
+import {oscOut} from './osc-out.js';
+import {linkSync} from './link-sync.js';
 import {metronome} from './metronome.js';
 import {midiInput} from './midi-input.js';
 import {midiPads, PAD_ACTIONS} from './midi-pads.js';
@@ -60,6 +62,12 @@ export class PreferencesModal {
     private audioOutput: HTMLSelectElement | null = null;
     private midiInputSelect: HTMLSelectElement | null = null;
     private midiCcGain: HTMLInputElement | null = null;
+    private linkEnabled: HTMLInputElement | null = null;
+    private linkStatus: HTMLElement | null = null;
+    private oscEnabled: HTMLInputElement | null = null;
+    private oscHost: HTMLInputElement | null = null;
+    private oscPort: HTMLInputElement | null = null;
+    private oscTarget: HTMLElement | null = null;
     private midiCcBpm: HTMLInputElement | null = null;
     private midiMonitorEnabled: HTMLInputElement | null = null;
     private midiMonitorInstrument: HTMLSelectElement | null = null;
@@ -94,6 +102,12 @@ export class PreferencesModal {
         this.audioOutput = document.getElementById('prefsAudioOutput') as HTMLSelectElement;
         this.midiInputSelect = document.getElementById('prefsMidiInput') as HTMLSelectElement;
         this.midiCcGain = document.getElementById('prefsMidiCcGain') as HTMLInputElement;
+        this.linkEnabled = document.getElementById('prefsLinkEnabled') as HTMLInputElement;
+        this.linkStatus = document.getElementById('prefsLinkStatus');
+        this.oscEnabled = document.getElementById('prefsOscEnabled') as HTMLInputElement;
+        this.oscHost = document.getElementById('prefsOscHost') as HTMLInputElement;
+        this.oscPort = document.getElementById('prefsOscPort') as HTMLInputElement;
+        this.oscTarget = document.getElementById('prefsOscTarget');
         this.midiCcBpm = document.getElementById('prefsMidiCcBpm') as HTMLInputElement;
         this.midiMonitorEnabled = document.getElementById('prefsMidiMonitorEnabled') as HTMLInputElement;
         this.midiMonitorInstrument = document.getElementById('prefsMidiMonitorInstrument') as HTMLSelectElement;
@@ -172,6 +186,12 @@ export class PreferencesModal {
             if (this.metronomeVolume) {
                 this.metronomeVolume.value = String(Math.round((settings.metronome?.volume ?? 0.4) * 100));
             }
+            if (this.linkEnabled) this.linkEnabled.checked = linkSync.settings.enabled;
+            this.renderLinkStatus();
+            if (this.oscEnabled) this.oscEnabled.checked = oscOut.settings.enabled;
+            if (this.oscHost) this.oscHost.value = oscOut.settings.host;
+            if (this.oscPort) this.oscPort.value = String(oscOut.settings.port);
+            this.renderOscTarget();
             if (this.midiCcGain) this.midiCcGain.value = String(settings.midi_input?.cc_gain ?? 7);
             if (this.midiCcBpm)  this.midiCcBpm.value  = String(settings.midi_input?.cc_bpm  ?? 74);
             if (this.midiMonitorEnabled) this.midiMonitorEnabled.checked = settings.midi_input?.monitor_enabled ?? false;
@@ -706,11 +726,69 @@ export class PreferencesModal {
             window.strudelApp?.editor?.setAssistEnabled(next.editor.assist_enabled);
             metronome.setVolume(next.metronome.volume);
             midiInput.applyFromSettings(next.midi_input);
+            await this.applyLink();
+            await this.applyOsc();
             await applyAudioSinkId(this.audioOutput?.value ?? '');
             this.close();
         } catch (e: any) {
             await errorDialog(`Could not save preferences:\n${e}`);
         }
+    }
+
+    /**
+     * Join or leave the Link session to match the form. Reports into the
+     * section's hint line rather than aborting the save, exactly as OSC does.
+     */
+    private async applyLink(): Promise<void> {
+        const error = await linkSync.apply(
+            !!this.linkEnabled?.checked,
+            parseFloat(this.defaultTempo?.value || '') || 120,
+        );
+        if (this.linkEnabled) this.linkEnabled.checked = linkSync.settings.enabled;
+        this.renderLinkStatus(error);
+    }
+
+    /** Peer count is the only readout that matters: it says whether anyone heard you. */
+    private renderLinkStatus(error?: string | null): void {
+        if (!this.linkStatus) return;
+        this.linkStatus.classList.toggle('is-ok', !error && linkSync.active);
+        if (error) {
+            this.linkStatus.textContent = error;
+        } else if (!linkSync.active) {
+            this.linkStatus.textContent = '';
+        } else {
+            const peers = linkSync.peers;
+            const tempo = linkSync.snapshot?.tempo ?? 0;
+            this.linkStatus.textContent = peers === 0
+                ? 'in session, no peers yet'
+                : `${peers} peer${peers === 1 ? '' : 's'} at ${tempo.toFixed(2)} BPM`;
+        }
+    }
+
+    /**
+     * Open (or close) the OSC socket to match the form. A bad host or an
+     * unusable port surfaces in the section's hint line rather than aborting
+     * the whole save — every other preference has already been written.
+     */
+    private async applyOsc(): Promise<void> {
+        const port = parseInt(this.oscPort?.value ?? '', 10);
+        const error = await oscOut.apply({
+            enabled: !!this.oscEnabled?.checked,
+            host: (this.oscHost?.value || '').trim() || '127.0.0.1',
+            port: Number.isFinite(port) && port > 0 && port < 65536 ? port : 57120,
+        });
+        if (this.oscEnabled) this.oscEnabled.checked = oscOut.settings.enabled;
+        this.renderOscTarget(error);
+    }
+
+    private renderOscTarget(error?: string | null): void {
+        if (!this.oscTarget) return;
+        this.oscTarget.classList.toggle('is-ok', !error && oscOut.settings.enabled);
+        this.oscTarget.textContent = error
+            ? error
+            : oscOut.settings.enabled && oscOut.target
+                ? `sending to ${oscOut.target}`
+                : '';
     }
 
     private async changeLibrary(): Promise<void> {

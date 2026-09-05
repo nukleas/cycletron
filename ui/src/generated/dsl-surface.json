@@ -42,6 +42,12 @@
     "kind": "method"
   },
   {
+    "label": "arp",
+    "detail": "arp(pat)",
+    "info": "Arpeggiate each chord. pat is an index pattern (arp(\"0 2 1 3\"), rebased per chord) or a Tidal ordering name: up, down, updown, downup, up&down, down&up, converge, diverge, disconverge, pinkyup, pinkyupdown, thumbup, thumbupdown. Names and indices mix in one pattern; an unknown name is silence, not a fallback to up.",
+    "kind": "method"
+  },
+  {
     "label": "arrange",
     "detail": "arrange(...)",
     "info": "Section combinator: arrange([bars, pat], …) plays each pattern for bars cycles at its native rate, then loops.",
@@ -69,6 +75,12 @@
     "label": "bank",
     "detail": "bank(name)",
     "info": "Sample playback",
+    "kind": "method"
+  },
+  {
+    "label": "beat",
+    "detail": "beat(positions, div)",
+    "info": "Place the source at the given slots of a cycle divided into div: beat(\"0 4\", 8). Positions wrap modulo div; div is a plain number.",
     "kind": "method"
   },
   {
@@ -207,6 +219,12 @@
     "label": "color",
     "detail": "color(hex)",
     "info": "Metadata (no audio effect)",
+    "kind": "method"
+  },
+  {
+    "label": "contract",
+    "detail": "contract(factor)",
+    "info": "Divide the step count; see expand.",
     "kind": "method"
   },
   {
@@ -468,6 +486,12 @@
     "kind": "method"
   },
   {
+    "label": "expand",
+    "detail": "expand(factor)",
+    "info": "Multiply the step count without moving events. Audible only once pace reads it back.",
+    "kind": "method"
+  },
+  {
     "label": "fast",
     "detail": "fast(n)",
     "info": "Time / sequencing",
@@ -675,6 +699,12 @@
     "label": "hresonance",
     "detail": "hresonance(q)",
     "info": "High-pass filter",
+    "kind": "method"
+  },
+  {
+    "label": "hurry",
+    "detail": "hurry(n)",
+    "info": "fast(n) plus a matching sample-speed change.",
     "kind": "method"
   },
   {
@@ -906,6 +936,12 @@
     "kind": "method"
   },
   {
+    "label": "pace",
+    "detail": "pace(steps)",
+    "info": "Refit the pattern to that many steps per cycle. Identity when the pattern carries no step count.",
+    "kind": "method"
+  },
+  {
     "label": "palindrome",
     "detail": "palindrome",
     "info": "Time / sequencing",
@@ -951,6 +987,42 @@
     "label": "penv",
     "detail": "penv(amount)",
     "info": "Pitch envelope",
+    "kind": "method"
+  },
+  {
+    "label": "ph",
+    "detail": "ph",
+    "info": "Sweep a notch through the signal. Rate alone engages it with a default depth.",
+    "kind": "method"
+  },
+  {
+    "label": "phasdp",
+    "detail": "phasdp",
+    "info": "How far the notch travels.",
+    "kind": "method"
+  },
+  {
+    "label": "phaser",
+    "detail": "phaser(hz)",
+    "info": "Sweep a notch through the signal. Rate alone engages it with a default depth.",
+    "kind": "method"
+  },
+  {
+    "label": "phaserdepth",
+    "detail": "phaserdepth(v)",
+    "info": "How far the notch travels.",
+    "kind": "method"
+  },
+  {
+    "label": "phaserrate",
+    "detail": "phaserrate",
+    "info": "Sweep a notch through the signal. Rate alone engages it with a default depth.",
+    "kind": "method"
+  },
+  {
+    "label": "phd",
+    "detail": "phd",
+    "info": "How far the notch travels.",
     "kind": "method"
   },
   {
@@ -1056,6 +1128,18 @@
     "kind": "method"
   },
   {
+    "label": "press",
+    "detail": "press",
+    "info": "Push every event into the second half of its own span.",
+    "kind": "method"
+  },
+  {
+    "label": "pressBy",
+    "detail": "pressBy(r)",
+    "info": "Shift each event r of the way into its span (r may be a pattern). 0 is identity; outside 0–1 is silence.",
+    "kind": "method"
+  },
+  {
     "label": "psus",
     "detail": "psus",
     "info": "Pitch envelope",
@@ -1078,6 +1162,48 @@
     "detail": "pure(value)",
     "info": "One event per cycle holding value.",
     "kind": "function"
+  },
+  {
+    "label": "pw",
+    "detail": "pw",
+    "info": "Pulse width 0–1. Setting it on a plain sine / tri / saw / square voice promotes it to a pulse oscillator. Colon form pw(\"0.3:2:0.4\") sets width, rate and depth at once.",
+    "kind": "method"
+  },
+  {
+    "label": "pwmdepth",
+    "detail": "pwmdepth(v)",
+    "info": "Depth of the pulse-width LFO.",
+    "kind": "method"
+  },
+  {
+    "label": "pwmrate",
+    "detail": "pwmrate(hz)",
+    "info": "Rate of the pulse-width LFO.",
+    "kind": "method"
+  },
+  {
+    "label": "pwr",
+    "detail": "pwr",
+    "info": "Rate of the pulse-width LFO.",
+    "kind": "method"
+  },
+  {
+    "label": "pwrate",
+    "detail": "pwrate",
+    "info": "Rate of the pulse-width LFO.",
+    "kind": "method"
+  },
+  {
+    "label": "pws",
+    "detail": "pws",
+    "info": "Depth of the pulse-width LFO.",
+    "kind": "method"
+  },
+  {
+    "label": "pwsweep",
+    "detail": "pwsweep",
+    "info": "Depth of the pulse-width LFO.",
+    "kind": "method"
   },
   {
     "label": "q",
@@ -1149,6 +1275,18 @@
     "label": "rev",
     "detail": "rev",
     "info": "Time / sequencing",
+    "kind": "method"
+  },
+  {
+    "label": "rib",
+    "detail": "rib",
+    "info": "Loop the window of that many cycles starting at offset, for as long as the pattern plays. Fractional lengths work.",
+    "kind": "method"
+  },
+  {
+    "label": "ribbon",
+    "detail": "ribbon(offset, cycles)",
+    "info": "Loop the window of that many cycles starting at offset, for as long as the pattern plays. Fractional lengths work.",
     "kind": "method"
   },
   {
@@ -1582,6 +1720,12 @@
     "detail": "white",
     "info": "White noise",
     "kind": "sound"
+  },
+  {
+    "label": "width",
+    "detail": "width(v)",
+    "info": "Pulse width 0–1. Setting it on a plain sine / tri / saw / square voice promotes it to a pulse oscillator. Colon form pw(\"0.3:2:0.4\") sets width, rate and depth at once.",
+    "kind": "method"
   },
   {
     "label": "within",

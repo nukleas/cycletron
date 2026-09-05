@@ -50,6 +50,16 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 sha2 = "0.11"
 open = "5"
+# OSC encoding for the UDP output stream (see src/osc.rs).
+rosc = "0.11"
+# Ableton Link tempo/phase sync (see src/link.rs). GPLv2+, which AGPLv3 §13
+# permits combining with, so no commercial Ableton licence is needed. Unlike
+# the deps above this one builds Ableton's C++ Link via cmake + bindgen, so
+# the macOS-universal / AppImage / NSIS jobs need cmake and libclang present.
+rusty_link = "0.4"
+# Free-space query for the recording sink. Pure Rust — no new -sys crate, so
+# the macOS-universal / AppImage / NSIS jobs are unaffected.
+fs4 = "0.13"
 
 # For proper production SAB support:
 # We embed the frontend and serve it over real http://127.0.0.1 so WebKit
@@ -64,6 +74,8 @@ hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
 # keys, the GNOME/KDE now-playing popovers, waybar, Omarchy's media widget.
 [target.'cfg(target_os = "linux")'.dependencies]
 mpris-server = { version = "0.10", features = ["tokio"] }
+[dev-dependencies]
+tempfile = "3"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -30,6 +30,7 @@
     "query-profiler.ts",
     "soundfont-tables.ts",
     "worklet.ts",
+    "wav-tap-worklet.ts",
     "worklet-types.d.ts",
     "pkg/*.d.ts",
     "global.d.ts"

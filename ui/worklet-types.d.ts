@@ -10,6 +10,17 @@ interface AudioWorkletRegistry {
             rngSeed: number;
         };
     };
+    /** Lossless capture tap: copies its input into a shared ring buffer. */
+    'wav-tap': {
+        in: never;
+        out: never;
+        options: {
+            /** Control header (4x Int32) followed by interleaved Float32 frames. */
+            ring: SharedArrayBuffer;
+            /** Ring capacity in frames. */
+            capacity: number;
+        };
+    };
 }
 
 /**

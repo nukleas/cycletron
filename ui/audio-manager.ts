@@ -113,8 +113,23 @@ export class StrudelAudioManager {
     private audioContext: AudioContext | null = null;
     private workletNode: TypedAudioWorkletNode<'strudel-processor'> | null = null;
     private analyserNode: AnalyserNode | null = null;
-    private gainNode: GainNode | null = null;
     private processor: MainThreadProcessor | null = null;
+
+    // --- Master bus ---------------------------------------------------------
+    // Everything the audience hears sums pre-tap; personal cues join post-tap.
+    //
+    //   worklet ─┐
+    //   midi mon ┼→ performanceBus → captureTap → analyser → monitorVolume → out
+    //            │                                              ↑
+    //   metronome└────────────── cueBus ─────────────────────────┘
+    //
+    // The split exists so monitoring level cannot leak into a capture: the
+    // volume slider drives monitorVolume, which sits *after* captureTap, so a
+    // recording is always at unity no matter how loud you are listening.
+    private performanceBus: GainNode | null = null;
+    private captureTap: GainNode | null = null;
+    private monitorVolume: GainNode | null = null;
+    private cueBus: GainNode | null = null;
 
     // --- Analyser stall watchdog -------------------------------------------
     // An output-device change (OBS / BlackHole capture, Bluetooth connect,
@@ -347,10 +362,22 @@ export class StrudelAudioManager {
         this.analyserNode.fftSize = 1024;
         this.analyserNode.smoothingTimeConstant = 0.8;
 
-        this.gainNode = this.audioContext.createGain();
-        this.gainNode.gain.setValueAtTime(1, this.audioContext.currentTime);
-        this.gainNode.connect(this.analyserNode);
-        this.analyserNode.connect(this.audioContext.destination);
+        this.performanceBus = this.audioContext.createGain();
+        this.captureTap = this.audioContext.createGain();
+        this.monitorVolume = this.audioContext.createGain();
+        this.cueBus = this.audioContext.createGain();
+
+        const now = this.audioContext.currentTime;
+        this.performanceBus.gain.setValueAtTime(1, now);
+        this.captureTap.gain.setValueAtTime(1, now);
+        this.cueBus.gain.setValueAtTime(1, now);
+        this.monitorVolume.gain.setValueAtTime(1, now);
+
+        this.performanceBus.connect(this.captureTap);
+        this.captureTap.connect(this.analyserNode);
+        this.analyserNode.connect(this.monitorVolume);
+        this.cueBus.connect(this.monitorVolume);
+        this.monitorVolume.connect(this.audioContext.destination);
 
         setPhase('worklet-module');
         await this.audioContext.audioWorklet.addModule(workletUrl);
@@ -374,7 +401,12 @@ export class StrudelAudioManager {
             console.error('[Worklet] crashed:', err);
             this.onCrash?.(err);
         };
-        this.workletNode.connect(this.gainNode);
+        this.workletNode.connect(this.performanceBus);
+
+        // Pin the DSP's own master gain at unity and leave it there. Monitoring
+        // level lives in the JS graph (see monitorVolume) precisely so it can't
+        // reach a capture; setting it here as well would put it back.
+        this.processor.setMasterGain(1.0);
 
         setPhase('worklet-handshake');
         await new Promise<void>((resolve, reject) => {
@@ -450,10 +482,15 @@ export class StrudelAudioManager {
     }
 
     /**
-     * Signal the worklet to update the master gain on the next render block.
+     * Set the monitoring level — what you hear, not what gets recorded.
+     *
+     * Sits after the capture tap by design. Ramped rather than stepped because
+     * a slider drag would otherwise produce a stairstep of zipper noise.
      */
-    sendMasterGain(gain: number): void {
-        this.processor?.setMasterGain(gain);
+    setMonitorGain(gain: number): void {
+        const ctx = this.audioContext;
+        if (!ctx || !this.monitorVolume) return;
+        this.monitorVolume.gain.setTargetAtTime(gain, ctx.currentTime, 0.01);
     }
 
     /**
@@ -603,8 +640,22 @@ export class StrudelAudioManager {
         return this.processor;
     }
 
-    getOutputNode(): GainNode | null {
-        return this.gainNode;
+    /**
+     * The node a recorder should tap: the full performance mix, at unity,
+     * before monitoring level and before any cue signal.
+     */
+    getCaptureTap(): GainNode | null {
+        return this.captureTap;
+    }
+
+    /** Sum point for anything the audience should hear (and a capture record). */
+    getPerformanceBus(): GainNode | null {
+        return this.performanceBus;
+    }
+
+    /** Sum point for personal cues — audible, deliberately never captured. */
+    getCueBus(): GainNode | null {
+        return this.cueBus;
     }
 
     getAnalyser(): AnalyserNode | null {
@@ -692,7 +743,7 @@ export class StrudelAudioManager {
     };
 
     /**
-     * Re-pull a stalled analyser. Sound flows gain → analyser → destination,
+     * Re-pull a stalled analyser. Sound flows captureTap → analyser → monitor,
      * so the node is clearly being pulled (you still hear audio) yet its
      * analysis buffer is stuck — a known WebKit post-device-reset state.
      * Toggling the input edge forces the node to re-initialise. The
@@ -701,9 +752,9 @@ export class StrudelAudioManager {
      */
     private _recoverAnalyser(): void {
         const ctx = this.audioContext;
-        const gain = this.gainNode;
+        const tap = this.captureTap;
         const an = this.analyserNode;
-        if (!ctx || !gain || !an) return;
+        if (!ctx || !tap || !an) return;
 
         console.warn(
             `[AudioManager] analyser stalled (all-zero); re-pulling graph ` +
@@ -715,11 +766,13 @@ export class StrudelAudioManager {
         if (ctx.state !== 'running') void ctx.resume();
 
         try {
-            gain.disconnect(an);
+            // Disconnect only this edge, never the analyser's outputs — a live
+            // recorder tap hangs off the same node.
+            tap.disconnect(an);
         } catch {
             // Edge may already be gone (teardown race) — reconnect re-establishes it.
         }
-        gain.connect(an);
+        tap.connect(an);
     }
 
     async dispose(): Promise<void> {
@@ -746,10 +799,16 @@ export class StrudelAudioManager {
             }
         }
 
-        if (this.gainNode) {
-            this.gainNode.disconnect();
-            this.gainNode = null;
+        for (const node of [
+            this.performanceBus, this.captureTap, this.cueBus, this.monitorVolume,
+        ]) {
+            node?.disconnect();
         }
+        this.performanceBus = null;
+        this.captureTap = null;
+        this.cueBus = null;
+        this.monitorVolume = null;
+
         if (this.analyserNode) {
             this.analyserNode.disconnect();
             this.analyserNode = null;
