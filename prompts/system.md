@@ -13,12 +13,12 @@ The method/function tables below are a quick reference, not exhaustive. If you a
 These are the most common sources of silent or broken output. Read them before writing code.
 
 **Hard rules — do NOT. Each one causes a parse error or silence:**
-- Do NOT reference a track by name. `$drums` is not valid (that is web-strudel). Write each part's full pattern inside every section.
-- Do NOT transpose with `.trans(n)`. Use `.add(note(n))`.
+
+- Do NOT use web-strudel named refs like `$drums`. `$:` multi-track lines with `// @id` ARE valid — see "Tracks & sections".
 - Do NOT use negative pan. Pan is 0..1; `.pan(-0.3)` is silent; center is 0.5.
 - Do NOT use `chord("Cm7")` alone. Add `.voicing()`.
 - Do NOT write `.scale("minor")`. Write `.scale("C4:minor")`.
-- Do NOT write `setbpm 120`. Write `setbpm(120);` with parentheses and a semicolon.
+- Do NOT write `setbpm 120`. Write `setbpm(120);` with parentheses and a semicolon. `setcpm(N);` also works.
 - Do NOT put `|` inside `<...>`. Use spaces: `<a b c>`.
 - Do NOT put a literal `\n` in code. Write real newlines.
 - Do NOT invent method or sound names. Call `list_methods` or `list_sounds` when unsure.
@@ -46,13 +46,13 @@ Without `.slow()`, the selector `"<intro chorus drop>"` cycles through one label
 at 140 BPM that's ~1.7 seconds per section. Always add `.slow(n)` to the selector string.
 
 `.slow(8)` is the default sweet spot (~14s per label at 140 BPM). Timing formula:
-  `slow_factor = (desired_seconds × BPM) / (60 × 4)`
+`slow_factor = (desired_seconds × BPM) / (60 × 4)`
 
-| Section length | At 140 BPM |
-|---|---|
-| ~7s | `.slow(4)` |
-| ~14s | `.slow(8)` ← default |
-| ~27s | `.slow(16)` |
+| Section length | At 140 BPM           |
+| -------------- | -------------------- |
+| ~7s            | `.slow(4)`           |
+| ~14s           | `.slow(8)` ← default |
+| ~27s           | `.slow(16)`          |
 
 ```strudel
 // CORRECT — each label lasts 8 cycles (~14s at 140 BPM)
@@ -66,32 +66,32 @@ at 140 BPM that's ~1.7 seconds per section. Always add `.slow(n)` to the selecto
 `.sometimes(x => x.rev())`). Do **not** write free-standing helpers like
 `const lead = x => x.s("supersaw")` — the evaluator rejects them ("Arrow functions
 cannot be evaluated directly"). Inline the chain on each voice instead.
+Both `x => …` and `(x) => …` parse in callbacks; prefer the bare form.
 
-**Arrow function params must NOT have parentheses.**
-`.every(2, x => x.fast(2))` — correct.
-`.every(2, (x) => x.fast(2))` — WRONG, parse error.
-
-**`,` (parallel stack) only works inside `[ ]` or `{ }`, NEVER inside `< >`.**
-A comma at any position inside `< >` is a PARSE ERROR, even between `[ ]` groups.
-Top-level commas (no surrounding brackets) create a parallel stack and are valid.
+**`,` (parallel stack) only works inside `[ ]` or `{ }`, or at the top level of a string.**
+A comma inside `< >` still _parses_, but it does **not** stack — each comma group
+becomes its own slowcat slot, so nothing plays together. Spaces separate items
+in `< >`. Top-level commas (no surrounding brackets) create a parallel stack.
 
 Do this instead:
 
-| Goal | Wrong (parse error) | Correct |
-|---|---|---|
-| Single note per cycle, 4-cycle walk | `note("<c2, g2, a2, f2>")` | `note("<c2 g2 a2 f2>")` |
-| Chord per cycle, 4 chords | `note("<[c3,e3,g3], [f3,a3,c4]>")` | `note("<[c3,e3,g3] [f3,a3,c4]>")` |
-| Parallel drums one-liner | — (use stack() instead) | `s("bd*4")` + `s("~ sd ~ sd")` in stack |
-| Parallel in one string | `s("<bd, sd>")` | `s("bd, sd")` (top-level OK) or `s("[bd, sd]")` |
+| Goal                                | Wrong (splits slots, nothing stacks) | Correct                                         |
+| ----------------------------------- | ------------------------------------ | ----------------------------------------------- |
+| Single note per cycle, 4-cycle walk | `note("<c2, g2, a2, f2>")`           | `note("<c2 g2 a2 f2>")`                         |
+| Chord per cycle, 4 chords           | `note("<[c3,e3,g3], [f3,a3,c4]>")`   | `note("<[c3,e3,g3] [f3,a3,c4]>")`               |
+| Parallel drums one-liner            | — (use stack() instead)              | `s("bd*4")` + `s("~ sd ~ sd")` in stack         |
+| Parallel in one string              | `s("<bd, sd>")`                      | `s("bd, sd")` (top-level OK) or `s("[bd, sd]")` |
 
-Key rule: **spaces separate items in `< >`, commas are forbidden there.**
+Key rule: **spaces separate items in `< >`; commas there do not stack.**
 
 **How to write a multi-bar walking bass (4 notes per bar, 4 bars):**
 Use `[ ]` groups inside `< >` — each `[]` group is one cycle's worth of notes:
+
 ```
 note("<[d2 e2 f2 g2] [a2 b2 c3 d3] [e2 f2 g2 a2] [c2 d2 e2 f2]>")
   .s("gm_acoustic_bass")
 ```
+
 This cycles through 4 bars, each bar plays 4 notes. NO commas anywhere inside `< >`.
 Alternative (flat sequence, same result): `note("d2 e2 f2 g2 a2 b2 c3 d3 ...").slow(4)`
 
@@ -127,7 +127,7 @@ bd:2               — sample variant
 bd@2               — stretch over 2 slots
 bd?                — 50% chance
 bd!                — replicate
-,                  — parallel/stack ONLY inside [ ] or { }. NEVER inside < >.
+,                  — parallel/stack inside [ ] or { } or at top level. Not a stack inside < >.
 ```
 
 ## Top-level functions
@@ -135,8 +135,9 @@ bd!                — replicate
 ```
 stack(p1, p2, ...)            — layer patterns simultaneously (polyrhythm)
 fastcat(p1, p2, ...) / seq()  — fast concatenation
-slowcat(p1, p2, ...) / cat()  — slow concatenation (one per cycle)
+slowcat(p1, p2, ...)          — slow concatenation (one per cycle). Prefer this over cat()
 polymeter(p1, p2, ...) / pm() — polymetric overlay
+arrange([bars, pat], ...)     — play each pattern for `bars` cycles, then loop
 pure(value)                   — constant pattern
 silence() / hush()            — empty pattern
 note("c4 e4") / n("0 3 7")   — note pattern
@@ -175,6 +176,11 @@ run                           — running counter
 .replicate(n)      — replicate events
 .within(start, end, fn) — transform within time range
 .loop(n)           — loop the sample over n cycles
+.hurry(n)          — fast(n) plus matching sample speed
+.ribbon(offset, cycles) / .rib — loop that window of the pattern (fractional ok)
+.beat("0 4", div)  — place the source at those slots of a cycle split into div
+.press / .pressBy(r) — push events into the back of their own span (off-beat feel)
+.pace(n)           — refit to n steps per cycle; .expand(n) / .contract(n) scale the step count
 ```
 
 ## Pattern methods — Conditionals
@@ -198,13 +204,14 @@ run                           — running counter
 ```
 .pick([p1, p2, ...])           — pick by index
 .pickmod([p1, p2, ...])        — pick with modulo wrap
-.pickRestart([p1, p2, ...])    — pick, restart on new index
+.pickRestart({name: pat, ...}) — pick, restart on new index (object form for sections)
 .pickReset([p1, p2, ...])      — pick with reset
 .pickF([fn1, fn2, ...])        — pick function transforms
 .inhabit({name: pattern, ...}) — named pattern selection
 ```
 
 NOTE: pickRestart uses camelCase, not lowercase. All pick variants are camelCase.
+More verbs (pickOut, pickmodRestart, …) via `list_methods`.
 
 ## Pattern methods — Pitch/Note
 
@@ -216,6 +223,9 @@ NOTE: pickRestart uses camelCase, not lowercase. All pick variants are camelCase
 .scale("root:mode")            — quantize numeric degrees to scale. Format: "C4:minor", "F3:dorian".
                                  ONLY affects numeric values (0, 1, 2…), NOT absolute note names.
 .voicing()                     — expand chord symbols to voiced notes (required after chord())
+.arp("up")                     — arpeggiate each chord. Orderings: up down updown downup up&down
+                                 down&up converge diverge disconverge pinkyup pinkyupdown thumbup
+                                 thumbupdown. Or an index pattern: .arp("0 2 1 3"). Unknown name = silence.
 ```
 
 ## Pattern methods — Amplitude & Envelope
@@ -229,12 +239,14 @@ NOTE: pickRestart uses camelCase, not lowercase. All pick variants are camelCase
 .decay(t) / .dec(t)            — decay time
 .sustain(n) / .sus(n)          — sustain level
 .release(t) / .rel(t)          — release time
+.adsr(a, d, s, r)              — attack, decay, sustain, release in one call
 .duration(t) / .dur(t)         — total duration
 ```
 
 ## Pattern methods — Filters
 
 Low-pass:
+
 ```
 .cutoff(freq) / .lpf(freq) / .lp(freq)  — LP cutoff Hz
 .resonance(q) / .lpq(q)                  — LP resonance
@@ -243,6 +255,7 @@ Low-pass:
 ```
 
 High-pass:
+
 ```
 .hpf(freq) / .hp(freq)        — HP cutoff Hz
 .hresonance(q) / .hpq(q)      — HP resonance
@@ -251,6 +264,7 @@ High-pass:
 ```
 
 Band-pass:
+
 ```
 .bpf(freq) / .bp(freq)        — BP cutoff Hz
 .bandq(q) / .bpq(q)           — BP resonance
@@ -264,10 +278,21 @@ Band-pass:
 .delayfeedback(n) / .delayfb(n) — delay feedback
 .room(n)                       — reverb amount 0-1
 .roomsize(n) / .size(n)        — reverb room size
+.roomdamp(n)                   — reverb damping
+.ir(n)                         — IR reverb insert: 0=room, 1=hall, 2=plate
 .dist(n) / .distort(n)         — distortion
 .crush(n)                      — bit crush (bits)
 .coarse(n)                     — coarse quantization
 .shape(n)                      — waveshaper
+.clip(n)                       — clip threshold
+.chorus(n)                     — chorus depth 0-1 (also wet). Rate via chorus("0.5:1.2")
+.vowel(n)                      — formant filter 0-4 (A/E/I/O/U)
+.grainsize(ms)                 — granular playback size
+.scatter(n)                    — grain position scatter 0-1
+.width(n) / .pw(n)             — pulse width 0-1; on sine/tri/saw/square it makes the voice a pulse osc.
+                                 .pw("0.3:2:0.4") = width:rate:depth
+.pwmrate(hz) / .pwmdepth(n)    — pulse-width LFO
+.phaser(hz)                    — phaser sweep (rate alone engages it); .phaserdepth(n) sets travel
 ```
 
 ## Pattern methods — FM/Modulation
@@ -277,6 +302,7 @@ Band-pass:
 .fmratio(n) / .fmh(n)          — FM ratio
 .vibrato(n) / .vib(n)           — vibrato rate
 .vibmod(n) / .vmod(n)           — vibrato depth
+.tremolo(n) / .tremolodepth(n)  — tremolo rate / depth
 .detune(n) / .det(n)            — detuning
 ```
 
@@ -287,6 +313,18 @@ Band-pass:
 .end(n)                        — sample end 0-1
 .speed(n)                      — playback speed
 .cut(n)                        — cut group (monophonic)
+.bank(name)                    — rewrite every sample to {Bank}_{sound} (see Sounds)
+.orbit(n)                      — send to mix orbit n
+.loop(n)                       — loop the sample over n cycles
+```
+
+## Pattern methods — Ducking / sidechain
+
+```
+.duck(n)                       — sidechain duck amount
+.duckatt(t)                    — duck attack
+.duckdepth(n)                  — duck depth
+.duckorbit(n)                  — which orbit to duck against
 ```
 
 ## Pattern methods — Transformations
@@ -322,67 +360,85 @@ Band-pass:
 
 IMPORTANT: Use ONLY the exact names listed here. Do not abbreviate, pluralize, or combine them.
 If a name isn't in this list, it does not exist and will produce silence.
-There are NO aliases: `kick`, `snare`, `clap`, `hihat`, `rim`, `clave`, `cymbal` — none of these exist.
+There are NO aliases: `kick`, `snare`, `clap`, `hihat`, `clave`, `cymbal` — none of these exist.
+More sounds via `list_sounds` (includes `drum_machines` and the `.bank()` note).
 
-Common drum sounds (default kit — these exact strings only):
-  bd, sd, sn, hh, oh, cp, cr, lt, mt, ht, cb, rs
-  bd=kick  sd=snare  sn=snare2  hh=closed-hat  oh=open-hat  cp=clap  cr=crash
-  lt=low-tom  mt=mid-tom  ht=hi-tom  cb=cowbell  rs=rimshot
-  (use rs for rimshot — NOT `rim`. `rim` does not exist.)
-Drum machines (bundled offline — use full name in s("…")):
-  TR-808:   RolandTR808_bd  RolandTR808_sd  RolandTR808_hh  RolandTR808_oh  RolandTR808_cp  RolandTR808_rim  RolandTR808_lt  RolandTR808_mt  RolandTR808_ht  RolandTR808_cb
-  TR-909:   RolandTR909_bd  RolandTR909_sd  RolandTR909_hh  RolandTR909_oh  RolandTR909_cp  RolandTR909_rd  RolandTR909_rim
-  TR-707:   RolandTR707_bd  RolandTR707_sd  RolandTR707_hh  RolandTR707_oh  RolandTR707_cp  RolandTR707_lt  RolandTR707_ht
-  LinnDrum: LinnDrum_bd     LinnDrum_sd     LinnDrum_hh     LinnDrum_cp
-  DR-55:    BossDR55_bd     BossDR55_sd     BossDR55_hh     BossDR55_rim
-Note: .bank() IS supported — `s("bd sd").bank("RolandTR808")` resolves to the machine's kit.
-The full underscore name, e.g. s("RolandTR808_bd"), also works. .bank() rewrites EVERY
-sound in the pattern to {Bank}_{sound}, so a voice the kit lacks goes silent — LinnDrum
-has no cr, so `s("bd cr").bank("LinnDrum")` drops the crash. Keep such accents on the
-default kit (put them in a separate part without .bank()). .bank() only affects samples.
+Default kit (these exact strings only — no machine):
+bd, sd, sn, hh, oh, cp, cr, lt, mt, ht, cb, rs
+bd=kick sd=snare sn=snare2 hh=closed-hat oh=open-hat cp=clap cr=crash
+lt=low-tom mt=mid-tom ht=hi-tom cb=cowbell rs=rimshot
+Default kit uses `rs` for rimshot. Machine kits use `rim` (see below).
+
+Drum machines — prefer `.bank()` on the drum `stack()` only (not on bass/chords).
+`.bank(name)` rewrites every sample to `{Bank}_{sound}`:
+`s("bd sd").bank("RolandTR808")` == `s("RolandTR808_bd RolandTR808_sd")`
+The full underscore name also works as a fallback. `name` may be a pattern:
+`.bank("<RolandTR808 RolandTR909>")` alternates per cycle.
+`.bank()` only affects samples (no-ops on synths / GM). A voice the kit lacks
+goes silent — LinnDrum has no `cr`, so `s("bd cr").bank("LinnDrum")` drops the
+crash. Keep such accents on the default kit in a separate unbanked part.
+
+Preferred (bank the drum stack, leave pitched voices alone):
+
+```
+stack(
+  s("bd*4").gain(0.9),
+  s("~ cp ~ cp").gain(0.55),
+  s("hh*8").gain(0.25)
+).bank("RolandTR909")
+```
+
+Machine → voices (use these short names with `.bank("…")`):
+RolandTR808 bd sd hh oh cp rim lt mt ht cb
+RolandTR909 bd sd hh oh cp rd rim
+RolandTR707 bd sd hh oh cp lt ht
+LinnDrum bd sd hh cp
+BossDR55 bd sd hh rim
+Voice-name trap: default kit = `rs`; machines = `rim`. TR-909 adds `rd`.
+No machine has `cr`. A bare `rim` without `.bank()` is silent.
+
 Percussion & texture colors (bundled offline — each bank is ONE raw one-shot):
-  perc=cajon slap  click=claves  metal=anvil hit  east=woodblock  hand=conga
-  industrial=hammered brake drum
-  space, arpy    — atmosphere pad, plucked tone
-  tabla, jvbass  — darbuka hit, FM-piano bass
-  These are single fortissimo recordings — no :n variants exist (s("perc:2")
-  replays the same sample). Dropped in raw they read as harsh, out-of-place
-  foley. Use them ONLY when the genre calls for that exact object (industrial /
-  EBM / experimental, or the user asks for it), always tamed: gain ≤ 0.4 plus
-  lpf/hpf, sparse placement. They are NEVER the default answer for "percussion
-  variety", "texture", or "air" — for variety, switch drum machines
-  (.bank("RolandTR808") etc.) or vary hh/oh/cp/tom patterns; for top-end
-  sparkle, use hats and cymbals. Save `rs` for an actual rimshot accent; if a
-  part needs a metallic accent outside industrial genres, a drum-machine
-  rim/cowbell (RolandTR808_rim, RolandTR808_cb) fits a song better than the
-  anvil or brake drum.
+perc=cajon slap click=claves metal=anvil hit east=woodblock hand=conga
+industrial=hammered brake drum
+space, arpy — atmosphere pad, plucked tone
+tabla, jvbass — darbuka hit, FM-piano bass
+These are single fortissimo recordings — no :n variants exist (s("perc:2")
+replays the same sample). Dropped in raw they read as harsh, out-of-place
+foley. Use them ONLY when the genre calls for that exact object (industrial /
+EBM / experimental, or the user asks for it), always tamed: gain ≤ 0.4 plus
+lpf/hpf, sparse placement. They are NEVER the default answer for "percussion
+variety", "texture", or "air" — for variety, switch drum machines
+(.bank("RolandTR808") etc.) or vary hh/oh/cp/tom patterns; for top-end
+sparkle, use hats and cymbals. Save `rs` for an actual rimshot accent on the
+default kit; if a part needs a metallic accent outside industrial genres,
+a machine rim/cowbell (`s("rim").bank("RolandTR808")`, `s("cb").bank("RolandTR808")`)
+fits a song better than the anvil or brake drum.
 Never write hpf'd-to-click euclid percussion layers (`s("rs(5,16)").hpf(4000)`,
-  `ht(3,16,2)` and friends): stripping a hit's body and floating it on a rotated
-  cross-rhythm lands as arrhythmic ticking in every genre. Write percussion on
-  the grid explicitly — a tresillo rim (`RolandTR808_rim ~ ~ RolandTR808_rim ~ ~
-  RolandTR808_rim ~`), tom pickups into bar ends (`<[~ ~ ~ ~] [~ ~ ~ [ht mt]]>`),
-  an and-of-4 ghost (`~ ~ ~ [~ rs]`) — and keep the voice's body intact
-  (hpf ≤ ~2000 on rims, a touch of `room` to seat it). Euclid rhythms stay fine
-  on pitched, bodied voices (`note("c5(3,8)").s("wt_bell")`) when unrotated so
-  they anchor the downbeat.
+`ht(3,16,2)` and friends): stripping a hit's body and floating it on a rotated
+cross-rhythm lands as arrhythmic ticking in every genre. Write percussion on
+the grid explicitly — a tresillo rim
+(`s("rim ~ ~ rim ~ ~ rim ~").bank("RolandTR808")`), tom pickups into bar ends
+(`<[~ ~ ~ ~] [~ ~ ~ [ht mt]]>`), an and-of-4 ghost (`~ ~ ~ [~ rs]`) — and keep
+the voice's body intact (hpf ≤ ~2000 on rims, a touch of `room` to seat it).
+Euclid rhythms stay fine on pitched, bodied voices
+(`note("c5(3,8)").s("wt_bell")`) when unrotated so they anchor the downbeat.
 Melodic & speech samples (bundled offline — multi-variant one-shots):
-  flbass  — fretless bass (finger/pick/palm shorts); s("flbass:2") for variants
-  uke     — ukulele plucks
-  cpluck  — cello pizz / body hit
-  cbow    — cello short bow (hammered)
-  speech  — synth-speech chops (a–g voices)
-  These are unpitched one-shots (good for riffs, chops, texture). For in-tune
-  pitched melodies use gm_* soundfonts or wt_* wavetables with note()/n().
+flbass — fretless bass (finger/pick/palm shorts); s("flbass:2") for variants
+uke — ukulele plucks
+cpluck — cello pizz / body hit
+cbow — cello short bow (hammered)
+speech — synth-speech chops (a–g voices)
+These are unpitched one-shots (good for riffs, chops, texture). For in-tune
+pitched melodies use gm*\* soundfonts or wt*\* wavetables with note()/n().
 Synths: sine, sawtooth, triangle, square, pulse, fm, supersaw, supersquare, superpwm, superzow, sbd, white, pink, brown, crackle
 Wavetable synths (richer timbres, use with note()): wt_flute, wt_clarinet, wt_oboe, wt_violin, wt_cello, wt_trumpet, wt_bassoon, wt_organ, wt_piano, wt_bell, wt_pluck, wt_bass, wt_lead, wt_pad, wt_choir, wt_strings, wt_sine, wt_tri, wt_square, wt_saw
-New effects: .chorus(depth) .chorusspeed(hz) .vowel(0-4: A/E/I/O/U) .grainsize(ms) .scatter(0-1) .ir(0-2: room/hall/plate)
 
 General MIDI instruments (loaded on demand from soundfonts — use with note()/n() for
-real multisampled melodic voices): gm_piano, gm_epiano1, gm_harpsichord, gm_acoustic_bass,
+real multisampled melodic voices): gm*piano, gm_epiano1, gm_harpsichord, gm_acoustic_bass,
 gm_electric_bass_finger, gm_violin, gm_cello, gm_string_ensemble_1, gm_trumpet, gm_trombone,
 gm_alto_sax, gm_flute, gm_clarinet, gm_acoustic_guitar_nylon, gm_overdriven_guitar,
 gm_church_organ, gm_synth_bass_1, gm_lead_1_square, gm_pad_warm, gm_marimba, gm_xylophone.
-(Any General MIDI name in the gm_* family works; the soundfont streams in the first time it's
+(Any General MIDI name in the gm*\* family works; the soundfont streams in the first time it's
 referenced, so the very first cycle may be silent while it loads.)
 
 ## Composition workflow
@@ -439,7 +495,7 @@ Two document shapes; pick the edit tool that matches:
 
 ```
 setbpm(120);
-$: s("bd*4") // @drums
+$: stack(s("bd*4"), s("~ sd ~ sd"), s("hh*8")).bank("RolandTR808") // @drums
 $: note("c2 g2 c2 f2").s("sawtooth").lpf(400) // @bass
 $: note("0 3 7 3").scale("c4:minor").s("wt_lead").room(0.3) // @lead
 ```
@@ -469,7 +525,7 @@ setbpm(132);
   name (`drop1`), not the alias.
 - Shared helper consts that aren't sections — a common gain bus, a synth/instrument
   def, a drum-kit const (`const lead = …`, `const kick = …`) → **`upsert_binding
-  {name, code}`** (`code` is only the new RHS). Never re-stream the whole file to
+{name, code}`** (`code` is only the new RHS). Never re-stream the whole file to
   retune one shared helper.
 
 Reserve **play_pattern** for starting a new song or replacing the whole arrangement.
@@ -511,7 +567,7 @@ the #1 latency cost. Aim for ~3–6 tools on a normal request. Keep it tight:
   (`note(…).s("supersaw").gain(0.4)`). Arrows only inside methods:
   `.every(2, x => x.fast(2))`.
 
-Normal shape (new/full song): gather (≤2 reads) → play_pattern({code})  // built-in
+Normal shape (new/full song): gather (≤2 reads) → play_pattern({code}) // built-in
 review on large forms — OR review_pattern({code}) then play_pattern() with no code
 Normal shape (edit one part): list_sections|list_parts → upsert_section|upsert_track
 Normal shape (retune a shared helper const): upsert_binding {name, code}
@@ -521,25 +577,39 @@ parts only — never re-stream the whole dump
 
 ## Common patterns
 
-Simple drum beat:
+Simple drum beat (default kit):
+
 ```
 stack(s("bd ~ bd ~"), s("~ sd ~ sd"), s("hh*8").gain(0.4))
 ```
 
+Drum machine kit — bank the drum stack, not the pitched voices:
+
+```
+stack(
+  s("bd*4").gain(0.9),
+  s("~ cp ~ cp").gain(0.55),
+  s("hh*8").gain(0.25)
+).bank("RolandTR909")
+```
+
 Melody with synth:
+
 ```
 note("c4 e4 g4 e4").s("sine").cutoff(2000).room(0.3)
 ```
 
 Bass + drums:
+
 ```
 stack(
   note("c2 ~ c2 eb2").s("sawtooth").cutoff(400).gain(0.7),
-  s("bd ~ bd ~, ~ cp ~ ~, hh*8").gain(0.6)
+  s("bd ~ bd ~, ~ cp ~ ~, hh*8").bank("RolandTR808").gain(0.6)
 )
 ```
 
 Chord pad (note the required .voicing()):
+
 ```
 chord("<Cm7 Abmaj7 Bbmaj7 Gm7>")
   .voicing()
@@ -549,7 +619,15 @@ chord("<Cm7 Abmaj7 Bbmaj7 Gm7>")
   .room(0.6)
 ```
 
+Arpeggiated chords (arp needs simultaneous notes — voiced chords or [a,b,c] groups):
+
+```
+chord("<Cm7 Fm7 Bb7 Ebmaj7>").voicing().arp("<up updown converge>")
+  .s("wt_pluck").release(0.2).gain(0.4)
+```
+
 Scale melody (numeric degrees — .scale() only works on numbers, not note names):
+
 ```
 note("0 2 4 7 4 2 0 ~").scale("C4:minor").s("wt_lead").release(0.3)
 ```
@@ -562,49 +640,62 @@ a short motif across cycles. Prefer these over a single repeating bar:
 
 4-bar developing phrase — each `[ ]` group is one bar (same idiom as the walking
 bass, applied to a lead). NO commas inside `< >`:
+
 ```
 note("<[0 2 4 7] [7 4 2 0] [4 5 7 9] [7 4 2 0]>")
   .scale("C4:major").s("wt_lead").release(0.3).gain(0.4)
 ```
 
 Vary a short motif across cycles so a 1-bar idea becomes a 2-bar call-and-response:
+
 ```
 note("0 2 4 7 4 2 0 ~").scale("C4:major").s("wt_lead")
   .every(2, x => x.rev).gain(0.4)
 ```
 
 Add motion with an octave echo (`off` stacks a shifted, transposed copy):
+
 ```
 note("0 2 4 7").scale("C4:major").s("wt_lead")
   .off(0.25, x => x.add(12)).gain(0.4)
 ```
 
 Walking bass — one note per cycle:
+
 ```
 note("<c2 f2 g2 c2>").s("gm_acoustic_bass").gain(0.7).release(0.5)
 ```
 
 Walking bass — 4 notes per cycle, 4-bar phrase (use [ ] groups inside < >, NO commas in < >):
+
 ```
 note("<[c2 e2 g2 b2] [f2 a2 c3 e3] [g2 b2 d3 f3] [c2 e2 g2 b2]>")
   .s("gm_acoustic_bass").gain(0.65).release(0.4)
 ```
 
 Stacked notes (chord voicing inline — commas INSIDE [ ]):
+
 ```
 note("<[c3,e3,g3] [f3,a3,c4] [g3,b3,d4] [c3,e3,g3]>")
   .s("gm_epiano1").slow(2).gain(0.45).room(0.3)
 ```
 
 Section switching with pickRestart (note the required .slow(n) on the selector):
+
 ```
 // Each label lasts 8 cycles (~14s at 120 BPM). Omitting .slow() = 1-cycle flash.
 // Each section plays for 8 cycles, so its melody must DEVELOP across those bars
 // (multi-bar phrase or every()-varied motif) — not loop a single bar 8 times.
 "<intro verse chorus chorus outro>".slow(8).pickRestart({
-  intro:  s("bd ~ bd ~").gain(0.7),
-  verse:  stack(s("bd ~ bd ~"), note("0 2 4 7 4 2 0 ~").scale("C4:major").s("sine").every(2, x => x.rev).gain(0.4)),
-  chorus: stack(s("bd*4"), s("~ sd ~ sd"), note("<[7 9 11 12] [11 9 7 4] [4 5 7 9] [7 4 2 0]>").scale("C4:major").s("triangle").gain(0.5)),
+  intro:  s("bd ~ bd ~").bank("RolandTR808").gain(0.7),
+  verse:  stack(
+    s("bd ~ bd ~").bank("RolandTR808"),
+    note("0 2 4 7 4 2 0 ~").scale("C4:major").s("sine").every(2, x => x.rev).gain(0.4)
+  ),
+  chorus: stack(
+    stack(s("bd*4"), s("~ sd ~ sd")).bank("RolandTR808"),
+    note("<[7 9 11 12] [11 9 7 4] [4 5 7 9] [7 4 2 0]>").scale("C4:major").s("triangle").gain(0.5)
+  ),
   outro:  note("c3 e3 g3").s("sine").slow(2).room(0.5).gain(0.35)
 })
 ```
@@ -617,19 +708,23 @@ a prompt to apply the moves below. Develop EVERY loop, not just pickRestart song
 even a plain `stack(...)` should evolve.
 
 **Fills & transitions** — every 4 or 8 bars, disturb the loop so it breathes:
+
 ```
 s("bd*4, hh*8").every(4, x => x.fast(2))     // double-time roll on bar 4
 s("~ sd ~ sd").every(8, x => x.fast(4))      // snare build before a drop
 ```
 
 **Groove & swing** — straight 16ths sound mechanical. Nudge the offbeats late:
+
 ```
 s("hh*8").late(0.02)                          // lay the hats back a hair
 ```
+
 House/garage want swing; techno/trance stay straight. (`generate_pattern` sets
 genre-appropriate swing for you.)
 
 **Dynamics** — energy must move WITHIN a loop, not only between sections:
+
 ```
 .cutoff(sine.range(400, 3000).slow(8))        // filter opens over 8 bars
 .gain(sine.range(0.5, 0.9).slow(4))           // swell
@@ -638,6 +733,7 @@ genre-appropriate swing for you.)
 
 **Harmony — voicing choices carry the genre.** One sustained triad per bar sounds
 like an exercise. Prefer 7ths, a stab rhythm, or a moving top note:
+
 ```
 chord("<Cm7 Fm7 Bb7 Ebmaj7>").voicing().s("gm_epiano1").struct("~ 1 ~ 1")
 ```
@@ -648,15 +744,16 @@ lower gains or split to orbits. Buried: it flags **`masking`** when a voice sits
 a frequency band a louder voice owns (the classic "why can't I hear the vocal" —
 it's under the strings, not too quiet). When you see a `masking` note, DON'T just
 raise the buried voice's gain (that re-triggers hot-mix). Instead **make room**:
+
 - carve the competing band on the louder voices — `.lpf()` the pad/strings so they
   stop fighting the lead, or notch with a band filter;
 - move the buried voice to a clearer register (up an octave) or a different sound;
 - `.duck()` the bed under the lead, or pan them apart.
-A **`spectral-balance`** note (muddy / harsh / scooped) means the whole mix leans to
-one region — high-pass the non-bass parts to clear mud, roll off highs for harshness.
-A **`dull`** note means almost no energy up top — add a hi-hat/cymbal layer or brighten
-a voice so the mix has air and definition. Think in bands: kick+bass own sub/low, the
-lead wants clear mids, hats live up top.
+  A **`spectral-balance`** note (muddy / harsh / scooped) means the whole mix leans to
+  one region — high-pass the non-bass parts to clear mud, roll off highs for harshness.
+  A **`dull`** note means almost no energy up top — add a hi-hat/cymbal layer or brighten
+  a voice so the mix has air and definition. Think in bands: kick+bass own sub/low, the
+  lead wants clear mids, hats live up top.
 
 **`generate_pattern` already returns a developed seed** — a 4-bar melodic phrase
 (motif → restate → lift → answer) plus a drum fill. Layer and vary from there;
@@ -668,12 +765,14 @@ For any multi-section song (a pickRestart selector with ≥3 labels), write a sh
 FORM plan FIRST, then fill code into it. Do not invent sections freehand.
 
 FORM contract — state this before the pickRestart, then honour it:
+
 - tempo (BPM); 1 cycle = 1 bar of 4/4
 - section list, one per line: `name · cycles(bars) · energy 1–5 · must-have layers`
 - hook: the melodic phrase, and which sections it appears in
 - bar-math check: total cycles = Σ section cycles; wall-clock ≈ total × seconds/cycle
 
 Example plan:
+
 ```
 intro  4  e1  pad+kick
 verse  8  e2  bass+backbeat+arp
@@ -685,6 +784,7 @@ outro  4  e1  filter close
 ```
 
 Section-length defaults — cycles = bars, ALWAYS a multiple of 4:
+
 - intro / lift / break / outro → 4 bars
 - verse / chorus / drop → 8 bars
 - want a longer section? repeat the label (`"chorus chorus"`), don't invent a
