@@ -60,13 +60,13 @@ cycletron-midi = { path = "crates/cycletron-midi" }
 cycletron-analysis = { path = "crates/cycletron-analysis" }
 # strudel-rs engine crates — pinned to public Codeberg main so the app builds
 # from a clean clone (no sibling checkout needed). Bump `rev` to move the engine.
-strudel-core = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "e0dcf513db17b66618ca07c674942f028acc440c" }
-strudel-mini = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "e0dcf513db17b66618ca07c674942f028acc440c", default-features = false }
-strudel-dsl = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "e0dcf513db17b66618ca07c674942f028acc440c" }
-strudel-audio = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "e0dcf513db17b66618ca07c674942f028acc440c" }
-strudel-sounds = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "e0dcf513db17b66618ca07c674942f028acc440c" }
-strudel-music-theory = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "e0dcf513db17b66618ca07c674942f028acc440c" }
-midi-to-strudel = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "e0dcf513db17b66618ca07c674942f028acc440c" }
+strudel-core = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
+strudel-mini = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2", default-features = false }
+strudel-dsl = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
+strudel-audio = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
+strudel-sounds = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
+strudel-music-theory = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
+midi-to-strudel = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
 
 # Shared external deps
 serde = { version = "1.0", features = ["derive"] }

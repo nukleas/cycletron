@@ -1,8 +1,10 @@
 # strudel-rs Supported DSL Surface
 
 Ground truth for what the strudel-rs parser+evaluator accepts. Verified against
-`../strudel-rs/` source (not web-strudel docs — they diverge). Anything not
-listed here is **not guaranteed to work**.
+the strudel-rs source at the rev the workspace `Cargo.toml` pins (not web-strudel
+docs — they diverge, and not whatever checkout happens to be on disk). Anything
+not listed here is **not guaranteed to work**. `strudel-dsl names` prints every
+name the pinned engine dispatches; diff it against this file when bumping.
 
 Source-of-truth files (jump here when something is ambiguous):
 
@@ -135,9 +137,29 @@ Aliases inside `()`.
 
 ### Time / sequencing
 
-`fast(n)`, `slow(n)`, `early(t)`, `late(t)`, `zoom(s, e)`, `rev`, `palindrome`,
-`linger(t)`, `repeatCycles(n)`, `replicate(n)`, `ply(n)`, `inside(n, fn)`,
-`outside(n, fn)`, `within(start, end, fn)`, `chop(n)`, `segment(rate)` (`seg`).
+`fast(n)`, `slow(n)`, `hurry(n)`, `early(t)`, `late(t)`, `zoom(s, e)`, `rev`,
+`palindrome`, `linger(t)`, `repeatCycles(n)`, `replicate(n)`, `ply(n)`,
+`inside(n, fn)`, `outside(n, fn)`, `within(start, end, fn)`, `chop(n)`,
+`segment(rate)` (`seg`).
+
+| Method | Behaviour |
+|--------|-----------|
+| `hurry(n)` | `fast(n)` plus a matching sample-speed change. |
+| `ribbon(offset, cycles)` (`rib`) | Loop the window of that many cycles starting at offset, for as long as the pattern plays. Fractional lengths work. |
+| `beat(positions, div)` | Place the source at the given slots of a cycle divided into div: `beat("0 4", 8)`. Positions wrap modulo div; div is a plain number. |
+| `press` | Push every event into the second half of its own span. |
+| `pressBy(r)` | Shift each event r of the way into its span (r may be a pattern). 0 is identity; outside 0–1 is silence. |
+
+### Stepwise
+
+Arguments are plain numbers, not patterns (no `stepcat` in this port yet).
+`fast` and `hurry` preserve step counts; `striate` multiplies them.
+
+| Method | Behaviour |
+|--------|-----------|
+| `pace(steps)` | Refit the pattern to that many steps per cycle. Identity when the pattern carries no step count. |
+| `expand(factor)` | Multiply the step count without moving events. Audible only once `pace` reads it back. |
+| `contract(factor)` | Divide the step count; see `expand`. |
 
 ### Conditionals
 
@@ -170,6 +192,10 @@ chains.
 `inhabitmod(...)` (`pickmodSqueeze`), `pickF(...)`, `pickmodF(...)`.
 
 ### Notes / pitch / scale
+
+| Method | Behaviour |
+|--------|-----------|
+| `arp(pat)` | Arpeggiate each chord. pat is an index pattern (`arp("0 2 1 3")`, rebased per chord) or a Tidal ordering name: up, down, updown, downup, up&down, down&up, converge, diverge, disconverge, pinkyup, pinkyupdown, thumbup, thumbupdown. Names and indices mix in one pattern; an unknown name is silence, not a fallback to up. |
 
 `note(pat)` (`n`), `sound(pat)` (`s`), `transpose(n)` (`trans`),
 `scaleTranspose(n)` (`scaleTrans`, `strans`), `scale("name")`,
@@ -241,6 +267,21 @@ chains.
 `tremolo(rate)` (`trem`), `tremolodepth(depth)` (`tremdepth`),
 `tremoloshape(s)` (`tremshape`), `detune(cents)` (`det`).
 
+### Pulse width / PWM
+
+| Method | Behaviour |
+|--------|-----------|
+| `width(v)` (`pw`) | Pulse width 0–1. Setting it on a plain sine / tri / saw / square voice promotes it to a pulse oscillator. Colon form `pw("0.3:2:0.4")` sets width, rate and depth at once. |
+| `pwmrate(hz)` (`pwrate`, `pwr`) | Rate of the pulse-width LFO. |
+| `pwmdepth(v)` (`pwsweep`, `pws`) | Depth of the pulse-width LFO. |
+
+### Phaser
+
+| Method | Behaviour |
+|--------|-----------|
+| `phaser(hz)` (`phaserrate`, `ph`) | Sweep a notch through the signal. Rate alone engages it with a default depth. |
+| `phaserdepth(v)` (`phd`, `phasdp`) | How far the notch travels. |
+
 ### Chorus
 
 `chorus(depth)` (`choruspeed(rate)`) — short modulated delay (LFO depth 0–1,
@@ -273,7 +314,8 @@ Applied as an **insert** (per-voice), not a send. Use alongside or instead of
 
 Compact index of the timbre/space effects above (see subsections for detail):
 `vowel(v)`, `grainsize(ms)` (`grain`), `scatter(v)`, `ir(v)`, `adsr(a, d, s, r)`,
-`roomdamp(amount)` (`verbdamp`), `ctf(hz)`, `chorus(depth)` (`choruspeed`).
+`roomdamp(amount)` (`verbdamp`), `ctf(hz)`, `chorus(depth)` (`choruspeed`),
+`width(v)` (`pw`), `pwmrate(hz)`, `pwmdepth(v)`, `phaser(hz)`, `phaserdepth(v)`.
 
 ### Sample playback
 
