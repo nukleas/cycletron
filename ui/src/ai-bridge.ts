@@ -33,9 +33,10 @@ export function toggleAiPanel(): void {
 let resetChatUi: (() => void) | null = null;
 
 /**
- * Clear the AI session everywhere: backend history, the chat transcript, and
- * dependents (title bar, editor empty state) via `session:cleared`. Single
- * implementation behind the chat "New" button, Edit menu, and palette.
+ * Clear the AI conversation: backend history and the chat transcript. The
+ * open file and the editor are untouched — this forgets what the agent was
+ * told, not what the user is working on. Single implementation behind the
+ * chat "New" button, Edit menu, and palette.
  */
 export async function clearSession(): Promise<void> {
     try {
@@ -44,7 +45,6 @@ export async function clearSession(): Promise<void> {
         console.warn('[ai-bridge] clear_session failed:', e);
     }
     resetChatUi?.();
-    document.dispatchEvent(new CustomEvent('session:cleared'));
 }
 
 // --- Main Init ---

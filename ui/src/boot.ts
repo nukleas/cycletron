@@ -96,10 +96,6 @@ function setupTitleBar(): void {
             dirty: !!e.detail?.dirty,
         });
     }) as EventListener);
-
-    document.addEventListener('session:cleared', () => {
-        update({name: 'untitled', dirty: false});
-    });
 }
 
 function setupAppShortcuts(): void {

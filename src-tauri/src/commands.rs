@@ -185,11 +185,11 @@ pub fn get_config(state: State<'_, AppState>) -> cycletron_core::config::AppConf
 /// Clear the session — reset chat history and pattern state for a new composition.
 #[tauri::command]
 pub fn clear_session(state: State<'_, AppState>) -> Result<(), String> {
-    let config = state.config.lock();
-    let tempo = config.audio.default_tempo;
-    drop(config);
-    let mut session = state.session.lock();
-    *session = cycletron_core::session::Session::new(tempo);
+    // Only the AI's memory goes: the chat history and the review cache /
+    // last-reviewed buffer. The open file, the editor code, the tempo and the
+    // undo history are the user's, not the conversation's.
+    state.session.lock().messages.clear();
+    *state.agent_write.lock() = crate::state::AgentWriteState::default();
     Ok(())
 }
 
