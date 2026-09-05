@@ -29,10 +29,41 @@ interface LensSurface {
 interface LensDesign {
     name: string;
     sheet: string;
-    efl: string;
-    fno: string;
+    /**
+     * Published focal length in mm. At load the prescription is scaled
+     * uniformly so its paraxial EFL equals this (a lens scaled by k has EFL
+     * k·f and the same aberration *shape*), and the image plane is moved to
+     * the paraxial focus. Omit for afocal/diverging designs.
+     */
+    efl?: number;
+    /**
+     * Published working f-number. Caps the fan at efl / (2·fno) when the
+     * prescription's apertures would pass a faster bundle (fixture stops are
+     * often oversized); the trace's own marginal ray is the limit otherwise.
+     */
+    fno?: number;
+    /** Readout override for designs with no real focus ("VIRTUAL FOCUS"). */
+    focusLabel?: string;
     maxFieldDeg: number;
+    /** Afocal/diverging designs terminate at a display screen, not a focus. */
+    screen?: boolean;
+    /** Fixed world-space framing for expanding beams; avoids audio-driven zoom. */
+    viewSemiDiameter?: number;
     surfaces: LensSurface[];
+}
+
+/** Numbers the bench derives from the prescription itself, never typed in. */
+interface DesignOptics {
+    /** Paraxial effective focal length at the d line, mm. */
+    efl: number;
+    /** Paraxial back focal distance from the last vertex, mm. */
+    bfl: number;
+    /** Tallest on-axis launch height that clears every clear aperture. */
+    hMax: number;
+    /** Working f-number at full aperture, efl / (2·hMax). */
+    fno: number;
+    /** Sum of thicknesses: the z of the image plane / screen. */
+    zImg: number;
 }
 
 /**
@@ -45,8 +76,8 @@ const LENS_DESIGNS: LensDesign[] = [
     {
         name: 'ACHROMAT DOUBLET 100mm',
         sheet: 'DWG 012-A · FRAUNHOFER',
-        efl: 'EFL 100.0',
-        fno: 'f/4',
+        efl: 100,
+        fno: 4,
         maxFieldDeg: 3,
         surfaces: [
             { r: 61.0, t: 4.0, nd: 1.5168, vd: 64.2, sd: 12.7, glass: 'N-BK7' },
@@ -57,8 +88,8 @@ const LENS_DESIGNS: LensDesign[] = [
     {
         name: 'COOKE TRIPLET 50mm',
         sheet: 'DWG 041-C · GB 22,607',
-        efl: 'EFL 50.0',
-        fno: 'f/4',
+        efl: 50,
+        fno: 4,
         maxFieldDeg: 7,
         surfaces: [
             { r: 26.1, t: 4.5, nd: 1.6204, vd: 60.3, sd: 9, glass: 'N-SK16' },
@@ -71,8 +102,8 @@ const LENS_DESIGNS: LensDesign[] = [
     {
         name: 'DOUBLE GAUSS 50mm',
         sheet: 'DWG 107-B · KINGSLAKE',
-        efl: 'EFL 50.0',
-        fno: 'f/2',
+        efl: 50,
+        fno: 2,
         maxFieldDeg: 10,
         surfaces: [
             { r: 57.08, t: 6.0, nd: 1.6223, vd: 53.3, sd: 16, glass: 'N-SSK2' },
@@ -87,13 +118,57 @@ const LENS_DESIGNS: LensDesign[] = [
             { r: -57.08, t: 40.0, nd: 1, vd: 0, sd: 16 },
         ],
     },
+    // Manufacturer geometry and derived bench distances: docs/LENS_BENCH.md.
+    {
+        name: 'FAST CONDENSER 30mm',
+        sheet: 'EO 70-265 · PCX',
+        efl: 30,
+        fno: 1.2,
+        maxFieldDeg: 4,
+        surfaces: [
+            { r: 15.50, t: 8.06, nd: 1.5168, vd: 64.17, sd: 11.10, glass: 'N-BK7' },
+            { r: 0, t: 24.69, nd: 1, vd: 0, sd: 11.10 },
+        ],
+    },
+    {
+        name: 'DIVERGING FAN -50mm',
+        sheet: 'EO 45-028 · PCV',
+        focusLabel: 'VIRTUAL FOCUS',
+        maxFieldDeg: 4,
+        screen: true,
+        viewSemiDiameter: 30,
+        surfaces: [
+            { r: -25.84, t: 3.50, nd: 1.5168, vd: 64.17, sd: 12, glass: 'N-BK7' },
+            // Positive display distance, NOT the manufacturer's negative BFL.
+            { r: 0, t: 35, nd: 1, vd: 0, sd: 12 },
+        ],
+    },
+    {
+        name: 'KEPLERIAN CROSSOVER',
+        sheet: 'DERIVED · 2× EO 47-368',
+        focusLabel: 'INVERTING',
+        maxFieldDeg: 1,
+        screen: true,
+        surfaces: [
+            { r: 50.80, t: 5, nd: 1.5168, vd: 64.17, sd: 12, glass: 'N-BK7' },
+            // Symmetric lenses: air gap = twice the published 48.29mm BFL.
+            { r: -50.80, t: 96.58, nd: 1, vd: 0, sd: 12 },
+            { r: 50.80, t: 5, nd: 1.5168, vd: 64.17, sd: 12, glass: 'N-BK7' },
+            { r: -50.80, t: 40, nd: 1, vd: 0, sd: 12 },
+        ],
+    },
 ];
 
 const RAYS = 15;              // rays per fan, per wavelength lane
 const LANES = 3;              // d (reference), F (blue), C (red)
-/** Index offset scale per lane — exaggerated so the split reads at px scale. */
-const LANE_DELTA = [0, 0.9, -0.6];
-const DISPERSION_GAIN = 8;
+/**
+ * Index offset per lane in units of (n_d − 1) / V_d, i.e. the glass's own
+ * F−C dispersion. For normal crown/flint glass the d line sits about 31% of
+ * the way up from C to F (N-BK7: n_C 1.51432, n_d 1.51680, n_F 1.52238), so
+ * F is +0.69 and C is −0.31 of the F−C spread. Real values: an achromat's
+ * lanes land on top of each other, a singlet's fan out — which is the point.
+ */
+const LANE_DELTA = [0, 0.69, -0.31];
 const MAX_PULSES = 64;
 const DESIGN_BARS = 16;       // bars per prescription before rotating
 /** Points per ray: launch + one per surface (max 10) + image plane. */
@@ -102,8 +177,7 @@ const MAX_PTS = 12;
 interface Pulse {
     /** Ray index in the d-line lane the pulse rides. */
     ray: number;
-    /** Position in point-index parameter space (segments are near-uniform,
-     *  so we skip arclength — visually indistinguishable at pulse speed). */
+    /** Distance travelled along the ray in world millimetres. */
     s: number;
     speed: number;
     color: string;
@@ -111,6 +185,177 @@ interface Pulse {
     life: number;
     arrived: boolean;
 }
+
+/**
+ * Paraxial (y, u) trace of a marginal ray from infinity at the d line.
+ * Returns EFL and the back focal distance from the last vertex; both are
+ * ±Infinity for an afocal system.
+ */
+function paraxial(S: LensSurface[]): {efl: number; bfl: number} {
+    let n1 = 1;
+    let y = 1;
+    let u = 0;
+    for (let k = 0; k < S.length; k++) {
+        const n2 = S[k].nd;
+        const c = S[k].r === 0 || Math.abs(S[k].r) > 1e6 ? 0 : 1 / S[k].r;
+        u = (n1 * u - y * (n2 - n1) * c) / n2;
+        if (k < S.length - 1) y += u * S[k].t;
+        n1 = n2;
+    }
+    if (Math.abs(u) < 1e-12) return {efl: Infinity, bfl: Infinity};
+    return {efl: -1 / u, bfl: -y / u};
+}
+
+/**
+ * Trace one meridional ray through `S` (vertex z's in `zs`, image plane at
+ * `zImg`), launched at height `y1` at z=0 with slope `slope`. `lane` picks
+ * the wavelength via LANE_DELTA. With `out`, the polyline (z, y) pairs are
+ * written at `base` and the point count returned in `np`; `clip` is the
+ * surface index where the ray died, −1 if it reached the image plane, and
+ * `yImg` its height there.
+ */
+function traceRay(
+    S: LensSurface[], zs: Float64Array, zImg: number, zStart: number,
+    y1: number, slope: number, lane: number,
+    out: Float32Array | null, base: number,
+): {np: number; clip: number; yImg: number} {
+    const dirLen = Math.sqrt(1 + slope * slope);
+    let pz = zStart;
+    let py = y1 + slope * zStart;
+    let dz = 1 / dirLen;
+    let dy = slope / dirLen;
+    let n1 = 1;
+    let np = 1;
+    let clip = -1;
+    if (out) { out[base] = pz; out[base + 1] = py; }
+
+    for (let k = 0; k < S.length; k++) {
+        const surf = S[k];
+        const r = surf.r;
+        const Zk = zs[k];
+        let qz: number;
+        let qy: number;
+        let nx: number;
+        let ny: number;
+
+        if (r === 0 || Math.abs(r) > 1e6) {
+            if (Math.abs(dz) < 1e-9) { clip = k; break; }
+            const t = (Zk - pz) / dz;
+            if (t < 1e-6) { clip = k; break; }
+            qz = pz + dz * t;
+            qy = py + dy * t;
+            nx = 1;
+            ny = 0;
+        } else {
+            // Sphere centered on-axis at Zk + r. Root choice picks the
+            // vertex-side intersection for either curvature sign.
+            const cz = Zk + r;
+            const ocz = pz - cz;
+            const b = dz * ocz + dy * py;
+            const c = ocz * ocz + py * py - r * r;
+            const disc = b * b - c;
+            if (disc < 0) {
+                // Missed the surface sphere — visibly fly off.
+                if (out) {
+                    out[base + np * 2] = pz + dz * zImg * 0.25;
+                    out[base + np * 2 + 1] = py + dy * zImg * 0.25;
+                }
+                np++;
+                clip = k;
+                break;
+            }
+            const sq = Math.sqrt(disc);
+            const t = r > 0 ? -b - sq : -b + sq;
+            if (t < 1e-6) { clip = k; break; }
+            qz = pz + dz * t;
+            qy = py + dy * t;
+            // Dividing by signed r keeps the normal consistently oriented;
+            // the refraction step re-flips as needed.
+            nx = (qz - cz) / r;
+            ny = qy / r;
+        }
+
+        if (out) { out[base + np * 2] = qz; out[base + np * 2 + 1] = qy; }
+        np++;
+
+        if (Math.abs(qy) > surf.sd) { clip = k; break; } // vignetted
+
+        const n2 = surf.nd > 1
+            ? surf.nd + LANE_DELTA[lane] * ((surf.nd - 1) / Math.max(surf.vd, 1))
+            : 1;
+        const mu = n1 / n2;
+        let cosI = -(dz * nx + dy * ny);
+        if (cosI < 0) { nx = -nx; ny = -ny; cosI = -cosI; }
+        const sin2T = mu * mu * (1 - cosI * cosI);
+        if (sin2T > 1) { clip = k; break; } // TIR
+        const kk = mu * cosI - Math.sqrt(1 - sin2T);
+        dz = mu * dz + kk * nx;
+        dy = mu * dy + kk * ny;
+        const inv = 1 / Math.sqrt(dz * dz + dy * dy);
+        dz *= inv;
+        dy *= inv;
+        n1 = n2;
+        pz = qz;
+        py = qy;
+    }
+
+    let yImg = NaN;
+    if (clip < 0 && dz > 1e-9) {
+        const t = (zImg - pz) / dz;
+        yImg = py + dy * t;
+        if (out) { out[base + np * 2] = zImg; out[base + np * 2 + 1] = yImg; }
+        np++;
+    } else if (clip < 0) {
+        clip = S.length - 1;
+    }
+    return {np, clip, yImg};
+}
+
+/**
+ * Normalise a prescription in place and derive its optics. Designs with a
+ * published `efl` are scaled so the trace agrees with the label, and every
+ * focusing design gets its image plane at the paraxial focus — typed image
+ * distances are how a bench ends up showing a blur at "IMG". The marginal
+ * height is found by bisection on the real trace so the fan fills the
+ * working aperture with no vignetting on axis.
+ */
+function prepareDesign(design: LensDesign): DesignOptics {
+    const S = design.surfaces;
+    if (design.efl !== undefined && !design.screen) {
+        const k = design.efl / paraxial(S).efl;
+        for (const surf of S) {
+            surf.r *= k;
+            surf.t *= k;
+            surf.sd *= k;
+        }
+        if (design.viewSemiDiameter !== undefined) design.viewSemiDiameter *= k;
+    }
+    let {efl, bfl} = paraxial(S);
+    if (!design.screen && Number.isFinite(bfl) && bfl > 0) {
+        S[S.length - 1].t = bfl;
+    }
+    let zImg = 0;
+    const zs = new Float64Array(S.length);
+    for (let k = 0; k < S.length; k++) {
+        zs[k] = zImg;
+        zImg += S[k].t;
+    }
+    const zStart = -0.18 * zImg;
+    let lo = 0;
+    let hi = S[0].sd * 1.01;
+    for (let i = 0; i < 40; i++) {
+        const mid = (lo + hi) / 2;
+        if (traceRay(S, zs, zImg, zStart, mid, 0, 0, null, 0).clip < 0) lo = mid;
+        else hi = mid;
+    }
+    if (!Number.isFinite(efl)) { efl = Infinity; bfl = Infinity; }
+    const hMax = design.fno !== undefined && efl > 0
+        ? Math.min(lo, efl / (2 * design.fno))
+        : lo;
+    return {efl, bfl, hMax, fno: efl / (2 * hMax), zImg};
+}
+
+const DESIGN_OPTICS: DesignOptics[] = LENS_DESIGNS.map(prepareDesign);
 
 /** Sag (axial depth) of a spherical surface at height y; 0 for planes. */
 function sagZ(r: number, y: number): number {
@@ -143,6 +388,11 @@ class LensBenchMode implements VizMode {
     private readonly imageHits = new Float32Array(RAYS).fill(NaN);
     private pulses: Pulse[] = [];
     private bloom = 0;
+    private readonly distances = new Float32Array(RAYS * MAX_PTS);
+    // Fixed ring pool: dense passages cannot grow rendering work indefinitely.
+    private readonly impactAge = new Float32Array(8).fill(1);
+    private readonly impactY = new Float32Array(8);
+    private nextImpact = 0;
     private titleFlash = 0;
     private readonly tracks = new TrackModel();
     private readonly transients = new TransientDetector(0.1, 0.08, 0.04);
@@ -171,8 +421,11 @@ class LensBenchMode implements VizMode {
         }
         const zMin = -0.18 * zImg;
         const zMax = zImg * 1.04;
-        const yMax = sdMax * 1.3;
-        const mL = 48, mR = 48, mT = 56, mB = 76;
+        const yMax = design.viewSemiDiameter ?? sdMax * 1.3;
+        // Blueprint margins for the callout strip and title block, shrunk
+        // proportionally so the sidebar-sized canvas still shows a bench.
+        const mL = Math.min(48, this.vw * 0.06), mR = mL;
+        const mT = Math.min(56, this.vh * 0.18), mB = Math.min(76, this.vh * 0.26);
         const scale = Math.min(
             (this.vw - mL - mR) / (zMax - zMin),
             (this.vh - mT - mB) / (2 * yMax),
@@ -191,22 +444,24 @@ class LensBenchMode implements VizMode {
      */
     private trace(): void {
         const design = LENS_DESIGNS[this.designIdx];
+        const optics = DESIGN_OPTICS[this.designIdx];
         const S = design.surfaces;
-        const nS = S.length;
         let z = 0;
-        for (let k = 0; k < nS; k++) {
+        for (let k = 0; k < S.length; k++) {
             zScratch[k] = z;
             z += S[k].t;
         }
         const zImg = z;
         const zStart = -0.18 * zImg;
-        const fill = 0.6 + this.lowSm * 0.32;
+        // The fan fills 70–100% of the working aperture with the low band, so
+        // the loudest state is the lens wide open and nothing vignettes on axis.
+        const fill = 0.7 + this.lowSm * 0.3;
         const slope = -Math.tan(this.field);
-        const dirLen = Math.sqrt(1 + slope * slope);
         const split = this.split;
 
         for (let w = 0; w < LANES; w++) {
-            // Chromatic lanes only exist while the highs hold them open.
+            // Chromatic lanes only exist while the highs hold them open. Their
+            // geometry is physical whenever they are drawn; `split` is opacity.
             const laneOn = w === 0 || split > 0.015;
             for (let i = 0; i < RAYS; i++) {
                 const rayIdx = w * RAYS + i;
@@ -216,104 +471,11 @@ class LensBenchMode implements VizMode {
                 }
                 const base = rayIdx * MAX_PTS * 2;
                 const p = (i / (RAYS - 1)) * 2 - 1;
-                const y1 = p * S[0].sd * fill;
-
-                // Tilted parallel bundle arriving at height y1 at z=0.
-                let pz = zStart;
-                let py = y1 + slope * zStart;
-                let dz = 1 / dirLen;
-                let dy = slope / dirLen;
-                let n1 = 1;
-                let np = 1;
-                let clip = -1;
-                this.polys[base] = pz;
-                this.polys[base + 1] = py;
-
-                for (let k = 0; k < nS; k++) {
-                    const surf = S[k];
-                    const r = surf.r;
-                    const Zk = zScratch[k];
-                    let qz: number;
-                    let qy: number;
-                    let nx: number;
-                    let ny: number;
-
-                    if (r === 0 || Math.abs(r) > 1e6) {
-                        if (Math.abs(dz) < 1e-9) { clip = k; break; }
-                        const t = (Zk - pz) / dz;
-                        if (t < 1e-6) { clip = k; break; }
-                        qz = pz + dz * t;
-                        qy = py + dy * t;
-                        nx = 1;
-                        ny = 0;
-                    } else {
-                        // Sphere centered on-axis at Zk + r. Root choice picks
-                        // the vertex-side intersection for either curvature
-                        // sign: r>0 → −b−√disc, r<0 → −b+√disc.
-                        const cz = Zk + r;
-                        const ocz = pz - cz;
-                        const ocy = py;
-                        const b = dz * ocz + dy * ocy;
-                        const c = ocz * ocz + ocy * ocy - r * r;
-                        const disc = b * b - c;
-                        if (disc < 0) {
-                            // Missed the surface sphere — visibly fly off.
-                            this.polys[base + np * 2] = pz + dz * zImg * 0.25;
-                            this.polys[base + np * 2 + 1] = py + dy * zImg * 0.25;
-                            np++;
-                            clip = k;
-                            break;
-                        }
-                        const sq = Math.sqrt(disc);
-                        const t = r > 0 ? -b - sq : -b + sq;
-                        if (t < 1e-6) { clip = k; break; }
-                        qz = pz + dz * t;
-                        qy = py + dy * t;
-                        // Dividing by signed r keeps the normal consistently
-                        // oriented; the refraction step re-flips as needed.
-                        nx = (qz - cz) / r;
-                        ny = qy / r;
-                    }
-
-                    this.polys[base + np * 2] = qz;
-                    this.polys[base + np * 2 + 1] = qy;
-                    np++;
-
-                    if (Math.abs(qy) > surf.sd) { clip = k; break; } // vignetted
-
-                    const n2 = surf.nd > 1
-                        ? surf.nd + LANE_DELTA[w] * ((surf.nd - 1) / Math.max(surf.vd, 1))
-                            * DISPERSION_GAIN * split
-                        : 1;
-                    const mu = n1 / n2;
-                    let cosI = -(dz * nx + dy * ny);
-                    if (cosI < 0) { nx = -nx; ny = -ny; cosI = -cosI; }
-                    const sin2T = mu * mu * (1 - cosI * cosI);
-                    if (sin2T > 1) { clip = k; break; } // TIR
-                    const kk = mu * cosI - Math.sqrt(1 - sin2T);
-                    dz = mu * dz + kk * nx;
-                    dy = mu * dy + kk * ny;
-                    const inv = 1 / Math.sqrt(dz * dz + dy * dy);
-                    dz *= inv;
-                    dy *= inv;
-                    n1 = n2;
-                    pz = qz;
-                    py = qy;
-                }
-
-                if (clip < 0 && dz > 1e-9) {
-                    const t = (zImg - pz) / dz;
-                    const qy = py + dy * t;
-                    this.polys[base + np * 2] = zImg;
-                    this.polys[base + np * 2 + 1] = qy;
-                    np++;
-                    if (w === 0) this.imageHits[i] = qy;
-                } else {
-                    if (clip < 0) clip = nS - 1;
-                    if (w === 0) this.imageHits[i] = NaN;
-                }
-                this.polyLen[rayIdx] = np;
-                this.polyClip[rayIdx] = clip;
+                const y1 = p * optics.hMax * fill;
+                const hit = traceRay(S, zScratch, zImg, zStart, y1, slope, w, this.polys, base);
+                this.polyLen[rayIdx] = hit.np;
+                this.polyClip[rayIdx] = hit.clip;
+                if (w === 0) this.imageHits[i] = hit.yImg;
             }
         }
     }
@@ -321,11 +483,13 @@ class LensBenchMode implements VizMode {
     private spawnPulse(ray: number, durSec: number, color: string): void {
         if (this.pulses.length >= MAX_PULSES) this.pulses.shift();
         const np = this.polyLen[ray];
-        const segs = Math.max(2, np) - 1;
+        if (np < 2) return;
+        const length = this.distances[ray * MAX_PTS + np - 1];
+        if (length <= 0) return;
         this.pulses.push({
             ray,
             s: 0,
-            speed: segs / Math.max(0.05, durSec),
+            speed: length / Math.max(0.05, durSec),
             color,
             life: 1,
             arrived: false,
@@ -349,6 +513,8 @@ class LensBenchMode implements VizMode {
         if (want !== this.designIdx) {
             this.designIdx = want;
             this.pulses.length = 0;
+            this.impactAge.fill(1);
+            this.bloom = 0;
             this.titleFlash = 1;
             this.refit();
         }
@@ -357,6 +523,21 @@ class LensBenchMode implements VizMode {
         const design = LENS_DESIGNS[this.designIdx];
         const maxField = (design.maxFieldDeg * Math.PI) / 180;
         this.field = Math.sin(this.driftT * 0.35) * maxField * (0.25 + this.midSm * 0.75);
+
+        // Trace before spawning and advancing so lengths and clipping agree
+        // with the geometry displayed this frame (including prescription changes).
+        this.trace();
+        for (let ray = 0; ray < RAYS; ray++) {
+            const base = ray * MAX_PTS * 2;
+            const offset = ray * MAX_PTS;
+            this.distances[offset] = 0;
+            for (let j = 1; j < this.polyLen[ray]; j++) {
+                this.distances[offset + j] = this.distances[offset + j - 1] + Math.hypot(
+                    this.polys[base + j * 2] - this.polys[base + (j - 1) * 2],
+                    this.polys[base + j * 2 + 1] - this.polys[base + (j - 1) * 2 + 1]);
+            }
+        }
+        for (let i = 0; i < this.impactAge.length; i++) this.impactAge[i] += dt;
 
         // Pattern onsets → light pulses riding the d-line rays. Pitched notes
         // map C1..C7 across the fan; unpitched haps hash to a stable ray.
@@ -381,11 +562,10 @@ class LensBenchMode implements VizMode {
         }
         this.tracks.decay(dt);
 
-        // FFT transients: kicks flood the marginal rays + bloom the focal
-        // plane, hats fire one fast spark.
+        // FFT transients: kicks flood the marginal rays; their arrivals light
+        // the focal plane. Hats fire one fast spark.
         const hits = this.transients.update(dt, low, mid, high);
         if (hits.kick) {
-            this.bloom = 1;
             this.spawnPulse(0, 0.25, s.theme.neon);
             this.spawnPulse(RAYS - 1, 0.25, s.theme.neon);
             this.spawnPulse(RAYS >> 1, 0.22, s.theme.active);
@@ -395,7 +575,7 @@ class LensBenchMode implements VizMode {
             this.spawnPulse(Math.min(RAYS - 1, upper), 0.15, '#ffffff');
         }
 
-        // Advance pulses in point-index space; arrivals at the image plane
+        // Advance at constant world-space speed; arrivals at the image plane
         // feed the bloom (vignetted rays just die at the clip point).
         for (let n = this.pulses.length - 1; n >= 0; n--) {
             const pulse = this.pulses[n];
@@ -403,11 +583,15 @@ class LensBenchMode implements VizMode {
                 const np = this.polyLen[pulse.ray];
                 if (np < 2) { this.pulses.splice(n, 1); continue; }
                 pulse.s += pulse.speed * dt;
-                if (pulse.s >= np - 1) {
-                    pulse.s = np - 1;
+                const length = this.distances[pulse.ray * MAX_PTS + np - 1];
+                if (pulse.s >= length) {
+                    pulse.s = length;
                     pulse.arrived = true;
                     if (this.polyClip[pulse.ray] < 0) {
                         this.bloom = Math.min(1.2, this.bloom + 0.35);
+                        this.impactAge[this.nextImpact] = 0;
+                        this.impactY[this.nextImpact] = this.imageHits[pulse.ray];
+                        this.nextImpact = (this.nextImpact + 1) % this.impactAge.length;
                     }
                 }
             } else {
@@ -418,8 +602,6 @@ class LensBenchMode implements VizMode {
         this.bloom *= Math.exp(-dt * 4);
         this.titleFlash *= Math.exp(-dt * 3);
 
-        // Geometry last so render sees this frame's fan.
-        this.trace();
     }
 
     render(ctx: CanvasRenderingContext2D, s: VizServices): void {
@@ -570,9 +752,9 @@ class LensBenchMode implements VizMode {
         // 5. Rays — one batched path per wavelength lane; d-line drawn last so
         // the reference trace sits on top of the chromatic fringe.
         const laneColors = [
-            `rgba(${tr}, ${tg}, ${tb}, ${(0.12 + this.midSm * 0.16).toFixed(3)})`,
-            `rgba(${neonRgb[0]}, ${neonRgb[1]}, ${neonRgb[2]}, ${(this.split * (0.08 + s.high * 0.16)).toFixed(3)})`,
-            `rgba(${redRgb[0]}, ${redRgb[1]}, ${redRgb[2]}, ${(this.split * (0.08 + s.high * 0.16)).toFixed(3)})`,
+            `rgba(${tr}, ${tg}, ${tb}, ${(0.18 + this.midSm * 0.16).toFixed(3)})`,
+            `rgba(${neonRgb[0]}, ${neonRgb[1]}, ${neonRgb[2]}, ${(this.split * (0.16 + this.split * 0.2)).toFixed(3)})`,
+            `rgba(${redRgb[0]}, ${redRgb[1]}, ${redRgb[2]}, ${(this.split * (0.16 + this.split * 0.2)).toFixed(3)})`,
         ];
         ctx.lineWidth = 1;
         for (let lane = LANES - 1; lane >= 0; lane--) {
@@ -605,38 +787,69 @@ class LensBenchMode implements VizMode {
             ctx.globalAlpha = 1;
         }
 
-        // 6. Pulses riding the d-line rays — short trail + hot dot.
+        // Three principal rays provide a bright, legible optical silhouette.
+        ctx.strokeStyle = theme.neon;
+        ctx.globalAlpha = 0.4 + this.lowSm * 0.25;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        for (let ray = 0; ray < RAYS; ray += (RAYS - 1) / 2) {
+            const np = this.polyLen[ray];
+            const end = this.polyClip[ray] >= 0 ? np - 1 : np;
+            const base = ray * MAX_PTS * 2;
+            for (let j = 0; j < end; j++) {
+                const x = sx(this.polys[base + j * 2]);
+                const y = sy(this.polys[base + j * 2 + 1]);
+                if (j === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // 6. Distance-clipped tails follow every refraction bend. No per-pulse
+        // coordinate arrays; the same path supplies a soft sheath and hot core.
         for (const pulse of this.pulses) {
             const np = this.polyLen[pulse.ray];
             if (np < 2) continue;
             const base = pulse.ray * MAX_PTS * 2;
-            const sPos = Math.min(pulse.s, np - 1.001);
+            const offset = pulse.ray * MAX_PTS;
+            const head = Math.min(pulse.s, this.distances[offset + np - 1]);
+            const tail = Math.max(0, head - Math.min(48 / scale, pulse.speed * 0.065));
             const alpha = pulse.arrived ? pulse.life : 1;
-            const at = (t: number): [number, number] => {
-                const i0 = Math.min(np - 2, Math.floor(t));
-                const f = t - i0;
-                return [
-                    sx(this.polys[base + i0 * 2] + (this.polys[base + (i0 + 1) * 2] - this.polys[base + i0 * 2]) * f),
-                    sy(this.polys[base + i0 * 2 + 1] + (this.polys[base + (i0 + 1) * 2 + 1] - this.polys[base + i0 * 2 + 1]) * f),
-                ];
-            };
-            const [px, py] = at(sPos);
-            const [qx, qy] = at(Math.max(0, sPos - 0.5));
-            ctx.strokeStyle = pulse.color;
-            ctx.globalAlpha = 0.55 * alpha;
-            ctx.lineWidth = 2;
+            let px = sx(this.polys[base]), py = sy(this.polys[base + 1]);
+            let started = false;
             ctx.beginPath();
-            ctx.moveTo(qx, qy);
-            ctx.lineTo(px, py);
+            for (let j = 1; j < np; j++) {
+                const start = this.distances[offset + j - 1];
+                const end = this.distances[offset + j];
+                if (end < tail || start > head || end <= start) continue;
+                const from = Math.max(0, (tail - start) / (end - start));
+                const to = Math.min(1, (head - start) / (end - start));
+                const z = this.polys[base + (j - 1) * 2];
+                const y = this.polys[base + (j - 1) * 2 + 1];
+                const dz = this.polys[base + j * 2] - z;
+                const dy = this.polys[base + j * 2 + 1] - y;
+                if (!started) { ctx.moveTo(sx(z + dz * from), sy(y + dy * from)); started = true; }
+                px = sx(z + dz * to);
+                py = sy(y + dy * to);
+                ctx.lineTo(px, py);
+            }
+            ctx.strokeStyle = pulse.color;
+            ctx.globalAlpha = 0.14 * alpha;
+            ctx.lineWidth = 5;
+            ctx.stroke();
+            ctx.globalAlpha = 0.85 * alpha;
+            ctx.lineWidth = 1.7;
             ctx.stroke();
             ctx.fillStyle = pulse.color;
             ctx.globalAlpha = 0.2 * alpha;
             ctx.beginPath();
             ctx.arc(px, py, 4.5, 0, TAU);
             ctx.fill();
+            ctx.fillStyle = '#ffffff';
             ctx.globalAlpha = 0.95 * alpha;
             ctx.beginPath();
-            ctx.arc(px, py, 2, 0, TAU);
+            ctx.arc(px, py, 1.7, 0, TAU);
             ctx.fill();
         }
         ctx.globalAlpha = 1;
@@ -646,19 +859,35 @@ class LensBenchMode implements VizMode {
         ctx.strokeStyle = `rgba(${tr}, ${tg}, ${tb}, 0.45)`;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(imgX, sy(sdMax * 1.15));
-        ctx.lineTo(imgX, sy(-sdMax * 1.15));
+        const planeHeight = design.screen ? (design.viewSemiDiameter ?? sdMax * 1.3) * 0.9 : sdMax * 1.15;
+        ctx.moveTo(imgX, sy(planeHeight));
+        ctx.lineTo(imgX, sy(-planeHeight));
         ctx.stroke();
         ctx.fillStyle = `rgba(${tr}, ${tg}, ${tb}, 0.5)`;
         ctx.font = `8px ${MONO}`;
-        ctx.fillText('IMG', imgX, sy(sdMax * 1.15) - 4);
+        ctx.fillText(design.screen ? 'SCREEN' : 'IMG', imgX, sy(planeHeight) - 4);
 
         let sum = 0, sum2 = 0, cnt = 0;
         for (let i = 0; i < RAYS; i++) {
             const v = this.imageHits[i];
             if (Number.isFinite(v)) { sum += v; sum2 += v * v; cnt++; }
         }
-        if (cnt > 0) {
+        if (design.screen) {
+            // Show the actual spread at the observation plane, not an invented
+            // bright focus at the centroid of a divergent or collimated bundle.
+            ctx.strokeStyle = theme.neon;
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            for (let i = 0; i < RAYS; i++) {
+                if (!Number.isFinite(this.imageHits[i])) continue;
+                const y = sy(this.imageHits[i]);
+                ctx.moveTo(imgX - 3, y);
+                ctx.lineTo(imgX + 3, y);
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+        if (cnt > 0 && !design.screen) {
             const mean = sum / cnt;
             const rms = Math.sqrt(Math.max(0, sum2 / cnt - mean * mean));
             const radius = 6 + rms * scale * 2 + this.bloom * 26;
@@ -669,7 +898,41 @@ class LensBenchMode implements VizMode {
             ctx.beginPath();
             ctx.arc(imgX, sy(mean), radius, 0, TAU);
             ctx.fill();
+            // Local flare uses crisp strokes, keeping the beam's landing point
+            // readable without a canvas-wide blur or compositing pass.
+            const focalY = sy(mean);
+            const flare = 5 + Math.min(1, this.bloom) * 30;
+            ctx.strokeStyle = theme.neon;
+            ctx.globalAlpha = 0.2 + Math.min(1, this.bloom) * 0.45;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(imgX, focalY - flare);
+            ctx.lineTo(imgX, focalY + flare);
+            ctx.stroke();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(imgX, focalY, 1.5 + Math.min(1, this.bloom) * 1.5, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = 1;
         }
+
+        // Arrival rings retain each ray's actual hit position. Eight slots cap
+        // work even when many notes converge in the same frame.
+        ctx.strokeStyle = theme.neon;
+        ctx.lineWidth = 1;
+        for (let i = 0; i < this.impactAge.length; i++) {
+            const age = this.impactAge[i];
+            if (age >= 0.45 || !Number.isFinite(this.impactY[i])) continue;
+            const progress = age / 0.45;
+            ctx.globalAlpha = (1 - progress) * (1 - progress) * 0.6;
+            ctx.beginPath();
+            ctx.arc(imgX, sy(this.impactY[i]), 3 + progress * 32, 0, TAU);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
 
         // 8. Glass callouts with leader lines, staggered on two rows.
         ctx.font = `10px ${MONO}`;
@@ -697,8 +960,18 @@ class LensBenchMode implements VizMode {
         ctx.textAlign = 'left';
         ctx.fillStyle = `rgba(${tr}, ${tg}, ${tb}, 0.7)`;
         const fieldDeg = ((this.field * 180) / Math.PI).toFixed(1);
+        // Readouts come from the trace, not the label: an afocal pair reads
+        // AFOCAL, a negative lens its (virtual) EFL, everything else EFL/BFL
+        // and the working f-number of the fan at full aperture.
+        const optics = DESIGN_OPTICS[this.designIdx];
+        const eflText = !Number.isFinite(optics.efl)
+            ? 'AFOCAL'
+            : design.screen
+                ? `EFL ${optics.efl.toFixed(1)}`
+                : `EFL ${optics.efl.toFixed(1)}  BFL ${optics.bfl.toFixed(2)}`;
+        const fnoText = design.focusLabel ?? `f/${optics.fno.toFixed(1)}`;
         ctx.fillText(
-            `${design.efl}   ${design.fno}   FIELD ${fieldDeg}°   λ-SPLIT ${this.split.toFixed(2)}`,
+            `${eflText}   ${fnoText}   FIELD ${fieldDeg}°   λ-SPLIT ${this.split.toFixed(2)}`,
             48, 18,
         );
 
@@ -719,7 +992,7 @@ class LensBenchMode implements VizMode {
         ctx.font = `9px ${MONO}`;
         ctx.fillText(design.sheet, tbX + 8, tbY + 31);
         ctx.fillText(
-            `BAR ${Math.max(0, Math.floor(s.cycle))}   SCALE ${scale.toFixed(2)}px/mm`,
+            `DESIGN ${this.designIdx + 1}/${LENS_DESIGNS.length}   BAR ${Math.max(0, Math.floor(s.cycle))}`,
             tbX + 8, tbY + 45,
         );
         const flash = 0.3 + this.titleFlash * 0.5 + downbeat * 0.2;
