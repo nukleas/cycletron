@@ -3131,6 +3131,50 @@ body.is-drop-target::after {
     transform: scale(1.4);
 }
 
+/* ---- Launch quantization — cycling button, skip-btn family ---- */
+
+.launch-btn {
+    height: 28px;
+    min-width: 46px;
+    padding: 0 8px;
+    margin-left: 4px;
+    font-size: 11px;
+    font-family: inherit;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    background: rgba(5, 6, 10, 0.55);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.launch-btn:hover {
+    color: var(--neon);
+    border-color: var(--neon-subtle);
+    box-shadow: 0 0 8px var(--neon-glow);
+}
+/* A grid is set (anything but Now). */
+.launch-btn.is-on {
+    color: var(--neon);
+    border-color: var(--neon);
+    background: var(--accent-subtle);
+    box-shadow: 0 0 10px var(--neon-glow), inset 0 0 8px var(--accent-subtle);
+}
+/* A swap is parked, waiting for the bar line: the label becomes a countdown. */
+.launch-btn.is-armed {
+    animation: launch-armed-pulse 1s ease-in-out infinite;
+}
+
+@keyframes launch-armed-pulse {
+    0%, 100% { box-shadow: 0 0 10px var(--neon-glow), inset 0 0 8px var(--accent-subtle); }
+    50%      { box-shadow: 0 0 2px var(--neon-glow); color: var(--text-muted); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .launch-btn.is-armed { animation: none; }
+}
+
 /* =========================================================
    WELCOME (first-run) MODAL — CYBERPUNK
    ========================================================= */
@@ -4775,4 +4819,82 @@ body.stage-active #fullscreenVizHUD { display: none; }
 .ai-messages::-webkit-scrollbar-thumb:hover,
 #midiLabPreview::-webkit-scrollbar-thumb:hover {
     background: var(--border);
+}
+
+/* =========================================================
+   MIXER — mute / solo per $: track
+   ========================================================= */
+
+.mixer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 190px;
+    overflow-y: auto;
+}
+
+.mixer-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    transition: background 0.15s, opacity 0.15s;
+}
+
+.mixer-row:hover {
+    background: var(--bg-lighter);
+}
+
+/* Muted, or shadowed by another track's solo. */
+.mixer-row--silent .mixer-name {
+    opacity: 0.4;
+    text-decoration: line-through;
+}
+
+.mixer-name {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+}
+
+.mixer-btn {
+    flex: none;
+    width: 20px;
+    height: 18px;
+    padding: 0;
+    font-size: 10px;
+    font-family: inherit;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--text-secondary);
+    background: var(--bg-light);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s, background 0.12s, box-shadow 0.12s;
+}
+
+.mixer-btn:hover {
+    color: var(--text);
+    border-color: var(--neon-subtle);
+}
+
+.mixer-btn--mute.is-on {
+    color: #0b0f18;
+    background: var(--neon-secondary);
+    border-color: var(--neon-secondary);
+    box-shadow: 0 0 6px var(--neon-secondary-glow);
+}
+
+.mixer-btn--solo.is-on {
+    color: #0b0f18;
+    background: var(--neon);
+    border-color: var(--neon);
+    box-shadow: 0 0 6px var(--neon-glow);
 }

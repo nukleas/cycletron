@@ -43,6 +43,7 @@
                     </svg>
                 </button>
                 <span id="midiInStatus" class="midi-in-status" hidden data-tooltip="MIDI input"></span>
+                <button id="launchQuantumBtn" class="launch-btn" type="button" data-tooltip="Launch quantization" aria-label="Launch quantization"></button>
             </div>
              <div class="slider-group">
                 <div class="bpm-control">
@@ -217,6 +218,13 @@
             <div class="sidebar-section">
                 <h3>Sequence Grid</h3>
                 <div id="visualizer"></div>
+            </div>
+
+            <div class="sidebar-section" id="mixerPanel" hidden>
+                <h3>Mixer <span id="mixerCount" class="section-count"></span>
+                    <button id="mixerClear" class="prefs-inline-btn" type="button" data-tooltip="Clear all mutes and solos">Clear</button>
+                </h3>
+                <div id="mixerList" class="mixer-list"></div>
             </div>
 
             <div class="sidebar-section">
@@ -650,6 +658,32 @@
                         <span>Autocomplete &amp; hover docs</span>
                     </label>
                     <p class="prefs-note">Suggestions and hover help sourced from the strudel-rs DSL surface. Toggle live from the command palette too.</p>
+                </section>
+                <section class="prefs-section">
+                    <h4>Ableton Link</h4>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsLinkEnabled">
+                        <span>Sync tempo and bar phase over Ableton Link</span>
+                    </label>
+                    <div class="prefs-field-hint" id="prefsLinkStatus"></div>
+                    <p class="prefs-note">Shares tempo and bar phase with Ableton Live, Bitwig and any other Link app on the network. Discovery is automatic &mdash; there is nothing to configure. While Link is on the session owns the tempo, so a pattern's <code>setbpm</code> is ignored, and Play waits for the shared bar line before starting.</p>
+                </section>
+                <section class="prefs-section">
+                    <h4>OSC Output</h4>
+                    <label class="prefs-field prefs-check">
+                        <input type="checkbox" id="prefsOscEnabled">
+                        <span>Send OSC over UDP</span>
+                    </label>
+                    <label class="prefs-field">
+                        <span>Host</span>
+                        <input type="text" id="prefsOscHost" placeholder="127.0.0.1" autocomplete="off" spellcheck="false">
+                    </label>
+                    <label class="prefs-field">
+                        <span>Port</span>
+                        <input type="number" id="prefsOscPort" min="1" max="65535" step="1" placeholder="57120">
+                    </label>
+                    <div class="prefs-field-hint" id="prefsOscTarget"></div>
+                    <p class="prefs-note" id="prefsOscStatus">Streams <code>/cycletron/cycle</code>, <code>/cycletron/transport</code> and <code>/cycletron/hap</code> — point Hydra, Resolume, TouchDesigner or a lighting rig at it. Onsets are frame-accurate (~16&nbsp;ms), which suits visuals rather than driving a sampler.</p>
                 </section>
                 <section class="prefs-section">
                     <h4>Notifications</h4>
