@@ -31,8 +31,8 @@ import {welcomeModal} from './welcome-modal.js';
 import {logsModal} from './logs-modal.js';
 import {checkForUpdates} from './updater.js';
 import {notify} from './notifications.js';
-import {initTrayBridge} from './tray-bridge.js';
-import {initShortcutBridge} from './shortcut-bridge.js';
+import {initPlaybackBridge} from './playback-bridge.js';
+import {initDesktopTheme} from './desktop-theme.js';
 import {diag} from './diagnostics.js';
 import {fileMenuButton} from './file-menu-button.js';
 import {editorEmptyState} from './editor-empty-state.js';
@@ -172,8 +172,7 @@ async function boot(): Promise<void> {
         soundsBrowser.init(),
         fileManager.init(),
         fileExplorer.init(),
-        initTrayBridge(),
-        initShortcutBridge(),
+        initPlaybackBridge(),
         restoreIfAny(),
     ]);
 
@@ -282,6 +281,7 @@ async function applyPhase4Settings(): Promise<void> {
         const editor = window.strudelApp?.editor;
         if (editor && editor.isAssistEnabled() !== assist) editor.setAssistEnabled(assist);
         metronome.applyFromSettings(settings.metronome ?? {enabled: false, volume: 0.4});
+        await initDesktopTheme(!!settings.follow_desktop_theme);
         midiInput.applyFromSettings(settings.midi_input ?? {
             device_id: null, cc_gain: 7, cc_bpm: 74,
             monitor_enabled: false, monitor_instrument: 'sawtooth', monitor_gain: 0.8,

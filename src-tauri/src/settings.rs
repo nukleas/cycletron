@@ -39,6 +39,11 @@ pub struct UserSettings {
     /// Which sample set live playback and export resolve sounds from.
     #[serde(default)]
     pub samples: SampleSetSettings,
+    /// Repaint the UI from the desktop's own theme (Omarchy's `colors.toml`).
+    /// Off by default: the neon palette is Cycletron's, and blending into the
+    /// desktop should be something the user asks for.
+    #[serde(default)]
+    pub follow_desktop_theme: bool,
     /// First-run welcome modal has been dismissed. Defaults to false so a
     /// fresh install sees the onboarding flow.
     #[serde(default)]

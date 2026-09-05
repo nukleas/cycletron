@@ -70,6 +70,10 @@ hyper = { version = "1", features = ["full"] }
 http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
 
+# MPRIS is how a Linux desktop discovers and drives a media player: media
+# keys, the GNOME/KDE now-playing popovers, waybar, Omarchy's media widget.
+[target.'cfg(target_os = "linux")'.dependencies]
+mpris-server = { version = "0.10", features = ["tokio"] }
 [dev-dependencies]
 tempfile = "3"
 
@@ -78,6 +82,12 @@ tauri-build = { version = "2", features = [] }
 
 [lib]
 # The _lib suffix keeps the lib's artifacts (.pdb/.lib) from colliding with the
-# cycletron-app bin target on Windows MSVC, which flattens both to cycletron_app.*
+# bin target on Windows MSVC, which flattens both to the same stem.
 name = "cycletron_app_lib"
 crate-type = ["lib", "staticlib", "cdylib"]
+
+# The CLI, the Omarchy plugin, and the transport bindings all invoke `cycletron`.
+# Cargo would otherwise name this binary after the package (`cycletron-app`).
+[[bin]]
+name = "cycletron"
+path = "src/main.rs"

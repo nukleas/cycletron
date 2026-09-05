@@ -2,6 +2,7 @@ mod agent_loop;
 mod codex_oauth;
 mod commands;
 mod demos;
+mod desktop_theme;
 mod export;
 mod files;
 mod library;
@@ -10,11 +11,14 @@ mod link;
 mod logs;
 mod menu;
 mod midi_input;
+#[cfg(target_os = "linux")]
+mod mpris;
 mod oauth;
 mod oauth_store;
 mod osc;
 mod packs;
 mod persistence;
+mod playback;
 mod recording;
 mod sample_sets;
 mod secrets;
@@ -204,6 +208,34 @@ pub fn run() {
                 Err(e) => tracing::warn!("tray setup failed: {e}"),
             }
 
+            // Follow the desktop palette when the user asks us to.
+            desktop_theme::spawn_watcher(app.handle().clone());
+
+            // MPRIS: media keys and every desktop now-playing surface.
+            #[cfg(target_os = "linux")]
+            mpris::init(app.handle().clone());
+
+            // SIGTERM/SIGINT skip Tauri's Exit event. Unlink the state file
+            // anyway, or a widget keeps reporting a session that is gone.
+            #[cfg(unix)]
+            {
+                tauri::async_runtime::spawn(async {
+                    let term =
+                        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate());
+                    let int =
+                        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt());
+                    let (Ok(mut term), Ok(mut int)) = (term, int) else {
+                        return;
+                    };
+                    tokio::select! {
+                        _ = term.recv() => {}
+                        _ = int.recv() => {}
+                    }
+                    crate::playback::remove_runtime_state_file();
+                    std::process::exit(0);
+                });
+            }
+
             // System-wide shortcuts (Cmd+Shift+Space, etc.).
             if let Err(e) = shortcuts::register_defaults(app.handle()) {
                 tracing::warn!("global shortcuts setup failed: {e}");
@@ -305,7 +337,7 @@ pub fn run() {
             commands::reveal_in_os,
             persistence::autosave_session,
             persistence::restore_session,
-            tray::tray_set_playback,
+            playback::set_playback_state,
             commands::import_midi,
             commands::inspect_midi,
             commands::save_midi_to_library,
@@ -332,6 +364,7 @@ pub fn run() {
             commands::log_diagnostic,
             commands::diagnostic_dump,
             commands::set_dock_badge,
+            desktop_theme::get_desktop_theme,
             link::link_enable,
             link::link_snapshot,
             osc::osc_configure,
@@ -364,13 +397,16 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {
-            // Commit any in-flight take before we go, so quitting mid-recording
-            // still leaves a playable file rather than an orphaned .part.
             if matches!(
                 event,
                 tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
             ) {
+                // Commit any in-flight take before we go, so quitting mid-recording
+                // still leaves a playable file rather than an orphaned .part.
                 app.state::<recording::RecordingState>().commit_all();
+                // Take the state file with us, so anything watching it doesn't
+                // keep reporting a session that has ended.
+                playback::remove_state_file(app);
             }
         });
 }

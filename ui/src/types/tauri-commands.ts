@@ -227,6 +227,7 @@ export interface UserSettings {
     editor: EditorSettings;
     midi_input: MidiInputSettings;
     samples: SampleSetSettings;
+    follow_desktop_theme: boolean;
     first_run_done: boolean;
     /** User has explicitly turned the AI assistant on. Off by default. */
     ai_consent: boolean;

@@ -73,6 +73,19 @@ export class PatternScheduler {
     private bpm: number = 120;
     private cps: number = 0.5;
 
+    /** Tempo, for anything reporting transport state outside the app. */
+    get tempo(): {bpm: number; cps: number} {
+        return {bpm: this.bpm, cps: this.cps};
+    }
+
+    /** Cycle position off the audio clock. Deliberately not the visualizer's
+     *  cycle: that one rides requestAnimationFrame, which the OS throttles to
+     *  a standstill whenever the window is hidden — precisely when something
+     *  outside the app is the thing doing the reporting. */
+    get cycle(): number {
+        return this.running ? this._liveCurrentCycle() : this.pausedCycle;
+    }
+
     private running: boolean = false;
     private startTime: number = 0;
     private scheduledTo: number = 0;

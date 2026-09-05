@@ -15,6 +15,7 @@ import {fileExplorer} from './file-explorer.js';
 import {presetById, presetProfile, defaultLlmSettings, normalizeLlm} from './providers.js';
 import {dismissibleModal} from './modal-utils.js';
 import {setNotificationsEnabled} from './notifications.js';
+import {setFollowDesktopTheme} from './desktop-theme.js';
 import {oscOut} from './osc-out.js';
 import {linkSync} from './link-sync.js';
 import {metronome} from './metronome.js';
@@ -55,6 +56,7 @@ export class PreferencesModal {
     private libraryRoot: HTMLElement | null = null;
     private autoCheck: HTMLInputElement | null = null;
     private notifications: HTMLInputElement | null = null;
+    private followDesktopTheme: HTMLInputElement | null = null;
     private editorAssist: HTMLInputElement | null = null;
     private metronomeVolume: HTMLInputElement | null = null;
     private audioOutput: HTMLSelectElement | null = null;
@@ -94,6 +96,7 @@ export class PreferencesModal {
         this.libraryRoot = document.getElementById('prefsLibraryRoot');
         this.autoCheck = document.getElementById('prefsAutoCheck') as HTMLInputElement;
         this.notifications = document.getElementById('prefsNotifications') as HTMLInputElement;
+        this.followDesktopTheme = document.getElementById('prefsFollowDesktopTheme') as HTMLInputElement;
         this.editorAssist = document.getElementById('prefsEditorAssist') as HTMLInputElement;
         this.metronomeVolume = document.getElementById('prefsMetronomeVolume') as HTMLInputElement;
         this.audioOutput = document.getElementById('prefsAudioOutput') as HTMLSelectElement;
@@ -178,6 +181,7 @@ export class PreferencesModal {
             if (this.libraryRoot) this.libraryRoot.textContent = libRoot || '—';
             if (this.autoCheck) this.autoCheck.checked = settings.updater.auto_check;
             if (this.notifications) this.notifications.checked = settings.notifications.enabled;
+            if (this.followDesktopTheme) this.followDesktopTheme.checked = !!settings.follow_desktop_theme;
             if (this.editorAssist) this.editorAssist.checked = settings.editor?.assist_enabled ?? true;
             if (this.metronomeVolume) {
                 this.metronomeVolume.value = String(Math.round((settings.metronome?.volume ?? 0.4) * 100));
@@ -541,6 +545,7 @@ export class PreferencesModal {
             samples: {
                 active: this.loaded?.samples?.active ?? 'cycletron',
             },
+            follow_desktop_theme: !!this.followDesktopTheme?.checked,
             first_run_done: firstRunDone,
             ai_consent: this.aiConsent ? !!this.aiConsent.checked : (this.loaded?.ai_consent ?? false),
         };
@@ -717,6 +722,7 @@ export class PreferencesModal {
                 window.strudelApp?.applyBpm?.(tempo);
             }
             setNotificationsEnabled(next.notifications.enabled);
+            await setFollowDesktopTheme(next.follow_desktop_theme);
             window.strudelApp?.editor?.setAssistEnabled(next.editor.assist_enabled);
             metronome.setVolume(next.metronome.volume);
             midiInput.applyFromSettings(next.midi_input);

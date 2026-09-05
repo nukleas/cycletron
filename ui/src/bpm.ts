@@ -7,6 +7,10 @@
 
 /** The current tempo as shown in the transport, or `fallback` before boot. */
 export function currentBpm(fallback = 120): number {
+    const scheduled = window.strudelApp?.scheduler?.tempo?.bpm;
+    if (typeof scheduled === 'number' && Number.isFinite(scheduled) && scheduled > 0) {
+        return scheduled;
+    }
     const slider = document.getElementById('bpmSlider') as HTMLInputElement | null;
     const v = slider ? parseFloat(slider.value) : NaN;
     return Number.isFinite(v) ? v : fallback;

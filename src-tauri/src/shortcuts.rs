@@ -1,9 +1,10 @@
 //! System-wide global shortcuts. These fire even when Cycletron is not
 //! the focused app — useful for live-performance transport control.
 //!
-//! The Rust side translates accelerator presses into `shortcut:*` events
-//! that the frontend consumes (same pattern as the menu).
+//! The Rust side translates accelerator presses into the same `transport:*`
+//! events the tray and the CLI verbs emit.
 
+use crate::playback::topic;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -21,14 +22,14 @@ pub fn register_defaults<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 
     gs.on_shortcut(play_pause, move |app, _shortcut, event| {
         if event.state == ShortcutState::Pressed {
-            let _ = app.emit("shortcut:play_pause", ());
+            let _ = app.emit(topic::PLAY_PAUSE, ());
         }
     })
     .map_err(to_tauri_err)?;
 
     gs.on_shortcut(stop, move |app, _shortcut, event| {
         if event.state == ShortcutState::Pressed {
-            let _ = app.emit("shortcut:stop", ());
+            let _ = app.emit(topic::STOP, ());
         }
     })
     .map_err(to_tauri_err)?;

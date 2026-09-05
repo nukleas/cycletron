@@ -91,7 +91,25 @@ export class StrudelApp {
     sampleLoader: SampleLoader | null;
     processor: MainThreadProcessor | null;
 
-    playbackState: PlaybackState;
+    private _playbackState: PlaybackState = PlaybackState.Stopped;
+    private playbackListeners: Array<(state: PlaybackState) => void> = [];
+
+    get playbackState(): PlaybackState {
+        return this._playbackState;
+    }
+
+    /** Assigning transport state notifies everything outside the app that
+     *  tracks it — the tray, the state file, MPRIS — from one place. */
+    set playbackState(next: PlaybackState) {
+        if (next === this._playbackState) return;
+        this._playbackState = next;
+        for (const listener of this.playbackListeners) listener(next);
+    }
+
+    onPlaybackStateChange(listener: (state: PlaybackState) => void): void {
+        this.playbackListeners.push(listener);
+    }
+
     isInitialized: boolean;
 
     // WASM modules (loaded dynamically)
@@ -153,7 +171,6 @@ export class StrudelApp {
         this.sampleLoader = null;
         this.processor = null;
 
-        this.playbackState = PlaybackState.Stopped;
         this.isInitialized = false;
 
         // WASM modules (loaded dynamically)
@@ -1557,7 +1574,9 @@ export class StrudelApp {
         bpm = linkSync.resolveBpm(bpm);
         bpm = Math.max(30, Math.min(300, bpm));
         if (isNaN(bpm)) return;
-        const value = String(bpm);
+        // The BPM control is a range input with step 1; a fractional string
+        // is rejected by the DOM and the slider stays put.
+        const value = String(Math.round(bpm));
         // Runs on every evaluate (each live-coding keystroke) — skip the DOM
         // and localStorage churn when the tempo didn't change. The scheduler
         // still gets the call; it no-ops internally on an unchanged BPM.
