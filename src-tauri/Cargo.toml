@@ -59,7 +59,7 @@ rosc = "0.11"
 rusty_link = "0.4"
 # Free-space query for the recording sink. Pure Rust — no new -sys crate, so
 # the macOS-universal / AppImage / NSIS jobs are unaffected.
-fs4 = "0.13"
+fs4 = "1.1"
 
 # For proper production SAB support:
 # We embed the frontend and serve it over real http://127.0.0.1 so WebKit
