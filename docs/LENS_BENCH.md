@@ -18,9 +18,21 @@ Every bench number is derived from the prescription at load
 - **EFL.** A design declares its published focal length; the surfaces are
   scaled uniformly so the paraxial trace agrees with it (scaling every length
   by k scales EFL by k and keeps the aberration shape).
-- **Image plane.** Focusing designs get their last air gap set to the paraxial
-  back focal distance. The three original fixtures had typed image distances
-  7, 20 and 28 mm past focus — the "IMG" line showed a blur, not a spot.
+- **Image plane.** Focusing designs get their last air gap set to the *best
+  focus*: the on-axis fan at full aperture is traced once and the RMS spot is
+  scanned along the bench; its minimum is the circle of least confusion,
+  which sits ahead of the paraxial focus by the lens's spherical aberration
+  (0.6 mm on the achromat, 3.7 mm on the f/1.35 condenser). The three
+  original fixtures had typed image distances 7, 20 and 28 mm past focus —
+  the "IMG" line showed a blur, not a spot.
+- **Focus marker.** The same scan finds an *internal* focus for an afocal
+  pair (the Keplerian's crossing between the lenses, 50.9 mm in) and the
+  bloom and note-arrival flare sit there while the screen still shows the
+  collimated output. When the fan never converges (the diverging lens) the
+  exit rays' backward extensions are solved by least squares for the
+  *virtual* focus (−46.8 mm, behind the front vertex), drawn as dashed
+  back-projections with the marker labelled VIRTUAL FOCUS; the view widens
+  to include it.
 - **Fan height.** Bisection on the real trace finds the tallest on-axis ray
   that clears every clear aperture, then the published f-number caps it
   (fixture stops are often oversized; the Double Gauss passes f/1.1). The low
@@ -29,12 +41,14 @@ Every bench number is derived from the prescription at load
 - **Readouts.** The title strip shows the traced EFL, BFL and working
   f-number; screen designs show AFOCAL / their virtual EFL.
 
-| Design | Scale k | EFL | BFL | Fan cap | Marginal d-line hit |
-|---|---|---|---|---|---|
-| Achromat doublet | 1.085 | 100.0 | 96.81 | f/4 (h 12.5) | ≈0.1 mm |
-| Cooke triplet | 1.516 | 50.0 | 37.18 | f/4 (h 6.25) | ≈0.1 mm |
-| Double Gauss | 1.832 | 50.0 | 22.18 | f/2 (h 12.5) | ≈0.6 mm |
-| Fast condenser | 1.000 | 30.0 | 24.68 | clear aperture, f/1.35 | ≈2.7 mm (a single PCX this fast is a blur by nature) |
+| Design | Scale k | EFL | Paraxial BFL | Fan cap | Best focus from last vertex | RMS spot paraxial → best |
+|---|---|---|---|---|---|---|
+| Achromat doublet | 1.085 | 100.0 | 96.81 | f/4 (h 12.5) | 96.25 | 0.049 → 0.019 mm |
+| Cooke triplet | 1.516 | 50.0 | 37.18 | f/4 (h 6.25) | 36.56 | 0.051 → 0.020 mm |
+| Double Gauss | 1.832 | 50.0 | 22.18 | f/2 (h 12.5) | 21.10 | 0.19 → 0.076 mm |
+| Fast condenser | 1.000 | 30.0 | 24.68 | clear aperture, f/1.35 | 20.99 | 1.14 → 0.43 mm |
+| Diverging fan | — | −50.0 | −52.31 | clear aperture | virtual, z −46.8 | — |
+| Keplerian pair | — | afocal | — | clear aperture | internal, z 50.85 | 0.14 mm |
 
 The condenser's f/1.2 label exceeds what its clear aperture passes, so the
 trace's own marginal ray (f/1.35) is the limit there.

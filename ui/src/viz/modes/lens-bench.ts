@@ -64,6 +64,21 @@ interface DesignOptics {
     fno: number;
     /** Sum of thicknesses: the z of the image plane / screen. */
     zImg: number;
+    /** z of the last vertex; readouts measure focus from here. */
+    lastVertex: number;
+    /**
+     * z of the real best focus (circle of least confusion of the on-axis
+     * fan) — the image plane for focusing designs, an internal crossing for
+     * an afocal pair. NaN when the bundle never converges.
+     */
+    focusZ: number;
+    /** RMS spot radius at that focus, mm. */
+    focusRms: number;
+    /**
+     * For a diverging bundle: z where the exit rays' backward extensions
+     * meet (least squares) — the virtual focus a textbook draws dashed.
+     */
+    virtualFocusZ: number;
 }
 
 /**
@@ -133,7 +148,6 @@ const LENS_DESIGNS: LensDesign[] = [
     {
         name: 'DIVERGING FAN -50mm',
         sheet: 'EO 45-028 · PCV',
-        focusLabel: 'VIRTUAL FOCUS',
         maxFieldDeg: 4,
         screen: true,
         viewSemiDiameter: 30,
@@ -202,7 +216,9 @@ function paraxial(S: LensSurface[]): {efl: number; bfl: number} {
         if (k < S.length - 1) y += u * S[k].t;
         n1 = n2;
     }
-    if (Math.abs(u) < 1e-12) return {efl: Infinity, bfl: Infinity};
+    // A nominally afocal pair traces to a focal length of tens of metres
+    // through rounding; anything beyond a few metres is afocal on a bench.
+    if (Math.abs(u) < 1e-12 || Math.abs(1 / u) > 5000) return {efl: Infinity, bfl: Infinity};
     return {efl: -1 / u, bfl: -y / u};
 }
 
@@ -312,6 +328,36 @@ function traceRay(
 }
 
 /**
+ * Height of a traced ray at axial position z, interpolated along its
+ * polyline and extended along its first / last segment beyond the ends —
+ * so the same call serves a focus inside the system, at the image plane, or
+ * a virtual focus behind the lens.
+ */
+function yAtZ(polys: Float32Array, base: number, np: number, z: number): number {
+    if (np < 2) return NaN;
+    let j = 1;
+    while (j < np - 1 && polys[base + j * 2] < z) j++;
+    const z0 = polys[base + (j - 1) * 2];
+    const y0 = polys[base + (j - 1) * 2 + 1];
+    const z1 = polys[base + j * 2];
+    const y1 = polys[base + j * 2 + 1];
+    if (z1 === z0) return y0;
+    return y0 + (y1 - y0) * (z - z0) / (z1 - z0);
+}
+
+/** RMS of the lane-0 fan's heights at z (rays that reached the image plane). */
+function fanRmsAt(polys: Float32Array, polyLen: Uint8Array, polyClip: Int8Array | Int16Array, z: number): number {
+    let sum2 = 0;
+    let n = 0;
+    for (let i = 0; i < RAYS; i++) {
+        if (polyClip[i] >= 0) continue;
+        const y = yAtZ(polys, i * MAX_PTS * 2, polyLen[i], z);
+        if (Number.isFinite(y)) { sum2 += y * y; n++; }
+    }
+    return n > 0 ? Math.sqrt(sum2 / n) : NaN;
+}
+
+/**
  * Normalise a prescription in place and derive its optics. Designs with a
  * published `efl` are scaled so the trace agrees with the label, and every
  * focusing design gets its image plane at the paraxial focus — typed image
@@ -352,7 +398,70 @@ function prepareDesign(design: LensDesign): DesignOptics {
     const hMax = design.fno !== undefined && efl > 0
         ? Math.min(lo, efl / (2 * design.fno))
         : lo;
-    return {efl, bfl, hMax, fno: efl / (2 * hMax), zImg};
+    const lastVertex = zs[S.length - 1];
+
+    // Where does the on-axis fan at full aperture actually come together?
+    // Scan the RMS spot along the bench: the minimum is the circle of least
+    // confusion — ahead of paraxial focus for a lens with spherical
+    // aberration, between the elements for a Keplerian pair. If the fan
+    // never tightens (a negative lens) the exit rays' backward extensions
+    // give the virtual focus instead.
+    const fan = new Float32Array(RAYS * MAX_PTS * 2);
+    const fanLen = new Uint8Array(RAYS);
+    const fanClip = new Int16Array(RAYS);
+    let launchRms = 0;
+    for (let i = 0; i < RAYS; i++) {
+        const y1 = ((i / (RAYS - 1)) * 2 - 1) * hMax;
+        const hit = traceRay(S, zs, zImg, zStart, y1, 0, 0, fan, i * MAX_PTS * 2);
+        fanLen[i] = hit.np;
+        fanClip[i] = hit.clip;
+        launchRms += y1 * y1;
+    }
+    launchRms = Math.sqrt(launchRms / RAYS);
+    let focusZ = NaN;
+    let focusRms = Infinity;
+    const steps = 600;
+    for (let k = 0; k <= steps; k++) {
+        const z = (zImg * k) / steps;
+        const rms = fanRmsAt(fan, fanLen, fanClip, z);
+        if (rms < focusRms) { focusRms = rms; focusZ = z; }
+    }
+    for (let k = -40; k <= 40; k++) {
+        const z = focusZ + (k / 40) * (zImg / steps);
+        const rms = fanRmsAt(fan, fanLen, fanClip, z);
+        if (rms < focusRms) { focusRms = rms; focusZ = z; }
+    }
+    // A real focus is a bundle that has actually converged, not the least
+    // bad spot of one that only ever spreads.
+    const converges = focusRms < 0.2 * launchRms;
+    let virtualFocusZ = NaN;
+    if (!converges) {
+        focusZ = NaN;
+        focusRms = NaN;
+        let sab = 0;
+        let sbb = 0;
+        for (let i = 0; i < RAYS; i++) {
+            const np = fanLen[i];
+            if (fanClip[i] >= 0 || np < 2) continue;
+            const base = i * MAX_PTS * 2;
+            const z0 = fan[base + (np - 2) * 2], y0 = fan[base + (np - 2) * 2 + 1];
+            const z1 = fan[base + (np - 1) * 2], y1 = fan[base + (np - 1) * 2 + 1];
+            const b = (y1 - y0) / (z1 - z0);
+            const a = y0 - b * z0;
+            sab += a * b;
+            sbb += b * b;
+        }
+        if (sbb > 0) {
+            const zls = -sab / sbb;
+            if (zls < lastVertex) virtualFocusZ = zls;
+        }
+    }
+    // Focusing designs image at best focus, not at the paraxial plane.
+    if (!design.screen && converges && focusZ > lastVertex) {
+        S[S.length - 1].t = focusZ - lastVertex;
+        zImg = focusZ;
+    }
+    return {efl, bfl, hMax, fno: efl / (2 * hMax), zImg, lastVertex, focusZ, focusRms, virtualFocusZ};
 }
 
 const DESIGN_OPTICS: DesignOptics[] = LENS_DESIGNS.map(prepareDesign);
@@ -386,6 +495,9 @@ class LensBenchMode implements VizMode {
     private readonly polyClip = new Int8Array(LANES * RAYS);
     /** Image-plane y per d-lane ray, NaN for dead rays — feeds the bloom. */
     private readonly imageHits = new Float32Array(RAYS).fill(NaN);
+    /** Live centroid / spread of the d-line fan at the design's focus. */
+    private focusY = NaN;
+    private focusRms = NaN;
     private pulses: Pulse[] = [];
     private bloom = 0;
     private readonly distances = new Float32Array(RAYS * MAX_PTS);
@@ -419,7 +531,10 @@ class LensBenchMode implements VizMode {
             zImg += surf.t;
             if (surf.sd > sdMax) sdMax = surf.sd;
         }
-        const zMin = -0.18 * zImg;
+        const optics = DESIGN_OPTICS[this.designIdx];
+        const zMin = Number.isFinite(optics.virtualFocusZ)
+            ? Math.min(-0.18 * zImg, optics.virtualFocusZ - 0.06 * zImg)
+            : -0.18 * zImg;
         const zMax = zImg * 1.04;
         const yMax = design.viewSemiDiameter ?? sdMax * 1.3;
         // Blueprint margins for the callout strip and title block, shrunk
@@ -477,6 +592,26 @@ class LensBenchMode implements VizMode {
                 this.polyClip[rayIdx] = hit.clip;
                 if (w === 0) this.imageHits[i] = hit.yImg;
             }
+        }
+
+        // Where the fan is tightest this frame: the field angle slides the
+        // focus laterally, so read it off the live rays rather than the
+        // on-axis number. A virtual focus is read off the exit rays'
+        // backward extensions.
+        const fz = Number.isFinite(optics.focusZ) ? optics.focusZ : optics.virtualFocusZ;
+        if (Number.isFinite(fz)) {
+            let sum = 0, sum2 = 0, n = 0;
+            for (let i = 0; i < RAYS; i++) {
+                if (this.polyClip[i] >= 0) continue;
+                const y = yAtZ(this.polys, i * MAX_PTS * 2, this.polyLen[i], fz);
+                if (!Number.isFinite(y)) continue;
+                sum += y; sum2 += y * y; n++;
+            }
+            this.focusY = n > 0 ? sum / n : NaN;
+            this.focusRms = n > 0 ? Math.sqrt(Math.max(0, sum2 / n - (sum / n) ** 2)) : NaN;
+        } else {
+            this.focusY = NaN;
+            this.focusRms = NaN;
         }
     }
 
@@ -887,36 +1022,68 @@ class LensBenchMode implements VizMode {
             ctx.stroke();
             ctx.globalAlpha = 1;
         }
-        if (cnt > 0 && !design.screen) {
-            const mean = sum / cnt;
-            const rms = Math.sqrt(Math.max(0, sum2 / cnt - mean * mean));
+        // The focus marker follows the trace: at the image plane for a
+        // focusing design (now placed at best focus), between the elements for
+        // an afocal pair, and behind the lens — with the exit rays projected
+        // back as dashed lines — for a diverging one.
+        const optics = DESIGN_OPTICS[this.designIdx];
+        const virtual = !Number.isFinite(optics.focusZ) && Number.isFinite(optics.virtualFocusZ);
+        const fz = virtual ? optics.virtualFocusZ : optics.focusZ;
+        if (Number.isFinite(fz) && Number.isFinite(this.focusY)) {
+            const fx = sx(fz);
+            const focalY = sy(this.focusY);
+            if (virtual) {
+                ctx.save();
+                ctx.setLineDash([3, 4]);
+                ctx.strokeStyle = theme.neon;
+                ctx.globalAlpha = 0.28;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let i = 0; i < RAYS; i++) {
+                    const np = this.polyLen[i];
+                    if (this.polyClip[i] >= 0 || np < 2) continue;
+                    const base = i * MAX_PTS * 2;
+                    const y = yAtZ(this.polys, base, np, fz);
+                    if (!Number.isFinite(y)) continue;
+                    ctx.moveTo(sx(this.polys[base + (np - 2) * 2]), sy(this.polys[base + (np - 2) * 2 + 1]));
+                    ctx.lineTo(fx, sy(y));
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+            const rms = virtual ? 0 : this.focusRms;
             const radius = 6 + rms * scale * 2 + this.bloom * 26;
-            const grad = ctx.createRadialGradient(imgX, sy(mean), 0, imgX, sy(mean), radius);
+            const grad = ctx.createRadialGradient(fx, focalY, 0, fx, focalY, radius);
             grad.addColorStop(0, `rgba(${neonRgb[0]}, ${neonRgb[1]}, ${neonRgb[2]}, ${(0.12 + this.bloom * 0.45).toFixed(3)})`);
             grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = grad;
             ctx.beginPath();
-            ctx.arc(imgX, sy(mean), radius, 0, TAU);
+            ctx.arc(fx, focalY, radius, 0, TAU);
             ctx.fill();
             // Local flare uses crisp strokes, keeping the beam's landing point
             // readable without a canvas-wide blur or compositing pass.
-            const focalY = sy(mean);
             const flare = 5 + Math.min(1, this.bloom) * 30;
             ctx.strokeStyle = theme.neon;
             ctx.globalAlpha = 0.2 + Math.min(1, this.bloom) * 0.45;
             ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(imgX, focalY - flare);
-            ctx.lineTo(imgX, focalY + flare);
+            ctx.moveTo(fx, focalY - flare);
+            ctx.lineTo(fx, focalY + flare);
             ctx.stroke();
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 1;
             ctx.stroke();
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.arc(imgX, focalY, 1.5 + Math.min(1, this.bloom) * 1.5, 0, TAU);
+            ctx.arc(fx, focalY, 1.5 + Math.min(1, this.bloom) * 1.5, 0, TAU);
             ctx.fill();
             ctx.globalAlpha = 1;
+            if (design.screen) {
+                ctx.fillStyle = `rgba(${tr}, ${tg}, ${tb}, 0.6)`;
+                ctx.font = `8px ${MONO}`;
+                ctx.textAlign = 'center';
+                ctx.fillText(virtual ? 'VIRTUAL FOCUS' : 'FOCUS', fx, focalY - flare - 6);
+            }
         }
 
         // Arrival rings retain each ray's actual hit position. Eight slots cap
@@ -963,13 +1130,21 @@ class LensBenchMode implements VizMode {
         // Readouts come from the trace, not the label: an afocal pair reads
         // AFOCAL, a negative lens its (virtual) EFL, everything else EFL/BFL
         // and the working f-number of the fan at full aperture.
-        const optics = DESIGN_OPTICS[this.designIdx];
+        // Focus distances: from the last vertex when the focus is past it (the
+        // usual BFL sense), otherwise as a bench z from the front vertex.
+        const focusText = Number.isFinite(optics.focusZ)
+            ? optics.focusZ > optics.lastVertex
+                ? `FOCUS ${(optics.focusZ - optics.lastVertex).toFixed(2)}`
+                : `FOCUS z ${optics.focusZ.toFixed(1)}`
+            : Number.isFinite(optics.virtualFocusZ)
+                ? `VIRTUAL FOCUS z ${optics.virtualFocusZ.toFixed(1)}`
+                : '';
         const eflText = !Number.isFinite(optics.efl)
-            ? 'AFOCAL'
+            ? `AFOCAL  ${focusText}`
             : design.screen
-                ? `EFL ${optics.efl.toFixed(1)}`
-                : `EFL ${optics.efl.toFixed(1)}  BFL ${optics.bfl.toFixed(2)}`;
-        const fnoText = design.focusLabel ?? `f/${optics.fno.toFixed(1)}`;
+                ? `EFL ${optics.efl.toFixed(1)}  ${focusText}`
+                : `EFL ${optics.efl.toFixed(1)}  BFL ${optics.bfl.toFixed(2)}  ${focusText}`;
+        const fnoText = design.focusLabel ?? (optics.efl > 0 && Number.isFinite(optics.efl) ? `f/${optics.fno.toFixed(1)}` : '');
         ctx.fillText(
             `${eflText}   ${fnoText}   FIELD ${fieldDeg}°   λ-SPLIT ${this.split.toFixed(2)}`,
             48, 18,
