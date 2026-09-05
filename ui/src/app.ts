@@ -887,10 +887,11 @@ export class StrudelApp {
                     this.sampleLoader!.loadMachineKits(),
                     this.sampleLoader!.loadPercussionColors(),
                     this.sampleLoader!.loadInstrumentBanks(),
+                    this.sampleLoader!.loadVcslBanks(),
                     this.loadEnabledPacks(),
-                ]).then(([machineCount, colorNames, instrumentNames, packSamples]) => {
+                ]).then(([machineCount, colorNames, instrumentNames, vcslNames, packSamples]) => {
                     if (!this.isInitialized) return;
-                    const extraBanks = [...colorNames, ...instrumentNames];
+                    const extraBanks = [...colorNames, ...instrumentNames, ...vcslNames];
                     const total = drums + machineCount + extraBanks.length + packSamples;
                     this.elements.sampleCount.textContent = `${total}`;
                     if (extraBanks.length && isTauri) {

@@ -98,6 +98,183 @@
     "samples/speech/f.wav",
     "samples/speech/g.wav"
   ],
+  "kalimba": {
+    "B2": "samples/kalimba/B2.mp3",
+    "Ds3": "samples/kalimba/Ds3.mp3",
+    "Gs3": "samples/kalimba/Gs3.mp3",
+    "Cs4": "samples/kalimba/Cs4.mp3",
+    "Fs4": "samples/kalimba/Fs4.mp3",
+    "B4": "samples/kalimba/B4.mp3"
+  },
+  "marimba": {
+    "F1": "samples/marimba/F1.mp3",
+    "G2": "samples/marimba/G2.mp3",
+    "F3": "samples/marimba/F3.mp3",
+    "C4": "samples/marimba/C4.mp3",
+    "B4": "samples/marimba/B4.mp3",
+    "C6": "samples/marimba/C6.mp3"
+  },
+  "vibraphone": {
+    "F2": "samples/vibraphone/F2.mp3",
+    "C3": "samples/vibraphone/C3.mp3",
+    "G3": "samples/vibraphone/G3.mp3",
+    "D4": "samples/vibraphone/D4.mp3",
+    "A4": "samples/vibraphone/A4.mp3",
+    "E5": "samples/vibraphone/E5.mp3"
+  },
+  "glockenspiel": {
+    "G4": "samples/glockenspiel/G4.mp3",
+    "G5": "samples/glockenspiel/G5.mp3",
+    "C6": "samples/glockenspiel/C6.mp3",
+    "G6": "samples/glockenspiel/G6.mp3",
+    "C7": "samples/glockenspiel/C7.mp3"
+  },
+  "tubularbells": {
+    "C3": "samples/tubularbells/C3.mp3",
+    "E3": "samples/tubularbells/E3.mp3",
+    "Gs3": "samples/tubularbells/Gs3.mp3",
+    "C4": "samples/tubularbells/C4.mp3",
+    "E4": "samples/tubularbells/E4.mp3"
+  },
+  "harp": {
+    "E1": "samples/harp/E1.mp3",
+    "D2": "samples/harp/D2.mp3",
+    "C3": "samples/harp/C3.mp3",
+    "B3": "samples/harp/B3.mp3",
+    "C5": "samples/harp/C5.mp3",
+    "B5": "samples/harp/B5.mp3",
+    "A6": "samples/harp/A6.mp3",
+    "F7": "samples/harp/F7.mp3"
+  },
+  "ocarina": {
+    "A3": "samples/ocarina/A3.mp3",
+    "Cs4": "samples/ocarina/Cs4.mp3",
+    "Fs4": "samples/ocarina/Fs4.mp3",
+    "As4": "samples/ocarina/As4.mp3",
+    "Cs5": "samples/ocarina/Cs5.mp3"
+  },
+  "recorder_alto_sus": {
+    "F3": "samples/recorder_alto_sus/F3.mp3",
+    "As3": "samples/recorder_alto_sus/As3.mp3",
+    "D4": "samples/recorder_alto_sus/D4.mp3",
+    "Gs4": "samples/recorder_alto_sus/Gs4.mp3",
+    "C5": "samples/recorder_alto_sus/C5.mp3",
+    "E5": "samples/recorder_alto_sus/E5.mp3"
+  },
+  "balafon": {
+    "Cs3": "samples/balafon/Cs3.mp3",
+    "F3": "samples/balafon/F3.mp3",
+    "C4": "samples/balafon/C4.mp3",
+    "F4": "samples/balafon/F4.mp3",
+    "C5": "samples/balafon/C5.mp3",
+    "F5": "samples/balafon/F5.mp3"
+  },
+  "harmonica": {
+    "C3": "samples/harmonica/C3.mp3",
+    "C4": "samples/harmonica/C4.mp3",
+    "G4": "samples/harmonica/G4.mp3",
+    "E5": "samples/harmonica/E5.mp3",
+    "C6": "samples/harmonica/C6.mp3"
+  },
+  "steinway": {
+    "As0": "samples/steinway/As0.mp3",
+    "Gs1": "samples/steinway/Gs1.mp3",
+    "E2": "samples/steinway/E2.mp3",
+    "D3": "samples/steinway/D3.mp3",
+    "As3": "samples/steinway/As3.mp3",
+    "Gs4": "samples/steinway/Gs4.mp3",
+    "E5": "samples/steinway/E5.mp3",
+    "D6": "samples/steinway/D6.mp3",
+    "As6": "samples/steinway/As6.mp3",
+    "Gs7": "samples/steinway/Gs7.mp3"
+  },
+  "strumstick": {
+    "D2": "samples/strumstick/D2.mp3",
+    "G2": "samples/strumstick/G2.mp3",
+    "Cs3": "samples/strumstick/Cs3.mp3",
+    "Fs3": "samples/strumstick/Fs3.mp3",
+    "B3": "samples/strumstick/B3.mp3",
+    "E4": "samples/strumstick/E4.mp3",
+    "A4": "samples/strumstick/A4.mp3"
+  },
+  "psaltery_pluck": {
+    "As3": "samples/psaltery_pluck/As3.mp3",
+    "D4": "samples/psaltery_pluck/D4.mp3",
+    "Fs4": "samples/psaltery_pluck/Fs4.mp3",
+    "As4": "samples/psaltery_pluck/As4.mp3",
+    "D5": "samples/psaltery_pluck/D5.mp3",
+    "Fs5": "samples/psaltery_pluck/Fs5.mp3"
+  },
+  "dantranh": {
+    "B1": "samples/dantranh/B1.mp3",
+    "Fs2": "samples/dantranh/Fs2.mp3",
+    "B2": "samples/dantranh/B2.mp3",
+    "Ds3": "samples/dantranh/Ds3.mp3",
+    "B3": "samples/dantranh/B3.mp3",
+    "Ds4": "samples/dantranh/Ds4.mp3",
+    "B4": "samples/dantranh/B4.mp3"
+  },
+  "gong": [
+    "samples/gong/00.mp3",
+    "samples/gong/01.mp3",
+    "samples/gong/02.mp3"
+  ],
+  "timpani": [
+    "samples/timpani/00.mp3",
+    "samples/timpani/01.mp3",
+    "samples/timpani/02.mp3",
+    "samples/timpani/03.mp3"
+  ],
+  "didgeridoo": [
+    "samples/didgeridoo/00.mp3",
+    "samples/didgeridoo/01.mp3",
+    "samples/didgeridoo/02.mp3"
+  ],
+  "bongo": [
+    "samples/bongo/00.mp3",
+    "samples/bongo/01.mp3",
+    "samples/bongo/02.mp3",
+    "samples/bongo/03.mp3"
+  ],
+  "shaker_small": [
+    "samples/shaker_small/00.mp3",
+    "samples/shaker_small/01.mp3",
+    "samples/shaker_small/02.mp3"
+  ],
+  "tambourine": [
+    "samples/tambourine/00.mp3",
+    "samples/tambourine/01.mp3",
+    "samples/tambourine/02.mp3"
+  ],
+  "agogo": [
+    "samples/agogo/00.mp3",
+    "samples/agogo/01.mp3",
+    "samples/agogo/02.mp3"
+  ],
+  "guiro": [
+    "samples/guiro/00.mp3",
+    "samples/guiro/01.mp3"
+  ],
+  "sleighbells": [
+    "samples/sleighbells/00.mp3",
+    "samples/sleighbells/01.mp3"
+  ],
+  "triangles": [
+    "samples/triangles/00.mp3",
+    "samples/triangles/01.mp3",
+    "samples/triangles/02.mp3"
+  ],
+  "framedrum": [
+    "samples/framedrum/00.mp3",
+    "samples/framedrum/01.mp3",
+    "samples/framedrum/02.mp3"
+  ],
+  "darbuka": [
+    "samples/darbuka/00.mp3",
+    "samples/darbuka/01.mp3",
+    "samples/darbuka/02.mp3",
+    "samples/darbuka/03.mp3"
+  ],
   "RolandTR808_bd": [
     "machines/RolandTR808_bd.wav"
   ],

@@ -422,6 +422,16 @@ the grid explicitly — a tresillo rim
 the voice's body intact (hpf ≤ ~2000 on rims, a touch of `room` to seat it).
 Euclid rhythms stay fine on pitched, bodied voices
 (`note("c5(3,8)").s("wt_bell")`) when unrotated so they anchor the downbeat.
+Real instruments (bundled offline, VCSL, CC0 — note-mapped, so note()/n() play IN TUNE):
+kalimba marimba vibraphone glockenspiel tubularbells balafon — mallets & bells
+harp strumstick psaltery_pluck dantranh — plucked strings (dantranh = Vietnamese zither)
+ocarina recorder_alto_sus harmonica — sustaining winds (shape with .release())
+steinway — grand piano
+Real percussion (bundled offline, VCSL, CC0 — :n variants): gong timpani didgeridoo bongo
+shaker_small tambourine agogo guiro sleighbells triangles framedrum darbuka.
+Reach for these when a genre wants a real instrument: a kalimba or balafon melody,
+a marimba/vibraphone comp, a harp arpeggio, a bongo/darbuka groove, a gong hit on a
+drop. They sound better than wt_* for acoustic material and need no download.
 Melodic & speech samples (bundled offline — multi-variant one-shots):
 flbass — fretless bass (finger/pick/palm shorts); s("flbass:2") for variants
 uke — ukulele plucks

@@ -27,6 +27,8 @@ import {
     INSTRUMENT_BANKS,
     MACHINE_KITS,
     PERCUSSION_COLORS,
+    VCSL_ONESHOTS,
+    VCSL_PITCHED,
 } from '../sample-tables.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -49,6 +51,13 @@ for (const [name, sub] of PERCUSSION_COLORS) {
 }
 for (const [name, files] of INSTRUMENT_BANKS) {
     banks[name] = files.map(manifestPath); // array order = `:n` sample index
+}
+for (const [name, notes] of VCSL_PITCHED) {
+    // Note-mapped: the engine repitches from the nearest recorded note.
+    banks[name] = Object.fromEntries(Object.entries(notes).map(([note, sub]) => [note, manifestPath(sub)]));
+}
+for (const [name, files] of VCSL_ONESHOTS) {
+    banks[name] = files.map(manifestPath);
 }
 for (const [machine, , voices] of MACHINE_KITS) {
     for (const [voice, url] of voices) {

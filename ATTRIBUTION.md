@@ -38,6 +38,19 @@ contributors — **CC0** ([`licenses/VCSL-LICENSE.txt`](licenses/VCSL-LICENSE.tx
 | `tabla` | Darbuka |
 | `jvbass` | Yamaha TX81Z — FM Piano (low C, trimmed) |
 
+## VCSL instruments — `ui/public/samples/{kalimba,marimba,vibraphone,glockenspiel,tubularbells,harp,ocarina,recorder_alto_sus,balafon,harmonica,steinway,strumstick,psaltery_pluck,dantranh,gong,timpani,didgeridoo,bongo,shaker_small,tambourine,agogo,guiro,sleighbells,triangles,framedrum,darbuka}/`
+
+**Versilian Community Sample Library (VCSL)** by Versilian Studios LLC and
+contributors — **CC0** ([`licenses/VCSL-LICENSE.txt`](licenses/VCSL-LICENSE.txt)).
+
+- Source: https://github.com/sgossner/VCSL — the exact upstream recording
+  behind every bundled file is listed in `ui/scripts/vcsl-sources.json`.
+- 125 recordings, one velocity layer each, 5–10 notes per pitched
+  instrument: trimmed to 4–8 s, faded, peak-normalised to −4 dB, downmixed to
+  mono and MP3-encoded by `ui/scripts/vendor-vcsl.mjs` (3.7 MB in total).
+  The full library, with every note and dynamic, is the downloadable `vcsl`
+  sample set.
+
 ## Melodic & speech expansion — `ui/public/samples/{flbass,uke,cpluck,cbow,speech}/`
 
 Short **CC0** slices from the Tidal [Clean-Samples](https://github.com/tidalcycles/Clean-Samples)
