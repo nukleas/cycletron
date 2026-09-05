@@ -12,8 +12,8 @@
     "prebuild": "npm run gen:dsl && npm run gen:manifest",
     "build": "vite build",
     "preview": "vite preview --port 5173",
-    "comment:build:wasm": "The prebuilt engine WASM is committed under ui/pkg (built from the pinned strudel-rs main rev). Only rerun build:wasm to bump the engine; it needs a strudel-rs checkout at that rev + nightly. Then commit ui/pkg.",
-    "build:wasm": "cd ../../strudel-rs/crates/strudel-audio-wasm && wasm-pack build . --target web --out-dir ../../../cycletron/ui/pkg -- -Z build-std=std,panic_abort"
+    "comment:build:wasm": "The prebuilt engine WASM is committed under ui/pkg. Only rerun build:wasm to bump the engine: it needs nightly + wasm-pack and a strudel-rs checkout (STRUDEL_RS, default ../../clean-strudel-rs) at the exact rev Cargo.toml pins — the script refuses anything else. Then commit ui/pkg with the pin bump.",
+    "build:wasm": "node scripts/build-wasm.mjs"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.1",
