@@ -7,8 +7,8 @@
 //! prediction is a visible number, and the model's tuning can start from data.
 
 use crate::{SampleSetPaths, mix_of, render_pcm, resolve_patterns, resolve_tempo};
-use cycletron_analysis::spectral::{BANDS, NB, balance_findings, predicted_bands};
-use cycletron_analysis::spectrum::{Measured, dominant_band, measure};
+use cycletron_analysis::spectral::{BANDS, NB, predicted_bands, sound_names};
+use cycletron_analysis::spectrum::{LEVEL_FLOOR_DB, Measured, dominant_band, measure};
 use cycletron_analysis::{Evaluated, Finding};
 use serde::Serialize;
 use std::fmt::Write;
@@ -21,8 +21,20 @@ pub const MAX_CYCLES: usize = 32;
 pub const MAX_SECONDS: f64 = 60.0;
 /// Default window when the pattern does not reveal a loop period.
 const DEFAULT_CYCLES: usize = 4;
-/// A predicted vs measured gap (absolute energy share) worth naming.
-const DISAGREE: f64 = 0.15;
+/// A predicted vs pink-weighted measured gap (absolute share) worth naming.
+const DISAGREE: f64 = 0.20;
+
+/// What a balanced mix looks like on the pink-weighted level view, dB relative
+/// to the loudest band: music falls ~1.5 dB/octave steeper than pink above the
+/// low-mids, and the sub sits a little under the bass. First-pass reference —
+/// tune it from `hear_timing` sweeps over real tracks, not from theory.
+const REF_DB: [f64; NB] = [-3.0, 0.0, -2.0, -4.0, -7.0, -10.0];
+/// A band this far below its reference (dB) has effectively nothing in it.
+const MISSING_DB: f64 = 12.0;
+/// A band this far above its reference is dominating.
+const EXCESS_DB: f64 = 8.0;
+/// A render peaking under this is quiet enough to say so.
+const QUIET_PEAK_DBFS: f64 = -24.0;
 
 #[derive(Debug, Clone)]
 pub struct HearOptions {
@@ -49,6 +61,8 @@ impl Default for HearOptions {
 #[derive(Debug, Clone, Serialize)]
 pub struct StemReport {
     pub name: String,
+    /// The sounds that fire in this stem, so `gain-2` reads as `bd, sd`.
+    pub sounds: Vec<String>,
     pub measured: Measured,
     /// The symbolic estimate for this stem alone; None when none of its
     /// events carries a sound.
@@ -67,11 +81,11 @@ pub struct HearReport {
     pub stems: Vec<StemReport>,
     /// Over the mix render.
     pub clipped_samples: u64,
-    /// Bands where the estimate and the measurement differ by more than
-    /// [`DISAGREE`], in the mixer's language.
+    /// Bands where the estimate and the pink-weighted measurement differ by
+    /// more than [`DISAGREE`] — calibration data for the symbolic model.
     pub disagreements: Vec<String>,
-    /// Balance findings from the *measured* mix spectrum (the same thresholds
-    /// the review applies to the estimate) plus clipping.
+    /// What the render itself says: clipping, silence, a quiet master, and
+    /// balance against [`REF_DB`] on the pink-weighted level view.
     pub findings: Vec<Finding>,
     /// One line: `clean`, or the problems found.
     pub verdict: String,
@@ -118,6 +132,7 @@ pub fn hear(code: &str, samples: &SampleSetPaths, opts: HearOptions) -> Result<H
             let pcm = render_pcm(pattern, bpm, opts.gain, seconds, samples)?;
             stem_reports.push(StemReport {
                 name: name.clone(),
+                sounds: sound_names(&pattern.query_arc(0, cycles as i32)),
                 measured: measure(&pcm.mono(), pcm.sample_rate),
                 predicted: predict(pattern, cycles),
             });
@@ -125,33 +140,11 @@ pub fn hear(code: &str, samples: &SampleSetPaths, opts: HearOptions) -> Result<H
     }
 
     let disagreements = match (&predicted_mix, mix.silent) {
-        (Some(pred), false) => disagreements(pred, &mix.bands),
+        (Some(pred), false) => disagreements(pred, &mix.pink),
         _ => Vec::new(),
     };
 
-    let mut findings = Vec::new();
-    if mix_pcm.clipped > 0 {
-        findings.push(Finding {
-            severity: "warn".into(),
-            code: "clipping".into(),
-            message: format!(
-                "{} sample(s) exceeded full scale in the mix render (peak {:+.1} dBFS) — lower \
-                 gains or the master.",
-                mix_pcm.clipped, mix.peak_db
-            ),
-        });
-    }
-    if mix.silent {
-        findings.push(Finding {
-            severity: "warn".into(),
-            code: "silent-render".into(),
-            message: "The mix rendered as silence — the sounds may not exist in the offline \
-                      sample set, or every layer is muted/gained to zero."
-                .into(),
-        });
-    } else {
-        findings.extend(balance_findings(&mix.bands, stems.len().max(1)));
-    }
+    let findings = measured_findings(&mix, mix_pcm.clipped);
     let verdict = if findings.is_empty() {
         "clean".to_string()
     } else {
@@ -178,21 +171,139 @@ pub fn hear(code: &str, samples: &SampleSetPaths, opts: HearOptions) -> Result<H
     })
 }
 
+/// Verdict from the render alone. Balance is judged on the pink-weighted level
+/// view against [`REF_DB`]; raw power share is not judged (it is bass-heavy
+/// for every real mix).
+pub fn measured_findings(mix: &Measured, clipped: u64) -> Vec<Finding> {
+    let mut out = Vec::new();
+    let push = |out: &mut Vec<Finding>, severity: &str, code: &str, message: String| {
+        out.push(Finding {
+            severity: severity.into(),
+            code: code.into(),
+            message,
+        });
+    };
+    if clipped > 0 {
+        push(
+            &mut out,
+            "warn",
+            "clipping",
+            format!(
+                "{clipped} sample(s) exceeded full scale in the mix render (peak {:+.1} dBFS) — \
+                 lower gains or the master.",
+                mix.peak_db
+            ),
+        );
+    }
+    if mix.silent {
+        push(
+            &mut out,
+            "warn",
+            "silent-render",
+            format!(
+                "The mix rendered as silence (rms {:.0} dBFS) — the sounds may not exist in the \
+                 offline sample set, or every layer is muted or gained to zero.",
+                mix.rms_db
+            ),
+        );
+        return out;
+    }
+    if mix.peak_db < QUIET_PEAK_DBFS {
+        push(
+            &mut out,
+            "note",
+            "quiet",
+            format!(
+                "Quiet render: peak {:+.1} dBFS, rms {:+.1} dBFS — plenty of headroom; raise \
+                 gains or the master before export.",
+                mix.peak_db, mix.rms_db
+            ),
+        );
+    }
+    let rel: Vec<f64> = (0..NB).map(|i| mix.level_db[i] - REF_DB[i]).collect();
+    let (sub, bass, lowmid, mid, presence, air) = (rel[0], rel[1], rel[2], rel[3], rel[4], rel[5]);
+    let db = |i: usize| format!("{:+.0} dB", mix.level_db[i]);
+
+    if presence < -MISSING_DB && air < -MISSING_DB {
+        push(
+            &mut out,
+            "note",
+            "dull",
+            format!(
+                "Almost nothing above ~2.5 kHz (presence {}, air {} vs the loudest band) — dark, \
+                 no definition. Add or lift hats/cymbals, or brighten a voice.",
+                db(4),
+                db(5)
+            ),
+        );
+    } else if presence > EXCESS_DB || air > EXCESS_DB {
+        push(
+            &mut out,
+            "note",
+            "top-heavy",
+            format!(
+                "Top end dominates (presence {}, air {} vs the loudest band) — can read harsh. \
+                 Tame hats/cymbals or roll off highs.",
+                db(4),
+                db(5)
+            ),
+        );
+    }
+    if lowmid < -MISSING_DB && mid < -MISSING_DB && (sub > -6.0 || bass > -6.0) {
+        push(
+            &mut out,
+            "note",
+            "low-heavy",
+            format!(
+                "Low end towers over the body (low-mid {}, mid {} vs the loudest band) — only \
+                 kick and bass are really there. Bring up the chords/leads or high-pass them \
+                 into the mids.",
+                db(2),
+                db(3)
+            ),
+        );
+    } else if mid < -MISSING_DB + 2.0 && bass > -4.0 && presence > -6.0 {
+        push(
+            &mut out,
+            "note",
+            "hollow",
+            format!(
+                "Scooped mids (mid {} vs the loudest band, with bass and presence both present) \
+                 — can sound hollow; give a voice some 800 Hz–2.5 kHz body.",
+                db(3)
+            ),
+        );
+    }
+    if mix.level_db[0] <= LEVEL_FLOOR_DB + 30.0 {
+        push(
+            &mut out,
+            "note",
+            "no-sub",
+            format!(
+                "No sub content below 60 Hz (sub {}) — fine for lo-fi or ambient, thin on a club \
+                 system; a sine bass an octave down or a longer kick tail fills it.",
+                db(0)
+            ),
+        );
+    }
+    out
+}
+
 fn predict(pattern: &Pattern, cycles: usize) -> Option<[f64; NB]> {
     predicted_bands(&pattern.query_arc(0, cycles as i32))
 }
 
-fn disagreements(pred: &[f64; NB], meas: &[f64; NB]) -> Vec<String> {
+fn disagreements(pred: &[f64; NB], pink: &[f64; NB]) -> Vec<String> {
     let mut out = Vec::new();
     for i in 0..NB {
-        let gap = pred[i] - meas[i];
+        let gap = pred[i] - pink[i];
         if gap.abs() > DISAGREE {
             out.push(format!(
-                "{}: predicted {:.0}%, measured {:.0}% — the estimate {} this band; trust the \
-                 measurement",
+                "{}: estimate {:.0}%, render {:.0}% — the symbolic model {} this band for \
+                 these sounds",
                 BANDS[i].0,
                 pred[i] * 100.0,
-                meas[i] * 100.0,
+                pink[i] * 100.0,
                 if gap > 0.0 {
                     "overstates"
                 } else {
@@ -251,45 +362,62 @@ pub fn report_to_text(r: &HearReport) -> String {
         r.render_ms,
     );
 
-    s.push_str("== mix: energy share per band (predicted vs measured) ==\n");
-    s.push_str("  band       predicted  measured\n");
+    s.push_str("== mix per band: estimate · render (pink-weighted share) · level vs loudest ==\n");
+    s.push_str("  band       estimate  render   level\n");
     for (i, (name, _, _)) in BANDS.iter().enumerate() {
         let p = r
             .predicted_mix
             .map_or_else(|| "   —".to_string(), |b| pct(b[i]));
-        let _ = writeln!(s, "  {name:<10} {p:>9}  {}", pct(r.mix.bands[i]));
+        let _ = writeln!(
+            s,
+            "  {name:<10} {p:>8}  {:>6}  {:>+5.0} dB",
+            pct(r.mix.pink[i]),
+            r.mix.level_db[i]
+        );
     }
     if r.mix.silent {
         s.push_str("  (silent render — no spectrum)\n");
     } else {
         let _ = writeln!(
             s,
-            "  centroid {} Hz · dominant {}",
+            "  centroid {} Hz · loudest band {}",
             khz(r.mix.centroid_hz),
-            dominant_band(&r.mix.bands)
+            dominant_band(&r.mix.pink)
         );
     }
 
     if !r.stems.is_empty() {
-        s.push_str("== stems: measured [sub bass low-mid mid presence air] · centroid · peak ==\n");
+        s.push_str(
+            "== stems: level per band [sub bass low-mid mid presence air] dB · centroid · peak ==\n",
+        );
         for st in &r.stems {
+            let label = if st.sounds.is_empty() {
+                st.name.clone()
+            } else {
+                format!("{} ({})", st.name, st.sounds.join(", "))
+            };
             if st.measured.silent {
                 let _ = writeln!(
                     s,
-                    "  {:<12} silent — its sounds may not be in the offline sample set",
-                    st.name
+                    "  {label:<24} silent (rms {:.0} dBFS) — inaudible: gained to nothing, or \
+                     its sounds are not in the offline sample set",
+                    st.measured.rms_db
                 );
                 continue;
             }
-            let bands: Vec<String> = st.measured.bands.iter().map(|b| pct(*b)).collect();
+            let levels: Vec<String> = st
+                .measured
+                .level_db
+                .iter()
+                .map(|d| format!("{d:>+4.0}"))
+                .collect();
             let pred = st.predicted.map_or_else(String::new, |p| {
-                format!("  (predicted dominant {})", dominant_band(&p))
+                format!("  (estimate: {})", dominant_band(&p))
             });
             let _ = writeln!(
                 s,
-                "  {:<12} [{}] · {} Hz · {:+.1} dBFS{pred}",
-                st.name,
-                bands.join(" "),
+                "  {label:<24} [{}] · {} Hz · {:+.1} dBFS{pred}",
+                levels.join(" "),
                 khz(st.measured.centroid_hz),
                 st.measured.peak_db,
             );
@@ -297,15 +425,15 @@ pub fn report_to_text(r: &HearReport) -> String {
     }
 
     if !r.disagreements.is_empty() {
-        s.push_str("== estimate vs render ==\n");
+        s.push_str("== estimate vs render (calibration of the symbolic model) ==\n");
         for d in &r.disagreements {
             let _ = writeln!(s, "  {d}");
         }
     }
 
-    s.push_str("== verdict ==\n");
+    s.push_str("== verdict (from the render) ==\n");
     if r.findings.is_empty() {
-        s.push_str("  clean — the render matches a balanced mix; no clipping.\n");
+        s.push_str("  clean — balanced against a typical mix tilt; no clipping.\n");
     }
     for f in &r.findings {
         let _ = writeln!(s, "  [{}] {}: {}", f.severity, f.code, f.message);
@@ -345,7 +473,7 @@ mod tests {
         assert!(r.stems.is_empty(), "single layer has no stems");
         let text = report_to_text(&r);
         assert!(text.starts_with("HEAR — rendered 2 cycle(s)"), "{text}");
-        assert!(text.contains("== verdict =="), "{text}");
+        assert!(text.contains("== verdict (from the render) =="), "{text}");
     }
 
     #[test]
@@ -376,6 +504,8 @@ mod tests {
         let kick = &r.stems[0];
         let hats = &r.stems[1];
         assert_eq!(kick.name, "Kick");
+        assert_eq!(kick.sounds, vec!["bd".to_string()]);
+        assert_eq!(hats.sounds, vec!["hh".to_string()]);
         assert!(kick.measured.centroid_hz < hats.measured.centroid_hz);
         assert_eq!(dominant_band(&kick.predicted.unwrap()), "sub");
         let text = report_to_text(&r);
@@ -390,6 +520,74 @@ mod tests {
         assert!(r.findings.iter().any(|f| f.code == "silent-render"));
         assert_eq!(r.verdict, "silent-render");
         assert!(r.disagreements.is_empty());
+    }
+
+    /// The measured verdict judges the pink-weighted level view against a
+    /// typical mix tilt, not raw power share — a synthetic "balanced" mix
+    /// (one sine per band at the reference levels) is clean, a lone
+    /// kick-and-bass is low-heavy and dull, a hat-only buffer is top-heavy.
+    #[test]
+    fn measured_verdict_uses_the_tilt_reference() {
+        use cycletron_analysis::spectrum::measure;
+        const SR: u32 = 44_100;
+        let n = SR as usize;
+        let tone = |hz: f32, amp: f32| -> Vec<f32> {
+            (0..n)
+                .map(|i| amp * (2.0 * std::f32::consts::PI * hz * i as f32 / SR as f32).sin())
+                .collect()
+        };
+        let sum = |parts: &[Vec<f32>]| -> Vec<f32> {
+            (0..n).map(|i| parts.iter().map(|p| p[i]).sum()).collect()
+        };
+        // Single tones: the level view is amplitude in dB up to the per-band
+        // octave weighting, so land each tone on REF_DB corrected for that.
+        let amp = |i: usize, db: f64| {
+            let oct = cycletron_analysis::spectral::octaves(i);
+            0.2 * (10f64.powf(db / 20.0) * oct.sqrt()) as f32
+        };
+        let balanced = sum(&[
+            tone(40.0, amp(0, -3.0)),
+            tone(120.0, amp(1, 0.0)),
+            tone(450.0, amp(2, -2.0)),
+            tone(1400.0, amp(3, -4.0)),
+            tone(3900.0, amp(4, -7.0)),
+            tone(11000.0, amp(5, -10.0)),
+        ]);
+        let m = measure(&balanced, SR);
+        let f = measured_findings(&m, 0);
+        assert!(
+            f.is_empty(),
+            "balanced mix should be clean: {f:?} {:?}",
+            m.level_db
+        );
+
+        let low_only = sum(&[tone(45.0, 0.3), tone(110.0, 0.3)]);
+        let codes: Vec<String> = measured_findings(&measure(&low_only, SR), 0)
+            .into_iter()
+            .map(|f| f.code)
+            .collect();
+        assert!(codes.contains(&"dull".to_string()), "{codes:?}");
+        assert!(codes.contains(&"low-heavy".to_string()), "{codes:?}");
+
+        let hats_only = tone(9000.0, 0.3);
+        let codes: Vec<String> = measured_findings(&measure(&hats_only, SR), 0)
+            .into_iter()
+            .map(|f| f.code)
+            .collect();
+        assert!(codes.contains(&"top-heavy".to_string()), "{codes:?}");
+        assert!(codes.contains(&"no-sub".to_string()), "{codes:?}");
+
+        let m = measure(&tone(120.0, 0.02), SR);
+        assert!(
+            measured_findings(&m, 0).iter().any(|f| f.code == "quiet"),
+            "{:?}",
+            m.peak_db
+        );
+        assert!(
+            measured_findings(&m, 3)
+                .iter()
+                .any(|f| f.code == "clipping")
+        );
     }
 
     #[test]

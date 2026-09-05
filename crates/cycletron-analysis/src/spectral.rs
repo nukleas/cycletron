@@ -39,6 +39,11 @@ fn band_center(i: usize) -> f64 {
     (BANDS[i].1 * BANDS[i].2).sqrt()
 }
 
+/// Width of a band in octaves — what pink-weighting divides by.
+pub fn octaves(i: usize) -> f64 {
+    (BANDS[i].2 / BANDS[i].1).log2()
+}
+
 /// Which band a frequency falls in (clamped to the ends).
 pub fn band_of(hz: f64) -> usize {
     for (i, (_, _, hi)) in BANDS.iter().enumerate() {
@@ -270,6 +275,19 @@ fn accumulate_voices<'a>(haps: impl Iterator<Item = &'a Hap<Value>>) -> Vec<Voic
     voices.into_values().filter(|v| v.hits > 0).collect()
 }
 
+/// The distinct sound names that fire in `haps`, sorted — how a stem is named
+/// for a human when its label is a method name.
+pub fn sound_names(haps: &[Hap<Value>]) -> Vec<String> {
+    let mut names: Vec<String> = haps
+        .iter()
+        .filter(|h| h.has_onset())
+        .filter_map(hap_sound)
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
 /// The predicted energy share per band for `haps`, integrated over every onset
 /// (a voice that hits eight times a cycle contributes eight times the energy of
 /// one that hits once — the same thing an FFT of the render integrates). This
@@ -407,10 +425,10 @@ fn masking_findings(voices: &[Voice], band_total: &[f64; NB]) -> Vec<Finding> {
 ///  - `spectral-balance`: the dominant tilt (mud / harsh / scooped);
 ///  - `dull`: a near-empty top end (no air/definition).
 ///
-/// `band_energy` may be raw or normalised — it is read as shares. Also the
-/// verdict `hear_pattern` gives a *measured* spectrum, so the thresholds are
-/// defined once.
-pub fn balance_findings(band_energy: &[f64; NB], nvoices: usize) -> Vec<Finding> {
+/// `band_energy` may be raw or normalised — it is read as shares of the
+/// *symbolic* estimate; the measured spectrum has its own thresholds
+/// (`cycletron_render::hear`), since physical power is bass-heavy by nature.
+fn balance_findings(band_energy: &[f64; NB], nvoices: usize) -> Vec<Finding> {
     let grand: f64 = band_energy.iter().sum();
     if grand <= 0.0 {
         return Vec::new();

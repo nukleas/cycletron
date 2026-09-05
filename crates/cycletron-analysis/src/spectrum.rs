@@ -4,7 +4,7 @@
 //! (rms / peak / crest). `hear_pattern` runs this over the offline render and
 //! prints it next to [`crate::spectral::predicted_bands`].
 
-use crate::spectral::{BANDS, NB, band_of};
+use crate::spectral::{BANDS, NB, band_of, octaves};
 use rustfft::{FftPlanner, num_complex::Complex};
 use serde::Serialize;
 
@@ -16,10 +16,23 @@ pub const HOP: usize = FRAME / 2;
 /// Below this the buffer is treated as digital silence (no spectrum reported).
 pub const SILENCE_DBFS: f64 = -70.0;
 
+/// The floor for a band's relative level, dB — an empty band reads as this.
+pub const LEVEL_FLOOR_DB: f64 = -60.0;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Measured {
-    /// Energy share per band (sums to 1; all zero when silent).
+    /// Share of signal power per band (sums to 1; all zero when silent).
+    /// Physical power is bass-heavy for any real mix — bass 50–70 %, air ~1 %
+    /// is normal — so read this against itself across edits, not as a mix
+    /// judgement.
     pub bands: [f64; NB],
+    /// Pink-weighted share: power per octave, renormalised. Removes the
+    /// bandwidth bias (air spans 1.7 octaves of Hz-flat noise, sub 1.6) — the
+    /// view a spectrum analyser with a pink tilt shows.
+    pub pink: [f64; NB],
+    /// Pink-weighted level per band in dB relative to the loudest band
+    /// (0 = loudest, floor [`LEVEL_FLOOR_DB`]). The unit mixers reason in.
+    pub level_db: [f64; NB],
     /// Power-weighted mean frequency — brightness. 0 when silent.
     pub centroid_hz: f64,
     pub rms_db: f64,
@@ -39,6 +52,8 @@ pub fn measure(mono: &[f32], sample_rate: u32) -> Measured {
     if silent {
         return Measured {
             bands: [0.0; NB],
+            pink: [0.0; NB],
+            level_db: [LEVEL_FLOOR_DB; NB],
             centroid_hz: 0.0,
             rms_db,
             peak_db,
@@ -86,8 +101,29 @@ pub fn measure(mono: &[f32], sample_rate: u32) -> Measured {
             *b /= power;
         }
     }
+    let mut pink = [0.0f64; NB];
+    for i in 0..NB {
+        pink[i] = bands[i] / octaves(i);
+    }
+    let pink_sum: f64 = pink.iter().sum();
+    if pink_sum > 0.0 {
+        for p in &mut pink {
+            *p /= pink_sum;
+        }
+    }
+    let loudest = pink.iter().copied().fold(0.0f64, f64::max);
+    let mut level_db = [LEVEL_FLOOR_DB; NB];
+    if loudest > 0.0 {
+        for i in 0..NB {
+            if pink[i] > 0.0 {
+                level_db[i] = (10.0 * (pink[i] / loudest).log10()).max(LEVEL_FLOOR_DB);
+            }
+        }
+    }
     Measured {
         bands,
+        pink,
+        level_db,
         centroid_hz: if power > 0.0 {
             weighted_hz / power
         } else {
@@ -151,6 +187,8 @@ mod tests {
         assert!(!m.silent);
         assert_eq!(dominant_band(&m.bands), "bass", "{:?}", m.bands);
         assert!(m.bands[1] > 0.9, "{:?}", m.bands);
+        assert_eq!(m.level_db[1], 0.0, "loudest band is the 0 dB reference");
+        assert!(m.level_db[5] < -30.0, "{:?}", m.level_db);
         assert!((m.centroid_hz - 100.0).abs() < 15.0, "{}", m.centroid_hz);
         // 0.5 amplitude sine: peak -6 dB, rms -9 dB, crest ~3 dB.
         assert!((m.peak_db + 6.0).abs() < 0.2, "{}", m.peak_db);
@@ -177,6 +215,10 @@ mod tests {
             .collect();
         let m = measure(&noise, SR);
         assert_eq!(dominant_band(&m.bands), "air", "{:?}", m.bands);
+        // Pink weighting divides by octave width, so white noise still rises
+        // toward the top but each band is within an order of magnitude.
+        assert!(m.pink[5] > m.pink[1], "{:?}", m.pink);
+        assert!(m.level_db[1] > -25.0, "{:?}", m.level_db);
         assert!(
             m.bands[4] > m.bands[3] && m.bands[3] > m.bands[2],
             "{:?}",
@@ -190,6 +232,7 @@ mod tests {
         let m = measure(&vec![0.0; 10_000], SR);
         assert!(m.silent);
         assert_eq!(m.bands, [0.0; NB]);
+        assert_eq!(m.level_db, [LEVEL_FLOOR_DB; NB]);
         assert!(measure(&[], SR).silent);
         // Shorter than one frame: zero-padded, still classified.
         let m = measure(&sine(200.0, 0.02), SR);
