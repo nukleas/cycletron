@@ -58,6 +58,38 @@ const ACCEPTS: &[Case] = &[
         code: r#"s("bd").chorus(0.3).vowel(1).scatter(0.2)"#,
         doc: "STRUDEL_RS_SUPPORTED effect quick-list",
     },
+    Case {
+        code: r#"note("[c3,e3,g3,b3]").arp("<up updown converge pinkyup>")"#,
+        doc: "STRUDEL_RS_SUPPORTED §4 / prompt: arp accepts Tidal ordering names",
+    },
+    Case {
+        code: r#"note("[c3,e3,g3]").arp("0 2 1")"#,
+        doc: "STRUDEL_RS_SUPPORTED §4 / prompt: arp accepts an index pattern",
+    },
+    Case {
+        code: r#"note("c3").s("square").pw("0.3:2:0.4").pwmrate(1).pwmdepth(0.2)"#,
+        doc: "STRUDEL_RS_SUPPORTED §4 / prompt: width/pw colon form + PWM controls",
+    },
+    Case {
+        code: r#"note("c3").s("sawtooth").phaser(1.5).phaserdepth(0.5)"#,
+        doc: "STRUDEL_RS_SUPPORTED §4 / prompt: phaser controls",
+    },
+    Case {
+        code: r#"s("bd sd hh cp").ribbon(0, 1.5).press.hurry(2)"#,
+        doc: "STRUDEL_RS_SUPPORTED §4 / prompt: ribbon, press, hurry",
+    },
+    Case {
+        code: r#"s("bd sd").beat("0 4", 8).pressBy(0.25)"#,
+        doc: "STRUDEL_RS_SUPPORTED §4 / prompt: beat(positions, div), pressBy",
+    },
+    Case {
+        code: r#"s("bd sd hh cp").expand(2).pace(8).contract(2)"#,
+        doc: "STRUDEL_RS_SUPPORTED §4 stepwise: pace / expand / contract",
+    },
+    Case {
+        code: r#"s("<bd, sd>")"#,
+        doc: "prompt: a comma inside < > parses (it just does not stack)",
+    },
 ];
 
 /// Patterns the validator MUST reject (documented as parser gotchas).
