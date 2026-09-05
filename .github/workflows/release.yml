@@ -126,7 +126,14 @@ jobs:
           # webkit/rsvg/appindicator for Tauri; libasound2-dev + libudev-dev for
           # the MIDI input crate (midir → alsa-sys) which otherwise fails at
           # "Package alsa was not found in the pkg-config search path".
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libudev-dev xdg-utils
+          #
+          # The gstreamer1.0-* sinks are for the AppImage, not the build:
+          # bundleMediaFramework copies whatever is in the runner's
+          # gstreamer-1.0 plugin dir, so the bundled sink set is decided by the
+          # runner image unless we name it. alpha.10 shipped with pulsesink and
+          # no alsasink, leaving autoaudiosink with nothing to fall back to on a
+          # host with no pulse server (#7). Pin both so the set is ours.
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libudev-dev xdg-utils gstreamer1.0-alsa gstreamer1.0-pulseaudio
 
       # tauri-bundler downloads NSIS at bundle time with an HTTP client that
       # intermittently dies on GitHub's release-assets CDN ("io: Peer
@@ -273,6 +280,15 @@ jobs:
           # reviewable (the "ugly" plugin set must never appear here).
           echo "--- bundled gstreamer plugins ---"
           ls squashfs-root/usr/lib/gstreamer-1.0/ 2>/dev/null || echo "(none)"
+          # WebKit routes WebAudio through GStreamer, so a missing sink is a
+          # silent app rather than an error (#7). Assert the two that matter
+          # here: this is the one place the finished bundle can be inspected.
+          for want in libgstpulseaudio.so libgstalsa.so; do
+            [ -f "squashfs-root/usr/lib/gstreamer-1.0/$want" ] || {
+              echo "::error::$want is missing from the AppImage's GStreamer plugins — Play would be silent wherever its sink is the only one available"
+              exit 1
+            }
+          done
           echo "--- bundled usr/lib after strip ---"
           ls squashfs-root/usr/lib/
           wget -qO appimagetool \
