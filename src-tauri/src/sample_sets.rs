@@ -2,13 +2,13 @@
 //!
 //! A **sample set** is an ordered list of `strudel.json` manifest sources;
 //! the order is the mapping: the first manifest owning a bank name wins,
-//! exactly like strudio's registration order. Two sets are built in:
+//! exactly like strudio's registration order. Built in:
 //!
 //! - `cycletron` — the bundled, license-audited set (always ready, nothing to
 //!   download; export resolves it from the app's resource dir).
-//! - `strudel` — the four sources `strudio play`/`render` registers
-//!   (`strudel_audio::default_sources`), so Cycletron sounds identical to
-//!   strudel-rs.
+//! - the downloadable [`BUILTIN_SETS`]: the strudio defaults, the strudel.cc
+//!   defaults, and the individual packs those are made of (drum machines,
+//!   VCSL, mridangam) so nobody downloads 300 MB for one kit.
 //!
 //! Users can define more sets in `{app_data}/sample-sets.json`:
 //!
@@ -17,8 +17,9 @@
 //!   "sources": ["github:user/breaks-pack", "https://example.com/kit.json"]}]
 //! ```
 //!
-//! Downloads land in `{app_cache}/sample-sets/<set-id>/<NN>-<slug>/` (NN
-//! preserves source precedence). Nothing is redistributed by us: the user's
+//! Downloads land in `{app_cache}/sample-sets/sources/<slug>/`, one dir per
+//! *source*, so sets that share a source (VCSL is in both `vcsl` and
+//! `strudel-cc`) share one download. Nothing is redistributed by us: the user's
 //! machine fetches from the same upstream URLs the strudel-rs engine streams
 //! from. Per source we write a *localized* `strudel.json` — the upstream
 //! manifest with `_base` stripped, resolved against its own directory —
@@ -57,6 +58,9 @@ static DOWNLOAD_RUNNING: AtomicBool = AtomicBool::new(false);
 pub struct SetDefinition {
     pub id: String,
     pub label: String,
+    /// One line for the Samples manager: what it adds and under what license.
+    #[serde(default)]
+    pub description: String,
     pub sources: Vec<String>,
 }
 
@@ -66,6 +70,7 @@ pub struct SetDefinition {
 pub struct SetStatus {
     pub id: String,
     pub label: String,
+    pub description: String,
     /// Built-in sets can't be edited away; the bundled one can't be removed.
     pub builtin: bool,
     /// Bundled set: always true. Others: every source's localized manifest
@@ -134,27 +139,93 @@ fn source_slug(url: &str) -> String {
     }
 }
 
-/// The built-in downloadable set: what `strudio play`/`render` registers, in
-/// registration order (first manifest owning a bank wins — which is why the
-/// default `bd` is uzu-drumkit's rather than Dirt-Samples').
-fn strudel_definition() -> SetDefinition {
-    SetDefinition {
-        id: "strudel".into(),
-        label: "strudel-rs (strudio defaults)".into(),
-        sources: vec![
-            default_sources::PIANO.into(),
-            default_sources::UZU_DRUMKIT.into(),
-            default_sources::UZU_WAVETABLES.into(),
-            default_sources::DIRT_SAMPLES.into(),
-        ],
-    }
+/// A built-in downloadable set. Sources are in registration order — the
+/// first manifest owning a bank name wins, so `bd` in `strudel` is
+/// uzu-drumkit's rather than Dirt-Samples', exactly as in strudio.
+struct BuiltinSet {
+    id: &'static str,
+    label: &'static str,
+    description: &'static str,
+    sources: &'static [&'static str],
 }
 
-/// All downloadable set definitions: the built-in `strudel` set plus any
-/// user-defined sets from `{app_data}/sample-sets.json`. (The bundled
-/// `cycletron` set is not in this list — it has no sources to download.)
+/// The downloadable sets every install offers. The two "defaults" sets
+/// reproduce another player's startup palette in its precedence order; the
+/// single-pack sets exist so a user who only wants the drum machines does
+/// not have to fetch Dirt-Samples too. Sources are shared on disk, so
+/// activating `strudel-cc` after `vcsl` only fetches what is missing.
+const BUILTIN_SETS: &[BuiltinSet] = &[
+    BuiltinSet {
+        id: "strudel",
+        label: "strudel-rs (strudio defaults)",
+        description: "What `strudio play` registers: Salamander piano (CC-BY), uzu drumkit \
+                      (Unlicense), uzu wavetables, then all of Dirt-Samples (no license). ~300 MB.",
+        sources: &[
+            default_sources::PIANO,
+            default_sources::UZU_DRUMKIT,
+            default_sources::UZU_WAVETABLES,
+            default_sources::DIRT_SAMPLES,
+        ],
+    },
+    BuiltinSet {
+        id: "strudel-cc",
+        label: "strudel.cc defaults",
+        description: "What strudel.cc loads at startup, in its order: piano, VCSL, 71 drum \
+                      machines, uzu drumkit + wavetables, mridangam, then Dirt-Samples. The largest set.",
+        sources: &[
+            default_sources::PIANO,
+            default_sources::VCSL_SAMPLES,
+            default_sources::TIDAL_DRUM_MACHINES,
+            default_sources::UZU_DRUMKIT,
+            default_sources::UZU_WAVETABLES,
+            default_sources::MRIDANGAM,
+            default_sources::DIRT_SAMPLES,
+        ],
+    },
+    BuiltinSet {
+        id: "drum-machines",
+        label: "Drum machines",
+        description: "71 classic boxes from tidal-drum-machines (no license file upstream): \
+                      s(\"bd sd\").bank(\"RolandTR909\"), AkaiMPC60, LinnDrum, OberheimDMX, YamahaRX5…",
+        sources: &[default_sources::TIDAL_DRUM_MACHINES],
+    },
+    BuiltinSet {
+        id: "vcsl",
+        label: "VCSL orchestral & world",
+        description: "Versilian Community Sample Library (CC0): 128 real instruments — kalimba, \
+                      marimba, vibraphone, harp, ocarina, recorders, gong, timpani, didgeridoo…",
+        sources: &[default_sources::VCSL_SAMPLES],
+    },
+    BuiltinSet {
+        id: "mridangam",
+        label: "Mridangam",
+        description: "South Indian mridangam strokes (ta, dhi, thom…) by Arthur Carabott and \
+                      Harishankar V Menon, CC-BY-SA.",
+        sources: &[default_sources::MRIDANGAM],
+    },
+];
+
+fn builtin_definitions() -> Vec<SetDefinition> {
+    BUILTIN_SETS
+        .iter()
+        .map(|b| SetDefinition {
+            id: b.id.into(),
+            label: b.label.into(),
+            description: b.description.into(),
+            sources: b.sources.iter().map(|s| (*s).to_string()).collect(),
+        })
+        .collect()
+}
+
+fn is_builtin(id: &str) -> bool {
+    id == BUNDLED_SET_ID || BUILTIN_SETS.iter().any(|b| b.id == id)
+}
+
+/// All downloadable set definitions: [`BUILTIN_SETS`] plus any user-defined
+/// sets from `{app_data}/sample-sets.json`. (The bundled `cycletron` set is
+/// not in this list — it has no sources to download.)
 pub fn definitions(app: &tauri::AppHandle) -> Vec<SetDefinition> {
-    let mut defs = vec![strudel_definition()];
+    let mut defs = builtin_definitions();
     let Ok(data_dir) = app.path().app_data_dir() else {
         return defs;
     };
@@ -213,18 +284,76 @@ fn sets_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .path()
         .app_cache_dir()
         .map_err(|e| format!("could not resolve app cache dir: {e}"))?;
-    Ok(cache.join("sample-sets"))
+    let root = cache.join("sample-sets");
+    migrate_per_set_layout(&root);
+    Ok(root)
+}
+
+/// Sub-directory of the sets root holding one dir per downloaded source.
+const SOURCES_DIR: &str = "sources";
+
+/// Cache dir for one source, shared by every set that lists it.
+fn source_dir(root: &Path, url: &str) -> PathBuf {
+    root.join(SOURCES_DIR).join(source_slug(url))
 }
 
 /// Per-source cache dirs for a set, in precedence order.
 fn source_dirs(app: &tauri::AppHandle, def: &SetDefinition) -> Result<Vec<PathBuf>, String> {
-    let root = sets_root(app)?.join(&def.id);
+    let root = sets_root(app)?;
     Ok(def
         .sources
         .iter()
-        .enumerate()
-        .map(|(i, url)| root.join(format!("{i:02}-{}", source_slug(url))))
+        .map(|url| source_dir(&root, url))
         .collect())
+}
+
+/// Forward-only migration from the original `<set-id>/<NN>-<slug>/` layout
+/// (one copy per set) to `sources/<slug>/`. Renames are free; a slug that
+/// already exists in the new layout wins and the old copy is deleted. Runs on
+/// every root lookup but is a single `read_dir` once nothing is left to move.
+fn migrate_per_set_layout(root: &Path) {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
+    let sources = root.join(SOURCES_DIR);
+    for set_dir in entries.flatten().map(|e| e.path()) {
+        if !set_dir.is_dir() || set_dir.file_name().is_some_and(|n| n == SOURCES_DIR) {
+            continue;
+        }
+        let Ok(subdirs) = std::fs::read_dir(&set_dir) else {
+            continue;
+        };
+        for old in subdirs.flatten().map(|e| e.path()) {
+            let Some(name) = old.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            // `<NN>-<slug>`: two digits, a dash, the slug.
+            let Some(slug) = name.get(3..).filter(|_| {
+                name.len() > 3
+                    && name.as_bytes()[..2].iter().all(u8::is_ascii_digit)
+                    && &name[2..3] == "-"
+            }) else {
+                continue;
+            };
+            let dest = sources.join(slug);
+            let result = if dest.exists() {
+                std::fs::remove_dir_all(&old)
+            } else {
+                std::fs::create_dir_all(&sources).and_then(|()| std::fs::rename(&old, &dest))
+            };
+            if let Err(e) = result {
+                tracing::warn!(
+                    target: "cycletron::sample_sets",
+                    from = %old.display(),
+                    to = %dest.display(),
+                    error = %e,
+                    "could not migrate sample-set source dir"
+                );
+            }
+        }
+        // Empty once every source moved; leave it alone otherwise.
+        let _ = std::fs::remove_dir(&set_dir);
+    }
 }
 
 /// The localized manifest paths for a set, in precedence order. Errors on an
@@ -249,6 +378,9 @@ pub fn list_sample_sets(app_handle: tauri::AppHandle) -> Result<Vec<SetStatus>, 
     let mut out = vec![SetStatus {
         id: BUNDLED_SET_ID.into(),
         label: "Cycletron (bundled)".into(),
+        description: "The license-audited offline kit that ships with the app: Fischer 808 drums, \
+                      three drum machines, VCSL percussion colors, Clean-Samples melodic slices."
+            .into(),
         builtin: true,
         ready: true,
         files: 0,
@@ -264,12 +396,13 @@ pub fn list_sample_sets(app_handle: tauri::AppHandle) -> Result<Vec<SetStatus>, 
             bytes += b;
         }
         out.push(SetStatus {
-            builtin: def.id == "strudel",
+            builtin: is_builtin(&def.id),
             ready: dirs.iter().all(|d| d.join(LOCAL_MANIFEST).is_file()),
             files,
             bytes,
             id: def.id,
             label: def.label,
+            description: def.description,
             sources: def.sources,
         });
     }
@@ -317,9 +450,25 @@ pub fn remove_sample_set(set_id: String, app_handle: tauri::AppHandle) -> Result
     if set_id == BUNDLED_SET_ID {
         return Err("the bundled set cannot be removed".into());
     }
-    let dir = sets_root(&app_handle)?.join(&set_id);
-    if dir.exists() {
-        std::fs::remove_dir_all(&dir).map_err(|e| format!("could not remove sample set: {e}"))?;
+    // Sources are shared: only delete the ones no other set lists.
+    let defs = definitions(&app_handle);
+    let def = defs
+        .iter()
+        .find(|d| d.id == set_id)
+        .ok_or_else(|| format!("unknown sample set '{set_id}'"))?;
+    let root = sets_root(&app_handle)?;
+    for url in &def.sources {
+        let shared = defs
+            .iter()
+            .any(|other| other.id != set_id && other.sources.iter().any(|u| u == url));
+        if shared {
+            continue;
+        }
+        let dir = source_dir(&root, url);
+        if dir.exists() {
+            std::fs::remove_dir_all(&dir)
+                .map_err(|e| format!("could not remove sample set: {e}"))?;
+        }
     }
     refresh_bank_names(&app_handle);
     Ok(())
@@ -355,12 +504,68 @@ pub async fn download_sample_set(
 pub struct ActiveSetBanks {
     pub pitched: Vec<String>,
     pub one_shots: Vec<String>,
+    /// Drum-machine kits: one-shot banks named `{Machine}_{voice}` with a
+    /// CamelCase machine prefix (`RolandTR909_bd`), the form `.bank()` targets.
+    /// Grouped so the agent sees 71 machines with their voices instead of
+    /// 683 flat bank names.
+    pub machines: Vec<MachineBanks>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MachineBanks {
+    pub machine: String,
+    pub voices: Vec<String>,
 }
 
 impl ActiveSetBanks {
     pub fn is_empty(&self) -> bool {
-        self.pitched.is_empty() && self.one_shots.is_empty()
+        self.pitched.is_empty() && self.one_shots.is_empty() && self.machines.is_empty()
     }
+
+    /// Classify bank names from manifests in precedence order (first owner
+    /// wins). `is_pitched` is the manifest shape: an object bank is
+    /// note-mapped, an array/string bank is indexed one-shots.
+    fn classify<'a>(banks: impl IntoIterator<Item = (&'a str, bool)>) -> Self {
+        let mut seen = std::collections::HashSet::new();
+        let mut out = Self::default();
+        let mut machines: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+        for (key, is_pitched) in banks {
+            if key.starts_with('_') || !seen.insert(key.to_string()) {
+                continue;
+            }
+            if is_pitched {
+                out.pitched.push(key.to_string());
+            } else if let Some((machine, voice)) = machine_voice(key) {
+                machines
+                    .entry(machine.to_string())
+                    .or_default()
+                    .push(voice.to_string());
+            } else {
+                out.one_shots.push(key.to_string());
+            }
+        }
+        out.pitched.sort();
+        out.one_shots.sort();
+        out.machines = machines
+            .into_iter()
+            .map(|(machine, mut voices)| {
+                voices.sort();
+                MachineBanks { machine, voices }
+            })
+            .collect();
+        out
+    }
+}
+
+/// Split `RolandTR909_bd` into `("RolandTR909", "bd")`. Only a CamelCase
+/// prefix counts as a machine — lowercase underscore names (`balafon_hard`,
+/// `wt_digital`) are ordinary banks.
+fn machine_voice(key: &str) -> Option<(&str, &str)> {
+    let (machine, voice) = key.split_once('_')?;
+    let camel = machine.starts_with(|c: char| c.is_ascii_uppercase())
+        && machine.chars().all(|c| c.is_ascii_alphanumeric());
+    (camel && !voice.is_empty() && voice.chars().all(|c| c.is_ascii_alphanumeric()))
+        .then_some((machine, voice))
 }
 
 /// Classified bank names of the active set (empty for the bundled set or when
@@ -384,30 +589,20 @@ pub fn active_set_banks(app: &tauri::AppHandle) -> ActiveSetBanks {
     if !paths.iter().all(|p| p.is_file()) {
         return ActiveSetBanks::default();
     }
-    let mut seen = std::collections::HashSet::new();
-    let mut banks = ActiveSetBanks::default();
-    for path in &paths {
-        let Some(obj) = std::fs::read_to_string(path)
-            .ok()
-            .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
-            .and_then(|m| m.as_object().cloned())
-        else {
-            continue;
-        };
-        for (key, def) in obj {
-            if key.starts_with('_') || !seen.insert(key.clone()) {
-                continue;
-            }
-            if def.is_object() {
-                banks.pitched.push(key);
-            } else {
-                banks.one_shots.push(key);
-            }
-        }
-    }
-    banks.pitched.sort();
-    banks.one_shots.sort();
-    banks
+    let manifests: Vec<serde_json::Map<String, serde_json::Value>> = paths
+        .iter()
+        .filter_map(|path| {
+            std::fs::read_to_string(path)
+                .ok()
+                .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+                .and_then(|m| m.as_object().cloned())
+        })
+        .collect();
+    ActiveSetBanks::classify(
+        manifests
+            .iter()
+            .flat_map(|obj| obj.iter().map(|(k, v)| (k.as_str(), v.is_object()))),
+    )
 }
 
 /// Refresh [`crate::state::AppState::active_set_banks`] from disk.
@@ -747,11 +942,17 @@ mod tests {
         );
     }
 
+    fn builtin(id: &str) -> SetDefinition {
+        builtin_definitions()
+            .into_iter()
+            .find(|d| d.id == id)
+            .unwrap()
+    }
+
     #[test]
     fn strudel_set_matches_strudio_registration_order() {
-        let def = strudel_definition();
         assert_eq!(
-            def.sources,
+            builtin("strudel").sources,
             vec![
                 default_sources::PIANO,
                 default_sources::UZU_DRUMKIT,
@@ -759,6 +960,113 @@ mod tests {
                 default_sources::DIRT_SAMPLES,
             ]
         );
+    }
+
+    #[test]
+    fn strudel_cc_set_matches_the_website_prebake_order() {
+        // website/src/repl/prebake.mjs: piano, VCSL, drum machines, uzu
+        // drumkit, uzu wavetables, mridangam, then a Dirt subset. We list
+        // all of Dirt last, which keeps every shared bank's owner identical.
+        assert_eq!(
+            builtin("strudel-cc").sources,
+            vec![
+                default_sources::PIANO,
+                default_sources::VCSL_SAMPLES,
+                default_sources::TIDAL_DRUM_MACHINES,
+                default_sources::UZU_DRUMKIT,
+                default_sources::UZU_WAVETABLES,
+                default_sources::MRIDANGAM,
+                default_sources::DIRT_SAMPLES,
+            ]
+        );
+    }
+
+    #[test]
+    fn builtin_ids_are_unique_registry_safe_and_described() {
+        let mut ids = std::collections::HashSet::new();
+        for set in BUILTIN_SETS {
+            assert!(ids.insert(set.id), "duplicate id {}", set.id);
+            assert!(
+                set.id
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'),
+                "{} must be lowercase a-z, 0-9, '-'",
+                set.id
+            );
+            assert!(
+                !set.sources.is_empty() && !set.description.is_empty(),
+                "{}",
+                set.id
+            );
+        }
+        assert!(is_builtin("strudel") && is_builtin(BUNDLED_SET_ID) && !is_builtin("my-breaks"));
+    }
+
+    #[test]
+    fn single_pack_sets_reuse_the_defaults_sets_sources() {
+        // Shared source dirs only pay off if the URLs are byte-identical.
+        let cc = builtin("strudel-cc").sources;
+        for id in ["drum-machines", "vcsl", "mridangam"] {
+            for url in builtin(id).sources {
+                assert!(cc.contains(&url), "{id} source {url} not in strudel-cc");
+            }
+        }
+    }
+
+    #[test]
+    fn machine_banks_group_camelcase_prefixes_only() {
+        let banks = ActiveSetBanks::classify([
+            ("RolandTR909_bd", false),
+            ("RolandTR909_sd", false),
+            ("AkaiMPC60_hh", false),
+            ("balafon_hard", false),
+            ("wt_digital", false),
+            ("bd", false),
+            ("piano", true),
+            ("_base", false),
+            ("bd", false), // second manifest: first owner wins
+        ]);
+        assert_eq!(banks.pitched, vec!["piano"]);
+        assert_eq!(banks.one_shots, vec!["balafon_hard", "bd", "wt_digital"]);
+        let machines: Vec<(&str, Vec<&str>)> = banks
+            .machines
+            .iter()
+            .map(|m| {
+                (
+                    m.machine.as_str(),
+                    m.voices.iter().map(String::as_str).collect(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            machines,
+            vec![("AkaiMPC60", vec!["hh"]), ("RolandTR909", vec!["bd", "sd"])]
+        );
+    }
+
+    #[test]
+    fn per_set_layout_migrates_to_shared_source_dirs() {
+        let root = tempfile::tempdir().unwrap();
+        let old = root
+            .path()
+            .join("strudel")
+            .join("01-tidalcycles-uzu-drumkit");
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join(LOCAL_MANIFEST), "{}").unwrap();
+        // A second set had its own copy of the same source: the first-moved
+        // copy wins and the duplicate is deleted.
+        let dup = root.path().join("mine").join("00-tidalcycles-uzu-drumkit");
+        std::fs::create_dir_all(&dup).unwrap();
+
+        migrate_per_set_layout(root.path());
+
+        let shared = source_dir(root.path(), "github:tidalcycles/uzu-drumkit");
+        assert!(shared.join(LOCAL_MANIFEST).is_file());
+        assert!(!root.path().join("strudel").exists());
+        assert!(!root.path().join("mine").exists());
+        // Idempotent.
+        migrate_per_set_layout(root.path());
+        assert!(shared.join(LOCAL_MANIFEST).is_file());
     }
 
     #[test]

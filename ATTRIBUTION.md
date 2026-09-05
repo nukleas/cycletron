@@ -98,13 +98,24 @@ for each release is printed in the release workflow's `fix-appimage` job; the
 GPL-incompatible "ugly" plugin set is excluded. The `.deb`/`.rpm` packages
 bundle no GStreamer — they use the host's.
 
-## Optional download: the strudel-rs sample set (not bundled)
+## Optional downloads: sample sets (not bundled)
 
-Preferences → Sample set can download the default strudel-rs/strudio sample
-set so Cycletron sounds identical to strudel-rs. **None of these files ship
-with Cycletron or are redistributed by us** — the user's machine fetches them
-from the upstream repositories (the same sources the strudel-rs engine
-streams from) into the local app cache.
+The Samples manager can download sample sets — the strudel-rs/strudio
+defaults, the strudel.cc defaults, and the single packs they are built from.
+**None of these files ship with Cycletron or are redistributed by us** — the
+user's machine fetches them from the upstream repositories (the same sources
+the strudel-rs engine streams from) into the local app cache.
+
+- **Versilian Community Sample Library (VCSL)** by Versilian Studios and
+  contributors (https://github.com/sgossner/VCSL) — **CC0**. The `vcsl` and
+  `strudel-cc` sets; ten of its one-shots are also bundled (above).
+- **tidal-drum-machines** (https://github.com/ritchse/tidal-drum-machines),
+  sample packs of 71 drum machines collected by ritchse — **no license file,
+  mixed provenance**. The `drum-machines` and `strudel-cc` sets. Downloaded
+  from upstream at user request only, never mirrored or redistributed.
+- **Mridangam** samples © Arthur Carabott 2022, performed by Harishankar V
+  Menon (https://github.com/yaxu/mrid, https://www.arthurcarabott.com/konnakkol/)
+  — **CC-BY-SA**. The `mridangam` and `strudel-cc` sets.
 
 - **Salamander Grand Piano** by **Alexander Holm** — **CC-BY-3.0**
   (<http://creativecommons.org/licenses/by/3.0/>). Fetched as the

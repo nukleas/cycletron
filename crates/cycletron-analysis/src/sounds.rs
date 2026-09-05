@@ -112,31 +112,19 @@ pub const MACHINE_KITS: &[(&str, &str, &[&str])] = &[
     ("BossDR55", "DR-55", &["bd", "sd", "hh", "rim"]),
 ];
 
-/// A representative slice of the General MIDI soundfont instruments that load on
-/// demand. (Any `gm_*` General MIDI name works; these are common picks.)
-pub const GM_INSTRUMENTS: &[&str] = &[
-    "gm_piano",
-    "gm_epiano1",
-    "gm_harpsichord",
-    "gm_acoustic_bass",
-    "gm_electric_bass_finger",
-    "gm_violin",
-    "gm_cello",
-    "gm_string_ensemble_1",
-    "gm_trumpet",
-    "gm_trombone",
-    "gm_alto_sax",
-    "gm_flute",
-    "gm_clarinet",
-    "gm_acoustic_guitar_nylon",
-    "gm_overdriven_guitar",
-    "gm_church_organ",
-    "gm_synth_bass_1",
-    "gm_lead_1_square",
-    "gm_pad_warm",
-    "gm_marimba",
-    "gm_xylophone",
-];
+/// Every General MIDI voice the engine dispatches, straight from the
+/// soundfont crate's own table so the list can never drift from the pinned
+/// engine. 128 programs; the piano family shares a bank name and selects the
+/// program with a `:n` variant (`gm_piano:7` is bright piano).
+pub fn gm_instruments() -> &'static [&'static str] {
+    static GM: std::sync::LazyLock<Vec<&'static str>> = std::sync::LazyLock::new(|| {
+        (0u8..128)
+            .filter_map(strudel_soundfont::GmInstrument::new_checked)
+            .map(strudel_soundfont::GmInstrument::to_str)
+            .collect()
+    });
+    &GM
+}
 
 static BUILTIN: std::sync::LazyLock<std::collections::HashSet<String>> =
     std::sync::LazyLock::new(|| {
@@ -146,7 +134,7 @@ static BUILTIN: std::sync::LazyLock<std::collections::HashSet<String>> =
             .chain(DEFAULT_DRUMS.iter())
             .chain(PERCUSSION.iter())
             .chain(INSTRUMENTS.iter())
-            .chain(GM_INSTRUMENTS.iter())
+            .chain(gm_instruments().iter())
             .map(std::string::ToString::to_string)
             .collect();
         for (machine, _, voices) in MACHINE_KITS {
@@ -158,9 +146,8 @@ static BUILTIN: std::sync::LazyLock<std::collections::HashSet<String>> =
     });
 
 /// Every sound name that resolves without user-loaded banks: synths,
-/// wavetables, default drums, and drum-machine voices. `gm_*` names are NOT
-/// enumerated (any GM name streams on demand) — callers should treat the
-/// `gm_` prefix as known. Built once; used by the silence linter.
+/// wavetables, default drums, drum-machine voices, and all 128 General MIDI
+/// voices. Built once; used by the silence linter.
 pub fn builtin_sound_set() -> &'static std::collections::HashSet<String> {
     &BUILTIN
 }
@@ -207,5 +194,27 @@ impl SoundSet {
             builtin: &NONE,
             user: Vec::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gm_list_is_the_full_general_midi_map() {
+        let gm = gm_instruments();
+        assert_eq!(gm.len(), 128);
+        for name in [
+            "gm_piano",
+            "gm_piano:7",
+            "gm_koto",
+            "gm_steel_drums",
+            "gm_pad_warm",
+        ] {
+            assert!(gm.contains(&name), "{name} missing");
+        }
+        assert!(gm.iter().all(|n| n.starts_with("gm_")));
+        assert!(builtin_sound_set().contains("gm_koto"));
     }
 }

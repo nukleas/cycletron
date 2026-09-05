@@ -176,6 +176,12 @@ export class SamplesModal {
                 }
             }
             container.appendChild(row);
+            if (set.description) {
+                const blurb = document.createElement('div');
+                blurb.className = 'prefs-note samples-set-blurb';
+                blurb.textContent = set.description;
+                container.appendChild(blurb);
+            }
         }
     }
 

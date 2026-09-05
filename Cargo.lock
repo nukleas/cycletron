@@ -1225,6 +1225,7 @@ dependencies = [
  "strudel-core",
  "strudel-dsl",
  "strudel-mini",
+ "strudel-soundfont",
 ]
 
 [[package]]

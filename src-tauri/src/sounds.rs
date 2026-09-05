@@ -227,8 +227,8 @@ pub fn register_sound_banks(names: Vec<String>, state: State<'_, AppState>) -> R
 // Built-in sound catalog lives in the shared analysis crate so CLI tools use
 // the same known-sound set; user-loaded banks are layered on here.
 pub use cycletron_analysis::sounds::{
-    DEFAULT_DRUMS, DRUM_MACHINE_NOTE, GM_INSTRUMENTS, INSTRUMENTS, MACHINE_KITS, PERCUSSION,
-    SYNTHS, WAVETABLES,
+    DEFAULT_DRUMS, DRUM_MACHINE_NOTE, INSTRUMENTS, MACHINE_KITS, PERCUSSION, SYNTHS, WAVETABLES,
+    gm_instruments,
 };
 
 /// True when a downloadable sample set is active AND on disk — the state in
@@ -257,6 +257,15 @@ pub fn known_sound_set(state: &AppState) -> cycletron_analysis::sounds::SoundSet
     cycletron_analysis::sounds::SoundSet::with_user_banks(banks)
 }
 
+/// The GM list is the engine's own 128-program table; the note keeps the
+/// agent from treating it as "piano and a few others".
+const GM_NOTE: &str = "All 128 General MIDI voices (streamed on first use — the first cycle may be \
+                       silent). Families: pianos/epianos, organs, guitars, basses, solo strings, \
+                       ensembles/choir, brass, reeds, pipes, synth leads 1-8, synth pads 1-8, fx, \
+                       world (sitar, banjo, shamisen, koto, kalimba, bagpipe, fiddle, shanai), \
+                       percussive (tinkle bell, agogo, steel drums, woodblock, taiko, melodic tom), \
+                       sound effects. gm_piano:7 / :16 / :24 pick the other piano programs.";
+
 pub fn sound_catalog(state: &AppState) -> serde_json::Value {
     let user_banks = state.loaded_sample_banks.lock().clone();
 
@@ -273,10 +282,15 @@ pub fn sound_catalog(state: &AppState) -> serde_json::Value {
             "sample_set_pitched": set.pitched.clone(),
             "sample_set_pitched_note": "Note-mapped instruments: note(\"c3 e3 g3\").s(\"<bank>\") repitches properly (nearest recorded note). Use these for melodies and chords.",
             "sample_set_one_shots": set.one_shots.clone(),
+            "drum_machines": set.machines.iter().map(|m| serde_json::json!({
+                "machine": m.machine,
+                "voices": m.voices,
+            })).collect::<Vec<_>>(),
+            "drum_machine_note": DRUM_MACHINE_NOTE,
             "sample_set_one_shots_note": "Indexed one-shots: note() repitches by playback rate from an assumed C3 root (like web strudel) — timbre stretches at extreme intervals, so keep melodies within ~an octave of C3. s(\"<bank>:n\") selects variants; .speed(r) is the raw rate control. For high-fidelity melodies prefer the pitched banks, gm_*, wt_*, or synths.",
             "sample_set_note": "A downloaded sample set is active (Samples manager) — these banks replace the bundled drum/percussion/instrument catalog. For the built-in 'strudel' set, defaults like bd/sd/hh come from the uzu drumkit and the rest (arpy, casio, breaks165, …) from Dirt-Samples. Banks load lazily — the first cycle of a new bank may be silent.",
-            "gm_instruments": GM_INSTRUMENTS,
-            "gm_note": "Any General MIDI name (gm_*) works; streams in on first use, first cycle may be silent.",
+            "gm_instruments": gm_instruments(),
+            "gm_note": GM_NOTE,
             "user_sample_banks": user_banks,
         });
     }
@@ -302,8 +316,8 @@ pub fn sound_catalog(state: &AppState) -> serde_json::Value {
         "instruments_note": "Melodic/speech expansion banks (CC0 Clean-Samples slices). flbass=fretless bass, uke=ukulele, cpluck=cello pluck, cbow=cello bow short, speech=synth speech chops. Multi-variant: s(\"flbass:2\"). Unpitched one-shots — for in-tune melodies prefer gm_* / wt_*.",
         "drum_machines": machines,
         "drum_machine_note": DRUM_MACHINE_NOTE,
-        "gm_instruments": GM_INSTRUMENTS,
-        "gm_note": "Any General MIDI name (gm_*) works; streams in on first use, first cycle may be silent.",
+        "gm_instruments": gm_instruments(),
+        "gm_note": GM_NOTE,
         "user_sample_banks": user_banks,
     })
 }

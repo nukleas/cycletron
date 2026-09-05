@@ -65,6 +65,7 @@ strudel-mini = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b
 strudel-dsl = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
 strudel-audio = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
 strudel-sounds = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
+strudel-soundfont = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2", default-features = false, features = ["gm"] }
 strudel-music-theory = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
 midi-to-strudel = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
 

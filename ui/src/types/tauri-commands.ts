@@ -159,6 +159,8 @@ export interface SampleSetSettings {
 export interface SampleSetStatus {
     id: string;
     label: string;
+    /** One line: what the set adds and under what license. */
+    description: string;
     builtin: boolean;
     ready: boolean;
     files: number;

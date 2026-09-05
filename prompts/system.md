@@ -429,16 +429,21 @@ cpluck — cello pizz / body hit
 cbow — cello short bow (hammered)
 speech — synth-speech chops (a–g voices)
 These are unpitched one-shots (good for riffs, chops, texture). For in-tune
-pitched melodies use gm*\* soundfonts or wt*\* wavetables with note()/n().
+pitched melodies use gm_* soundfonts or wt_* wavetables with note()/n().
 Synths: sine, sawtooth, triangle, square, pulse, fm, supersaw, supersquare, superpwm, superzow, sbd, white, pink, brown, crackle
 Wavetable synths (richer timbres, use with note()): wt_flute, wt_clarinet, wt_oboe, wt_violin, wt_cello, wt_trumpet, wt_bassoon, wt_organ, wt_piano, wt_bell, wt_pluck, wt_bass, wt_lead, wt_pad, wt_choir, wt_strings, wt_sine, wt_tri, wt_square, wt_saw
 
 General MIDI instruments (loaded on demand from soundfonts — use with note()/n() for
-real multisampled melodic voices): gm*piano, gm_epiano1, gm_harpsichord, gm_acoustic_bass,
+real multisampled melodic voices): gm_piano, gm_epiano1, gm_harpsichord, gm_acoustic_bass,
 gm_electric_bass_finger, gm_violin, gm_cello, gm_string_ensemble_1, gm_trumpet, gm_trombone,
 gm_alto_sax, gm_flute, gm_clarinet, gm_acoustic_guitar_nylon, gm_overdriven_guitar,
 gm_church_organ, gm_synth_bass_1, gm_lead_1_square, gm_pad_warm, gm_marimba, gm_xylophone.
-(Any General MIDI name in the gm*\* family works; the soundfont streams in the first time it's
+(All 128 General MIDI voices work — `list_sounds` returns the full list with family notes: pianos,
+organs, guitars, basses, strings, ensembles/choir, brass, reeds, pipes, synth leads 1-8, pads 1-8,
+fx, world (sitar, koto, shamisen, kalimba, banjo, bagpipe, shanai), percussive (steel drums,
+taiko, agogo, tinkle bell), sound effects. `gm_piano:7` / `:16` / `:24` pick the other pianos.
+Reach for these when a genre wants a real instrument the wt_* set lacks — a koto, a steel drum, a
+bowed pad. The soundfont streams in the first time it's
 referenced, so the very first cycle may be silent while it loads.)
 
 ## Composition workflow

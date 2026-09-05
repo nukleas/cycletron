@@ -14,6 +14,7 @@ serde_json = { workspace = true }
 strudel-core = { workspace = true }
 strudel-dsl = { workspace = true }
 strudel-mini = { workspace = true }
+strudel-soundfont = { workspace = true }
 
 [dev-dependencies]
 cycletron-gen = { workspace = true }

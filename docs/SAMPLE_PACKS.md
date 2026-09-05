@@ -110,9 +110,25 @@ Built in:
   `ui/public/cycletron.strudel.json`, generated from `ui/sample-tables.ts`,
   so export always matches live playback.
 - **strudel** — the exact sources `strudio play`/`render` registers
-  (dough-samples piano, uzu drumkit, uzu wavetables, Dirt-Samples), fetched
-  from upstream into `{app_cache}/sample-sets/strudel/`. Active, Cycletron
-  sounds identical to strudel-rs.
+  (dough-samples piano, uzu drumkit, uzu wavetables, Dirt-Samples). Active,
+  Cycletron sounds identical to strudel-rs.
+- **strudel-cc** — what strudel.cc loads at startup, in its order: piano,
+  VCSL, tidal-drum-machines, uzu drumkit, uzu wavetables, mridangam, then
+  Dirt-Samples (the site loads a ten-bank Dirt subset; we list all of Dirt
+  last, so every shared bank keeps the same owner). The largest set.
+- **drum-machines** — the 71 tidal-drum-machines kits on their own:
+  `s("bd sd").bank("RolandTR909")`, `AkaiMPC60`, `LinnDrum`, `OberheimDMX`,
+  `YamahaRX5`… The agent's `list_sounds` lists every machine with its voices
+  while this set (or `strudel-cc`) is active.
+- **vcsl** — the Versilian Community Sample Library (CC0): 128 pitched and
+  percussion instruments.
+- **mridangam** — South Indian mridangam strokes (CC-BY-SA).
+
+Downloads are stored per *source* under `{app_cache}/sample-sets/sources/`,
+so sets that share a source share one download: after `vcsl`, activating
+`strudel-cc` only fetches what is missing, and deleting a set only removes
+sources no other set lists. (Installs from before this layout are moved over
+automatically.)
 
 Define your own sets in `{app_data}/sample-sets.json`:
 
