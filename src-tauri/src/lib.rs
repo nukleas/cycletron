@@ -6,11 +6,13 @@ mod export;
 mod files;
 mod library;
 mod library_index;
+mod link;
 mod logs;
 mod menu;
 mod midi_input;
 mod oauth;
 mod oauth_store;
+mod osc;
 mod packs;
 mod persistence;
 mod recording;
@@ -330,6 +332,11 @@ pub fn run() {
             commands::log_diagnostic,
             commands::diagnostic_dump,
             commands::set_dock_badge,
+            link::link_enable,
+            link::link_snapshot,
+            osc::osc_configure,
+            osc::osc_transport,
+            osc::osc_frame,
             sounds::scan_sample_folder,
             sounds::read_audio_file,
             sounds::register_sound_banks,

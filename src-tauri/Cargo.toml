@@ -50,6 +50,13 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 sha2 = "0.11"
 open = "5"
+# OSC encoding for the UDP output stream (see src/osc.rs).
+rosc = "0.11"
+# Ableton Link tempo/phase sync (see src/link.rs). GPLv2+, which AGPLv3 §13
+# permits combining with, so no commercial Ableton licence is needed. Unlike
+# the deps above this one builds Ableton's C++ Link via cmake + bindgen, so
+# the macOS-universal / AppImage / NSIS jobs need cmake and libclang present.
+rusty_link = "0.4"
 # Free-space query for the recording sink. Pure Rust — no new -sys crate, so
 # the macOS-universal / AppImage / NSIS jobs are unaffected.
 fs4 = "0.13"

@@ -30,6 +30,7 @@ import {helpModal} from './help-modal.js';
 import {preferencesModal, persistEditorAssist} from './preferences.js';
 import {midiLab} from './midi-lab.js';
 import {audioRecorder} from './audio-recorder.js';
+import {launchQuantum} from './launch-quantum.js';
 import {checkForUpdates} from './updater.js';
 import {dismissibleModal} from './modal-utils.js';
 import {logsModal} from './logs-modal.js';
@@ -204,6 +205,7 @@ const COMMANDS: Item[] = [
     {id: 'cmd.play_pause',  title: 'Play / Pause',          section: 'Commands', hint: '⌘↩',     run: () => requireApp().togglePlayPause()},
     {id: 'cmd.stop',        title: 'Stop Playback',         section: 'Commands', hint: 'Esc',    run: () => requireApp().stop()},
     {id: 'cmd.record',      title: 'Toggle Recording',      section: 'Commands',                 run: () => audioRecorder.toggle()},
+    {id: 'cmd.launch_quantum', title: 'Launch Quantization: Next Grid', section: 'Commands',       run: () => launchQuantum.cycleNext()},
     {id: 'cmd.export_audio',title: 'Export Audio…',         section: 'Commands', hint: '⌘⇧E',    run: () => fileManager.exportAudio()},
     {id: 'cmd.export_midi', title: 'Export MIDI…',          section: 'Commands',                 run: () => fileManager.exportMidi()},
     {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => midiLab.openEmpty()},

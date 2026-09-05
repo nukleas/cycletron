@@ -18,6 +18,10 @@ import {ambientViz} from './ambient-viz.js';
 import {stage} from './stage.js';
 import {audioRecorder} from './audio-recorder.js';
 import {visualsMenu} from './visuals-menu.js';
+import {launchQuantum} from './launch-quantum.js';
+import {mixer} from './mixer.js';
+import {oscOut} from './osc-out.js';
+import {linkSync} from './link-sync.js';
 import {ExamplesBrowser} from './examples.js';
 import {notify} from './notifications.js';
 import {invoke, isTauri} from './tauri.js';
@@ -185,6 +189,7 @@ export class StrudelApp {
             this.visualizer.setCycle(this.latestCycle);
         }
         this.updateActiveNotes(this.latestCycle);
+        oscOut.frame(this.latestCycle);
         this.vizPending = false;
     };
 
@@ -303,6 +308,7 @@ export class StrudelApp {
         // Forward cycle position to the fullscreen viz so its motion locks to
         // musical time (cheap; bypasses the vizPending gate).
         ambientViz.updateCycle(cycle);
+        launchQuantum.tick(cycle);
 
         // If a frame is already waiting, don't even update the cycle count!
         if (this.vizPending || !this.isInitialized) return;
@@ -313,6 +319,10 @@ export class StrudelApp {
     };
 
     onCodeChange = (code: string): void => {
+        // Track the buffer whether or not we're playing — opening a file should
+        // populate the mixer before the first evaluate.
+        mixer.refresh(code);
+
         if (this._suppressNextCodeChange) {
             this._suppressNextCodeChange = false;
             this.hideError();
@@ -399,6 +409,18 @@ export class StrudelApp {
     };
 
     setupUI(): void {
+        // The scheduler may not exist yet (audio arms on first Play), so the
+        // setting is stashed here and re-applied when it is constructed.
+        launchQuantum.init(cycles => {
+            if (this.scheduler) this.scheduler.launchQuantum = cycles;
+        });
+        mixer.init(this._reapplyMix);
+        void oscOut.init();
+        // Link is the tempo authority while it is on, so it pushes through
+        // applyBpm exactly like the slider does.
+        void linkSync.init(bpm => this.applyBpm(bpm));
+        document.getElementById('mixerClear')?.addEventListener('click', () => mixer.clear());
+
         // Returns a touchend handler that fires callback on double-tap
         const doubleTap = (callback: () => void) => {
             let lastTap = 0;
@@ -763,6 +785,9 @@ export class StrudelApp {
 
         // Scheduler callbacks
         this.scheduler.onCycleUpdate = this.handleCycleUpdate;
+        this.scheduler.onPatternInstalled = this._onPatternInstalled;
+        this.scheduler.onLaunchArmed = (b) => launchQuantum.setArmed(b);
+        this.scheduler.launchQuantum = launchQuantum.cycles;
 
         const analyser = this.audioManager.getAnalyser()!;
 
@@ -785,11 +810,13 @@ export class StrudelApp {
         // pattern console pane. Auto-starts and stays on by default; safe to
         // call again after a worklet-crash re-init, it just swaps analysers
         // (and refreshes the pattern-source memory reference).
-        ambientViz.attach(analyser, {
+        const patternSource = {
             scheduler: this.scheduler,
             memory: this.audioManager.getWasmMemory()!,
             cycleViewPtr: wasmModule.getCycleViewBufPtr(),
-        });
+        };
+        ambientViz.attach(analyser, patternSource);
+        oscOut.attach(patternSource);
 
         // Capture pointers for active-note highlighting
         this._activeLocsBufPtr = wasmModule.getActiveLocsBufPtr();
@@ -1120,12 +1147,7 @@ export class StrudelApp {
             const {pattern, bpm} = this.parsePatternWithTempo(code);
             // Hot-swap without resetting the clock so the pattern continues
             // from the current cycle position instead of jumping to 0.
-            this.scheduler!.setPattern(pattern, false);
-            if (bpm != null) {
-                this.applyBpm(bpm);
-            }
-            this.visualizer?.resetCache();
-            this.updateVisualization();
+            this._swapPattern(pattern, bpm);
             this.hideError();
             if (this.editor) this.editor.replaced = false;
         } catch (e) {
@@ -1134,8 +1156,56 @@ export class StrudelApp {
         }
     }, 100);
 
+    /**
+     * Hand a freshly parsed pattern to the scheduler, applying the side effects
+     * that have to move with it.
+     *
+     * Under launch quantization the scheduler holds the swap until the next
+     * boundary and calls {@link _onPatternInstalled} then, so tempo and the
+     * visualizer cache never run ahead of what is actually sounding.
+     */
+    private _swapPattern(pattern: PatternHandle, bpm: number | undefined): void {
+        if (!this.scheduler!.setPatternQuantized(pattern, bpm)) {
+            this._onPatternInstalled(bpm);
+        }
+    }
+
+    /**
+     * Re-apply the pattern after a mute/solo change. Routed through the same
+     * quantized swap as an evaluate, so mutes land on the bar line too. Never
+     * arms audio or starts the transport — toggling a mute while stopped
+     * should stay stopped.
+     */
+    private _reapplyMix = (): void => {
+        if (!this.isInitialized || !this.editor) return;
+        if (this.playbackState !== PlaybackState.Playing) return;
+        try {
+            const {pattern, bpm} = this.parsePatternWithTempo(this.editor.getCode());
+            this._swapPattern(pattern, bpm);
+        } catch {
+            // Buffer is mid-edit and doesn't parse; the next evaluate picks it up.
+        }
+    };
+
+    /** Tell OSC listeners where the transport went. `cps = bpm / 240`. */
+    private _announceTransport(state: 'playing' | 'paused' | 'stopped'): void {
+        const bpm = parseInt(this.elements.bpmSlider.value, 10) || 120;
+        oscOut.transport(state, bpm, bpm / 240);
+    }
+
+    private _onPatternInstalled = (bpm: number | undefined): void => {
+        this.visualizer?.resetCache();
+        // Redraw the sequence grid now rather than waiting for the next frame,
+        // matching what the keystroke path did before it shared this code.
+        this.visualizer?.render();
+        this.applyBpm(bpm ?? parseInt(this.elements.bpmSlider.value, 10));
+    };
+
     parsePatternWithTempo(code: string): { pattern: PatternHandle; bpm: number | undefined } {
-        const pattern = this.wasm!.parsePattern(code);
+        // Mute/solo is an override layer over the buffer, not an edit to it.
+        // The transform preserves byte offsets, so active-note locations
+        // reported against the parsed source still map onto the editor.
+        const pattern = this.wasm!.parsePattern(mixer.transform(code));
         const raw = this.bpmView ? this.bpmView[0] : NaN;
         return {pattern, bpm: isNaN(raw) ? undefined : raw};
     }
@@ -1151,13 +1221,11 @@ export class StrudelApp {
         try {
             const result = this.parsePatternWithTempo(code);
             pattern = result.pattern;
+            mixer.refresh(code);
 
             // Hot-swap without resetting the clock so the pattern continues
             // from the current cycle position instead of jumping to 0.
-            this.scheduler!.setPattern(pattern, false);
-            this.visualizer?.resetCache();
-            // Use tempo from code if present, otherwise use slider value
-            this.applyBpm(result.bpm ?? parseInt(this.elements.bpmSlider.value, 10));
+            this._swapPattern(pattern, result.bpm);
         } catch (e) {
             const msg = (e as Error).message || String(e);
             this.showError(msg); // Normal syntax error
@@ -1215,12 +1283,15 @@ export class StrudelApp {
         // re-apply the old pattern on top of the new document.
         this.debouncedEvaluate.cancel();
         this._suppressNextCodeChange = true;
+        // A different document: mute/solo positions don't carry over.
+        mixer.reset();
         this.editor.setCode(code);
         await this.evaluate(code);
     }
 
     private _enterPlayingState(): void {
         this.playbackState = PlaybackState.Playing;
+        this._announceTransport('playing');
 
         this._setTransportPlaying();
         this.elements.stopBtn.disabled = false;
@@ -1236,9 +1307,28 @@ export class StrudelApp {
         this.elements.liveIndicator.classList.add('active');
     }
 
-    play(): void {
+    async play(): Promise<void> {
+        await this._awaitLinkBar();
         const code = this.editor!.getCode();
         this.evaluate(code);
+    }
+
+    /**
+     * Hold a start until the Link session's bar line so it lands in phase.
+     * Returns immediately when Link is off or has no peers.
+     *
+     * The status line is the feedback here: a bar is up to two seconds at
+     * common tempos, and a Play press that does nothing for that long reads as
+     * a broken button rather than as quantization.
+     */
+    private async _awaitLinkBar(): Promise<void> {
+        if (!linkSync.active || linkSync.peers === 0) return;
+        const previous = this.elements.status.textContent;
+        this.setStatus('Waiting for Link bar…');
+        const waited = await linkSync.waitForBar();
+        if (waited > 0 && this.elements.status.textContent === 'Waiting for Link bar…') {
+            this.setStatus(previous ?? '');
+        }
     }
 
     /**
@@ -1250,6 +1340,7 @@ export class StrudelApp {
     pause(): void {
         if (this.playbackState !== PlaybackState.Playing) return;
         this.playbackState = PlaybackState.Paused;
+        this._announceTransport('paused');
 
         // Stop scheduling new events. clearEvents() flushes the lookahead
         // queue so those events don't double-fire on resume.
@@ -1274,7 +1365,11 @@ export class StrudelApp {
      * the scheduler. startTime is reconstructed from pausedCycle since
      * currentTime kept advancing while the context remained running.
      */
-    resume(): void {
+    async resume(): Promise<void> {
+        if (this.playbackState !== PlaybackState.Paused) return;
+        await this._awaitLinkBar();
+        // The gate yields, so re-check: a Stop during the wait must not be
+        // undone by the resume it was racing.
         if (this.playbackState !== PlaybackState.Paused) return;
 
         this.scheduler!.resume();
@@ -1300,13 +1395,13 @@ export class StrudelApp {
         }
         switch (this.playbackState) {
             case PlaybackState.Stopped:
-                this.play();
+                await this.play();
                 break;
             case PlaybackState.Playing:
                 this.pause();
                 break;
             case PlaybackState.Paused:
-                this.resume();
+                await this.resume();
                 break;
         }
     }
@@ -1401,7 +1496,7 @@ export class StrudelApp {
             return;
         }
 
-        this.play();
+        await this.play();
     }
 
     /** Update transport button to the "currently playing" appearance. */
@@ -1428,6 +1523,7 @@ export class StrudelApp {
 
         this.scheduler?.stop();
         this.playbackState = PlaybackState.Stopped;
+        this._announceTransport('stopped');
 
         const btn = this.elements.transportBtn;
         btn.classList.remove('transport--playing', 'transport--paused');
@@ -1456,6 +1552,9 @@ export class StrudelApp {
      *  value box, stats readout, immersive HUD) updates here, so no surface
      *  can go stale regardless of what triggered the change. */
     applyBpm(bpm: number): void {
+        // While in a Link session the shared tempo wins, so a pattern's
+        // `setbpm` cannot silently desync this instance from its peers.
+        bpm = linkSync.resolveBpm(bpm);
         bpm = Math.max(30, Math.min(300, bpm));
         if (isNaN(bpm)) return;
         const value = String(bpm);

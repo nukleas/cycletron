@@ -136,7 +136,14 @@ class HelpModal {
             '<li><strong>AI panel</strong> — describe music; the model rewrites the editor.</li>' +
             '<li><strong>Files</strong> — library root for saves and MIDI imports.</li>' +
             '<li><strong>Examples</strong> — Lessons → Patterns → Showcase (Play first, then load).</li>' +
+            '<li><strong>Mixer</strong> — mute/solo the <code>$:</code> tracks live. Names come from the comment above each track; your file is never changed.</li>' +
             '</ul>';
+        html +=
+            '<h4 class="help-h">Performing</h4>' +
+            '<p>The <strong>Q</strong> button in the top bar holds each evaluate until the next bar line ' +
+            '(click to step through 1/2/4/8 bars) instead of swapping mid-phrase. Mixer moves follow the same grid. ' +
+            'Preferences → <strong>OSC Output</strong> streams the transport and note onsets over UDP ' +
+            'to Hydra, Resolume, TouchDesigner or a lighting rig.</p>';
         html +=
             '<h4 class="help-h">AI & privacy</h4>' +
             `<p>${escapeHtml(PRIVACY_BLURB)}</p>`;
