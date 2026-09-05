@@ -11,7 +11,7 @@
  */
 
 import {ambientViz} from './ambient-viz.js';
-import {stage, STAGE_PRESETS} from './stage.js';
+import {stage, STAGE_PRESETS, STAGE_TEXT_SIZES} from './stage.js';
 import {attachDropdown} from './dropdown.js';
 import {VIZ_MODES} from './viz/registry.js';
 import {VizMode} from './types/visualizer.js';
@@ -47,6 +47,7 @@ class VisualsMenu {
     private stageHudItem: HTMLButtonElement | null = null;
     private stageFullscreenItem: HTMLButtonElement | null = null;
     private stageResItems: HTMLButtonElement[] = [];
+    private stageTextItems: HTMLButtonElement[] = [];
 
     init(opts: VisualsMenuOptions): void {
         this.opts = opts;
@@ -151,6 +152,19 @@ class VisualsMenu {
         });
         menu.appendChild(this.stageFullscreenItem);
 
+        // Code size doubles as how much of the frame the code covers, so it is
+        // the first thing reached for once the visuals are the point. ⌘+/⌘−
+        // does it live on stage; this is where you find out that it does.
+        this.stageTextItems = STAGE_TEXT_SIZES.map((size, i) => {
+            const b = this.item(`Code: ${size.label}`, 'menuitemradio', () => {
+                stage.setTextSize(size.id);
+                this.refresh();
+            });
+            if (i === 0) b.appendChild(this.hint('⌘+ / ⌘− on stage'));
+            menu.appendChild(b);
+            return b;
+        });
+
         // Output resolution is what a recorder or an OBS window capture gets,
         // so it belongs next to the stage toggle rather than buried in prefs.
         this.stageResItems = STAGE_PRESETS.map((preset) => {
@@ -225,6 +239,9 @@ class VisualsMenu {
         const resolutionId = stage.resolution().id;
         this.stageResItems.forEach((b, i) =>
             b.setAttribute('aria-checked', String(STAGE_PRESETS[i].id === resolutionId)));
+        const textSizeId = stage.textSize().id;
+        this.stageTextItems.forEach((b, i) =>
+            b.setAttribute('aria-checked', String(STAGE_TEXT_SIZES[i].id === textSizeId)));
 
         const ambientMode = ambientViz.getMode();
         this.modeItems.forEach((b, i) => b?.setAttribute('aria-checked', String(i === ambientMode)));

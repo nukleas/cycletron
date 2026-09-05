@@ -21,13 +21,33 @@ import {ambientViz} from './ambient-viz.js';
 import {diag} from './diagnostics.js';
 import {isTauri} from './tauri.js';
 import type {FixedResolution, FullscreenVisualizer} from './fullscreen-viz.js';
-import {StageCodeLayer} from './viz/stage/code-layer.js';
+import {DEFAULT_FONT_PX, StageCodeLayer} from './viz/stage/code-layer.js';
 import {StageHudLayer} from './viz/stage/hud-layer.js';
 
 export interface StagePreset extends FixedResolution {
     id: string;
     label: string;
 }
+
+export interface StageTextSize {
+    id: string;
+    label: string;
+    /** Authored against a 1080p frame; larger outputs scale up from it. */
+    px: number;
+}
+
+/**
+ * How large the code is drawn — and, because the column is sized to hold a
+ * fixed number of characters, how much of the frame it covers. Smaller is not
+ * only more readable-at-a-distance in reverse, it hands width back to the
+ * visuals, which is usually the reason to reach for this.
+ */
+export const STAGE_TEXT_SIZES: readonly StageTextSize[] = [
+    {id: 'xs', label: 'Extra Small', px: 18},
+    {id: 's', label: 'Small', px: 22},
+    {id: 'm', label: 'Medium', px: DEFAULT_FONT_PX},
+    {id: 'l', label: 'Large', px: 36},
+];
 
 /**
  * Output presets. 1080p is the default; the higher ones exist because a 1080p
@@ -44,6 +64,7 @@ export const STAGE_PRESETS: readonly StagePreset[] = [
 const RESOLUTION_KEY = 'stage-resolution';
 const HUD_KEY = 'stage-hud';
 const OS_FULLSCREEN_KEY = 'stage-os-fullscreen';
+const TEXT_SIZE_KEY = 'stage-text-size';
 
 const IS_MAC = /Mac|iPhone|iPad/i.test(navigator.userAgent);
 const EXIT_HINT = IS_MAC ? '⌘⇧F' : 'Ctrl+Shift+F';
@@ -72,6 +93,7 @@ export class Stage {
 
         this.root = document.getElementById('stageRoot') as HTMLDivElement | null;
         this.hudLayer.setVisible(this.isHudVisible());
+        this.codeLayer.setBaseFontPx(this.textSize().px);
 
         // Capture phase: CodeMirror has focus on stage, and its keymap would
         // otherwise see the event first.
@@ -80,7 +102,19 @@ export class Stage {
                 e.preventDefault();
                 e.stopPropagation();
                 void this.toggle();
+                return;
             }
+
+            // ⌘+ / ⌘− is the editor's zoom, which does nothing visible on stage
+            // — the code here is drawn, not shown. Rather than leave the one
+            // shortcut everybody reaches for doing nothing, point it at the
+            // size that is actually on screen.
+            if (!this.active || !(e.metaKey || e.ctrlKey) || e.shiftKey) return;
+            const step = e.key === '=' || e.key === '+' ? 1 : e.key === '-' ? -1 : 0;
+            if (step === 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this.stepTextSize(step);
         }, {capture: true});
     }
 
@@ -183,6 +217,27 @@ export class Stage {
         localStorage.setItem(RESOLUTION_KEY, id);
         if (this.active) this.viz?.setFixedResolution(this.resolution());
         this.onStateChange?.();
+    }
+
+    textSize(): StageTextSize {
+        const id = localStorage.getItem(TEXT_SIZE_KEY);
+        return STAGE_TEXT_SIZES.find((size) => size.id === id)
+            ?? STAGE_TEXT_SIZES.find((size) => size.px === DEFAULT_FONT_PX)!;
+    }
+
+    setTextSize(id: string): void {
+        const size = STAGE_TEXT_SIZES.find((entry) => entry.id === id);
+        if (!size) return;
+        localStorage.setItem(TEXT_SIZE_KEY, size.id);
+        this.codeLayer.setBaseFontPx(size.px);
+        this.onStateChange?.();
+    }
+
+    /** Step through the sizes, clamped at both ends. */
+    stepTextSize(delta: number): void {
+        const at = STAGE_TEXT_SIZES.indexOf(this.textSize());
+        const next = Math.min(Math.max(at + delta, 0), STAGE_TEXT_SIZES.length - 1);
+        this.setTextSize(STAGE_TEXT_SIZES[next].id);
     }
 
     isHudVisible(): boolean {

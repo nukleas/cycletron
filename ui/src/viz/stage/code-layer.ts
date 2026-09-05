@@ -30,12 +30,23 @@ const FONT_STACK = "'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, ui-monos
 
 /** Design metrics, authored against a 1080p frame and scaled from there. */
 const REFERENCE_HEIGHT = 1080;
-const DEFAULT_FONT_PX = 28;
+export const DEFAULT_FONT_PX = 28;
 const LINE_HEIGHT_RATIO = 1.5;
 /** A touch under full opacity so the code sits in the scene rather than on it. */
 const CODE_ALPHA = 0.92;
-/** Fraction of frame width the code column occupies. */
-const COLUMN_WIDTH = 0.56;
+/**
+ * Characters per line.
+ *
+ * The column is sized from this and the measured advance width, rather than
+ * being a fixed fraction of the frame: shrinking the text has to mean less of
+ * the frame covered, not the same column packed with more characters. The
+ * visuals are the reason to be on stage, so width the code gives up goes back
+ * to them. At the default size on a 1080p frame this lands where the old fixed
+ * 56% column did.
+ */
+const CODE_COLUMNS = 64;
+/** Ceiling on the column, so the largest text still can't swallow the frame. */
+const MAX_COLUMN_WIDTH = 0.62;
 const MARGIN_X = 0.055;
 const MARGIN_Y = 0.075;
 /** Continuation rows hang under their source line by this many characters. */
@@ -81,6 +92,8 @@ export class StageCodeLayer implements VizLayer {
     private rows: Row[] = [];
     private colors: Record<string, string> = {};
 
+    /** Authored size at 1080p, before the frame-height scale. User-settable. */
+    private basePx = DEFAULT_FONT_PX;
     private fontPx = DEFAULT_FONT_PX;
 
     private charW = 0;
@@ -105,6 +118,7 @@ export class StageCodeLayer implements VizLayer {
     private readonly measure: CanvasRenderingContext2D;
 
     private needsRewrap = true;
+    private needsRelayout = false;
 
     constructor() {
         const canvas = document.createElement('canvas');
@@ -112,6 +126,18 @@ export class StageCodeLayer implements VizLayer {
     }
 
     // ---- input -------------------------------------------------------------
+
+    /**
+     * Set the authored font size (at 1080p; larger frames scale up from it).
+     *
+     * Deferred to the next frame rather than laid out here: the caller is a
+     * menu click or a keystroke and has no `VizServices` to lay out against.
+     */
+    setBaseFontPx(px: number): void {
+        if (px === this.basePx) return;
+        this.basePx = px;
+        this.needsRelayout = true;
+    }
 
     setSnapshot(snapshot: EditorSnapshot): void {
         const textChanged = snapshot.code !== this.snapshot.code;
@@ -150,9 +176,10 @@ export class StageCodeLayer implements VizLayer {
     // ---- VizLayer ----------------------------------------------------------
 
     layout(s: VizServices): void {
+        this.needsRelayout = false;
         this.colors = resolveSyntaxColors();
 
-        this.fontPx = Math.max(10, Math.round(DEFAULT_FONT_PX * (s.height / REFERENCE_HEIGHT)));
+        this.fontPx = Math.max(10, Math.round(this.basePx * (s.height / REFERENCE_HEIGHT)));
         this.lineH = Math.round(this.fontPx * LINE_HEIGHT_RATIO);
 
         this.measure.font = `${this.fontPx}px ${FONT_STACK}`;
@@ -163,7 +190,7 @@ export class StageCodeLayer implements VizLayer {
         this.box = {
             x: Math.round(s.width * MARGIN_X),
             y: Math.round(s.height * MARGIN_Y),
-            w: Math.round(s.width * COLUMN_WIDTH),
+            w: Math.round(Math.min(CODE_COLUMNS * this.charW, s.width * MAX_COLUMN_WIDTH)),
             h: Math.round(s.height * (1 - MARGIN_Y * 2)),
         };
         this.cols = Math.max(8, Math.floor(this.box.w / this.charW));
@@ -189,6 +216,7 @@ export class StageCodeLayer implements VizLayer {
     }
 
     render(ctx: CanvasRenderingContext2D, s: VizServices): void {
+        if (this.needsRelayout) this.layout(s);
         if (this.needsRewrap) this.rewrap();
         if (!this.rows.length) return;
 
