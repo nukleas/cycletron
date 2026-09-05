@@ -354,3 +354,47 @@ impl StreamDecoder for ResponsesAccumulator {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_exchange_becomes_function_call_and_output() {
+        let msgs = vec![
+            ApiMessage {
+                role: "assistant".to_string(),
+                content: vec![ContentBlock::ToolUse {
+                    id: "call_1".to_string(),
+                    name: "play_pattern".to_string(),
+                    input: serde_json::json!({"code": "bd sd"}),
+                }],
+            },
+            ApiMessage {
+                role: "user".to_string(),
+                content: vec![ContentBlock::ToolResult {
+                    tool_use_id: "call_1".to_string(),
+                    // The agent loop renders the envelope header into the
+                    // content, so the Responses wire (which has no is_error)
+                    // still carries the failure class.
+                    content: "[result ok=false category=invalid-code retryable=yes]\nINVALID: x"
+                        .to_string(),
+                    is_error: Some(true),
+                }],
+            },
+        ];
+        let out = to_responses_input(&msgs);
+        assert_eq!(out[0]["type"], "function_call");
+        assert_eq!(out[0]["call_id"], "call_1");
+        assert_eq!(out[0]["name"], "play_pattern");
+        assert_eq!(out[0]["arguments"], "{\"code\":\"bd sd\"}");
+        assert_eq!(out[1]["type"], "function_call_output");
+        assert_eq!(out[1]["call_id"], "call_1");
+        assert!(
+            out[1]["output"]
+                .as_str()
+                .unwrap()
+                .starts_with("[result ok=false category=invalid-code")
+        );
+    }
+}

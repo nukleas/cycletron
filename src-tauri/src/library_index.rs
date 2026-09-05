@@ -15,7 +15,38 @@
 
 use crate::files;
 use serde::Serialize;
+use std::fmt;
 use std::path::Path;
+
+/// Why a library read or write was refused. The agent loop maps each variant
+/// to a tool-result category so the model knows whether to retry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LibError {
+    /// The path resolves outside the library root.
+    PathDenied(String),
+    /// No song at that path.
+    NotFound(String),
+    /// The path or content is not usable (not a song file, too large, empty).
+    BadArgument(String),
+    /// The destination already exists.
+    Conflict(String),
+    /// A filesystem operation failed.
+    Io(String),
+}
+
+impl fmt::Display for LibError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PathDenied(m)
+            | Self::NotFound(m)
+            | Self::BadArgument(m)
+            | Self::Conflict(m)
+            | Self::Io(m) => f.write_str(m),
+        }
+    }
+}
+
+impl std::error::Error for LibError {}
 
 /// A song is text; refuse to index or read anything larger. Guards against a
 /// library root pointed at a code repo (soundfont `.js` blobs run into MBs and
@@ -297,7 +328,7 @@ fn scan_sounds(code: &str) -> Vec<String> {
 /// Resolve a caller-supplied path (relative to the library root, or absolute)
 /// and READ it — but only if it stays inside the root. Returns the file's code.
 /// This is the single choke point for `read_song`; it never writes.
-pub fn read_song(root: &Path, requested: &str) -> Result<files::FileDoc, String> {
+pub fn read_song(root: &Path, requested: &str) -> Result<files::FileDoc, LibError> {
     let candidate = {
         let p = Path::new(requested);
         if p.is_absolute() {
@@ -307,30 +338,37 @@ pub fn read_song(root: &Path, requested: &str) -> Result<files::FileDoc, String>
         }
     };
     if !crate::library::within(root, &candidate) {
-        return Err(format!(
+        return Err(LibError::PathDenied(format!(
             "'{requested}' is outside the library — read_song only reaches songs in your library."
-        ));
+        )));
     }
     if !is_song(&candidate) {
-        return Err(format!("'{requested}' is not a .strudel/.js song file."));
+        return Err(LibError::BadArgument(format!(
+            "'{requested}' is not a .strudel/.js song file."
+        )));
     }
     // Refuse oversized files: a real song is small; anything this large is a data
     // blob (a soundfont, a bundle) and would blow the agent's context if returned.
     if let Ok(meta) = std::fs::metadata(&candidate)
         && meta.len() > MAX_SONG_BYTES
     {
-        return Err(format!(
+        return Err(LibError::BadArgument(format!(
             "'{requested}' is {} KB — too large to be a song (limit {} KB). Skipping.",
             meta.len() / 1024,
             MAX_SONG_BYTES / 1024
-        ));
+        )));
     }
-    let doc =
-        files::read_file(&candidate).map_err(|e| format!("could not read '{requested}': {e}"))?;
+    let doc = files::read_file(&candidate).map_err(|e| {
+        if candidate.exists() {
+            LibError::Io(format!("could not read '{requested}': {e}"))
+        } else {
+            LibError::NotFound(format!("no song at '{requested}'"))
+        }
+    })?;
     if is_js(&candidate) && !looks_like_pattern(&doc.code) {
-        return Err(format!(
+        return Err(LibError::BadArgument(format!(
             "'{requested}' is a .js file but doesn't look like a strudel pattern — skipping."
-        ));
+        )));
     }
     Ok(doc)
 }
@@ -342,10 +380,10 @@ pub fn read_song(root: &Path, requested: &str) -> Result<files::FileDoc, String>
 
 /// Resolve a caller path (relative to root, or absolute) and confirm it stays
 /// inside the library. The single guard every write goes through.
-fn resolve_in_root(root: &Path, requested: &str) -> Result<std::path::PathBuf, String> {
+fn resolve_in_root(root: &Path, requested: &str) -> Result<std::path::PathBuf, LibError> {
     let requested = requested.trim().trim_start_matches('@');
     if requested.is_empty() {
-        return Err("empty path".to_string());
+        return Err(LibError::BadArgument("empty path".to_string()));
     }
     let p = Path::new(requested);
     let candidate = if p.is_absolute() {
@@ -354,9 +392,9 @@ fn resolve_in_root(root: &Path, requested: &str) -> Result<std::path::PathBuf, S
         root.join(p)
     };
     if !crate::library::within(root, &candidate) {
-        return Err(format!(
+        return Err(LibError::PathDenied(format!(
             "'{requested}' is outside your library — writes stay inside it."
-        ));
+        )));
     }
     Ok(candidate)
 }
@@ -395,9 +433,11 @@ pub fn save_song(
     name: &str,
     code: &str,
     folder: Option<&str>,
-) -> Result<String, String> {
+) -> Result<String, LibError> {
     if code.trim().is_empty() {
-        return Err("nothing to save — the code is empty".to_string());
+        return Err(LibError::BadArgument(
+            "nothing to save — the code is empty".to_string(),
+        ));
     }
     let dir = match folder {
         Some(f) if !f.trim().is_empty() => resolve_in_root(root, f)?,
@@ -405,15 +445,18 @@ pub fn save_song(
     };
     let target = dir.join(format!("{}.strudel", slugify(name)));
     if !crate::library::within(root, &target) {
-        return Err("resolved path escapes the library".to_string());
+        return Err(LibError::PathDenied(
+            "resolved path escapes the library".to_string(),
+        ));
     }
-    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| LibError::Io(format!("mkdir: {e}")))?;
 
     // Snapshot the existing content before overwriting, so it's recoverable.
     if let (Some(app_dir), Ok(existing)) = (app_data_dir, std::fs::read_to_string(&target)) {
         crate::snapshots::record(app_dir, &target, &existing);
     }
-    std::fs::write(&target, with_frontmatter(name, code)).map_err(|e| format!("write: {e}"))?;
+    std::fs::write(&target, with_frontmatter(name, code))
+        .map_err(|e| LibError::Io(format!("write: {e}")))?;
     if let Some(app_dir) = app_data_dir {
         crate::snapshots::record(app_dir, &target, code);
     }
@@ -421,49 +464,58 @@ pub fn save_song(
 }
 
 /// Rename a song in place (keeps its folder + `.strudel` extension). Won't clobber.
-pub fn rename_song(root: &Path, from: &str, new_name: &str) -> Result<String, String> {
+pub fn rename_song(root: &Path, from: &str, new_name: &str) -> Result<String, LibError> {
     let src = resolve_in_root(root, from)?;
     if !src.is_file() {
-        return Err(format!("no song at '{from}'"));
+        return Err(LibError::NotFound(format!("no song at '{from}'")));
     }
     let dst = src.with_file_name(format!("{}.strudel", slugify(new_name)));
     if !crate::library::within(root, &dst) {
-        return Err("destination escapes the library".to_string());
-    }
-    if dst.exists() {
-        return Err(format!(
-            "'{}' already exists — pick another name",
-            rel_of(root, &dst)
+        return Err(LibError::PathDenied(
+            "destination escapes the library".to_string(),
         ));
     }
-    crate::library::rename_path(&src, &dst).map_err(|e| format!("rename: {e}"))?;
+    if dst.exists() {
+        return Err(LibError::Conflict(format!(
+            "'{}' already exists — pick another name",
+            rel_of(root, &dst)
+        )));
+    }
+    crate::library::rename_path(&src, &dst).map_err(|e| LibError::Io(format!("rename: {e}")))?;
     Ok(rel_of(root, &dst))
 }
 
 /// Move a song into `dest_folder` (created if needed). Won't clobber.
-pub fn move_song(root: &Path, from: &str, dest_folder: &str) -> Result<String, String> {
+pub fn move_song(root: &Path, from: &str, dest_folder: &str) -> Result<String, LibError> {
     let src = resolve_in_root(root, from)?;
     if !src.is_file() {
-        return Err(format!("no song at '{from}'"));
+        return Err(LibError::NotFound(format!("no song at '{from}'")));
     }
     let dir = resolve_in_root(root, dest_folder)?;
-    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir: {e}"))?;
-    let name = src.file_name().ok_or("bad source name")?;
+    std::fs::create_dir_all(&dir).map_err(|e| LibError::Io(format!("mkdir: {e}")))?;
+    let name = src
+        .file_name()
+        .ok_or_else(|| LibError::BadArgument("bad source name".to_string()))?;
     let dst = dir.join(name);
     if !crate::library::within(root, &dst) {
-        return Err("destination escapes the library".to_string());
+        return Err(LibError::PathDenied(
+            "destination escapes the library".to_string(),
+        ));
     }
     if dst.exists() {
-        return Err(format!("'{}' already exists there", rel_of(root, &dst)));
+        return Err(LibError::Conflict(format!(
+            "'{}' already exists there",
+            rel_of(root, &dst)
+        )));
     }
-    crate::library::rename_path(&src, &dst).map_err(|e| format!("move: {e}"))?;
+    crate::library::rename_path(&src, &dst).map_err(|e| LibError::Io(format!("move: {e}")))?;
     Ok(rel_of(root, &dst))
 }
 
 /// Create a folder in the library.
-pub fn create_folder(root: &Path, rel: &str) -> Result<String, String> {
+pub fn create_folder(root: &Path, rel: &str) -> Result<String, LibError> {
     let dir = resolve_in_root(root, rel)?;
-    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| LibError::Io(format!("mkdir: {e}")))?;
     Ok(rel_of(root, &dir))
 }
 

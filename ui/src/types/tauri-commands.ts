@@ -20,12 +20,68 @@ export interface CurrentFile {
     dirty: boolean;
 }
 
+/** Mirror of Rust `ToolCategory` (kebab-case on the wire). */
+export type ToolCategory =
+    | 'invalid-code'
+    | 'not-applied'
+    | 'not-found'
+    | 'bad-argument'
+    | 'precondition'
+    | 'budget-exhausted'
+    | 'policy-blocked'
+    | 'path-denied'
+    | 'conflict'
+    | 'io'
+    | 'truncated'
+    | 'unknown';
+
+export interface ToolFinding {
+    severity: string;
+    code: string;
+    message: string;
+}
+
+/** Mirror of Rust `ToolOutcome` — the typed envelope every agent tool returns. */
+export interface ToolOutcome {
+    ok: boolean;
+    /** Present iff `!ok`. */
+    category?: ToolCategory;
+    retryable: boolean;
+    /** One line for the chat row. */
+    summary: string;
+    /** The full result the model read. */
+    text: string;
+    warnings?: ToolFinding[];
+    repairs?: string[];
+    data?: unknown;
+}
+
+/** Mirror of Rust `ToolTrace` — one tool call persisted on an assistant turn. */
+export interface ToolTrace {
+    id: string;
+    name: string;
+    input: unknown;
+    outcome: ToolOutcome;
+    duration_ms: number;
+}
+
 export interface ChatMessage {
     id: string;
     role: 'user' | 'assistant' | 'system';
     content: string;
     timestamp: string;
+    /** Tools this assistant turn called, in order. Absent on text-only turns. */
+    tools?: ToolTrace[];
 }
+
+/** Mirror of Rust `AgentEvent` — the `agent-event` stream during `send_message`. */
+export type AgentEvent =
+    | {type: 'text_delta'; text: string}
+    | {type: 'tool_call'; id: string; name: string; input: unknown}
+    | {type: 'tool_result'; id: string; name: string; outcome: ToolOutcome; duration_ms: number}
+    | {type: 'ui_action'; name: string; payload: string}
+    | {type: 'done'; full_text: string}
+    | {type: 'error'; message: string};
 
 export interface SessionSnapshot {
     file_path: string | null;

@@ -14,7 +14,8 @@ import {renderMarkdownToHtml, enhanceCodeBlocks} from './markdown.js';
 import {openExternal} from './external-link.js';
 import {aiConsent} from './ai-consent.js';
 import {invoke as ipc, isTauri} from './tauri.js';
-import type {UserSettings} from './types/tauri-commands.js';
+import {createToolRow, completeToolRow} from './ai-tool-row.js';
+import type {AgentEvent, UserSettings} from './types/tauri-commands.js';
 
 
 // The chat UI + agent-event stream are wired at most once, and only after the
@@ -110,7 +111,11 @@ async function wireAiChat() {
     const clearBtn = document.getElementById('aiClear')!;
     const quickPromptsEl = document.getElementById('aiQuickPrompts')!;
 
+    // The assistant turn being streamed: its tool rows (in call order) sit
+    // above the prose body, so re-rendering the markdown never wipes them.
     let streamingEl: HTMLDivElement | null = null;
+    let streamingBody: HTMLDivElement | null = null;
+    let streamingTools: HTMLDivElement | null = null;
     let streamingText = '';
     let isProcessing = false;
 
@@ -158,7 +163,14 @@ async function wireAiChat() {
 
         streamingText = '';
         streamingEl = addMessage('assistant', '');
-        streamingEl.innerHTML = '<span class="ai-loading">Thinking</span>';
+        streamingEl.innerHTML = '';
+        streamingTools = document.createElement('div');
+        streamingTools.className = 'ai-tools';
+        streamingTools.hidden = true;
+        streamingBody = document.createElement('div');
+        streamingBody.className = 'ai-msg-body';
+        streamingBody.innerHTML = '<span class="ai-loading">Thinking</span>';
+        streamingEl.append(streamingTools, streamingBody);
 
         try {
             const app = getApp();
@@ -174,9 +186,9 @@ async function wireAiChat() {
                 editorCode: editorCode || null,
             });
             removeTask('ai-response');
-            if (streamingEl) {
-                streamingEl.innerHTML = renderMarkdownToHtml(response || streamingText);
-                enhanceCodeBlocks(streamingEl);
+            if (streamingBody) {
+                streamingBody.innerHTML = renderMarkdownToHtml(response || streamingText);
+                enhanceCodeBlocks(streamingBody);
             }
             // If the AI took more than ~6s and the user has switched away,
             // ping them with a system notification so they don't miss it.
@@ -187,12 +199,14 @@ async function wireAiChat() {
             }
         } catch (err: any) {
             removeTask('ai-response');
-            if (streamingEl) {
-                streamingEl.textContent = `Error: ${err}`;
+            if (streamingEl && streamingBody) {
+                streamingBody.textContent = `Error: ${err}`;
                 streamingEl.classList.add('ai-msg-error');
             }
         } finally {
             streamingEl = null;
+            streamingBody = null;
+            streamingTools = null;
             streamingText = '';
             setProcessing(false);
             input.focus();
@@ -236,36 +250,48 @@ async function wireAiChat() {
 
     // --- Streaming Agent Events ---
 
-    await listen('agent-event', (event: any) => {
+    await listen('agent-event', (event: {payload?: AgentEvent}) => {
         const data = event.payload;
         if (!data) return;
 
         switch (data.type) {
             case 'text_delta':
                 streamingText += data.text;
-                if (streamingEl) {
-                    streamingEl.innerHTML = renderMarkdownToHtml(streamingText);
+                if (streamingBody) {
+                    streamingBody.innerHTML = renderMarkdownToHtml(streamingText);
                     messagesEl.scrollTop = messagesEl.scrollHeight;
                 }
                 break;
 
             case 'tool_call':
-                addMessage('system', `\u{2699} ${data.name}`);
+                if (streamingTools) {
+                    streamingTools.hidden = false;
+                    streamingTools.appendChild(createToolRow(data.id, data.name, data.input));
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                }
                 break;
 
-            case 'tool_result':
+            case 'tool_result': {
+                const row = streamingTools?.querySelector<HTMLDetailsElement>(
+                    `.ai-tool[data-tool-id="${CSS.escape(data.id)}"]`,
+                );
+                if (row) completeToolRow(row, data.outcome, data.duration_ms);
+                break;
+            }
+
+            case 'ui_action':
                 if (data.name === '__set_code_and_play') {
-                    void injectCodeAndPlay(data.result);
+                    void injectCodeAndPlay(data.payload);
                 } else if (data.name === '__stop_playback') {
                     stopPlayback();
                 } else if (data.name === '__set_tempo') {
-                    setTempo(parseFloat(data.result));
+                    setTempo(parseFloat(data.payload));
                 } else if (data.name === '__library_changed') {
                     // Agent wrote to the library — refresh the file tree + toast.
                     try {
-                        window.__TAURI__?.event?.emit?.('library-changed', data.result);
+                        window.__TAURI__?.event?.emit?.('library-changed', data.payload);
                     } catch { /* non-tauri */ }
-                    void notify('Library updated', data.result);
+                    void notify('Library updated', data.payload);
                 }
                 break;
         }

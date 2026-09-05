@@ -61,8 +61,8 @@ pub struct AgentWriteState {
     pub review_calls: usize,
     /// Hash of the code for the last review (cache key).
     pub last_review_hash: Option<u64>,
-    /// Full tool result text of the last review (served on cache hit).
-    pub last_review_result: Option<String>,
+    /// The last review's envelope (served on cache hit).
+    pub last_review_result: Option<cycletron_core::types::ToolOutcome>,
     /// Code body of the last successful (non-INVALID) review — playable via
     /// `play_pattern` with no `code` argument.
     pub last_reviewed_code: Option<String>,

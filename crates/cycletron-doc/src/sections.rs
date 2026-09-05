@@ -6,6 +6,8 @@
 //! without re-emitting the whole song (the #1 latency win for iterative form
 //! edits on Agency-style documents).
 
+use crate::DocError;
+
 /// Public view of one named section for `list_sections`.
 #[derive(Debug, Clone)]
 pub struct SectionInfo {
@@ -59,18 +61,20 @@ pub fn list_sections(code: &str) -> Vec<SectionInfo> {
 /// Replace one section's expression body. `expr` is only the section body
 /// (e.g. `stack(s("bd*4"), …)`), not `drop1: …`. Returns the new document
 /// and the section id written.
-pub fn upsert_section(code: &str, handle: &str, expr: &str) -> Result<(String, String), String> {
+pub fn upsert_section(code: &str, handle: &str, expr: &str) -> Result<(String, String), DocError> {
     let expr = expr.trim();
     if expr.is_empty() {
-        return Err("upsert_section: 'code' is empty".to_string());
+        return Err(DocError::BadArgument(
+            "upsert_section: 'code' is empty".to_string(),
+        ));
     }
     let sections = parse_sections(code);
     if sections.is_empty() {
-        return Err(
+        return Err(DocError::NoStructure(
             "upsert_section: no section object found (const sections = {…} or \
              pickRestart/arrange). For `$:` tracks use upsert_track instead."
                 .to_string(),
-        );
+        ));
     }
     let key = clean_id(handle);
     let Some(sec) = sections
@@ -78,10 +82,10 @@ pub fn upsert_section(code: &str, handle: &str, expr: &str) -> Result<(String, S
         .find(|s| clean_id(&s.id) == key || s.index.to_string() == handle.trim())
     else {
         let names: Vec<_> = sections.iter().map(|s| s.id.as_str()).collect();
-        return Err(format!(
+        return Err(DocError::NotFound(format!(
             "no section matches '{handle}'. Sections: {}. Address by name or 1-based index.",
             names.join(", ")
-        ));
+        )));
     };
 
     // Keep surrounding whitespace style: replace only the expression span.
@@ -97,7 +101,7 @@ pub fn upsert_section(code: &str, handle: &str, expr: &str) -> Result<(String, S
 pub fn upsert_sections(
     code: &str,
     patches: &[(String, String)],
-) -> Result<(String, Vec<String>), String> {
+) -> Result<(String, Vec<String>), DocError> {
     let mut doc = code.to_string();
     let mut wrote = Vec::with_capacity(patches.len());
     for (id, expr) in patches {
@@ -566,14 +570,18 @@ mod tests {
 
     #[test]
     fn missing_section_errors_with_names() {
-        let err = upsert_section(SAMPLE, "verse", "x").unwrap_err();
+        let err = upsert_section(SAMPLE, "verse", "x")
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("drop1"));
         assert!(err.contains("intro"));
     }
 
     #[test]
     fn no_form_errors_clearly() {
-        let err = upsert_section(r#"$: s("bd*4") // @drums"#, "drums", "x").unwrap_err();
+        let err = upsert_section(r#"$: s("bd*4") // @drums"#, "drums", "x")
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("upsert_track"));
     }
 

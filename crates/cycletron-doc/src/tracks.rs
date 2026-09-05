@@ -26,6 +26,8 @@
 //! evaluator before anything reaches audio — so this module can be coarse on
 //! exotic input without ever injecting broken code.
 
+use crate::DocError;
+
 /// The `//@mute ` sentinel prefix a muted track's lines carry.
 const MUTE: &str = "//@mute ";
 
@@ -305,7 +307,7 @@ fn splice(code: &str, span: (usize, usize), replacement: &[String]) -> String {
 pub fn upsert_tracks(
     code: &str,
     patches: &[(String, String)],
-) -> Result<(String, Vec<String>), String> {
+) -> Result<(String, Vec<String>), DocError> {
     let mut doc = code.to_string();
     let mut wrote = Vec::with_capacity(patches.len());
     for (id, expr) in patches {
@@ -319,10 +321,12 @@ pub fn upsert_tracks(
 /// Insert or replace a track. If a track matching `handle` (id or index) exists,
 /// its span is replaced; otherwise a new `$: <expr> // @<id>` track is appended.
 /// Returns the new document and the id that was written.
-pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, String), String> {
+pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, String), DocError> {
     let expr = expr.trim();
     if expr.is_empty() {
-        return Err("upsert_track: 'code' is empty".to_string());
+        return Err(DocError::BadArgument(
+            "upsert_track: 'code' is empty".to_string(),
+        ));
     }
     let numeric = is_index_handle(handle);
     // A numeric handle names an index, never a new id.
@@ -366,10 +370,10 @@ pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, Str
         return Err(no_match(&tracks, handle));
     }
     if id.is_empty() {
-        return Err(format!(
+        return Err(DocError::BadArgument(format!(
             "upsert_track: no track matches '{handle}', and a new track needs a \
              non-empty id (letters/digits) to be addressable later."
-        ));
+        )));
     }
     let sep = if code.is_empty() || code.ends_with('\n') {
         ""
@@ -381,16 +385,16 @@ pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, Str
 }
 
 /// Comment out a track (silence it) by prefixing its lines with `//@mute `.
-pub fn mute_track(code: &str, handle: &str) -> Result<String, String> {
+pub fn mute_track(code: &str, handle: &str) -> Result<String, DocError> {
     toggle_mute(code, handle, true)
 }
 
 /// Restore a muted track.
-pub fn unmute_track(code: &str, handle: &str) -> Result<String, String> {
+pub fn unmute_track(code: &str, handle: &str) -> Result<String, DocError> {
     toggle_mute(code, handle, false)
 }
 
-fn toggle_mute(code: &str, handle: &str, mute: bool) -> Result<String, String> {
+fn toggle_mute(code: &str, handle: &str, mute: bool) -> Result<String, DocError> {
     let tracks = parse_tracks(code);
     let t = find(&tracks, handle)
         .ok_or_else(|| no_match(&tracks, handle))?
@@ -420,7 +424,7 @@ fn toggle_mute(code: &str, handle: &str, mute: bool) -> Result<String, String> {
 /// Delete a track entirely. Not yet exposed as an agent tool (mute is the
 /// reversible default); kept for the UI mixer strip and future wiring.
 #[allow(dead_code)]
-pub fn remove_track(code: &str, handle: &str) -> Result<String, String> {
+pub fn remove_track(code: &str, handle: &str) -> Result<String, DocError> {
     let tracks = parse_tracks(code);
     let t = find(&tracks, handle)
         .ok_or_else(|| no_match(&tracks, handle))?
@@ -429,7 +433,7 @@ pub fn remove_track(code: &str, handle: &str) -> Result<String, String> {
 }
 
 /// A helpful "no such track" error listing the handles that DO exist.
-fn no_match(tracks: &[Track], handle: &str) -> String {
+fn no_match(tracks: &[Track], handle: &str) -> DocError {
     let avail: Vec<String> = tracks
         .iter()
         .map(|t| match &t.id {
@@ -437,14 +441,14 @@ fn no_match(tracks: &[Track], handle: &str) -> String {
             None => format!("#{}", t.index),
         })
         .collect();
-    format!(
+    DocError::NotFound(format!(
         "no track matches '{handle}'. Tracks: {}. Address by @id or 1-based index.",
         if avail.is_empty() {
             "(none)".to_string()
         } else {
             avail.join(", ")
         }
-    )
+    ))
 }
 
 #[cfg(test)]
@@ -597,7 +601,7 @@ mod tests {
 
     #[test]
     fn missing_track_error_lists_available() {
-        let e = mute_track(MULTI, "lead").unwrap_err();
+        let e = mute_track(MULTI, "lead").unwrap_err().to_string();
         assert!(e.contains("@drums"));
         assert!(e.contains("@hats"));
     }

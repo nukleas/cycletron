@@ -92,10 +92,11 @@ impl StreamAccumulator {
                         }
                     }
                     // Emit tool call event
-                    if let Some(ContentBlock::ToolUse { name, input, .. }) =
+                    if let Some(ContentBlock::ToolUse { id, name, input }) =
                         self.content_blocks.get(*index)
                     {
                         let _ = event_tx.send(AgentEvent::ToolCall {
+                            id: id.clone(),
                             name: name.clone(),
                             input: input.clone(),
                         });

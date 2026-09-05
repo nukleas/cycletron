@@ -10,8 +10,13 @@ use crate::{Evaluated, Finding};
 pub enum ReviewOutcome {
     /// The code did not evaluate.
     Invalid(String),
-    /// The rendered report (no VERDICT line) and how many warns it contains.
-    Report { text: String, warns: usize },
+    /// The rendered report (no VERDICT line) and every finding it printed —
+    /// silence lint, mix critique and (for songs with a form) form critique,
+    /// in that order. Warn count = findings with severity "warn".
+    Report {
+        text: String,
+        findings: Vec<Finding>,
+    },
 }
 
 pub fn review_report(code: &str, cycles: usize, known: &SoundSet) -> ReviewOutcome {
@@ -45,7 +50,7 @@ pub fn review_report(code: &str, cycles: usize, known: &SoundSet) -> ReviewOutco
         digest.sounds.join(", "),
     ));
 
-    let mut warns = 0usize;
+    let mut findings: Vec<Finding> = Vec::new();
     let section = |title: &str, findings: &[Finding], out: &mut String| {
         out.push_str(&format!("== {title} ==\n"));
         if findings.is_empty() {
@@ -58,12 +63,12 @@ pub fn review_report(code: &str, cycles: usize, known: &SoundSet) -> ReviewOutco
 
     let mut lint = crate::lint_source(code);
     lint.extend(crate::lint_digest(digest, known));
-    warns += lint.iter().filter(|f| f.severity == "warn").count();
     section("silence lint", &lint, &mut out);
+    findings.extend(lint);
 
     let c = crate::critique(&ev);
-    warns += c.findings.iter().filter(|f| f.severity == "warn").count();
     section("mix critique", &c.findings, &mut out);
+    findings.extend(c.findings);
 
     if has_form {
         // Section→label map so the form is visible without a separate
@@ -81,9 +86,12 @@ pub fn review_report(code: &str, cycles: usize, known: &SoundSet) -> ReviewOutco
             ));
         }
         let c = crate::critique_form(&ev);
-        warns += c.findings.iter().filter(|f| f.severity == "warn").count();
         section("form critique", &c.findings, &mut out);
+        findings.extend(c.findings);
     }
 
-    ReviewOutcome::Report { text: out, warns }
+    ReviewOutcome::Report {
+        text: out,
+        findings,
+    }
 }

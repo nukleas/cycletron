@@ -1204,6 +1204,7 @@ name = "cycletron-agent"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "cycletron-core",
  "eventsource-stream",
  "reqwest",
  "serde",
