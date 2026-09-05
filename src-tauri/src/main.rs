@@ -1,5 +1,20 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+// GDK builds the X11 WM_CLASS *class* from the program name with its first
+// letter uppercased — "Cycletron" — while the Wayland app_id is the program
+// name verbatim, "cycletron". tauri-bundler writes `StartupWMClass=cycletron`
+// (the binary name) into the desktop entry, so on X11 the window and its
+// launcher entry disagree: compositor window rules, taskbar grouping and the
+// icon all stop matching (#8). Pinning the class makes both display backends
+// agree with the entry, so one Hyprland rule covers Wayland and XWayland.
+#[cfg(target_os = "linux")]
+unsafe extern "C" {
+    /// Sets the class GDK reports in X11's `WM_CLASS`. It only stores the
+    /// string, so it must be called before GTK/GDK initializes. gdk-3 is
+    /// linked in by Tauri's GTK backend.
+    fn gdk_set_program_class(program_class: *const std::ffi::c_char);
+}
+
 fn main() {
     // Linux/WebKitGTK environment fixes. All must land before GTK/the webview
     // initializes.
@@ -25,6 +40,10 @@ fn main() {
         {
             std::env::set_var("GDK_BACKEND", "wayland");
         }
+
+        // Match X11's WM_CLASS class to the Wayland app_id and to the desktop
+        // entry's StartupWMClass — see the declaration above.
+        gdk_set_program_class(c"cycletron".as_ptr());
 
         // WebKitGTK 2.48+ hybrid Skia painting defaults to a CPU raster pool
         // that burns most of a core on our always-animating UI; 0 moves tile
