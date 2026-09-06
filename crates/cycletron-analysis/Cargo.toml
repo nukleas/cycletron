@@ -15,6 +15,7 @@ strudel-core = { workspace = true }
 strudel-dsl = { workspace = true }
 strudel-mini = { workspace = true }
 strudel-soundfont = { workspace = true }
+rustfft = { workspace = true }
 
 [dev-dependencies]
 cycletron-gen = { workspace = true }

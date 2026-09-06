@@ -39,6 +39,11 @@ pub struct AppState {
     /// at startup and kept fresh by the `sample_sets` download/remove
     /// commands + settings changes.
     pub active_set_banks: Mutex<crate::sample_sets::ActiveSetBanks>,
+    /// The active sample set's manifests for offline renders (`export_audio`,
+    /// the agent's `hear_pattern`). Resolved alongside `active_set_banks` by
+    /// `sample_sets::refresh_bank_names`; None until the first refresh or
+    /// when the active set is not downloaded.
+    pub sample_paths: Mutex<Option<cycletron_render::SampleSetPaths>>,
     /// Genre recipes loaded from `<corpus>/genres/*.md` — the knowledge base
     /// behind the `genre_recipe` tool.
     pub recipes: Mutex<Vec<Recipe>>,
@@ -59,6 +64,8 @@ pub struct AppState {
 pub struct AgentWriteState {
     /// How many non-cached `review_pattern` calls have run this user message.
     pub review_calls: usize,
+    /// How many `hear_pattern` renders have run this user message.
+    pub hear_calls: usize,
     /// Hash of the code for the last review (cache key).
     pub last_review_hash: Option<u64>,
     /// The last review's envelope (served on cache hit).
@@ -81,6 +88,11 @@ pub struct AgentWriteState {
 /// Prompt says gate once + re-gate once after fixes; thrash beyond that is pure
 /// latency (telemetry: one run paid for 7 full-song reviews).
 pub const MAX_REVIEWS_PER_RUN: usize = 2;
+
+/// Hard cap on `hear_pattern` renders per user message: each one renders the
+/// mix and every stem (seconds of CPU), and a second listen after a fix is
+/// all a mix decision needs.
+pub const MAX_HEARS_PER_RUN: usize = 2;
 
 /// Full `play_pattern` rewrites above this size, after list_sections/list_parts
 /// in the same request, are blocked unless `force: true`.
@@ -105,6 +117,7 @@ impl AppState {
             last_autosave: Mutex::new(None),
             loaded_sample_banks: Mutex::new(Vec::new()),
             active_set_banks: Mutex::new(crate::sample_sets::ActiveSetBanks::default()),
+            sample_paths: Mutex::new(None),
             recipes: Mutex::new(Vec::new()),
             read_budget: Mutex::new((0, 0)),
             agent_write: Mutex::new(AgentWriteState::default()),
@@ -121,6 +134,7 @@ impl AppState {
     pub fn reset_agent_write_run(&self) {
         let mut w = self.agent_write.lock();
         w.review_calls = 0;
+        w.hear_calls = 0;
         w.listed_structure = false;
         w.force_full_play = false;
     }

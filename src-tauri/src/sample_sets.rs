@@ -26,6 +26,7 @@
 //! atomically and **last**, so its presence marks the source complete
 //! (interrupted downloads resume by skipping files that already exist).
 
+use cycletron_render::SampleSetPaths;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -605,12 +606,56 @@ pub fn active_set_banks(app: &tauri::AppHandle) -> ActiveSetBanks {
     )
 }
 
-/// Refresh [`crate::state::AppState::active_set_banks`] from disk.
+/// Refresh [`crate::state::AppState::active_set_banks`] and
+/// [`crate::state::AppState::sample_paths`] from disk — the agent's sound
+/// catalog and the offline renderers follow the active set together.
 pub fn refresh_bank_names(app: &tauri::AppHandle) {
     let banks = active_set_banks(app);
-    *app.state::<crate::state::AppState>()
-        .active_set_banks
-        .lock() = banks;
+    let paths = match active_sample_set(app) {
+        Ok(p) => Some(p),
+        Err(e) => {
+            tracing::warn!(target: "cycletron::samples", "offline render sample set unavailable: {e}");
+            None
+        }
+    };
+    let state = app.state::<crate::state::AppState>();
+    *state.active_set_banks.lock() = banks;
+    *state.sample_paths.lock() = paths;
+}
+
+/// Resolve the sample-set manifests offline renders resolve sounds from —
+/// the same set live playback loads, so the two cannot drift apart.
+pub fn active_sample_set(app: &tauri::AppHandle) -> Result<SampleSetPaths, String> {
+    let active = app
+        .state::<crate::state::AppState>()
+        .user_settings
+        .lock()
+        .samples
+        .active
+        .clone();
+    if active == BUNDLED_SET_ID {
+        let manifest = app
+            .path()
+            .resolve(
+                "cycletron.strudel.json",
+                tauri::path::BaseDirectory::Resource,
+            )
+            .map_err(|e| format!("could not resolve bundled sample manifest: {e}"))?;
+        if !manifest.is_file() {
+            return Err(format!(
+                "bundled sample manifest missing: {}",
+                manifest.display()
+            ));
+        }
+        return Ok(SampleSetPaths::Cycletron { manifest });
+    }
+    let manifests = manifest_paths(app, &active)?;
+    if manifests.iter().any(|m| !m.is_file()) {
+        return Err(format!(
+            "sample set '{active}' is not downloaded — download it in the Samples manager"
+        ));
+    }
+    Ok(SampleSetPaths::Strudel { manifests })
 }
 
 async fn download_all(app: &tauri::AppHandle, set_id: &str) -> Result<(), String> {

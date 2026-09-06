@@ -7,6 +7,7 @@ members = [
     "crates/cycletron-gen",
     "crates/cycletron-midi",
     "crates/cycletron-analysis",
+    "crates/cycletron-render",
     "src-tauri",
     "tools/parity/dsl-eval",
     "tools/parity/corpus-scan",
@@ -58,6 +59,7 @@ cycletron-doc = { path = "crates/cycletron-doc" }
 cycletron-gen = { path = "crates/cycletron-gen" }
 cycletron-midi = { path = "crates/cycletron-midi" }
 cycletron-analysis = { path = "crates/cycletron-analysis" }
+cycletron-render = { path = "crates/cycletron-render" }
 # strudel-rs engine crates — pinned to public Codeberg main so the app builds
 # from a clean clone (no sibling checkout needed). Bump `rev` to move the engine.
 strudel-core = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
@@ -84,4 +86,5 @@ uuid = { version = "1", features = ["v4"] }
 midly = "0.5"
 hound = "3.5"
 rustc-hash = "2"
+rustfft = "6"
 criterion = { version = "0.8.2", features = ["html_reports"] }

@@ -564,6 +564,11 @@ the #1 latency cost. Aim for ~3–6 tools on a normal request. Keep it tight:
   cached server-side; a third review is refused (budget 2/request).
 - **Gate what's already playing without re-emitting:** review_pattern() or
   validate_pattern() with no args uses the current editor document.
+- **hear_pattern is your ears, not a linter.** It renders the mix and every
+  stem offline and measures them (band energy predicted vs measured, centroid,
+  peak/rms, clipping) — seconds of CPU. Call it once after a review raised
+  masking / spectral-balance / clipping notes, or when the user says the mix
+  sounds off; act on the measurement with a surgical edit. Budget 2/request.
 - **Don't stack overlapping analyses.** critique_form already covers form — skip
   analyze_arrangement unless you specifically need the raw section table.
   inspect_pattern is for debugging a specific moment — skip it if nothing's wrong.

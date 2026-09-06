@@ -325,6 +325,7 @@ async fn execute_tool(
         ToolName::GeneratePattern => tool_generate_pattern(input),
         ToolName::ValidatePattern => tool_validate_pattern(input, state),
         ToolName::ReviewPattern => tool_review_pattern(input, state),
+        ToolName::HearPattern => tool_hear_pattern(input, state).await,
         ToolName::InspectPattern => tool_inspect_pattern(input),
         ToolName::AnalyzeArrangement => tool_analyze_arrangement(input),
         ToolName::CritiquePattern => tool_critique_pattern(input),
@@ -945,6 +946,7 @@ fn infer_write_kind(name: &str, input: &serde_json::Value) -> Option<String> {
         "upsert_section" | "upsert_sections" => Some("section".into()),
         "upsert_binding" => Some("binding".into()),
         "review_pattern" => Some("review".into()),
+        "hear_pattern" => Some("hear".into()),
         "validate_pattern" => Some("validate".into()),
         _ => None,
     }
@@ -1144,6 +1146,95 @@ pub(crate) fn review_code(code: &str, cycles: usize, state: &AppState) -> ToolOu
             ToolOutcome::ok(summary, text).with_warnings(findings(&found))
         }
     }
+}
+
+/// Render the pattern offline and measure it — the agent's ears. The render
+/// is CPU-bound (mix + every stem), so it runs on a blocking thread; the
+/// envelope carries the full report as `data` and its findings as warnings.
+async fn tool_hear_pattern(input: &serde_json::Value, state: &AppState) -> ToolResult {
+    // Explicit code → last reviewed buffer → current editor, like play_pattern.
+    let code = if let Some(c) = input["code"]
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        c.to_string()
+    } else if let Some(c) = state.last_reviewed_code() {
+        c
+    } else {
+        current_document(state).map_err(|_| {
+            ToolErr::precondition(
+                "Nothing to hear: pass `code`, review a pattern first, or play one so it is in \
+                 the editor.",
+            )
+        })?
+    };
+
+    let Some(samples) = state.sample_paths.lock().clone() else {
+        return Err(ToolErr::precondition(
+            "No sample set is resolved for offline rendering yet — the active set is not \
+             downloaded. The user can pick or download one in the Samples manager.",
+        ));
+    };
+
+    {
+        let mut w = state.agent_write.lock();
+        if w.hear_calls >= crate::state::MAX_HEARS_PER_RUN {
+            return Ok(ToolOutcome::failed(
+                ToolCategory::BudgetExhausted,
+                format!(
+                    "Hear budget used ({}/{} this request). Act on the last measurement — fix \
+                     the mix surgically and play it; do not render again.",
+                    crate::state::MAX_HEARS_PER_RUN,
+                    crate::state::MAX_HEARS_PER_RUN,
+                ),
+            ));
+        }
+        w.hear_calls += 1;
+    }
+
+    // Fail as the review would on code that does not evaluate, before paying
+    // for a render.
+    if let Err(e) = strudel::Evaluated::new(&code, 1) {
+        return Ok(ToolOutcome::failed(
+            ToolCategory::InvalidCode,
+            format!(
+                "INVALID: {e}{}\n\nFix the error (review_pattern) before hearing it.",
+                error_context(&code, &e)
+            ),
+        ));
+    }
+
+    let opts = cycletron_render::HearOptions {
+        cycles: input["cycles"].as_u64().map(|n| n as usize),
+        stems: input["stems"].as_bool().unwrap_or(true),
+        bpm: Some(state.session.lock().tempo),
+        ..cycletron_render::HearOptions::default()
+    };
+    let report = tokio::task::spawn_blocking(move || cycletron_render::hear(&code, &samples, opts))
+        .await
+        .map_err(|e| ToolErr::io(format!("render task failed: {e}")))?
+        .map_err(ToolErr::io)?;
+
+    let summary = format!(
+        "mix: {} · {} cycle(s), {:.1} s{} · {} ms",
+        report.verdict,
+        report.cycles,
+        report.seconds,
+        if report.stems.is_empty() {
+            String::new()
+        } else {
+            format!(", {} stems", report.stems.len())
+        },
+        report.render_ms,
+    );
+    let warnings = findings(&report.findings);
+    let data = serde_json::to_value(&report).map_err(ToolErr::io)?;
+    Ok(
+        ToolOutcome::ok(summary, cycletron_render::report_to_text(&report))
+            .with_warnings(warnings)
+            .with_data(data),
+    )
 }
 
 fn tool_inspect_pattern(input: &serde_json::Value) -> ToolResult {
@@ -2560,6 +2651,206 @@ mod session_history_tests {
                 );
             }
             other => panic!("expected tool_result, got {other:?}"),
+        }
+    }
+}
+
+/// Headless agent eval: run real prompts through the real loop against the
+/// configured provider and print what the agent did — every tool row with its
+/// outcome category and timing, the final reply, and a review of the song it
+/// left in the editor. Each song is written to `_eval/<slug>.strudel`.
+///
+/// Uses the app's own data dir (settings, provider key / OAuth, corpus), so a
+/// debug build reads `provider-keys.json` there. Run with:
+///
+///   cargo test -p cycletron-app agent_eval -- --ignored --nocapture
+///
+/// Env: `CYCLETRON_EVAL_PROMPTS` (`;`-separated; default: five genre briefs),
+/// `CYCLETRON_EVAL_DATA_DIR`, `CYCLETRON_EVAL_OUT`.
+#[cfg(test)]
+mod agent_eval {
+    use super::*;
+    use cycletron_core::session::Session;
+    use std::path::PathBuf;
+    use std::time::Instant;
+
+    const DEFAULT_PROMPTS: &str = "Make me a deep house track — warm, rolling, something I could DJ with;\
+        Build a driving techno track, dark and hypnotic, 130 bpm;\
+        Write a drum and bass tune with a proper break and a reese bass;\
+        Give me a boom-bap hip-hop beat with a dusty sample-style lead;\
+        Make an ambient piece — slow, evolving pads, no drums, that breathes";
+
+    fn slug(s: &str) -> String {
+        s.chars()
+            .take(40)
+            .map(|c| {
+                if c.is_ascii_alphanumeric() {
+                    c.to_ascii_lowercase()
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>()
+            .trim_matches('-')
+            .to_string()
+    }
+
+    #[tokio::test]
+    #[ignore = "manual eval — talks to the configured LLM provider"]
+    async fn agent_eval() {
+        let data_dir = std::env::var("CYCLETRON_EVAL_DATA_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                PathBuf::from(std::env::var("HOME").unwrap())
+                    .join("Library/Application Support/com.nukleas.cycletron")
+            });
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let out_dir = std::env::var("CYCLETRON_EVAL_OUT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| workspace.join("_eval"));
+        std::fs::create_dir_all(&out_dir).unwrap();
+        let prompts: Vec<String> = std::env::var("CYCLETRON_EVAL_PROMPTS")
+            .unwrap_or_else(|_| DEFAULT_PROMPTS.to_string())
+            .split(';')
+            .map(|p| p.trim().to_string())
+            .filter(|p| !p.is_empty())
+            .collect();
+
+        let state = AppState::new();
+        state.initialize(data_dir).expect("initialize app state");
+        *state.sample_paths.lock() = Some(cycletron_render::SampleSetPaths::Cycletron {
+            manifest: workspace.join("ui/public/cycletron.strudel.json"),
+        });
+        let active = state.user_settings.lock().llm.active.clone();
+        if crate::oauth::refresh_if_stale(&active).await {
+            state.rebuild_agent_client();
+        }
+        let client = state
+            .agent_client
+            .lock()
+            .clone()
+            .expect("no AI provider configured (is ai_consent on, and is a key stored?)");
+        let model = state
+            .user_settings
+            .lock()
+            .llm
+            .active_profile()
+            .model
+            .clone();
+        eprintln!(
+            "== agent eval: provider={active} model={model} prompts={} ==",
+            prompts.len()
+        );
+
+        let mut rows: Vec<String> = Vec::new();
+        for prompt in &prompts {
+            eprintln!("\n### {prompt}");
+            let tempo = state.config.lock().audio.default_tempo;
+            *state.session.lock() = Session::new(tempo);
+            let messages = {
+                let mut s = state.session.lock();
+                s.add_user_message(prompt.clone());
+                s.messages.clone()
+            };
+
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let printer = tokio::spawn(async move {
+                let mut calls = 0usize;
+                let mut fails: Vec<String> = Vec::new();
+                let mut tool_ms = 0u64;
+                while let Some(ev) = rx.recv().await {
+                    match ev {
+                        AgentEvent::ToolCall { name, input, .. } => {
+                            let compact = crate::telemetry::truncate(
+                                &serde_json::to_string(&input).unwrap_or_default(),
+                                110,
+                            );
+                            eprintln!("  ⚙ {name} {compact}");
+                        }
+                        AgentEvent::ToolResult {
+                            name,
+                            outcome,
+                            duration_ms,
+                            ..
+                        } => {
+                            calls += 1;
+                            tool_ms += duration_ms;
+                            let cat = outcome
+                                .category
+                                .map(|c| format!(" [{}]", c.as_str()))
+                                .unwrap_or_default();
+                            if !outcome.ok {
+                                fails.push(format!("{name}{cat}"));
+                            }
+                            eprintln!(
+                                "  {} {name} — {}{cat} ({duration_ms} ms)",
+                                if outcome.ok { "✓" } else { "✗" },
+                                outcome.summary
+                            );
+                        }
+                        AgentEvent::Error { message } => eprintln!("  !! {message}"),
+                        _ => {}
+                    }
+                }
+                (calls, fails, tool_ms)
+            });
+
+            let started = Instant::now();
+            let result = run_agent_loop(client.as_ref(), &messages, &state, tx).await;
+            let wall = started.elapsed().as_secs_f64();
+            let (calls, fails, tool_ms) = printer.await.unwrap();
+
+            let reply = match result {
+                Ok((text, tools)) => {
+                    state
+                        .session
+                        .lock()
+                        .add_assistant_message_with_tools(text.clone(), tools);
+                    text
+                }
+                Err(e) => format!("AGENT ERROR: {e}"),
+            };
+            let reply_preview: String = reply.replace('\n', " ").chars().take(240).collect();
+            eprintln!("  ↳ {reply_preview}");
+
+            let code = state.session.lock().current_pattern.clone();
+            let review = match &code {
+                Some(c) => {
+                    let path = out_dir.join(format!("{}.strudel", slug(prompt)));
+                    std::fs::write(&path, c).unwrap();
+                    let r = review_code(c, 8, &state);
+                    let warns = r.warnings.iter().filter(|w| w.severity == "warn").count();
+                    eprintln!(
+                        "  saved {} ({} chars) — {}",
+                        path.display(),
+                        c.len(),
+                        r.summary
+                    );
+                    if !r.ok {
+                        "INVALID".to_string()
+                    } else {
+                        format!("{} chars, {warns} warn(s)", c.len())
+                    }
+                }
+                None => "no song in the editor".to_string(),
+            };
+            rows.push(format!(
+                "{:<44} {:>5.0}s {:>3} tools ({:>5} ms in tools) fails: {:<28} song: {review}",
+                slug(prompt),
+                wall,
+                calls,
+                tool_ms,
+                if fails.is_empty() {
+                    "none".to_string()
+                } else {
+                    fails.join(", ")
+                },
+            ));
+        }
+
+        eprintln!("\n== summary ==");
+        for r in &rows {
+            eprintln!("{r}");
         }
     }
 }
