@@ -871,7 +871,7 @@ class LensBenchMode implements VizMode {
         const edge = FIELDS - 1;
         const tCurv = this.fieldZ[edge] - this.fieldZ[AXIS];
         const aberrText = !design.screen && Number.isFinite(this.fieldDist[edge]) && Number.isFinite(tCurv)
-            ? `   DIST ${(this.fieldDist[edge] * 100).toFixed(2)}%   T-CURV ${tCurv.toFixed(2)}`
+            ? `   DIST ${(this.fieldDist[edge] * 100).toFixed(2)}%   T-CURV ${tCurv.toFixed(2)}mm`
             : '';
         ctx.fillText(
             `${eflText}   ${fnoText}   FIELD ±${fieldDeg}°${aberrText}   λ-SPLIT ${this.split.toFixed(2)}`,

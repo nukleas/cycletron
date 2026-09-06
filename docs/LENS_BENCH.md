@@ -96,10 +96,17 @@ the stop.
   the design's own focus; the afocal pair fits the segment that straddles its
   internal crossing instead, the diverging lens the exit segments extended
   backwards to a virtual field curve. The dotted curve through the five foci
-  is the tangential field curvature, drawn straight on the bench. At full
-  field it reads −0.48 mm (achromat, 3°), −0.88 (Cooke, 7°), −1.80 (Double
-  Gauss, 10°) and +0.56 on the condenser (4°) — a coma-dominated singlet with
-  its stop at the lens bends the other way.
+  is the tangential field curvature, drawn straight on the bench. It is the
+  RMS minimum of the live meridional fan, not a Coddington trace, and it
+  moves with the pupil fill (the low band) because the circle of least
+  confusion of an aberrated fan is aperture-dependent; the numbers below
+  are at full fill. At full field it reads −0.48 mm (achromat, 3°), −0.88
+  (Cooke, 7°), −1.80 (Double Gauss, 10°), inward as expected. The
+  condenser reads +0.56 (4°), the other way: that is not field curvature
+  (a stop-at-lens singlet has near-zero third-order coma and a Petzval sag
+  of ~−0.04 mm here) but the focus shift of a fan whose rim ray has died
+  and so carries less spherical aberration. T-CURV and DIST on the strip
+  are teaching readouts, not qualification data.
 - **Distortion.** The chief ray's landing height against the paraxial chief
   ray's at the bench's *actual* image plane (`chiefGain` per unit slope, traced
   at load). `efl·tan θ` is the wrong baseline here: the image plane sits ahead
