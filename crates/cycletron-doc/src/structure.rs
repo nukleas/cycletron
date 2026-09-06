@@ -14,6 +14,7 @@
 //! `sections.rs`). Correctness of the *result* is still enforced by the caller
 //! re-validating the whole buffer through the real evaluator before it plays.
 
+use crate::DocError;
 use strudel_dsl::parse_strudel_file;
 
 /// Public view of one top-level binding.
@@ -85,25 +86,27 @@ pub fn replace_span(code: &str, start: usize, end: usize, new: &str) -> String {
 /// Replace one binding's whole expression body. `expr` is the new RHS only
 /// (e.g. `{ … }`, or `note("c").s("sine")`), NOT `const name =`. Everything
 /// else stays byte-identical. Returns the new document and the binding name.
-pub fn upsert_binding(code: &str, name: &str, expr: &str) -> Result<(String, String), String> {
+pub fn upsert_binding(code: &str, name: &str, expr: &str) -> Result<(String, String), DocError> {
     let expr = expr.trim();
     if expr.is_empty() {
-        return Err("upsert_binding: 'code' is empty".to_string());
+        return Err(DocError::BadArgument(
+            "upsert_binding: 'code' is empty".to_string(),
+        ));
     }
     let Some(b) = find_binding(code, name) else {
         let names: Vec<_> = list_bindings(code).into_iter().map(|b| b.name).collect();
         if names.is_empty() {
-            return Err(
+            return Err(DocError::NoStructure(
                 "upsert_binding: no top-level const/let bindings found (or the document \
                  does not parse). To edit a track use upsert_track; a section, upsert_section."
                     .to_string(),
-            );
+            ));
         }
-        return Err(format!(
+        return Err(DocError::NotFound(format!(
             "no binding matches '{}'. Bindings: {}.",
             name.trim(),
             names.join(", ")
-        ));
+        )));
     };
     let out = replace_span(code, b.expr_start, b.expr_end, expr);
     Ok((out, b.name))
@@ -180,7 +183,7 @@ $: "<intro drop1>".pickRestart({
 
     #[test]
     fn missing_binding_errors_with_names() {
-        let err = upsert_binding(DOC, "bass", "x").unwrap_err();
+        let err = upsert_binding(DOC, "bass", "x").unwrap_err().to_string();
         assert!(err.contains("sections"));
         assert!(err.contains("lead"));
     }

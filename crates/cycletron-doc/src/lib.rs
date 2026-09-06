@@ -10,6 +10,9 @@
 //! caller re-validates the full buffer through the evaluator before anything
 //! reaches audio.
 
+pub mod error;
 pub mod sections;
 pub mod structure;
 pub mod tracks;
+
+pub use error::DocError;

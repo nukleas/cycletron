@@ -21,6 +21,14 @@ struct Event {
     tool: String,
     #[serde(default)]
     ok: bool,
+    /// The tool outcome's category (kebab-case). Absent on success and on
+    /// records written before tools returned typed outcomes.
+    #[serde(default)]
+    category: Option<String>,
+    #[serde(default)]
+    retryable: bool,
+    #[serde(default)]
+    duration_ms: u64,
     #[serde(default)]
     result: String,
     #[serde(default)]
@@ -29,15 +37,20 @@ struct Event {
     write_kind: Option<String>,
 }
 
-/// Outcome classification. A tool can return Ok yet report failure in its text;
-/// those *soft* failures are the struggle signal we care about (they don't set
-/// `ok:false`, so they're invisible unless we sniff the result text):
+/// Outcome classification. Records written since tools return typed outcomes
+/// carry the failure `category` verbatim (`invalid-code`, `not-applied`,
+/// `budget-exhausted`, …). Older records only had `ok` plus the result text,
+/// where a tool could return Ok yet report failure in prose; those *soft*
+/// failures are sniffed from the text:
 ///   - `invalid`     — validate/review "INVALID: …"
 ///   - `not-applied` — play/upsert fail-closed "NOT APPLIED/NOT PLAYED — …"
 ///   - `recipe-miss` — genre_recipe "No recipe matches …" / "No genre recipes …"
 ///   - `silent`      — inspect/analyze reported a silent pattern (0 events)
 ///   - `failed`      — "Could not …" / "error …"
-fn outcome(e: &Event) -> &'static str {
+fn outcome(e: &Event) -> &str {
+    if let Some(c) = &e.category {
+        return c;
+    }
     if !e.ok {
         return "error";
     }
@@ -88,6 +101,7 @@ fn normalize(result: &str) -> String {
 struct ToolAgg {
     calls: usize,
     fails: usize,
+    duration_ms: u64,
 }
 
 fn main() -> ExitCode {
@@ -118,6 +132,7 @@ fn main() -> ExitCode {
 
     let mut per_tool: BTreeMap<String, ToolAgg> = BTreeMap::new();
     let mut error_buckets: BTreeMap<String, usize> = BTreeMap::new();
+    let mut category_counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     // run -> tool -> failure count, for retry-loop detection.
     let mut run_fails: BTreeMap<u128, BTreeMap<String, Vec<usize>>> = BTreeMap::new();
 
@@ -125,8 +140,14 @@ fn main() -> ExitCode {
         let o = outcome(e);
         let agg = per_tool.entry(e.tool.clone()).or_default();
         agg.calls += 1;
+        agg.duration_ms += e.duration_ms;
         if is_failure(o) {
             agg.fails += 1;
+            let c = category_counts.entry(o.to_string()).or_default();
+            c.0 += 1;
+            if e.retryable {
+                c.1 += 1;
+            }
             *error_buckets.entry(normalize(&e.result)).or_default() += 1;
             run_fails
                 .entry(e.run)
@@ -180,8 +201,18 @@ fn main() -> ExitCode {
         println!();
     }
 
+    if !category_counts.is_empty() {
+        println!("Failure categories (count · retryable):");
+        let mut cats: Vec<_> = category_counts.iter().collect();
+        cats.sort_by_key(|(_, (n, _))| std::cmp::Reverse(*n));
+        for (cat, (n, retry)) in cats {
+            println!("  {cat:<18} {n:>5} {retry:>6}");
+        }
+        println!();
+    }
+
     // Per-tool table, worst failure-rate first.
-    println!("Per-tool (calls · fails · fail-rate):");
+    println!("Per-tool (calls · fails · fail-rate · mean ms):");
     let mut tools: Vec<_> = per_tool.iter().collect();
     tools.sort_by(|a, b| {
         let ra = a.1.fails as f64 / a.1.calls as f64;
@@ -192,9 +223,10 @@ fn main() -> ExitCode {
     });
     for (tool, agg) in tools {
         let rate = 100.0 * agg.fails as f64 / agg.calls as f64;
+        let mean_ms = agg.duration_ms as f64 / agg.calls as f64;
         println!(
-            "  {tool:<22} {:>5} {:>6} {:>6.0}%",
-            agg.calls, agg.fails, rate
+            "  {tool:<22} {:>5} {:>6} {:>6.0}% {:>8.0}",
+            agg.calls, agg.fails, rate, mean_ms
         );
     }
 

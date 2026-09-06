@@ -111,16 +111,17 @@ pub fn finish_tool_calls(
             }
         };
 
-        let _ = event_tx.send(AgentEvent::ToolCall {
-            name: buf.name.clone(),
-            input: input.clone(),
-        });
-
         let id = if buf.id.is_empty() {
             format!("call_{}", buf.name)
         } else {
             buf.id
         };
+        let _ = event_tx.send(AgentEvent::ToolCall {
+            id: id.clone(),
+            name: buf.name.clone(),
+            input: input.clone(),
+        });
+
         blocks.push(ContentBlock::ToolUse {
             id,
             name: buf.name,

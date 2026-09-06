@@ -2273,6 +2273,37 @@ body.is-drop-target::after {
 
 .ai-msg-error { border-left: 2px solid var(--ai-red); }
 
+/* Tool rows: one collapsed <details> per tool call, above the turn's prose. */
+.ai-tools { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.ai-tool {
+    font-size: 10px; color: var(--ai-text-dim);
+    border: 1px solid var(--ai-border);
+    background: rgba(0, 0, 0, 0.25);
+    padding: 2px 6px;
+}
+.ai-tool > summary {
+    display: flex; gap: 6px; align-items: baseline;
+    cursor: pointer; list-style: none; user-select: none;
+}
+.ai-tool > summary::-webkit-details-marker { display: none; }
+.ai-tool-glyph { flex: none; width: 1em; text-align: center; }
+.ai-tool-name { flex: none; font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace; color: var(--ai-neon); }
+.ai-tool-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-tool-cat {
+    flex: none; font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--ai-red); border: 1px solid var(--ai-red); padding: 0 4px;
+}
+.ai-tool-ms { flex: none; font-variant-numeric: tabular-nums; }
+.ai-tool-pending .ai-tool-glyph { color: var(--ai-neon); }
+.ai-tool-err .ai-tool-glyph, .ai-tool-err .ai-tool-name { color: var(--ai-red); }
+.ai-tool pre {
+    margin: 4px 0 2px; padding: 0;
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 240px; overflow: auto;
+    font-size: 10px; line-height: 1.4; color: var(--ai-text);
+}
+.ai-tool-input { opacity: 0.7; }
+
 /* Markdown */
 .ai-msg-assistant p { margin: 0 0 6px 0; }
 .ai-msg-assistant p:last-child { margin-bottom: 0; }

@@ -20,10 +20,17 @@ pub struct ToolEvent {
     /// Iteration within the run (the agent-loop turn).
     pub turn: usize,
     pub tool: String,
-    /// Whether `execute_tool` returned Ok (vs. a hard error like unknown tool).
-    /// Note: a tool can return Ok and still report failure in `result`
-    /// (e.g. validate_pattern → "INVALID: …") — the analyzer classifies that.
+    /// The tool outcome's `ok` — false for every failure, including the
+    /// fail-closed kinds (INVALID, NOT APPLIED, budget) that used to hide
+    /// inside an Ok result text.
     pub ok: bool,
+    /// The outcome's failure category (kebab-case), absent when `ok`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    /// Whether the failure is worth retrying with different input.
+    pub retryable: bool,
+    /// Wall time of the tool call.
+    pub duration_ms: u64,
     /// Truncated, compact JSON of the tool input (the code the agent tried).
     pub input: String,
     /// Truncated tool result (captures "INVALID: …" / "Could not …" prefixes).

@@ -1,3 +1,4 @@
+use cycletron_core::types::ToolOutcome;
 use serde::{Deserialize, Serialize};
 
 /// A message in the Claude API conversation format.
@@ -136,16 +137,29 @@ pub enum AgentEvent {
     #[serde(rename = "text_delta")]
     TextDelta { text: String },
 
-    /// AI is calling a tool.
+    /// AI is calling a tool. `id` pairs it with its `tool_result`.
     #[serde(rename = "tool_call")]
     ToolCall {
+        id: String,
         name: String,
         input: serde_json::Value,
     },
 
-    /// Tool returned a result.
+    /// A tool finished: its typed envelope and how long it ran.
     #[serde(rename = "tool_result")]
-    ToolResult { name: String, result: String },
+    ToolResult {
+        id: String,
+        name: String,
+        outcome: ToolOutcome,
+        duration_ms: u64,
+    },
+
+    /// A tool asks the frontend to act: `__set_code_and_play` (payload = the
+    /// code), `__stop_playback`, `__set_tempo` (payload = bpm),
+    /// `__library_changed` (payload = the song's @path). Tools have no
+    /// AppHandle, so this is how they reach the REPL and the file tree.
+    #[serde(rename = "ui_action")]
+    UiAction { name: String, payload: String },
 
     /// AI response is complete.
     #[serde(rename = "done")]

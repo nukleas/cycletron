@@ -137,4 +137,56 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn snapshot_keeps_tool_envelopes_and_reads_legacy_traces() {
+        use cycletron_core::types::{ChatRole, ToolCategory, ToolOutcome, ToolTrace};
+        let dir = std::env::temp_dir().join("cycletron_persist_tools_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let snap = SessionSnapshot {
+            file_path: None,
+            code: String::new(),
+            bpm: 120.0,
+            messages: vec![ChatMessage {
+                id: "m1".into(),
+                role: ChatRole::Assistant,
+                content: "tried".into(),
+                timestamp: chrono::Utc::now(),
+                tools: vec![ToolTrace {
+                    id: "c1".into(),
+                    name: "validate_pattern".into(),
+                    input: serde_json::json!({ "code": "s(\"bd\")" }),
+                    outcome: ToolOutcome::failed(ToolCategory::InvalidCode, "INVALID: x"),
+                    duration_ms: 7,
+                }],
+            }],
+            saved_at: chrono::Utc::now(),
+        };
+        write_snapshot(&dir, &snap).unwrap();
+        let back = read_snapshot(&dir).unwrap();
+        let t = &back.messages[0].tools[0];
+        assert_eq!(t.outcome.category, Some(ToolCategory::InvalidCode));
+        assert_eq!(t.outcome.text, "INVALID: x");
+        assert_eq!(t.duration_ms, 7);
+
+        // A snapshot written before the envelope existed still restores; its
+        // traces are migrated into envelopes on read.
+        let legacy = r#"{
+            "file_path": null, "code": "", "bpm": 100.0,
+            "saved_at": "2026-01-01T00:00:00Z",
+            "messages": [{
+                "id": "m", "role": "assistant", "content": "", "timestamp": "2026-01-01T00:00:00Z",
+                "tools": [{"id": "c", "name": "play_pattern", "input": {}, "result": "NOT PLAYED — x", "is_error": false}]
+            }]
+        }"#;
+        std::fs::write(snapshot_path(&dir), legacy).unwrap();
+        let back = read_snapshot(&dir).expect("legacy snapshot must still load");
+        let t = &back.messages[0].tools[0];
+        assert!(t.outcome.ok);
+        assert_eq!(t.outcome.summary, "NOT PLAYED — x");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

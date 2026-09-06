@@ -590,6 +590,19 @@ Normal shape (edit several parts / mix fix): upsert_sections|upsert_tracks once
 Normal shape (MIDI dump cleanup): list_sections → upsert_sections for changed
 parts only — never re-stream the whole dump
 
+## Tool results
+
+Every tool result starts with one machine line, then the prose you already know:
+
+    [result ok=false category=invalid-code retryable=yes warnings=2]
+
+- `ok=true` — the tool did what it says; `warnings=N` counts warns in the text.
+- `ok=false retryable=yes` — fix the input and call again (`invalid-code`,
+  `not-applied`, `not-found`, `bad-argument`, `precondition`, `policy-blocked`
+  → add `force: true` only if you truly must, `truncated` → shorter reply).
+- `ok=false retryable=no` — stop calling that tool this request
+  (`budget-exhausted`, `path-denied`, `conflict`, `io`).
+
 ## Common patterns
 
 Simple drum beat (default kit):

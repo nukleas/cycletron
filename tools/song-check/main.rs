@@ -105,7 +105,8 @@ enum Review {
 fn review(code: &str, cycles: usize, known: &analysis::sounds::SoundSet) -> Review {
     match analysis::review_report(code, cycles, known) {
         analysis::ReviewOutcome::Invalid(e) => Review::Invalid(e),
-        analysis::ReviewOutcome::Report { mut text, warns } => {
+        analysis::ReviewOutcome::Report { mut text, findings } => {
+            let warns = findings.iter().filter(|f| f.severity == "warn").count();
             text.push_str(&if warns == 0 {
                 "\nVERDICT: ready to play.".to_string()
             } else {

@@ -38,6 +38,7 @@ import {fileMenuButton} from './file-menu-button.js';
 import {editorEmptyState} from './editor-empty-state.js';
 import {basename} from './paths.js';
 import {currentBpm} from './bpm.js';
+import {toolRowFromTrace} from './ai-tool-row.js';
 import type {SessionSnapshot, UserSettings} from './types/tauri-commands.js';
 
 
@@ -329,7 +330,17 @@ async function restoreIfAny(): Promise<void> {
                 if (m.role === 'system') continue;
                 const div = document.createElement('div');
                 div.className = `ai-msg ai-msg-${m.role}`;
-                div.textContent = m.content;
+                // Same shape as a live assistant turn: tool rows, then prose.
+                if (m.tools?.length) {
+                    const tools = document.createElement('div');
+                    tools.className = 'ai-tools';
+                    for (const t of m.tools) tools.appendChild(toolRowFromTrace(t));
+                    div.appendChild(tools);
+                }
+                const body = document.createElement('div');
+                body.className = 'ai-msg-body';
+                body.textContent = m.content;
+                div.appendChild(body);
                 msgsEl.appendChild(div);
             }
         }
