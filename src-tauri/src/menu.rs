@@ -106,7 +106,7 @@ pub fn build_app_menu<R: Runtime>(
         .item(&PredefinedMenuItem::paste(app, None)?)
         .item(&PredefinedMenuItem::select_all(app, None)?)
         .separator()
-        .item(&MenuItemBuilder::with_id("edit.clear_session", "Clear Session").build(app)?)
+        .item(&MenuItemBuilder::with_id("edit.clear_session", "Clear AI Session").build(app)?)
         .build()?;
 
     // View

@@ -33,12 +33,6 @@ class EditorEmptyState {
             this.update();
         }) as EventListener);
 
-        document.addEventListener('session:cleared', () => {
-            this.filePath = null;
-            this.code = '';
-            this.update();
-        });
-
         this.hookEditor();
         this.update();
     }
