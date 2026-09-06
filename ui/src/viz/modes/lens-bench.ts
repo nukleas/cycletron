@@ -120,7 +120,7 @@ class LensBenchMode implements VizMode {
 
     /**
      * 2D meridional trace, re-run every frame: five fields × three lanes ×
-     * eleven rays plus three aiming rays per field, ≤12 surfaces of
+     * eleven rays plus three aiming rays per field, ≤16 surfaces of
      * quadratic math each — trivially cheap, and it buys continuous field
      * and chromatic animation with zero cache invalidation. Each field's
      * bundle is a collimated beam at its field angle — the design's own
@@ -647,7 +647,7 @@ class LensBenchMode implements VizMode {
         ctx.fillStyle = `rgba(${tr}, ${tg}, ${tb}, 0.5)`;
         ctx.font = `8px ${MONO}`;
         ctx.textAlign = 'center';
-        ctx.fillText(design.screen ? 'SCREEN' : 'IMG', imgX, sy(planeHeight) - 4);
+        ctx.fillText(design.screen ? (design.screenLabel ?? 'SCREEN') : 'IMG', imgX, sy(planeHeight) - 4);
 
         if (design.screen) {
             // Show the actual spread at the observation plane, not an invented
@@ -822,14 +822,18 @@ class LensBenchMode implements VizMode {
         }
         ctx.globalAlpha = 1;
 
-        // 8. Glass callouts with leader lines, staggered on two rows.
+        // 8. Glass callouts with leader lines, staggered on two rows. Each
+        // glass is called out once per design: a train of identical
+        // doublets (the riflescope) would otherwise pile labels on top of
+        // each other.
         ctx.font = `10px ${MONO}`;
         ctx.textAlign = 'center';
         let runIdx = 0;
         for (let k = 0; k < nS - 1; k++) {
             if (S[k].nd <= 1 || !S[k].glass) continue;
-            // Only the first surface of a cemented run gets the label.
-            if (k > 0 && S[k - 1].nd > 1 && S[k - 1].glass === S[k].glass) continue;
+            let seen = false;
+            for (let j = 0; j < k; j++) if (S[j].glass === S[k].glass) { seen = true; break; }
+            if (seen) continue;
             const runEnd = k + 1;
             const cxEl = (sx(zs[k]) + sx(zs[runEnd])) / 2;
             const topY = sy(Math.max(S[k].sd, S[runEnd].sd));
@@ -863,7 +867,7 @@ class LensBenchMode implements VizMode {
                 ? `VIRTUAL FOCUS z ${optics.virtualFocusZ.toFixed(1)}`
                 : '';
         const eflText = !Number.isFinite(optics.efl)
-            ? `AFOCAL  ${focusText}`
+            ? `AFOCAL  MAG ${optics.magnification.toFixed(1)}×  ${focusText}`
             : design.screen
                 ? `EFL ${optics.efl.toFixed(1)}  ${focusText}`
                 : `EFL ${optics.efl.toFixed(1)}  BFL ${optics.bfl.toFixed(2)}  ${focusText}`;

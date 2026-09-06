@@ -37,11 +37,18 @@ export interface LensDesign {
      * often oversized); the trace's own marginal ray is the limit otherwise.
      */
     fno?: number;
+    /** Entrance pupil diameter in mm — the aperture spec of an afocal
+     *  instrument (a "4×17" scope has a 17 mm objective). Caps the fan. */
+    entrancePupil?: number;
     /** Readout override for designs with no real focus ("VIRTUAL FOCUS"). */
     focusLabel?: string;
     maxFieldDeg: number;
     /** Afocal/diverging designs terminate at a display screen, not a focus. */
     screen?: boolean;
+    /** Put the screen at the paraxial exit pupil (chief rays' crossing after
+     *  the last surface) — the eye's position behind an afocal instrument. */
+    exitPupil?: boolean;
+    screenLabel?: string;
     /** Fixed world-space framing for expanding beams; avoids audio-driven zoom. */
     viewSemiDiameter?: number;
     surfaces: LensSurface[];
@@ -92,14 +99,103 @@ export interface DesignOptics {
     chiefGain: number;
     /** Tallest |y| any bundle reaches at max field: fixed framing height. */
     yExtent: number;
+    /** Afocal designs: exit / entrance beam height ratio (negative = inverting). NaN otherwise. */
+    magnification: number;
+}
+
+/**
+ * Fraunhofer achromat form (rustoptic import fixture, N-BK7 / F2 cemented,
+ * paraxial EFL 92.2 at this scale). The bench's first design, and — scaled
+ * — every element of the riflescope.
+ */
+const FRAUNHOFER = {
+    r: [61.0, -44.3, -129.0],
+    t: [4.0, 2.5],
+    nd: [1.5168, 1.6200],
+    vd: [64.2, 36.4],
+    sd: 12.7,
+    glass: ['N-BK7', 'F2'],
+};
+
+/** The Fraunhofer form scaled by `k`, crown first; `reversed` puts the
+ *  flint first (a Plössl's field-side doublet). `tail` is the air after it. */
+function fraunhofer(k: number, reversed: boolean, tail: number): LensSurface[] {
+    const F = FRAUNHOFER;
+    const sd = F.sd * k;
+    if (!reversed) {
+        return [
+            { r: F.r[0] * k, t: F.t[0] * k, nd: F.nd[0], vd: F.vd[0], sd, glass: F.glass[0] },
+            { r: F.r[1] * k, t: F.t[1] * k, nd: F.nd[1], vd: F.vd[1], sd, glass: F.glass[1] },
+            { r: F.r[2] * k, t: tail, nd: 1, vd: 0, sd },
+        ];
+    }
+    return [
+        { r: -F.r[2] * k, t: F.t[1] * k, nd: F.nd[1], vd: F.vd[1], sd, glass: F.glass[1] },
+        { r: -F.r[1] * k, t: F.t[0] * k, nd: F.nd[0], vd: F.vd[0], sd, glass: F.glass[0] },
+        { r: -F.r[0] * k, t: tail, nd: 1, vd: 0, sd },
+    ];
+}
+
+/** Paraxial back focal distance of a group, from its last vertex. */
+function groupBfl(S: LensSurface[]): number {
+    const p = paraxialRay(S, 1, 0, -1);
+    return -p.y / p.u;
+}
+
+/** Paraxial front focal distance of a group, from its first vertex: the
+ *  back focal distance of the group traced backwards. */
+function groupFfd(S: LensSurface[]): number {
+    const n = S.length;
+    const rev: LensSurface[] = [];
+    for (let i = 0; i < n; i++) {
+        const src = S[n - 1 - i];
+        rev.push({
+            r: -src.r,
+            t: i < n - 1 ? S[n - 2 - i].t : 1,
+            nd: i < n - 1 ? S[n - 2 - i].nd : 1,
+            vd: 0,
+            sd: src.sd,
+        });
+    }
+    return groupBfl(rev);
+}
+
+/**
+ * A 4× riflescope assembled from the Fraunhofer form: f=100 objective,
+ * two f=50 erector doublets relaying the first image, and a Plössl
+ * eyepiece (two f=50 doublets, crowns facing). Every air gap is solved
+ * paraxially so each group's focal point lands on the previous image; the
+ * bench places the screen at the exit pupil, where the field bundles cross
+ * into the eye. The objective is the stop; the erectors and eyepiece are
+ * as big as the form's edge thickness allows, which is what limits the
+ * field.
+ */
+function riflescope(): LensDesign {
+    const efl0 = -1 / paraxialRay(fraunhofer(1, false, 1), 1, 0, -1).u;
+    const objective = fraunhofer(100 / efl0, false, 0);
+    const erectorA = fraunhofer(50 / efl0, false, 20);
+    const erectorB = fraunhofer(50 / efl0, false, 0);
+    const eyepiece = [...fraunhofer(50 / efl0, true, 2), ...fraunhofer(50 / efl0, false, 30)];
+    objective[2].t = groupBfl(objective) + groupFfd(erectorA);
+    erectorB[2].t = groupBfl(erectorB) + groupFfd(eyepiece);
+    return {
+        name: 'RIFLESCOPE 4×17',
+        sheet: 'DERIVED · 4× FRAUNHOFER ERECTOR',
+        entrancePupil: 17,
+        maxFieldDeg: 1.5,
+        screen: true,
+        exitPupil: true,
+        screenLabel: 'EXIT PUPIL',
+        surfaces: [...objective, ...erectorA, ...erectorB, ...eyepiece],
+    };
 }
 
 /**
  * Real prescriptions: the Fraunhofer achromat from the rustoptic import
  * fixtures, the two photographic objectives from the Zemax sample set
- * (docs/LENS_BENCH.md cites the sources), and three Edmund Optics catalog
- * singlets. A stop on a plane in air (Double Gauss) is crossed
- * un-refracted (n1 === n2) and still clips.
+ * (docs/LENS_BENCH.md cites the sources), two Edmund Optics catalog
+ * singlets, and the derived riflescope. A stop on a plane in air (Double
+ * Gauss) is crossed un-refracted (n1 === n2) and still clips.
  */
 export const LENS_DESIGNS: LensDesign[] = [
     {
@@ -108,11 +204,7 @@ export const LENS_DESIGNS: LensDesign[] = [
         efl: 100,
         fno: 4,
         maxFieldDeg: 3,
-        surfaces: [
-            { r: 61.0, t: 4.0, nd: 1.5168, vd: 64.2, sd: 12.7, glass: 'N-BK7' },
-            { r: -44.3, t: 2.5, nd: 1.6200, vd: 36.4, sd: 12.7, glass: 'F2' },
-            { r: -129.0, t: 96.0, nd: 1, vd: 0, sd: 12.7 },
-        ],
+        surfaces: fraunhofer(1, false, 96.0),
     },
     // Zemax sample "Cooke 40 degree field" (Samples/Sequential/Objectives):
     // three air-spaced singlets, f/5, EFL 50, half field 20°, the stop on the
@@ -156,18 +248,8 @@ export const LENS_DESIGNS: LensDesign[] = [
             { r: -67.148, t: 57.305, nd: 1, vd: 0, sd: 22.80 },
         ],
     },
+    riflescope(),
     // Manufacturer geometry and derived bench distances: docs/LENS_BENCH.md.
-    {
-        name: 'FAST CONDENSER 30mm',
-        sheet: 'EO 70-265 · PCX',
-        efl: 30,
-        fno: 1.2,
-        maxFieldDeg: 4,
-        surfaces: [
-            { r: 15.50, t: 8.06, nd: 1.5168, vd: 64.17, sd: 11.10, glass: 'N-BK7' },
-            { r: 0, t: 24.69, nd: 1, vd: 0, sd: 11.10 },
-        ],
-    },
     {
         name: 'DIVERGING FAN -50mm',
         sheet: 'EO 45-028 · PCV',
@@ -213,8 +295,8 @@ export const LANES = 3;              // d (reference), F (blue), C (red)
  * lanes land on top of each other, a singlet's fan out — which is the point.
  */
 export const LANE_DELTA = [0, 0.69, -0.31];
-/** Points per ray: launch + one per surface (max 12) + image plane. */
-export const MAX_PTS = 14;
+/** Points per ray: launch + one per surface (max 16) + image plane. */
+export const MAX_PTS = 18;
 /** On-axis fan used at load to find best focus; separate from the live
  *  RAYS so the derived focus numbers do not move with the display density. */
 const FAN_RAYS = 15;
@@ -534,6 +616,15 @@ export function prepareDesign(design: LensDesign): DesignOptics {
     if (!design.screen && Number.isFinite(bfl) && bfl > 0) {
         S[S.length - 1].t = bfl;
     }
+    let stopIdx = 0;
+    for (let k = 0; k < S.length; k++) if (S[k].stop) stopIdx = k;
+    if (design.exitPupil) {
+        // The eye goes where the chief ray (through the stop centre) crosses
+        // the axis again behind the last surface.
+        const chief = paraxialRay(S, -paraxialRay(S, 0, 1, stopIdx).yStop / paraxialRay(S, 1, 0, stopIdx).yStop, 1, stopIdx);
+        const eye = -chief.y / chief.u;
+        if (Number.isFinite(eye) && eye > 0) S[S.length - 1].t = eye;
+    }
     let zImg = 0;
     const zs = new Float64Array(S.length);
     for (let k = 0; k < S.length; k++) {
@@ -541,8 +632,6 @@ export function prepareDesign(design: LensDesign): DesignOptics {
         zImg += S[k].t;
     }
     const zStart = -0.18 * zImg;
-    let stopIdx = 0;
-    for (let k = 0; k < S.length; k++) if (S[k].stop) stopIdx = k;
     let lo = 0;
     let hi = S[0].sd * 1.01;
     for (let i = 0; i < 40; i++) {
@@ -553,9 +642,9 @@ export function prepareDesign(design: LensDesign): DesignOptics {
     if (!Number.isFinite(efl)) { efl = Infinity; bfl = Infinity; }
     // A hair inside the bisected limit, so the rim ray survives the
     // Float32 launch table at full fill instead of dying at its own edge.
-    const hMax = design.fno !== undefined && efl > 0
-        ? Math.min(lo * 0.998, efl / (2 * design.fno))
-        : lo * 0.998;
+    let hMax = lo * 0.998;
+    if (design.fno !== undefined && Number.isFinite(efl) && efl > 0) hMax = Math.min(hMax, efl / (2 * design.fno));
+    if (design.entrancePupil !== undefined) hMax = Math.min(hMax, design.entrancePupil / 2);
     const lastVertex = zs[S.length - 1];
 
     // Where does the on-axis fan at full aperture actually come together?
@@ -630,10 +719,11 @@ export function prepareDesign(design: LensDesign): DesignOptics {
     // image plane: the undistorted image height at a defocused plane is
     // not efl·tanθ, and the difference is several percent on a fast singlet.
     const chiefGain = paraxialRay(S, -N / M, 1, stopIdx).yImg;
+    const magnification = Number.isFinite(efl) ? NaN : 1 / paraxialRay(S, 1, 0, stopIdx).y;
 
     const optics: DesignOptics = {
         zs, efl, bfl, hMax, fno: efl / (2 * hMax), zImg, zStart, lastVertex,
-        focusZ, focusRms, virtualFocusZ, stopIdx, stopHalf, M, N, chiefGain, yExtent: 0,
+        focusZ, focusRms, virtualFocusZ, stopIdx, stopHalf, M, N, chiefGain, yExtent: 0, magnification,
     };
     // Framing: the tallest launch or image height any bundle reaches at
     // max field, so the view never zooms with the music.

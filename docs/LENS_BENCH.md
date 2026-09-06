@@ -25,12 +25,13 @@ Every bench number is derived from the prescription at load
   focus*: the on-axis fan at full aperture is traced once and the RMS spot is
   scanned along the bench; its minimum is the circle of least confusion,
   which sits ahead of the paraxial focus by the lens's spherical aberration
-  (0.6 mm on the achromat, 3.7 mm on the f/1.35 condenser). The original
+  (0.6 mm on the achromat). The original
   achromat fixture had a typed image distance 7 mm past focus — the "IMG"
   line showed a blur, not a spot. The two Zemax samples ship at best focus
   already, and the scan lands within 0.03 mm of their own image distances.
 - **Focus marker.** The same scan finds an *internal* focus for an afocal
-  pair (the Keplerian's crossing between the lenses, 50.9 mm in) and the
+  instrument (the Keplerian's crossing between the lenses, 50.9 mm in; the
+  riflescope's first image behind its objective, 103.6 mm in) and the
   bloom and note-arrival flare sit there while the screen still shows the
   collimated output. When the fan never converges (the diverging lens) the
   exit rays' backward extensions are solved by least squares for the
@@ -41,25 +42,28 @@ Every bench number is derived from the prescription at load
   that clears every clear aperture (backed off by 0.2% so the rim ray
   survives single-precision storage), then the published f-number caps it
   (the achromat's fixture apertures would pass f/4 exactly; the Zemax
-  samples' f/5 and f/2.99 are their entrance-pupil diameters). The low
+  samples' f/5 and f/2.99 are their entrance-pupil diameters; an afocal
+  instrument is capped by its objective diameter instead). The low
   band swings the pupil between 70% and 100% of that, so the loudest state is
   the lens wide open with no vignetting on axis.
 - **Readouts.** The title strip shows the traced EFL, BFL and working
   f-number, the design's half-field, and — for focusing designs — the
   distortion and tangential field curvature at the full field; screen
-  designs show AFOCAL / their virtual EFL.
+  designs show their virtual EFL, or AFOCAL with the traced magnification
+  (exit over entrance beam height, negative when inverting).
+- **Exit pupil.** An afocal instrument flagged `exitPupil` gets its screen
+  where the paraxial chief ray crosses the axis behind the eyepiece — the
+  eye's position, 49.9 mm behind the riflescope's eyepiece — so every
+  field's bundle converges onto the same disc there.
 
 | Design | Scale k | EFL | Paraxial BFL | Fan cap | Best focus from last vertex | RMS spot paraxial → best |
 |---|---|---|---|---|---|---|
 | Achromat doublet | 1.085 | 100.0 | 96.81 | f/4 (h 12.5) | 96.25 | 0.049 → 0.019 mm |
 | Cooke triplet | 1.000 | 50.0 | 42.42 | f/5 (h 5.0) | 42.22 (sample: 42.21) | 0.013 → 0.004 mm |
 | Double Gauss | 1.000 | 99.5 | 57.50 | f/2.99 (h 16.67) | 57.28 (sample: 57.31) | 0.024 → 0.008 mm |
-| Fast condenser | 1.000 | 30.0 | 24.68 | clear aperture, f/1.35 | 20.99 | 1.14 → 0.43 mm |
+| Riflescope 4×17 | — | afocal, 3.9× | — | 17 mm objective (h 8.5) | internal, z 103.6 | 0.007 mm |
 | Diverging fan | — | −50.0 | −52.31 | clear aperture | virtual, z −46.8 | — |
 | Keplerian pair | — | afocal | — | clear aperture | internal, z 50.85 | 0.14 mm |
-
-The condenser's f/1.2 label exceeds what its clear aperture passes, so the
-trace's own marginal ray (f/1.35) is the limit there.
 
 ## Field points and pupil aiming
 
@@ -83,14 +87,15 @@ the stop.
   coordinates p·stopHalf·fill for p ∈ [−1, 1], and one secant step puts the
   chief ray through the stop centre to better than a micron. The map is exact
   to aberration level (≤0.11 mm at the stop on the Cooke, 0.36 mm at 14° on
-  the Double Gauss and on the f/1.35 condenser). If a reference ray dies before the stop
+  the Double Gauss). If a reference ray dies before the stop
   the paraxial map is used for that frame, so no field is ever empty. The F
   and C lanes reuse the d-line launch heights: a white-light entry ray
   disperses, a bench aims at d.
 - **Vignetting.** Rays that clip elsewhere die exactly as on axis (dimmed
   stubs). Off axis that is the real vignetting of the design: the Double
   Gauss loses a rim ray at 14° exactly as the Zemax sample does, the Cooke
-  passes its whole f/5 pupil out to 20°, the singlets lose their rim ray.
+  passes its whole f/5 pupil out to 20°, the diverging singlet loses its
+  rim ray, and the riflescope loses two at its field edge in the eyepiece.
 - **Tangential focus.** Per field, in closed form: with each surviving ray's
   exit segment `y = a + b·z`, the spread across rays is quadratic in z and its
   minimum is `z* = −cov(a, b) / var(b)`. It is rejected when fewer than three
@@ -104,17 +109,16 @@ the stop.
   confusion of an aberrated fan is aperture-dependent; the numbers below
   are at full fill. At full field it reads −0.48 mm (achromat, 3°), +0.17
   (Cooke, 20°) and −0.05 (Double Gauss, 14°) — the two anastigmats are
-  flat-field designs, and the bench shows it. The
-  condenser reads +0.56 (4°), the other way: that is not field curvature
-  (a stop-at-lens singlet has near-zero third-order coma and a Petzval sag
-  of ~−0.04 mm here) but the focus shift of a fan whose rim ray has died
-  and so carries less spherical aberration. T-CURV and DIST on the strip
-  are teaching readouts, not qualification data.
+  flat-field designs, and the bench shows it. Beware reading the number on
+  a fan that has lost its rim ray: the circle of least confusion then
+  carries less spherical aberration and shifts, which is not field
+  curvature. T-CURV and DIST on the strip are teaching readouts, not
+  qualification data.
 - **Distortion.** The chief ray's landing height against the paraxial chief
   ray's at the bench's *actual* image plane (`chiefGain` per unit slope, traced
   at load). `efl·tan θ` is the wrong baseline here: the image plane sits ahead
-  of paraxial focus by the spherical aberration, and naive f·tanθ would read
-  −12.8% on the condenser where the true figure is −0.03%. The Double Gauss
+  of paraxial focus by the spherical aberration, and naive f·tanθ would
+  read percent-level "distortion" on a fast singlet that has none. The Double Gauss
   reads −0.87% (barrel) at 14°, the Cooke +0.07% at 20°. Ticks at IMG show
   the ideal and actual chief-ray heights; the F/C chief rays sit beside them
   while the highs hold the lanes open (lateral colour).
@@ -172,18 +176,31 @@ Zero radius in code means a plane. Apertures use half the published **clear
 aperture**, not half the mechanical diameter. Final distances locate either a
 nominal image plane or an explicitly labelled observation screen.
 
-### Fast condenser — EO 70-265
+### Riflescope 4×17 — derived assembly (replaced the condenser, September 6, 2026)
 
-Source: [Edmund Optics 25mm diameter, 30mm focal length PCX lens](https://www.edmundoptics.com/p/25mm-dia-x-30mm-fl-swir-coated-n-bk7-pcx-lens/53967/).
+The Edmund PCX condenser (EO 70-265) that held this slot was traced
+correctly — its marginal rays crossed the axis 5 mm ahead of the paraxial
+ones — but an f/1.35 singlet is a light collector, not an imager, and on the
+bench it read as broken. It was replaced with an instrument that shows the
+trace off: a 4× riflescope built entirely from the Fraunhofer achromat form
+scaled by the paraxial trace (`riflescope()` in `optics.ts`):
 
-Published geometry: front radius +15.50, planar rear, centre thickness 8.06,
-clear aperture 22.20, N-BK7, EFL 30.00, BFL 24.69, nominal f/1.2.
-The image plane is 24.69 beyond the rear vertex. The strongly curved front
-surface gives a broad cone and visible spherical/chromatic aberration. The
-source product has a SWIR coating, but its specified EFL is at 587.6nm; this
-visualization uses the glass geometry at the d line and does not model that
-coating. The ±4° field is a display choice for a condenser, which has no
-specified field of its own.
+- **Objective:** the form scaled to EFL 100, 17 mm entrance pupil (f/5.9),
+  the aperture stop.
+- **Erector:** two f=50 doublets, 20 mm apart, the first with its front
+  focal point on the objective's image, so the relay is afocal between them
+  and re-forms an erect image behind the second.
+- **Eyepiece:** a Plössl — two f=50 doublets, flint sides outward, 2 mm
+  apart (EFL 25.9) — with its front focal point on the erected image.
+- **Screen:** at the exit pupil, solved from the paraxial chief ray, 49.9 mm
+  behind the eyepiece; the 4.4 mm exit beam is what the eye receives.
+
+Every gap is a paraxial solve (group BFL plus the next group's FFD), nothing
+is typed in, and the whole train is afocal to rounding with magnification
++3.86 (erect). Field ±1.5°, what a real 4× scope sees; the erector and
+eyepiece diameters are limited by the form's edge thickness, and that is
+what vignettes the rim rays at the field edge. Fifteen surfaces, so the
+polyline stride is 18 points per ray.
 
 ### Diverging fan — EO 45-028
 
@@ -220,13 +237,13 @@ gives n_d = 1.51680 and V_d = 64.17; all three added designs use these values.
 
 ## Integration and validation
 
-The three Edmund additions follow the achromat, Cooke, and Double Gauss in
-the 16-bar rotation. The title block shows the current design number. The
+The riflescope and the two Edmund singlets follow the achromat, Cooke, and
+Double Gauss in the 16-bar rotation. The title block shows the current design number. The
 achromat retains its original fixture data; the Cooke and Double Gauss are
 the Zemax samples above.
 
-All six designs stay within the 165-ray / 14-point buffers (3 lanes × 5
-fields × 11 rays; the Double Gauss's 11 surfaces need 13 points per ray). The original numerical checks covered three viewport
+All six designs stay within the 165-ray / 18-point buffers (3 lanes × 5
+fields × 11 rays; the riflescope's 15 surfaces need 17 points per ray). The original numerical checks covered three viewport
 sizes, low/mid/high extremes, and both field limits: 648 render scenarios
 with finite coordinates, 15/15 reference rays on axis at the quiet aperture
 setting. The field-point work was checked by tracing every design at full
