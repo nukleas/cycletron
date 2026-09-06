@@ -4,9 +4,9 @@
 //! `ConversionArgs` and writes to disk. We mirror the conversion pipeline
 //! directly so we can take a byte slice and return a `String`, no files.
 //!
-//! Before conversion we optionally run a **conservative cleanup** (short ghost
-//! notes, exact/overlap duplicates, velocity clamp) so imports are smoother
-//! without mutating the source file on disk.
+//! Before conversion we optionally run a **conservative cleanup** (re-trigger
+//! merge, short ghost notes, exact/overlap duplicates, grid snap, velocity
+//! clamp) so imports are smoother without mutating the source file on disk.
 
 pub mod index;
 
@@ -63,6 +63,22 @@ pub struct CleanupOptions {
     /// Drop exact-onset duplicates and heavy same-pitch overlaps, keeping the
     /// longer / louder note.
     pub remove_duplicates: bool,
+    /// Join same-pitch re-triggers into one held note: two notes merge when
+    /// one of them is shorter than `1/N` of a quarter and the second starts
+    /// within half that of the first's release (overlaps included). `0`
+    /// disables — the default, and deliberately so. A sustain chopped into
+    /// fast re-triggers (the "plays it very fast instead of holding it"
+    /// import, audio transcriptions) is structurally identical to a real
+    /// staccato riff (Darude, Sandstorm: 32nd notes with 32nd rests), so only
+    /// the person listening can pick; the MIDI Lab preview reports the count.
+    /// 8 = fragments under a 32nd, 4 = under a 16th (chiptune-style 64th
+    /// pulses), 2 = under an 8th (basic-pitch output). Drum channels are never
+    /// merged.
+    pub merge_fragment_divisor: u32,
+    /// Snap onsets and offsets to a grid of `N` steps per bar (16 = sixteenths
+    /// in 4/4). `0` disables (default). Lossy for swing and triplets; useful for
+    /// transcriptions whose timing jitter would otherwise force a 64th grid.
+    pub snap_per_bar: usize,
     pub velocity_mode: VelocityMode,
 }
 
@@ -71,6 +87,8 @@ impl Default for CleanupOptions {
         Self {
             short_note_divisor: 32,
             remove_duplicates: true,
+            merge_fragment_divisor: 0,
+            snap_per_bar: 0,
             velocity_mode: VelocityMode::Moderate,
         }
     }
@@ -82,6 +100,8 @@ impl CleanupOptions {
         Self {
             short_note_divisor: 0,
             remove_duplicates: false,
+            merge_fragment_divisor: 0,
+            snap_per_bar: 0,
             velocity_mode: VelocityMode::Off,
         }
     }
@@ -89,6 +109,8 @@ impl CleanupOptions {
     pub fn is_active(&self) -> bool {
         self.short_note_divisor > 0
             || self.remove_duplicates
+            || self.merge_fragment_divisor > 0
+            || self.snap_per_bar > 0
             || self.velocity_mode != VelocityMode::Off
     }
 }
@@ -154,6 +176,10 @@ pub struct CleanupReport {
     pub notes_after: usize,
     pub removed_short: usize,
     pub removed_duplicates: usize,
+    /// Fragments folded into a held note (a chain of 4 counts as 3).
+    pub merged: usize,
+    /// Notes whose onset or offset moved to the snap grid.
+    pub snapped: usize,
     pub velocity_adjusted: usize,
 }
 
@@ -485,31 +511,12 @@ pub fn apply_cleanup(midi: &mut MidiData, opts: &CleanupOptions) -> CleanupRepor
         return report;
     }
 
-    let bpm = if midi.bpm.is_finite() && midi.bpm > 0.0 {
-        midi.bpm
-    } else {
-        120.0
-    };
-    let quarter_sec = 60.0 / bpm;
-    let short_threshold = if opts.short_note_divisor > 0 {
-        Some(quarter_sec / f64::from(opts.short_note_divisor))
-    } else {
-        None
-    };
-    let vel_range = opts.velocity_mode.range();
+    let params = CleanupParams::from_options(opts, midi.bpm, midi.cycle_ticks, midi.cycle_len);
 
     // track_info is a Box<[TrackInfo]>; rebuild each events slice.
     for track in midi.track_info.iter_mut() {
         let mut events: Vec<NoteEvent> = track.events.to_vec();
-        let (short, dups, vel) = cleanup_event_list(
-            &mut events,
-            short_threshold,
-            opts.remove_duplicates,
-            vel_range,
-        );
-        report.removed_short += short;
-        report.removed_duplicates += dups;
-        report.velocity_adjusted += vel;
+        cleanup_event_list(&mut events, &params, &mut report);
         track.events = events.into_boxed_slice();
     }
 
@@ -517,53 +524,235 @@ pub fn apply_cleanup(midi: &mut MidiData, opts: &CleanupOptions) -> CleanupRepor
     report
 }
 
-/// Pure cleanup over a flat note list. Returns (removed_short, removed_dups, velocity_adjusted).
-fn cleanup_event_list(
-    events: &mut Vec<NoteEvent>,
+/// `CleanupOptions` resolved against one file's tempo and bar length.
+#[derive(Debug, Clone, Default)]
+struct CleanupParams {
+    /// Seconds. Notes shorter than this are dropped.
     short_threshold: Option<f64>,
     remove_duplicates: bool,
+    /// Seconds. Same-pitch notes re-triggering within this gap are joined
+    /// (half of `fragment_max`).
+    merge_gap: Option<f64>,
+    /// Seconds. A pair is only joined when one note is shorter than this:
+    /// anything longer re-struck on the same pitch is a real repeat.
+    fragment_max: f64,
+    snap: Option<SnapGrid>,
     vel_range: Option<(u8, u8)>,
-) -> (usize, usize, usize) {
-    // 1. Short notes.
-    let mut removed_short = 0usize;
-    if let Some(thresh) = short_threshold {
+}
+
+/// One snap grid step, in whichever time base the converter reads.
+///
+/// midi-to-strudel quantizes by ticks when the file is metrical
+/// (`cycle_ticks` known) and by seconds otherwise, so ticks are the source of
+/// truth when present and seconds are kept consistent with a local linear
+/// correction (exact under a constant tempo, a close approximation across a
+/// tempo-map boundary).
+#[derive(Debug, Clone, Copy)]
+struct SnapGrid {
+    step_ticks: Option<f64>,
+    step_sec: f64,
+    sec_per_tick: f64,
+}
+
+impl CleanupParams {
+    fn from_options(
+        opts: &CleanupOptions,
+        bpm: f64,
+        cycle_ticks: Option<u64>,
+        cycle_len: f64,
+    ) -> Self {
+        let bpm = if bpm.is_finite() && bpm > 0.0 {
+            bpm
+        } else {
+            120.0
+        };
+        let quarter_sec = 60.0 / bpm;
+        let divisor = |n: u32| (n > 0).then(|| quarter_sec / f64::from(n));
+        let snap = (opts.snap_per_bar > 0 && cycle_len > 0.0).then(|| {
+            let steps = opts.snap_per_bar as f64;
+            let ticks = cycle_ticks.filter(|&t| t > 0).map(|t| t as f64);
+            SnapGrid {
+                step_ticks: ticks.map(|t| t / steps),
+                step_sec: cycle_len / steps,
+                sec_per_tick: ticks.map_or(0.0, |t| cycle_len / t),
+            }
+        });
+        Self {
+            short_threshold: divisor(opts.short_note_divisor),
+            remove_duplicates: opts.remove_duplicates,
+            merge_gap: divisor(opts.merge_fragment_divisor).map(|f| f / 2.0),
+            fragment_max: divisor(opts.merge_fragment_divisor).unwrap_or(0.0),
+            snap,
+            vel_range: opts.velocity_mode.range(),
+        }
+    }
+}
+
+/// Cleanup over one track's note list, in this order: merge re-triggers,
+/// drop short notes, drop duplicates, snap to grid (then de-duplicate again,
+/// since snapping can land two notes on one onset), clamp velocity. Merge runs
+/// first so overlapping same-pitch fragments are joined rather than thrown
+/// away by the duplicate pass.
+fn cleanup_event_list(events: &mut Vec<NoteEvent>, p: &CleanupParams, report: &mut CleanupReport) {
+    if let Some(gap) = p.merge_gap.filter(|_| events.len() > 1) {
+        let before = events.len();
+        *events = merge_retriggers(std::mem::take(events), gap, p.fragment_max);
+        report.merged += before - events.len();
+    }
+
+    if let Some(thresh) = p.short_threshold {
         events.retain(|ev| {
             // Zero-duration / missing-off notes are almost always noise.
             let short =
                 ev.duration_sec < thresh || (ev.duration_ticks == 0 && ev.duration_sec <= 0.0);
             if short {
-                removed_short += 1;
-                false
-            } else {
-                true
+                report.removed_short += 1;
             }
+            !short
         });
     }
 
-    // 2. Duplicates / heavy overlaps on the same channel+pitch.
-    let mut removed_dups = 0usize;
-    if remove_duplicates && events.len() > 1 {
-        let before = events.len();
-        *events = greedy_keep_non_overlapping(std::mem::take(events));
-        removed_dups = before.saturating_sub(events.len());
+    let dedupe = |events: &mut Vec<NoteEvent>, report: &mut CleanupReport| {
+        if events.len() > 1 {
+            let before = events.len();
+            *events = greedy_keep_non_overlapping(std::mem::take(events));
+            report.removed_duplicates += before - events.len();
+        }
+    };
+    if p.remove_duplicates {
+        dedupe(events, report);
     }
 
-    // 3. Velocity clamp.
-    let mut velocity_adjusted = 0usize;
-    if let Some((lo, hi)) = vel_range {
-        for ev in events.iter_mut() {
-            if ev.velocity == 0 {
-                continue;
-            }
+    if let Some(grid) = p.snap {
+        report.snapped += snap_events(events, grid);
+        if p.remove_duplicates {
+            dedupe(events, report);
+        }
+    }
+
+    if let Some((lo, hi)) = p.vel_range {
+        for ev in events.iter_mut().filter(|ev| ev.velocity != 0) {
             let clamped = ev.velocity.clamp(lo, hi);
             if clamped != ev.velocity {
-                velocity_adjusted += 1;
+                report.velocity_adjusted += 1;
                 ev.velocity = clamped;
             }
         }
     }
+}
 
-    (removed_short, removed_dups, velocity_adjusted)
+/// GM percussion channel (0-based). Drum hits are onsets, not sustains — a
+/// 32nd-note roll must never be folded into one long hit.
+const DRUM_CHANNEL: u8 = 9;
+
+/// Join chains of same-channel, same-pitch notes into one note spanning first
+/// onset to last release, at the chain's peak velocity. Two adjacent notes
+/// link when the second starts less than `gap` seconds after the chain's
+/// release (overlaps included) **and** at least one of the two is shorter
+/// than `fragment_max`. Both comparisons are strict, so a 32nd note followed
+/// by an exact 32nd rest never links under a 32nd setting.
+fn merge_retriggers(mut events: Vec<NoteEvent>, gap: f64, fragment_max: f64) -> Vec<NoteEvent> {
+    events.sort_by(|a, b| {
+        a.channel
+            .cmp(&b.channel)
+            .then_with(|| a.note.cmp(&b.note))
+            .then_with(|| a.time_tick.cmp(&b.time_tick))
+            .then_with(|| a.time_sec.total_cmp(&b.time_sec))
+    });
+
+    let mut out: Vec<NoteEvent> = Vec::with_capacity(events.len());
+    let mut chain: Vec<NoteEvent> = Vec::new();
+    let flush = |chain: &mut Vec<NoteEvent>, out: &mut Vec<NoteEvent>| {
+        if chain.len() <= 1 {
+            out.append(chain);
+            return;
+        }
+        let first = &chain[0];
+        let end_tick = chain
+            .iter()
+            .map(|ev| ev.time_tick.saturating_add(ev.duration_ticks))
+            .max()
+            .unwrap_or(first.time_tick);
+        let end_sec = chain
+            .iter()
+            .map(|ev| ev.time_sec + ev.duration_sec)
+            .fold(first.time_sec, f64::max);
+        let velocity = chain
+            .iter()
+            .map(|ev| ev.velocity)
+            .max()
+            .unwrap_or(first.velocity);
+        out.push(NoteEvent {
+            duration_ticks: end_tick.saturating_sub(first.time_tick),
+            duration_sec: end_sec - first.time_sec,
+            velocity,
+            ..first.clone()
+        });
+        chain.clear();
+    };
+
+    for ev in events {
+        let continues = chain.last().is_some_and(|last| {
+            let chain_end = chain
+                .iter()
+                .map(|c| c.time_sec + c.duration_sec)
+                .fold(f64::MIN, f64::max);
+            last.channel == ev.channel
+                && last.channel != DRUM_CHANNEL
+                && last.note == ev.note
+                && ev.time_sec - chain_end < gap
+                && (last.duration_sec < fragment_max || ev.duration_sec < fragment_max)
+        });
+        if !continues {
+            flush(&mut chain, &mut out);
+        }
+        chain.push(ev);
+    }
+    flush(&mut chain, &mut out);
+
+    out.sort_by(|a, b| {
+        a.time_tick
+            .cmp(&b.time_tick)
+            .then_with(|| a.time_sec.total_cmp(&b.time_sec))
+            .then_with(|| a.channel.cmp(&b.channel))
+            .then_with(|| a.note.cmp(&b.note))
+    });
+    out
+}
+
+/// Move every onset and release to the nearest grid line. A note that would
+/// collapse to zero length keeps one grid step. Returns how many notes moved.
+fn snap_events(events: &mut [NoteEvent], grid: SnapGrid) -> usize {
+    let mut moved = 0usize;
+    for ev in events.iter_mut() {
+        match grid.step_ticks {
+            Some(step) => {
+                let on = (ev.time_tick as f64 / step).round() * step;
+                let off = (((ev.time_tick + ev.duration_ticks) as f64) / step).round() * step;
+                let off = if off <= on { on + step } else { off };
+                let (on_t, off_t) = (on.round() as u64, off.round() as u64);
+                if on_t != ev.time_tick || off_t - on_t != ev.duration_ticks {
+                    moved += 1;
+                }
+                ev.time_sec += (on_t as f64 - ev.time_tick as f64) * grid.sec_per_tick;
+                ev.duration_sec = (off_t - on_t) as f64 * grid.sec_per_tick;
+                ev.time_tick = on_t;
+                ev.duration_ticks = off_t - on_t;
+            }
+            None => {
+                let step = grid.step_sec;
+                let on = (ev.time_sec / step).round() * step;
+                let off = ((ev.time_sec + ev.duration_sec) / step).round() * step;
+                let off = if off <= on { on + step } else { off };
+                if (on - ev.time_sec).abs() > 1e-9 || (off - on - ev.duration_sec).abs() > 1e-9 {
+                    moved += 1;
+                }
+                ev.time_sec = on;
+                ev.duration_sec = off - on;
+            }
+        }
+    }
+    moved
 }
 
 /// Keep non-overlapping notes per (channel, pitch). When two notes of the same
@@ -642,6 +831,13 @@ mod tests {
         assert_eq!(parse_note_name("bd"), None);
     }
 
+    /// Run one cleanup pass with everything off except what the test sets.
+    fn run(events: &mut Vec<NoteEvent>, p: CleanupParams) -> CleanupReport {
+        let mut report = CleanupReport::default();
+        cleanup_event_list(events, &p, &mut report);
+        report
+    }
+
     #[test]
     fn drops_short_notes() {
         let mut events = vec![
@@ -650,9 +846,15 @@ mod tests {
             note(240, 100, "E4", 70, 0),
         ];
         // threshold high enough to kill the 1-tick ghost
-        let (short, dups, _) = cleanup_event_list(&mut events, Some(0.01), false, None);
-        assert_eq!(short, 1);
-        assert_eq!(dups, 0);
+        let r = run(
+            &mut events,
+            CleanupParams {
+                short_threshold: Some(0.01),
+                ..Default::default()
+            },
+        );
+        assert_eq!(r.removed_short, 1);
+        assert_eq!(r.removed_duplicates, 0);
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].note, "C4");
         assert_eq!(events[1].note, "E4");
@@ -665,9 +867,15 @@ mod tests {
             note(0, 40, "C4", 60, 0), // same onset, shorter
             note(200, 80, "D4", 70, 0),
         ];
-        let (short, dups, _) = cleanup_event_list(&mut events, None, true, None);
-        assert_eq!(short, 0);
-        assert_eq!(dups, 1);
+        let r = run(
+            &mut events,
+            CleanupParams {
+                remove_duplicates: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(r.removed_short, 0);
+        assert_eq!(r.removed_duplicates, 1);
         assert_eq!(events.len(), 2);
         assert!(
             events
@@ -683,8 +891,14 @@ mod tests {
             note(50, 50, "C4", 90, 0),   // fully inside the first
             note(300, 100, "C4", 70, 0), // after — keep
         ];
-        let (_, dups, _) = cleanup_event_list(&mut events, None, true, None);
-        assert_eq!(dups, 1);
+        let r = run(
+            &mut events,
+            CleanupParams {
+                remove_duplicates: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(r.removed_duplicates, 1);
         assert_eq!(events.len(), 2);
     }
 
@@ -695,11 +909,169 @@ mod tests {
             note(100, 100, "D4", 120, 0),
             note(200, 100, "E4", 80, 0),
         ];
-        let (_, _, adj) = cleanup_event_list(&mut events, None, false, Some((56, 108)));
-        assert_eq!(adj, 2);
+        let r = run(
+            &mut events,
+            CleanupParams {
+                vel_range: Some((56, 108)),
+                ..Default::default()
+            },
+        );
+        assert_eq!(r.velocity_adjusted, 2);
         assert_eq!(events[0].velocity, 56);
         assert_eq!(events[1].velocity, 108);
         assert_eq!(events[2].velocity, 80);
+    }
+
+    /// The `note()` helper maps 480 ticks to 0.5 s (a quarter at 120 BPM), so
+    /// a 16th is 120 ticks / 0.125 s. This is the "< 1/16" setting.
+    fn merge_params() -> CleanupParams {
+        CleanupParams {
+            merge_gap: Some(0.125 / 2.0), // half the fragment limit: a 32nd
+            fragment_max: 0.125,          // a 16th
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn merges_chopped_sustain_into_one_note() {
+        // A held E4 that a transcription split into uneven touching fragments,
+        // with an unrelated D4 in between on the timeline.
+        let mut events = vec![
+            note(0, 100, "E4", 70, 0),
+            note(100, 60, "E4", 90, 0),
+            note(150, 200, "E4", 80, 0), // overlaps the previous fragment
+            note(350, 40, "E4", 60, 0),  // short splinter
+            note(400, 290, "E4", 60, 0), // 10-tick gap after it
+            note(200, 100, "D4", 75, 0),
+        ];
+        let r = run(&mut events, merge_params());
+        assert_eq!(r.merged, 4);
+        assert_eq!(events.len(), 2);
+        let e4 = events.iter().find(|e| e.note == "E4").unwrap();
+        assert_eq!(e4.time_tick, 0);
+        assert_eq!(e4.duration_ticks, 690);
+        assert!((e4.duration_sec - 690.0 / 480.0 * 0.5).abs() < 1e-9);
+        assert_eq!(e4.velocity, 90);
+        assert!(
+            events
+                .iter()
+                .any(|e| e.note == "D4" && e.duration_ticks == 100)
+        );
+    }
+
+    #[test]
+    fn merge_keeps_legato_sixteenths() {
+        // Four legato 16ths on E2 — a bassline, not a chopped note.
+        let mut events = (0..4).map(|i| note(i * 120, 120, "E2", 100, 0)).collect();
+        let r = run(&mut events, merge_params());
+        assert_eq!(r.merged, 0);
+        assert_eq!(events.len(), 4);
+    }
+
+    #[test]
+    fn merge_keeps_uneven_resung_pitch() {
+        // "Tom's Di-ner": an 8th then a quarter on the same pitch, legato.
+        let mut events = vec![note(0, 240, "F#4", 90, 0), note(240, 480, "F#4", 90, 0)];
+        let r = run(&mut events, merge_params());
+        assert_eq!(r.merged, 0);
+        assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn merge_keeps_staccato_riff_at_its_own_size() {
+        // Sandstorm: 32nd notes with exact 32nd rests. Under the "< 1/32"
+        // setting (gap limit a 64th) nothing links; a 16th setting would join.
+        let p = CleanupParams {
+            merge_gap: Some(0.0625 / 2.0),
+            fragment_max: 0.0625,
+            ..Default::default()
+        };
+        let mut events = (0..8).map(|i| note(i * 120, 58, "E3", 100, 0)).collect();
+        let r = run(&mut events, p);
+        assert_eq!(r.merged, 0);
+        assert_eq!(events.len(), 8);
+    }
+
+    #[test]
+    fn merge_skips_drum_channel() {
+        // A 32nd-note snare roll on channel 10 stays a roll.
+        let mut events = (0..8)
+            .map(|i| note(i * 60, 60, "D2", 100, DRUM_CHANNEL))
+            .collect();
+        let r = run(&mut events, merge_params());
+        assert_eq!(r.merged, 0);
+        assert_eq!(events.len(), 8);
+    }
+
+    #[test]
+    fn merge_joins_machine_gun_retriggers() {
+        // Equal but sub-16th fragments: a sustain exported as 64th re-triggers.
+        let mut events = (0..16).map(|i| note(i * 30, 30, "G3", 100, 0)).collect();
+        let r = run(&mut events, merge_params());
+        assert_eq!(r.merged, 15);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].duration_ticks, 480);
+    }
+
+    #[test]
+    fn merge_respects_gap_and_channel() {
+        let mut events = vec![
+            note(0, 100, "C4", 80, 0),
+            note(200, 100, "C4", 80, 0), // 100-tick gap ≥ the 60-tick limit
+            note(300, 100, "C4", 80, 1), // touching, but another channel
+        ];
+        let r = run(&mut events, merge_params());
+        assert_eq!(r.merged, 0);
+        assert_eq!(events.len(), 3);
+    }
+
+    #[test]
+    fn snaps_to_grid_and_keeps_notes_audible() {
+        // 1920 ticks per bar, 16 steps → 120-tick grid.
+        let grid = SnapGrid {
+            step_ticks: Some(120.0),
+            step_sec: 0.125,
+            sec_per_tick: 0.5 / 480.0,
+        };
+        let mut events = vec![
+            note(7, 110, "C4", 80, 0),   // → 0..120
+            note(250, 20, "D4", 80, 0),  // would collapse → keeps one step 240..360
+            note(480, 240, "E4", 80, 0), // already on grid
+        ];
+        let r = run(
+            &mut events,
+            CleanupParams {
+                snap: Some(grid),
+                ..Default::default()
+            },
+        );
+        assert_eq!(r.snapped, 2);
+        assert_eq!((events[0].time_tick, events[0].duration_ticks), (0, 120));
+        assert!((events[0].time_sec - 0.0).abs() < 1e-9);
+        assert!((events[0].duration_sec - 0.125).abs() < 1e-9);
+        assert_eq!((events[1].time_tick, events[1].duration_ticks), (240, 120));
+        assert_eq!((events[2].time_tick, events[2].duration_ticks), (480, 240));
+    }
+
+    #[test]
+    fn snap_then_dedupe_collapses_colliding_onsets() {
+        let grid = SnapGrid {
+            step_ticks: Some(120.0),
+            step_sec: 0.125,
+            sec_per_tick: 0.5 / 480.0,
+        };
+        let mut events = vec![
+            note(0, 100, "C4", 80, 0),
+            note(50, 100, "C4", 80, 0), // snaps onto the first
+        ];
+        let p = CleanupParams {
+            snap: Some(grid),
+            remove_duplicates: true,
+            ..Default::default()
+        };
+        let r = run(&mut events, p);
+        assert_eq!(events.len(), 1);
+        assert_eq!(r.removed_duplicates, 1);
     }
 
     #[test]

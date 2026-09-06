@@ -310,6 +310,7 @@ pub fn sound_catalog(state: &AppState) -> serde_json::Value {
         "synths": SYNTHS,
         "wavetables": WAVETABLES,
         "drums": DEFAULT_DRUMS,
+        "drums_note": "Default kit is multi-variant: s(\"hh\"), s(\"hh:2\"), s(\"bd:4\"). Index 0 is the original Fischer 808 take. hh:1–5 and rd/rim/sh/tb/brk are uzu-drumkit. rim == rs. cl/ma/lc/mc/hc are extra 808 voices (claves, maracas, congas).",
         "percussion": PERCUSSION,
         "percussion_note": "Single one-shot color banks: perc=cajon, click=claves, metal=anvil, east=woodblock, hand=conga, industrial=brake drum — raw fortissimo foley with no :n variants. Sparse genre-appropriate accents only (industrial/EBM/experimental), tamed with low gain + filtering; never default texture or percussion variety. space/arpy = atmosphere & pluck; tabla/jvbass = tonal.",
         "instruments": INSTRUMENTS,

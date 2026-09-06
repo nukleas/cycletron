@@ -16,6 +16,7 @@ import {
     INSTRUMENT_BANKS,
     MACHINE_KITS,
     PERCUSSION_COLORS,
+    UZU_BASE,
     VCSL_ONESHOTS,
     VCSL_PITCHED,
 } from './sample-tables.js';
@@ -231,11 +232,22 @@ export class SampleLoader {
     }
 
     async loadEssentialDrums(): Promise<number> {
-        const essentials = ESSENTIAL_DRUMS.map(({name, sub, src}) => ({
-            name,
-            url: LOCAL_SAMPLES_BASE + sub,
-            fallback: FISCHER_808_BASE + src,
-        }));
+        const essentials: Array<{name: string; url: string; fallback?: string; sampleIdx: number}> = [];
+        for (const {name, files} of ESSENTIAL_DRUMS) {
+            files.forEach((f, i) => {
+                const fallback = f.fischer
+                    ? FISCHER_808_BASE + f.fischer
+                    : f.uzu
+                      ? UZU_BASE + f.uzu
+                      : undefined;
+                essentials.push({
+                    name,
+                    url: LOCAL_SAMPLES_BASE + f.sub,
+                    fallback,
+                    sampleIdx: i,
+                });
+            });
+        }
 
         const result = await this._loadKitBatch(essentials, 'Essential Drums');
         return result.loaded;

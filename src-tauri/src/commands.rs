@@ -395,6 +395,11 @@ pub struct ImportMidiOptions {
     /// Drop notes shorter than 1/N of a quarter. 0 = off. Typical 16/32/64.
     pub short_note_divisor: Option<u32>,
     pub remove_duplicates: Option<bool>,
+    /// Join same-pitch re-triggers when one note is shorter than 1/N of a
+    /// quarter. 0 = off.
+    pub merge_fragment_divisor: Option<u32>,
+    /// Snap onsets/releases to N steps per bar. 0 = off.
+    pub snap_per_bar: Option<usize>,
     /// `"off" | "moderate" | "strong"`.
     pub velocity_mode: Option<String>,
 }
@@ -450,6 +455,12 @@ fn build_import_options(input: Option<ImportMidiOptions>) -> Result<midi::Import
         }
         if let Some(b) = input.remove_duplicates {
             opts.cleanup.remove_duplicates = b;
+        }
+        if let Some(n) = input.merge_fragment_divisor {
+            opts.cleanup.merge_fragment_divisor = n;
+        }
+        if let Some(n) = input.snap_per_bar {
+            opts.cleanup.snap_per_bar = n;
         }
         if let Some(s) = input.velocity_mode.as_deref() {
             opts.cleanup.velocity_mode = midi::VelocityMode::parse(s)

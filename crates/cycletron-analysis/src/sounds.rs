@@ -48,8 +48,12 @@ pub const WAVETABLES: &[&str] = &[
 ];
 
 /// Drum sample banks loaded by default at startup.
+///
+/// `bd`/`sd`/`hh`/`oh`/`cr`/toms/congas are multi-variant (`s("hh:2")`).
+/// `rim` is the same bank as `rs`. `rd`/`sh`/`tb`/`brk` come from uzu-drumkit.
 pub const DEFAULT_DRUMS: &[&str] = &[
-    "bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs",
+    "bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs", "rim", "rd", "sh",
+    "tb", "brk", "cl", "ma", "lc", "mc", "hc",
 ];
 
 /// Percussion & texture "color" banks — CC0 recordings (VCSL) bundled in
