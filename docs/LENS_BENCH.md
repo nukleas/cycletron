@@ -2,7 +2,10 @@
 
 Lens Bench is an audio-reactive meridional ray visualization, not an optical
 qualification tool. It uses spherical surfaces, vector Snell refraction, and
-clear-aperture clipping. The reference lane uses the d-line refractive index;
+clear-aperture clipping, and traces five field points at once — each bundle
+aimed through the aperture stop (see *Field points and pupil aiming*). The
+optics live in `ui/src/viz/modes/lens-bench/optics.ts`; the mode that draws
+them in `ui/src/viz/modes/lens-bench.ts`. The reference lane uses the d-line refractive index;
 the two color lanes use the glass's own F and C indices derived from its Abbe
 number (n_F = n_d + 0.69·(n_d−1)/V_d, n_C = n_d − 0.31·(n_d−1)/V_d — the
 d line sits about 31% up from C to F for normal glasses), so an achromat's
@@ -13,7 +16,7 @@ losses are not simulated.
 ## Nothing typed in decides focus
 
 Every bench number is derived from the prescription at load
-(`prepareDesign` in `ui/src/viz/modes/lens-bench.ts`):
+(`prepareDesign` in `ui/src/viz/modes/lens-bench/optics.ts`):
 
 - **EFL.** A design declares its published focal length; the surfaces are
   scaled uniformly so the paraxial trace agrees with it (scaling every length
@@ -34,12 +37,15 @@ Every bench number is derived from the prescription at load
   back-projections with the marker labelled VIRTUAL FOCUS; the view widens
   to include it.
 - **Fan height.** Bisection on the real trace finds the tallest on-axis ray
-  that clears every clear aperture, then the published f-number caps it
+  that clears every clear aperture (backed off by 0.2% so the rim ray
+  survives single-precision storage), then the published f-number caps it
   (fixture stops are often oversized; the Double Gauss passes f/1.1). The low
-  band swings the fan between 70% and 100% of that, so the loudest state is
+  band swings the pupil between 70% and 100% of that, so the loudest state is
   the lens wide open with no vignetting on axis.
 - **Readouts.** The title strip shows the traced EFL, BFL and working
-  f-number; screen designs show AFOCAL / their virtual EFL.
+  f-number, the design's half-field, and — for focusing designs — the
+  distortion and tangential field curvature at the full field; screen
+  designs show AFOCAL / their virtual EFL.
 
 | Design | Scale k | EFL | Paraxial BFL | Fan cap | Best focus from last vertex | RMS spot paraxial → best |
 |---|---|---|---|---|---|---|
@@ -52,6 +58,64 @@ Every bench number is derived from the prescription at load
 
 The condenser's f/1.2 label exceeds what its clear aperture passes, so the
 trace's own marginal ray (f/1.35) is the limit there.
+
+## Field points and pupil aiming
+
+Five field points are traced every frame, at −1, −0.6, 0, +0.6 and +1 of the
+design's `maxFieldDeg` — each a collimated bundle entering at that field
+angle. The angles are the design's own field points and never move with the
+music; the mid band lights the off-axis bundles up instead. The ± pairs are
+the same field point seen from both sides of the axis and share a colour
+(axis in the drafting text colour, 0.6 field violet, full field yellow), so
+the bench reads like a layout plot with the chief rays crossing in an X at
+the stop.
+
+- **Stop.** The surface flagged `stop`, else the front surface. `stopHalf` is
+  the height at the stop of the on-axis ray launched at the fan height: the
+  working pupil, expressed where the stop is, so every field samples the same
+  aperture (Double Gauss: 9.9 mm at the stop for the f/2 fan, well inside its
+  oversized 18.3 mm fixture stop).
+- **Aiming.** For each field two reference rays, seeded from the paraxial map
+  `y_stop = M·y₁ + N·u` (M, N traced once per design), fix an affine
+  launch-height map `y₁(y_stop)`; eleven rays are launched at pupil
+  coordinates p·stopHalf·fill for p ∈ [−1, 1], and one secant step puts the
+  chief ray through the stop centre to better than a micron. The map is exact
+  to aberration level (≤0.07 mm at the stop on the photographic designs,
+  0.35 mm on the f/1.35 condenser). If a reference ray dies before the stop
+  the paraxial map is used for that frame, so no field is ever empty. The F
+  and C lanes reuse the d-line launch heights: a white-light entry ray
+  disperses, a bench aims at d.
+- **Vignetting.** Rays that clip elsewhere die exactly as on axis (dimmed
+  stubs). Off axis that is the real vignetting of the design; the scaled
+  photographic fixtures are generous enough that nothing clips at their max
+  fields, the singlets lose their rim ray.
+- **Tangential focus.** Per field, in closed form: with each surviving ray's
+  exit segment `y = a + b·z`, the spread across rays is quadratic in z and its
+  minimum is `z* = −cov(a, b) / var(b)`. It is rejected when fewer than three
+  rays survive, the exit is collimated, or z* lands more than 0.35·zImg from
+  the design's own focus; the afocal pair fits the segment that straddles its
+  internal crossing instead, the diverging lens the exit segments extended
+  backwards to a virtual field curve. The dotted curve through the five foci
+  is the tangential field curvature, drawn straight on the bench. At full
+  field it reads −0.48 mm (achromat, 3°), −0.88 (Cooke, 7°), −1.80 (Double
+  Gauss, 10°) and +0.56 on the condenser (4°) — a coma-dominated singlet with
+  its stop at the lens bends the other way.
+- **Distortion.** The chief ray's landing height against the paraxial chief
+  ray's at the bench's *actual* image plane (`chiefGain` per unit slope, traced
+  at load). `efl·tan θ` is the wrong baseline here: the image plane sits ahead
+  of paraxial focus by the spherical aberration, and naive f·tanθ would read
+  −12.8% on the condenser where the true figure is −0.03%. Ticks at IMG show
+  the ideal and actual chief-ray heights; the F/C chief rays sit beside them
+  while the highs hold the lanes open (lateral colour).
+- **Ray-fan inset.** On canvases 560×360 and larger, three panels bottom-left
+  plot transverse aberration ε_y = y_img(p) − y_img(chief) against pupil
+  coordinate for the axis, 0.6 and full field, one curve per lane on a shared
+  scale that is printed. Spherical reads as a cubic, coma as an S, lateral
+  colour as the F/C curves offset from the d line.
+- **Pulses.** Each pattern track rides the field `slot mod 5`, so instruments
+  travel different bundles; kicks flood the on-axis marginal pair and chief,
+  snares fire the two full-field chief rays through the stop centre, and each
+  field blooms at its own focus when its rays arrive.
 
 ## Added designs (researched September 4, 2026)
 
@@ -71,7 +135,8 @@ The image plane is 24.69 beyond the rear vertex. The strongly curved front
 surface gives a broad cone and visible spherical/chromatic aberration. The
 source product has a SWIR coating, but its specified EFL is at 587.6nm; this
 visualization uses the glass geometry at the d line and does not model that
-coating. Field sweep (±4°) is an artistic display setting.
+coating. The ±4° field is a display choice for a condenser, which has no
+specified field of its own.
 
 ### Diverging fan — EO 45-028
 
@@ -83,7 +148,7 @@ The bench screen is placed **35mm after the rear vertex**, a chosen display
 distance rather than the negative BFL. The real rays diverge: no positive image
 plane or central focal glow is claimed. Screen ticks and arrival rings mark
 actual ray intersections. A fixed 30mm view semi-height contains the expanding
-fan without zooming with the music. Field sweep: ±4°.
+fan without zooming with the music. Field: ±4°, a display choice.
 
 ### Keplerian crossover — derived assembly
 
@@ -99,7 +164,7 @@ second. The chosen vertex-to-vertex air gap is therefore 2 × 48.29 = 96.58.
 Rays cross between the lenses and leave approximately collimated in the
 paraxial reference lane. Stronger marginal rays and exaggerated color lanes
 retain aberration. A screen 40mm after the second lens shows the output bundle;
-it is not labelled a focus. Field sweep is limited to ±1° to reduce vignetting.
+it is not labelled a focus. The field is limited to ±1° to reduce vignetting.
 
 ### Glass constants
 
@@ -113,10 +178,15 @@ the 16-bar rotation. The title block shows the current design number. Existing
 prescriptions retain their original data; this research did not revalidate
 their historical attribution.
 
-All six designs stay within the existing 45-ray / 12-point buffers. Numerical
-checks covered three viewport sizes, low/mid/high extremes, and both field
-limits: 648 render scenarios with finite coordinates. All six designs deliver
-15/15 reference rays on axis at the quiet aperture setting. Additional checks
+All six designs stay within the 165-ray / 12-point buffers (3 lanes × 5
+fields × 11 rays). The original numerical checks covered three viewport
+sizes, low/mid/high extremes, and both field limits: 648 render scenarios
+with finite coordinates, 15/15 reference rays on axis at the quiet aperture
+setting. The field-point work was checked by tracing every design at full
+spread and full pupil: every field keeps at least 9 of 11 d-line rays, every
+chief ray crosses the stop centre to <1e-3 mm, every focusing design has a
+finite tangential focus for all five fields, and distortion stays under
+0.3%. Additional checks
 confirmed divergent output for the negative lens, axis crossing and nearly
 parallel paraxial output for the Keplerian pair, and no focal-gradient rendering
 for screen designs. The checks stubbed audio scheduling and canvas rasterization;
