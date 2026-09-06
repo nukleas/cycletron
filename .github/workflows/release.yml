@@ -247,7 +247,8 @@ jobs:
   # rolling distros — EGL_BAD_ALLOC even for the surfaceless platform (#6).
   # The bundled wayland libs are dead weight anyway: the AppRun hook forces
   # GDK_BACKEND=x11, so only host Mesa ever dlopens libwayland-client — and it
-  # needs its own. Strip them, repack, re-sign, and fix the updater signatures.
+  # needs its own. Strip them, repack, re-sign, and repoint the updater at
+  # the rebuilt AppImage (new asset id AND new signature).
   # Runs after the whole build matrix so every job's latest.json merge is done
   # (patching from inside the linux job would race the other uploads).
   fix-appimage:
@@ -265,6 +266,14 @@ jobs:
           gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --pattern '*.AppImage' --pattern latest.json
           APPIMAGE=$(ls ./*.AppImage)
+          NAME=$(basename "$APPIMAGE")
+          # The asset id latest.json points at today. The release is a draft at
+          # this point, and for a draft tauri-action writes api.github.com
+          # asset-id URLs (a draft has no working browser_download_url) — so
+          # re-uploading the AppImage below retires the very id the updater
+          # was told to fetch.
+          OLD_ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+            --jq ".assets[] | select(.name == \"$NAME\") | .id")
           chmod +x "$APPIMAGE"
           "$APPIMAGE" --appimage-extract >/dev/null
           rm -v squashfs-root/usr/lib/libwayland-*.so*
@@ -283,14 +292,35 @@ jobs:
             -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
             "$APPIMAGE"
           SIG=$(cat "$APPIMAGE.sig")
-          python3 - "$SIG" <<'EOF'
+          # Upload the AppImage FIRST and read back its new id: --clobber does
+          # not edit an asset in place, it deletes and re-creates it, so the id
+          # changes every run and latest.json has to carry the new one.
+          gh release upload "$GITHUB_REF_NAME" "$APPIMAGE" "$APPIMAGE.sig" \
+            --clobber --repo "$GITHUB_REPOSITORY"
+          NEW_ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+            --jq ".assets[] | select(.name == \"$NAME\") | .id")
+          echo "AppImage asset id: $OLD_ID -> $NEW_ID"
+          python3 - "$SIG" "$OLD_ID" "$NEW_ID" "$NAME" <<'EOF'
           import json, sys
-          sig = sys.argv[1]
+          sig, old_id, new_id, name = sys.argv[1:5]
           j = json.load(open('latest.json'))
-          for entry in j['platforms'].values():
-              if entry.get('url', '').endswith('.AppImage'):
+          patched = []
+          for key, entry in j['platforms'].items():
+              url = entry.get('url', '')
+              # Draft release: an asset-id URL ending in /<id>. Published
+              # release: a download URL ending in the file name. Match either,
+              # and never match on '.AppImage' alone — an asset-id URL does not
+              # end in it, which is how this silently no-opped for five
+              # releases and left every Linux client fetching a dead id (404).
+              if url.endswith('/' + old_id) or url.endswith(name):
+                  entry['url'] = url.replace('/' + old_id, '/' + new_id)
                   entry['signature'] = sig
+                  patched.append(key)
+          if not patched:
+              sys.exit("::error::latest.json has no entry pointing at %s "
+                       "(asset id %s) — Linux auto-update would 404" % (name, old_id))
           json.dump(j, open('latest.json', 'w'), indent=2)
+          print("patched url + signature for: %s" % ", ".join(patched))
           EOF
-          gh release upload "$GITHUB_REF_NAME" "$APPIMAGE" "$APPIMAGE.sig" latest.json \
+          gh release upload "$GITHUB_REF_NAME" latest.json \
             --clobber --repo "$GITHUB_REPOSITORY"
