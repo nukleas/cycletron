@@ -81,7 +81,7 @@ export class MidiLab {
     /** Enable/disable per-knob cleanup fields from the master checkbox. */
     private syncCleanupControls(): void {
         const on = !!(document.getElementById('midiLabCleanup') as HTMLInputElement | null)?.checked;
-        for (const id of ['midiLabShortNotes', 'midiLabRemoveDups', 'midiLabVelocity']) {
+        for (const id of ['midiLabShortNotes', 'midiLabRemoveDups', 'midiLabMerge', 'midiLabSnap', 'midiLabVelocity']) {
             const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
             if (el) el.disabled = !on;
         }
@@ -306,6 +306,10 @@ export class MidiLab {
             const short = num('midiLabShortNotes');
             if (short !== undefined) opts.shortNoteDivisor = short;
             opts.removeDuplicates = chk('midiLabRemoveDups');
+            const merge = num('midiLabMerge');
+            if (merge !== undefined) opts.mergeFragmentDivisor = merge;
+            const snap = num('midiLabSnap');
+            if (snap !== undefined) opts.snapPerBar = snap;
             opts.velocityMode = (sel('midiLabVelocity') as ImportMidiOptions['velocityMode']) ?? undefined;
         }
         // Build included channels from the meta + excluded set.
@@ -330,10 +334,13 @@ export class MidiLab {
             if (this.previewEl) this.previewEl.textContent = result.code;
             if (this.previewHint) {
                 const lines = result.code.split('\n').length;
-                const cleaned = result.cleanup?.notes_before
-                    ? result.cleanup.notes_before - result.cleanup.notes_after
-                    : 0;
-                const cleanHint = cleaned > 0 ? ` · cleaned ${cleaned} notes` : '';
+                const c = result.cleanup;
+                const parts: string[] = [];
+                if (c?.merged) parts.push(`merged ${c.merged}`);
+                const dropped = c ? c.removed_short + c.removed_duplicates : 0;
+                if (dropped > 0) parts.push(`dropped ${dropped}`);
+                if (c?.snapped) parts.push(`snapped ${c.snapped}`);
+                const cleanHint = parts.length ? ` · ${parts.join(', ')}` : '';
                 this.previewHint.textContent =
                     `${Math.round(result.bpm)} bpm · ${lines} lines${cleanHint}`;
             }
