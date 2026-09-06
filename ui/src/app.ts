@@ -32,8 +32,26 @@ import {initTooltips} from './tooltip.js';
 /** Decodes bank names out of the missing-manifest-banks ring. */
 const MANIFEST_NAME_DECODER = new TextDecoder();
 
-/** How many cycles the ⏮/⏭ transport buttons jump. */
+/** How many cycles the skip-back / skip-forward transport buttons jump. */
 const SKIP_CYCLES = 5;
+
+type TransportIcon = 'play' | 'pause' | 'restart';
+
+const TRANSPORT_ICONS: Record<TransportIcon, string> = {
+    play: '<svg class="btn-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="7,4 21,12 7,20"/></svg>',
+    pause: '<svg class="btn-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>',
+    restart: '<svg class="btn-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+};
+
+/** Rebuild the transport button as SVG + label so Linux never paints color emoji. */
+function setTransportLabel(btn: HTMLButtonElement, text: string, icon?: TransportIcon): void {
+    btn.replaceChildren();
+    if (icon) btn.insertAdjacentHTML('afterbegin', TRANSPORT_ICONS[icon]);
+    const span = document.createElement('span');
+    span.className = 'btn-text';
+    span.textContent = text;
+    btn.appendChild(span);
+}
 
 interface AppElements {
     // -- Header controls --
@@ -749,7 +767,7 @@ export class StrudelApp {
         const el = this.elements;
 
         el.transportBtn.classList.remove('transport--playing', 'transport--paused');
-        el.transportBtn.textContent = '▶ Play';
+        setTransportLabel(el.transportBtn, 'Play', 'play');
         el.transportBtn.disabled = false;
         el.stopBtn.disabled = true;
         el.skipBackBtn.disabled = true;
@@ -1273,7 +1291,7 @@ export class StrudelApp {
 
         const btn = this.elements.transportBtn;
         btn.disabled = true;
-        btn.textContent = '⏳ Starting...';
+        setTransportLabel(btn, 'Starting…');
 
         try {
             await this.initAudio();
@@ -1287,7 +1305,7 @@ export class StrudelApp {
             this._initInProgress = false;
 
             if (this.playbackState !== PlaybackState.Playing) {
-                btn.textContent = '▶ Play';
+                setTransportLabel(btn, 'Play', 'play');
                 btn.classList.remove('transport--playing');
                 btn.disabled = false;
             }
@@ -1367,7 +1385,7 @@ export class StrudelApp {
         const btn = this.elements.transportBtn;
         btn.classList.remove('transport--playing');
         btn.classList.add('transport--paused');
-        btn.textContent = '▶ Resume';
+        setTransportLabel(btn, 'Resume', 'play');
         btn.disabled = false;
 
         this.elements.stopBtn.disabled = false;
@@ -1443,7 +1461,7 @@ export class StrudelApp {
 
         const btn = this.elements.transportBtn;
         btn.classList.remove('transport--playing', 'transport--paused');
-        btn.textContent = '↻ Restart audio';
+        setTransportLabel(btn, 'Restart audio', 'restart');
         btn.disabled = false;
 
         this.elements.stopBtn.disabled = true;
@@ -1465,7 +1483,7 @@ export class StrudelApp {
 
         const btn = this.elements.transportBtn;
         btn.disabled = true;
-        btn.textContent = '⏳ Restarting...';
+        setTransportLabel(btn, 'Restarting…');
 
         try {
             await this.dispose();
@@ -1522,7 +1540,7 @@ export class StrudelApp {
         const btn = this.elements.transportBtn;
         btn.classList.remove('transport--paused');
         btn.classList.add('transport--playing');
-        btn.textContent = '⏸ Pause';
+        setTransportLabel(btn, 'Pause', 'pause');
         btn.disabled = false;
     }
 
@@ -1545,7 +1563,7 @@ export class StrudelApp {
 
         const btn = this.elements.transportBtn;
         btn.classList.remove('transport--playing', 'transport--paused');
-        btn.textContent = '▶ Play';
+        setTransportLabel(btn, 'Play', 'play');
         btn.disabled = false;
 
         this.elements.stopBtn.disabled = true;

@@ -31,10 +31,10 @@
                 <div id="visualsMenu" class="dropdown-menu" role="menu" aria-labelledby="visualsMenuBtn" hidden></div>
             </div>
             <div class="transport-group">
-                <span data-tooltip="Back 5 cycles"><button id="skipBackBtn" class="skip-btn" disabled aria-label="Skip back 5 cycles">⏮ 5</button></span>
-                <button id="transportBtn" class="primary" disabled>▶ Play</button>
-                <button id="stopBtn" class="danger" disabled>■ Stop</button>
-                <span data-tooltip="Forward 5 cycles"><button id="skipFwdBtn" class="skip-btn" disabled aria-label="Skip forward 5 cycles">5 ⏭</button></span>
+                <span data-tooltip="Back 5 cycles"><button id="skipBackBtn" class="skip-btn" disabled aria-label="Skip back 5 cycles"><svg class="btn-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="4" y="5" width="2.5" height="14"/><polygon points="20,5 9,12 20,19"/></svg> 5</button></span>
+                <button id="transportBtn" class="primary" disabled><svg class="btn-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="7,4 21,12 7,20"/></svg><span class="btn-text">Play</span></button>
+                <button id="stopBtn" class="danger" disabled><svg class="btn-icon" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12"/></svg> Stop</button>
+                <span data-tooltip="Forward 5 cycles"><button id="skipFwdBtn" class="skip-btn" disabled aria-label="Skip forward 5 cycles">5 <svg class="btn-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="4,5 15,12 4,19"/><rect x="17.5" y="5" width="2.5" height="14"/></svg></button></span>
                 <button id="metronomeBtn" class="metronome-btn" data-tooltip="Metronome off" aria-label="Metronome">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 22h14"/>
@@ -299,8 +299,8 @@
             <span class="hud-unit">BPM</span>
         </div>
         <div class="hud-center">
-            <button id="fsVizPrev" class="hud-btn" data-tooltip="Previous visualization ( [ )" aria-label="Previous visualization">◀</button>
-            <button id="fsVizNext" class="hud-btn" data-tooltip="Next visualization ( ] )" aria-label="Next visualization">▶</button>
+            <button id="fsVizPrev" class="hud-btn" data-tooltip="Previous visualization ( [ )" aria-label="Previous visualization"><svg class="btn-icon" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="17,4 7,12 17,20"/></svg></button>
+            <button id="fsVizNext" class="hud-btn" data-tooltip="Next visualization ( ] )" aria-label="Next visualization"><svg class="btn-icon" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="7,4 17,12 7,20"/></svg></button>
             <button id="fsVizAuto" class="hud-btn" data-tooltip="Auto-cycle visualizations every 16 cycles">AUTO</button>
         </div>
         <div class="hud-right">
@@ -319,7 +319,7 @@
         <div class="app-modal-window" role="document">
             <div class="app-modal-header">
                 <span id="welcomeTitle">Welcome</span>
-                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
             </div>
             <div class="welcome-body">
                 <div class="welcome-step" data-step="0">
@@ -366,7 +366,7 @@
         <div class="app-modal-window app-modal-window--small" role="document">
             <div class="app-modal-header">
                 <span id="aiConsentTitle">Turn on the AI assistant?</span>
-                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
             </div>
             <div class="ai-consent-body">
                 <p>Cycletron includes an AI assistant that can write, edit, and arrange patterns with you. It's yours to switch on — or leave off.</p>
@@ -387,7 +387,7 @@
         <div class="app-modal-window logs-window" role="document">
             <div class="app-modal-header">
                 <span id="logsTitle">Logs</span>
-                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
             </div>
             <div class="logs-body">
                 <div class="logs-toolbar">
@@ -412,7 +412,7 @@
         <div class="app-modal-window history-modal-window" role="document">
             <div class="app-modal-header">
                 <span id="historyTitle">Version History</span>
-                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
             </div>
             <div class="history-body">
                 <div class="history-list" id="historyList"></div>
@@ -434,7 +434,7 @@
         <div class="app-modal-window app-modal-window--wide" role="document">
             <div class="app-modal-header">
                 <span id="helpTitle">Help</span>
-                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
             </div>
             <div id="helpTabs" class="help-tabs" role="tablist">
                 <button type="button" class="help-tab help-tab--active" data-help-section="guide">User Guide</button>
@@ -455,7 +455,7 @@
         <div class="app-modal-window" role="document">
             <div class="app-modal-header">
                 <span id="samplesTitle">Samples</span>
-                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
             </div>
             <div class="packs-modal-body">
                 <h4 class="samples-heading">Sample set</h4>
@@ -483,7 +483,7 @@
         <div class="app-modal-window app-modal-window--small" role="document">
             <div class="app-modal-header">
                 <span id="aboutTitle">About</span>
-                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
             </div>
             <div class="about-modal-body">
                 <div class="about-logo">CYCLE<span class="about-logo-accent">TRON</span></div>
@@ -516,7 +516,7 @@
         <div class="app-modal-window" role="document">
             <div class="app-modal-header">
                 <span id="prefsTitle">Preferences</span>
-                <button class="app-modal-close" data-dismiss aria-label="Close">×</button>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
             </div>
             <div class="prefs-body">
                 <section class="prefs-section">
@@ -723,7 +723,7 @@
         <div class="app-modal-window app-modal-window--wide" role="document">
             <div class="app-modal-header">
                 <span id="midiLabTitle">MIDI LAB</span>
-                <button class="app-modal-close" id="midiLabClose" data-dismiss aria-label="Close">×</button>
+                <button class="app-modal-close" id="midiLabClose" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
             </div>
             <div class="midi-lab-fileline">
                 <button id="midiLabBrowse" class="midi-lab-browse">Browse…</button>
