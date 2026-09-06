@@ -55,6 +55,8 @@ pub struct AppState {
     /// and the last successfully reviewed code so `play_pattern` can omit
     /// re-emitting a full document after a gate.
     pub agent_write: Mutex<AgentWriteState>,
+    /// Rewrite cap and note framing; see [`AgentPolicy`].
+    pub agent_policy: Mutex<AgentPolicy>,
 }
 
 /// Agent write-path state that survives across tool calls within (and between)
@@ -66,6 +68,9 @@ pub struct AgentWriteState {
     pub review_calls: usize,
     /// How many `hear_pattern` renders have run this user message.
     pub hear_calls: usize,
+    /// Applied rewrites per section / track / binding id this user message
+    /// (lower-cased, without `@`). The rewrite cap in [`AgentPolicy`] reads it.
+    pub rewrites: std::collections::HashMap<String, usize>,
     /// Hash of the code for the last review (cache key).
     pub last_review_hash: Option<u64>,
     /// The last review's envelope (served on cache hit).
@@ -94,6 +99,42 @@ pub const MAX_REVIEWS_PER_RUN: usize = 2;
 /// all a mix decision needs.
 pub const MAX_HEARS_PER_RUN: usize = 2;
 
+/// Applied rewrites of the same section / track / binding allowed per user
+/// message. The thrash signature in telemetry was one request rewriting
+/// `drop2` three times and `drop` twice (~15k chars streamed) with no warning
+/// driving it — after two takes the model should play what it has and let the
+/// user judge.
+pub const MAX_REWRITES_PER_TARGET: usize = 2;
+
+/// The agent's write policy. Production runs the defaults; the headless eval
+/// flips them to compare guardrails against leeway on the same prompts.
+#[derive(Debug, Clone, Copy)]
+pub struct AgentPolicy {
+    /// Applied rewrites of one target allowed per request; `usize::MAX` = none.
+    pub rewrite_cap: usize,
+    /// Tell the model (prompt + review text) that `[note]` findings are
+    /// observations to report, not defects to rewrite for.
+    pub advisory_notes: bool,
+}
+
+impl Default for AgentPolicy {
+    fn default() -> Self {
+        Self {
+            rewrite_cap: MAX_REWRITES_PER_TARGET,
+            advisory_notes: true,
+        }
+    }
+}
+
+#[cfg(test)]
+impl AgentPolicy {
+    /// No cap, no advisory framing — the pre-guardrail behaviour, for the eval.
+    pub const LEEWAY: Self = Self {
+        rewrite_cap: usize::MAX,
+        advisory_notes: false,
+    };
+}
+
 /// Full `play_pattern` rewrites above this size, after list_sections/list_parts
 /// in the same request, are blocked unless `force: true`.
 pub const FULL_REWRITE_GUARD_CHARS: usize = 4_000;
@@ -121,6 +162,7 @@ impl AppState {
             recipes: Mutex::new(Vec::new()),
             read_budget: Mutex::new((0, 0)),
             agent_write: Mutex::new(AgentWriteState::default()),
+            agent_policy: Mutex::new(AgentPolicy::default()),
         }
     }
 
@@ -135,6 +177,7 @@ impl AppState {
         let mut w = self.agent_write.lock();
         w.review_calls = 0;
         w.hear_calls = 0;
+        w.rewrites.clear();
         w.listed_structure = false;
         w.force_full_play = false;
     }
