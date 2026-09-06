@@ -95,10 +95,11 @@ export interface DesignOptics {
 }
 
 /**
- * Real prescriptions (rustoptic import fixtures / Kingslake, Smith). The
- * Double Gauss stop sits on a dummy plane inside the front SF5 element,
- * exactly as the fixture records it — the trace crosses it un-refracted
- * (n1 === n2) and the aperture still clips there.
+ * Real prescriptions: the Fraunhofer achromat from the rustoptic import
+ * fixtures, the two photographic objectives from the Zemax sample set
+ * (docs/LENS_BENCH.md cites the sources), and three Edmund Optics catalog
+ * singlets. A stop on a plane in air (Double Gauss) is crossed
+ * un-refracted (n1 === n2) and still clips.
  */
 export const LENS_DESIGNS: LensDesign[] = [
     {
@@ -113,37 +114,46 @@ export const LENS_DESIGNS: LensDesign[] = [
             { r: -129.0, t: 96.0, nd: 1, vd: 0, sd: 12.7 },
         ],
     },
+    // Zemax sample "Cooke 40 degree field" (Samples/Sequential/Objectives):
+    // three air-spaced singlets, f/5, EFL 50, half field 20°, the stop on the
+    // flint's rear face. Semi-diameters are the sample's own.
     {
         name: 'COOKE TRIPLET 50mm',
-        sheet: 'DWG 041-C · GB 22,607',
+        sheet: 'ZEMAX SAMPLE · COOKE 40° FIELD',
         efl: 50,
-        fno: 4,
-        maxFieldDeg: 7,
+        fno: 5,
+        maxFieldDeg: 20,
         surfaces: [
-            { r: 26.1, t: 4.5, nd: 1.6204, vd: 60.3, sd: 9, glass: 'N-SK16' },
-            { r: 253.0, t: 6.0, nd: 1, vd: 0, sd: 9 },
-            { r: -69.0, t: 1.5, nd: 1.6200, vd: 36.4, sd: 5, stop: true, glass: 'F2' },
-            { r: 37.0, t: 5.5, nd: 1.6204, vd: 60.3, sd: 9, glass: 'N-SK16' },
-            { r: -28.7, t: 44.5, nd: 1, vd: 0, sd: 9 },
+            { r: 22.0136, t: 3.2590, nd: 1.62041, vd: 60.32, sd: 9.5, glass: 'SK16' },
+            { r: -435.760, t: 6.0076, nd: 1, vd: 0, sd: 9.5 },
+            { r: -22.2133, t: 1.0000, nd: 1.62004, vd: 36.37, sd: 5, glass: 'F2' },
+            { r: 20.2919, t: 4.7504, nd: 1, vd: 0, sd: 5, stop: true },
+            { r: 79.6836, t: 2.9521, nd: 1.62041, vd: 60.32, sd: 7.5, glass: 'SK16' },
+            { r: -18.3953, t: 42.2078, nd: 1, vd: 0, sd: 7.5 },
         ],
     },
+    // Zemax sample "Double Gauss 28 degree field": the stop in the central
+    // air gap with a flint on each side, EPD 33.33 (f/2.99), EFL 99.50, half
+    // field 14°. Semi-diameters are half the sample's surface diameters, so
+    // the rim rays vignette off axis exactly as they do in the sample.
     {
-        name: 'DOUBLE GAUSS 50mm',
-        sheet: 'DWG 107-B · KINGSLAKE',
-        efl: 50,
-        fno: 2,
-        maxFieldDeg: 10,
+        name: 'DOUBLE GAUSS 100mm',
+        sheet: 'ZEMAX SAMPLE · DOUBLE GAUSS 28° FIELD',
+        efl: 99.5,
+        fno: 2.985,
+        maxFieldDeg: 14,
         surfaces: [
-            { r: 57.08, t: 6.0, nd: 1.6223, vd: 53.3, sd: 16, glass: 'N-SSK2' },
-            { r: 149.58, t: 0.5, nd: 1, vd: 0, sd: 16 },
-            { r: 37.68, t: 8.0, nd: 1.6910, vd: 54.7, sd: 14, glass: 'N-LAK9' },
-            { r: 0, t: 3.5, nd: 1.6727, vd: 32.2, sd: 11, glass: 'N-SF5' },
-            { r: 0, t: 3.5, nd: 1.6727, vd: 32.2, sd: 10, stop: true },
-            { r: -30.39, t: 1.5, nd: 1, vd: 0, sd: 11 },
-            { r: -30.39, t: 8.0, nd: 1.6910, vd: 54.7, sd: 14, glass: 'N-LAK9' },
-            { r: -72.91, t: 0.5, nd: 1, vd: 0, sd: 16 },
-            { r: 300.0, t: 5.0, nd: 1.6223, vd: 53.3, sd: 16, glass: 'N-SSK2' },
-            { r: -57.08, t: 40.0, nd: 1, vd: 0, sd: 16 },
+            { r: 54.153, t: 8.747, nd: 1.60738, vd: 56.65, sd: 30.26, glass: 'N-SK2' },
+            { r: 152.522, t: 0.5, nd: 1, vd: 0, sd: 29.29 },
+            { r: 35.951, t: 14.0, nd: 1.62041, vd: 60.32, sd: 24.92, glass: 'N-SK16' },
+            { r: 0, t: 3.777, nd: 1.60342, vd: 38.03, sd: 22.12, glass: 'F5' },
+            { r: 22.27, t: 14.253, nd: 1, vd: 0, sd: 15.17 },
+            { r: 0, t: 12.428, nd: 1, vd: 0, sd: 10.23, stop: true },
+            { r: -25.685, t: 3.777, nd: 1.60342, vd: 38.03, sd: 13.59, glass: 'F5' },
+            { r: 0, t: 10.834, nd: 1.62041, vd: 60.32, sd: 17.24, glass: 'N-SK16' },
+            { r: -36.98, t: 0.5, nd: 1, vd: 0, sd: 19.68 },
+            { r: 196.417, t: 6.858, nd: 1.62041, vd: 60.32, sd: 22.52, glass: 'N-SK16' },
+            { r: -67.148, t: 57.305, nd: 1, vd: 0, sd: 22.80 },
         ],
     },
     // Manufacturer geometry and derived bench distances: docs/LENS_BENCH.md.
@@ -203,8 +213,8 @@ export const LANES = 3;              // d (reference), F (blue), C (red)
  * lanes land on top of each other, a singlet's fan out — which is the point.
  */
 export const LANE_DELTA = [0, 0.69, -0.31];
-/** Points per ray: launch + one per surface (max 10) + image plane. */
-export const MAX_PTS = 12;
+/** Points per ray: launch + one per surface (max 12) + image plane. */
+export const MAX_PTS = 14;
 /** On-axis fan used at load to find best focus; separate from the live
  *  RAYS so the derived focus numbers do not move with the display density. */
 const FAN_RAYS = 15;

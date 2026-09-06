@@ -25,9 +25,10 @@ Every bench number is derived from the prescription at load
   focus*: the on-axis fan at full aperture is traced once and the RMS spot is
   scanned along the bench; its minimum is the circle of least confusion,
   which sits ahead of the paraxial focus by the lens's spherical aberration
-  (0.6 mm on the achromat, 3.7 mm on the f/1.35 condenser). The three
-  original fixtures had typed image distances 7, 20 and 28 mm past focus —
-  the "IMG" line showed a blur, not a spot.
+  (0.6 mm on the achromat, 3.7 mm on the f/1.35 condenser). The original
+  achromat fixture had a typed image distance 7 mm past focus — the "IMG"
+  line showed a blur, not a spot. The two Zemax samples ship at best focus
+  already, and the scan lands within 0.03 mm of their own image distances.
 - **Focus marker.** The same scan finds an *internal* focus for an afocal
   pair (the Keplerian's crossing between the lenses, 50.9 mm in) and the
   bloom and note-arrival flare sit there while the screen still shows the
@@ -39,7 +40,8 @@ Every bench number is derived from the prescription at load
 - **Fan height.** Bisection on the real trace finds the tallest on-axis ray
   that clears every clear aperture (backed off by 0.2% so the rim ray
   survives single-precision storage), then the published f-number caps it
-  (fixture stops are often oversized; the Double Gauss passes f/1.1). The low
+  (the achromat's fixture apertures would pass f/4 exactly; the Zemax
+  samples' f/5 and f/2.99 are their entrance-pupil diameters). The low
   band swings the pupil between 70% and 100% of that, so the loudest state is
   the lens wide open with no vignetting on axis.
 - **Readouts.** The title strip shows the traced EFL, BFL and working
@@ -50,8 +52,8 @@ Every bench number is derived from the prescription at load
 | Design | Scale k | EFL | Paraxial BFL | Fan cap | Best focus from last vertex | RMS spot paraxial → best |
 |---|---|---|---|---|---|---|
 | Achromat doublet | 1.085 | 100.0 | 96.81 | f/4 (h 12.5) | 96.25 | 0.049 → 0.019 mm |
-| Cooke triplet | 1.516 | 50.0 | 37.18 | f/4 (h 6.25) | 36.56 | 0.051 → 0.020 mm |
-| Double Gauss | 1.832 | 50.0 | 22.18 | f/2 (h 12.5) | 21.10 | 0.19 → 0.076 mm |
+| Cooke triplet | 1.000 | 50.0 | 42.42 | f/5 (h 5.0) | 42.22 (sample: 42.21) | 0.013 → 0.004 mm |
+| Double Gauss | 1.000 | 99.5 | 57.50 | f/2.99 (h 16.67) | 57.28 (sample: 57.31) | 0.024 → 0.008 mm |
 | Fast condenser | 1.000 | 30.0 | 24.68 | clear aperture, f/1.35 | 20.99 | 1.14 → 0.43 mm |
 | Diverging fan | — | −50.0 | −52.31 | clear aperture | virtual, z −46.8 | — |
 | Keplerian pair | — | afocal | — | clear aperture | internal, z 50.85 | 0.14 mm |
@@ -73,22 +75,22 @@ the stop.
 - **Stop.** The surface flagged `stop`, else the front surface. `stopHalf` is
   the height at the stop of the on-axis ray launched at the fan height: the
   working pupil, expressed where the stop is, so every field samples the same
-  aperture (Double Gauss: 9.9 mm at the stop for the f/2 fan, well inside its
-  oversized 18.3 mm fixture stop).
+  aperture (Double Gauss: 9.95 mm at the stop for the f/2.99 fan against a
+  10.23 mm stop semi-diameter; Zemax reports the same stop radius, 9.997).
 - **Aiming.** For each field two reference rays, seeded from the paraxial map
   `y_stop = M·y₁ + N·u` (M, N traced once per design), fix an affine
   launch-height map `y₁(y_stop)`; eleven rays are launched at pupil
   coordinates p·stopHalf·fill for p ∈ [−1, 1], and one secant step puts the
   chief ray through the stop centre to better than a micron. The map is exact
-  to aberration level (≤0.07 mm at the stop on the photographic designs,
-  0.35 mm on the f/1.35 condenser). If a reference ray dies before the stop
+  to aberration level (≤0.11 mm at the stop on the Cooke, 0.36 mm at 14° on
+  the Double Gauss and on the f/1.35 condenser). If a reference ray dies before the stop
   the paraxial map is used for that frame, so no field is ever empty. The F
   and C lanes reuse the d-line launch heights: a white-light entry ray
   disperses, a bench aims at d.
 - **Vignetting.** Rays that clip elsewhere die exactly as on axis (dimmed
-  stubs). Off axis that is the real vignetting of the design; the scaled
-  photographic fixtures are generous enough that nothing clips at their max
-  fields, the singlets lose their rim ray.
+  stubs). Off axis that is the real vignetting of the design: the Double
+  Gauss loses a rim ray at 14° exactly as the Zemax sample does, the Cooke
+  passes its whole f/5 pupil out to 20°, the singlets lose their rim ray.
 - **Tangential focus.** Per field, in closed form: with each surviving ray's
   exit segment `y = a + b·z`, the spread across rays is quadratic in z and its
   minimum is `z* = −cov(a, b) / var(b)`. It is rejected when fewer than three
@@ -100,8 +102,9 @@ the stop.
   RMS minimum of the live meridional fan, not a Coddington trace, and it
   moves with the pupil fill (the low band) because the circle of least
   confusion of an aberrated fan is aperture-dependent; the numbers below
-  are at full fill. At full field it reads −0.48 mm (achromat, 3°), −0.88
-  (Cooke, 7°), −1.80 (Double Gauss, 10°), inward as expected. The
+  are at full fill. At full field it reads −0.48 mm (achromat, 3°), +0.17
+  (Cooke, 20°) and −0.05 (Double Gauss, 14°) — the two anastigmats are
+  flat-field designs, and the bench shows it. The
   condenser reads +0.56 (4°), the other way: that is not field curvature
   (a stop-at-lens singlet has near-zero third-order coma and a Petzval sag
   of ~−0.04 mm here) but the focus shift of a fan whose rim ray has died
@@ -111,7 +114,8 @@ the stop.
   ray's at the bench's *actual* image plane (`chiefGain` per unit slope, traced
   at load). `efl·tan θ` is the wrong baseline here: the image plane sits ahead
   of paraxial focus by the spherical aberration, and naive f·tanθ would read
-  −12.8% on the condenser where the true figure is −0.03%. Ticks at IMG show
+  −12.8% on the condenser where the true figure is −0.03%. The Double Gauss
+  reads −0.87% (barrel) at 14°, the Cooke +0.07% at 20°. Ticks at IMG show
   the ideal and actual chief-ray heights; the F/C chief rays sit beside them
   while the highs hold the lanes open (lateral colour).
 - **Ray-fan inset.** On canvases 560×360 and larger, three panels bottom-left
@@ -123,6 +127,35 @@ the stop.
   travel different bundles; kicks flood the on-axis marginal pair and chief,
   snares fire the two full-field chief rays through the stop centre, and each
   field blooms at its own focus when its rays arrive.
+
+## Photographic objectives (Zemax samples, replaced September 6, 2026)
+
+The original Cooke and Double Gauss entries were rustoptic import fixtures
+that an optical review found not to be what their labels said (a five-surface
+"triplet" with a cemented rear, a "Double Gauss" with the stop buried inside
+the front flint and no rear flint). Both were replaced with the sample
+prescriptions that ship with Zemax OpticStudio under
+`Samples/Sequential/Objectives`, read from public mirrors of the files:
+
+- **Cooke triplet** — `Cooke 40 degree field.zmx`
+  ([mirror](https://github.com/xzos/PyZDDE/blob/master/ZMXFILES/Cooke_40_degree_field.zmx)).
+  Radii +22.0136 / −435.760 / −22.2133 / +20.2919 / +79.6836 / −18.3953,
+  thicknesses 3.259 / 6.008 / 1.000 / 4.750 / 2.952 / 42.208, SK16 / F2 /
+  SK16, semi-diameters 9.5 / 9.5 / 5 / 5 / 7.5 / 7.5, stop on the flint's
+  rear face, entrance pupil 10 mm (f/5), fields 0 / 14 / 20°. Paraxial EFL
+  traces to 50.02.
+- **Double Gauss** — `Double Gauss 28 degree field.zmx`
+  ([mirror with Zemax's own report](https://github.com/fmannan/LensSimulator/blob/master/LensPrescription/DGauss28DegField_Zemax.txt)).
+  Radii +54.153 / +152.522 / +35.951 / ∞ / +22.27 / stop / −25.685 / ∞ /
+  −36.98 / +196.417 / −67.148, thicknesses 8.747 / 0.5 / 14.0 / 3.777 /
+  14.253 / 12.428 / 3.777 / 10.834 / 0.5 / 6.858 / 57.305, N-SK2 / N-SK16 /
+  F5 / F5 / N-SK16 / N-SK16, semi-diameters half the sample's surface
+  diameters, entrance pupil 33.33 mm, half field 14°. Zemax reports EFL
+  99.50068, BFL 57.49797, working f/2.98; the bench's paraxial trace gives
+  99.50 / 57.50.
+
+Glass constants are Schott catalog values at the d line: SK16 1.62041 /
+60.32, F2 1.62004 / 36.37, N-SK2 1.60738 / 56.65, F5 1.60342 / 38.03.
 
 ## Added designs (researched September 4, 2026)
 
@@ -180,13 +213,13 @@ gives n_d = 1.51680 and V_d = 64.17; all three added designs use these values.
 
 ## Integration and validation
 
-The three additions follow the original achromat, Cooke, and Double Gauss in
-the 16-bar rotation. The title block shows the current design number. Existing
-prescriptions retain their original data; this research did not revalidate
-their historical attribution.
+The three Edmund additions follow the achromat, Cooke, and Double Gauss in
+the 16-bar rotation. The title block shows the current design number. The
+achromat retains its original fixture data; the Cooke and Double Gauss are
+the Zemax samples above.
 
-All six designs stay within the 165-ray / 12-point buffers (3 lanes × 5
-fields × 11 rays). The original numerical checks covered three viewport
+All six designs stay within the 165-ray / 14-point buffers (3 lanes × 5
+fields × 11 rays; the Double Gauss's 11 surfaces need 13 points per ray). The original numerical checks covered three viewport
 sizes, low/mid/high extremes, and both field limits: 648 render scenarios
 with finite coordinates, 15/15 reference rays on axis at the quiet aperture
 setting. The field-point work was checked by tracing every design at full

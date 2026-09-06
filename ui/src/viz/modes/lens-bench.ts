@@ -120,7 +120,7 @@ class LensBenchMode implements VizMode {
 
     /**
      * 2D meridional trace, re-run every frame: five fields × three lanes ×
-     * eleven rays plus three aiming rays per field, ≤10 surfaces of
+     * eleven rays plus three aiming rays per field, ≤12 surfaces of
      * quadratic math each — trivially cheap, and it buys continuous field
      * and chromatic animation with zero cache invalidation. Each field's
      * bundle is a collimated beam at its field angle — the design's own
