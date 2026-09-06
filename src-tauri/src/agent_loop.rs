@@ -132,7 +132,7 @@ pub async fn run_agent_loop(
         let session = state.session.lock();
         session.current_pattern.clone()
     };
-    let system_prompt = if let Some(code) = &current_code {
+    let mut system_prompt = if let Some(code) = &current_code {
         format!(
             "{}\n\n## Current editor code (what the user hears right now)\n\n```\n{}\n```\n\n\
              When the user asks to modify, add to, or expand the song, work from this code. \
@@ -142,6 +142,7 @@ pub async fn run_agent_loop(
     } else {
         SYSTEM_PROMPT.clone()
     };
+    system_prompt.push_str(&policy_prompt(*state.agent_policy.lock()));
 
     let mut full_text = String::new();
     // Compact record of every tool this turn called, persisted onto the
@@ -295,6 +296,87 @@ pub async fn run_agent_loop(
     });
 
     Ok((full_text, turn_tools))
+}
+
+/// The write-policy rules the model is told, matching what the tools enforce.
+/// Empty under the leeway policy, so the eval's two arms differ only here and
+/// in the tools' refusals.
+fn policy_prompt(policy: crate::state::AgentPolicy) -> String {
+    let mut s = String::new();
+    if policy.advisory_notes {
+        s.push_str(
+            "\n\n## Review notes\n`[note]` findings in a review (hot-mix, masking, balance) are \
+             observations, not defects: mention them to the user if relevant, and do NOT rewrite a \
+             section or track to chase them unless the user asked about the mix — hear_pattern \
+             measures it. Only `[warn]` lines need fixing before play.",
+        );
+    }
+    if policy.rewrite_cap < usize::MAX {
+        s.push_str(&format!(
+            "\n\n## Rewrite budget\nEach section, track or binding may be rewritten at most \
+             {} time(s) per request. After that, play what is there and let the user judge; \
+             a further rewrite of the same target is refused.",
+            policy.rewrite_cap
+        ));
+    }
+    s
+}
+
+/// Refuse a rewrite of any target already at this request's cap. Only
+/// *applied* rewrites count (a NOT APPLIED attempt must be retryable), so the
+/// third successful take of one section in a request is the cut.
+fn rewrite_budget_block(state: &AppState, targets: &[&str]) -> Option<ToolOutcome> {
+    let cap = state.agent_policy.lock().rewrite_cap;
+    let w = state.agent_write.lock();
+    let over: Vec<String> = targets
+        .iter()
+        .map(|t| rewrite_key(t))
+        .filter(|k| w.rewrites.get(k).copied().unwrap_or(0) >= cap)
+        .map(|k| format!("@{k}"))
+        .collect();
+    if over.is_empty() {
+        return None;
+    }
+    Some(ToolOutcome::failed(
+        ToolCategory::BudgetExhausted,
+        format!(
+            "Rewrite budget used for {} — each section/track may be rewritten at most {cap} \
+             time(s) per request, and it has been. Play what is there (play_pattern with no \
+             code) and let the user judge; edit it again only when they ask.",
+            over.join(", ")
+        ),
+    ))
+}
+
+/// Count an applied rewrite of each target.
+fn record_rewrites(state: &AppState, targets: &[&str]) {
+    let mut w = state.agent_write.lock();
+    for t in targets {
+        *w.rewrites.entry(rewrite_key(t)).or_insert(0) += 1;
+    }
+}
+
+fn rewrite_key(target: &str) -> String {
+    target.trim().trim_start_matches('@').to_ascii_lowercase()
+}
+
+/// `apply_document` for a targeted write: the cap check before, the count
+/// after a successful apply.
+fn apply_rewrite(
+    state: &AppState,
+    event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    targets: &[&str],
+    new_code: &str,
+    lead: &str,
+) -> ToolResult {
+    if let Some(blocked) = rewrite_budget_block(state, targets) {
+        return Ok(blocked);
+    }
+    let out = apply_document(state, event_tx, new_code, lead)?;
+    if out.ok {
+        record_rewrites(state, targets);
+    }
+    Ok(out)
 }
 
 /// Execute a tool by name.
@@ -1143,6 +1225,14 @@ pub(crate) fn review_code(code: &str, cycles: usize, state: &AppState) -> ToolOu
                      (play_pattern with no code reuses this buffer after a clean re-review)."
                 )
             });
+            let notes = found.iter().filter(|f| f.severity == "note").count();
+            if notes > 0 && state.agent_policy.lock().advisory_notes {
+                text.push_str(&format!(
+                    "\n{notes} [note] line(s) above are observations, not defects — mention them to \
+                     the user if relevant; do not rewrite for them unless they asked about the mix \
+                     (hear_pattern measures it)."
+                ));
+            }
             ToolOutcome::ok(summary, text).with_warnings(findings(&found))
         }
     }
@@ -1680,6 +1770,18 @@ fn apply_document(
         session.set_pattern(code.clone());
         session.playback = PlaybackState::Playing;
     }
+    // The document just changed, so a buffer reviewed earlier in this
+    // request is stale: a later `play_pattern()` must fall through to the
+    // editor, not replay the pre-edit review (the eval caught a whole
+    // request's edits silently reverted this way).
+    {
+        let mut w = state.agent_write.lock();
+        if w.last_reviewed_code.as_deref() != Some(code.as_str()) {
+            w.last_reviewed_code = None;
+            w.last_review_hash = None;
+            w.last_review_result = None;
+        }
+    }
     let _ = event_tx.send(AgentEvent::UiAction {
         name: "__set_code_and_play".to_string(),
         payload: code.clone(),
@@ -1792,11 +1894,15 @@ fn tool_upsert_track(
     let id = req_str(input, "id")?;
     let expr = req_str(input, "code")?;
     let code = current_document(state)?;
+    if let Some(blocked) = rewrite_budget_block(state, &[id]) {
+        return Ok(blocked);
+    }
     let (new_code, wrote) = cycletron_doc::tracks::upsert_track(&code, id, expr)?;
     state.stamp_write_kind("track");
-    apply_document(
+    apply_rewrite(
         state,
         event_tx,
+        &[wrote.as_str()],
         &new_code,
         &format!("Track @{wrote} updated (other tracks unchanged)."),
     )
@@ -1809,12 +1915,18 @@ fn tool_upsert_tracks(
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> ToolResult {
     let patches = parse_id_code_patches(input)?;
+    let ids: Vec<&str> = patches.iter().map(|(id, _)| id.as_str()).collect();
+    if let Some(blocked) = rewrite_budget_block(state, &ids) {
+        return Ok(blocked);
+    }
     let code = current_document(state).unwrap_or_default();
     let (new_code, wrote) = cycletron_doc::tracks::upsert_tracks(&code, &patches)?;
     state.stamp_write_kind("track");
-    apply_document(
+    let wrote_ids: Vec<&str> = wrote.iter().map(String::as_str).collect();
+    apply_rewrite(
         state,
         event_tx,
+        &wrote_ids,
         &new_code,
         &format!(
             "{} track(s) updated: {}.",
@@ -1837,11 +1949,15 @@ fn tool_upsert_section(
     let id = req_str(input, "id")?;
     let expr = req_str(input, "code")?;
     let code = current_document(state)?;
+    if let Some(blocked) = rewrite_budget_block(state, &[id]) {
+        return Ok(blocked);
+    }
     let (new_code, wrote) = cycletron_doc::sections::upsert_section(&code, id, expr)?;
     state.stamp_write_kind("section");
-    apply_document(
+    apply_rewrite(
         state,
         event_tx,
+        &[wrote.as_str()],
         &new_code,
         &format!("Section @{wrote} updated (other sections unchanged)."),
     )
@@ -1854,12 +1970,18 @@ fn tool_upsert_sections(
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
 ) -> ToolResult {
     let patches = parse_id_code_patches(input)?;
+    let ids: Vec<&str> = patches.iter().map(|(id, _)| id.as_str()).collect();
+    if let Some(blocked) = rewrite_budget_block(state, &ids) {
+        return Ok(blocked);
+    }
     let code = current_document(state)?;
     let (new_code, wrote) = cycletron_doc::sections::upsert_sections(&code, &patches)?;
     state.stamp_write_kind("section");
-    apply_document(
+    let wrote_ids: Vec<&str> = wrote.iter().map(String::as_str).collect();
+    apply_rewrite(
         state,
         event_tx,
+        &wrote_ids,
         &new_code,
         &format!(
             "{} section(s) updated: {}.",
@@ -1883,11 +2005,15 @@ fn tool_upsert_binding(
     let name = req_str(input, "name")?;
     let expr = req_str(input, "code")?;
     let code = current_document(state)?;
+    if let Some(blocked) = rewrite_budget_block(state, &[name]) {
+        return Ok(blocked);
+    }
     let (new_code, wrote) = cycletron_doc::structure::upsert_binding(&code, name, expr)?;
     state.stamp_write_kind("binding");
-    apply_document(
+    apply_rewrite(
         state,
         event_tx,
+        &[wrote.as_str()],
         &new_code,
         &format!("Binding `{wrote}` updated (rest of the document unchanged)."),
     )
@@ -2283,6 +2409,103 @@ mod write_path_tests {
     }
 
     #[test]
+    fn play_without_code_after_an_edit_plays_the_edit_not_the_stale_review() {
+        let song = r#"
+setbpm(120);
+"<a@1 b@1>".slow(2).pickRestart({
+  a: s("bd*4"),
+  b: s("sd*2")
+})
+"#;
+        let s = state_with_code(song);
+        assert!(tool_review_pattern(&json!({}), &s).unwrap().ok);
+        assert_eq!(s.last_reviewed_code().as_deref(), Some(song));
+        let out =
+            tool_upsert_section(&json!({"id": "b", "code": r#"s("hh*8")"#}), &s, &sink()).unwrap();
+        assert!(out.ok, "{out:?}");
+        assert!(
+            s.last_reviewed_code().is_none(),
+            "an applied edit retires the reviewed buffer"
+        );
+        let played = tool_play_pattern(&json!({"review": false}), &s, &sink()).unwrap();
+        assert!(played.ok, "{played:?}");
+        let doc = s.session.lock().current_pattern.clone().unwrap();
+        assert!(
+            doc.contains(r#"b: s("hh*8")"#),
+            "play must keep the edit: {doc}"
+        );
+    }
+
+    #[test]
+    fn third_rewrite_of_one_section_is_refused_and_resets_per_run() {
+        let song = r#"
+setbpm(120);
+"<a@1 b@1>".slow(2).pickRestart({
+  a: s("bd*4"),
+  b: s("sd*2")
+})
+"#;
+        let s = state_with_code(song);
+        let take = |code: &str| {
+            tool_upsert_section(&json!({"id": "b", "code": code}), &s, &sink()).unwrap()
+        };
+        assert!(take(r#"s("hh*8")"#).ok);
+        // A NOT APPLIED attempt does not count: the model must be able to fix it.
+        let bad = take("s(\"hh*8\").nope(((");
+        assert_eq!(bad.category, Some(ToolCategory::NotApplied));
+        assert!(take(r#"s("hh*4")"#).ok);
+        let third = take(r#"s("hh*2")"#);
+        assert_eq!(
+            third.category,
+            Some(ToolCategory::BudgetExhausted),
+            "{third:?}"
+        );
+        assert!(!third.retryable);
+        assert!(third.text.contains("@b"), "{}", third.text);
+        // Another target is unaffected, and the batch form checks every id.
+        assert!(take_other(&s).ok);
+        let batch = tool_upsert_sections(
+            &json!({"patches": [{"id": "a", "code": r#"s("bd*2")"#}, {"id": "b", "code": r#"s("cp")"#}]}),
+            &s,
+            &sink(),
+        )
+        .unwrap();
+        assert_eq!(batch.category, Some(ToolCategory::BudgetExhausted));
+        // A new user message resets the budget.
+        s.reset_agent_write_run();
+        assert!(take(r#"s("hh")"#).ok);
+
+        fn take_other(s: &AppState) -> ToolOutcome {
+            tool_upsert_section(&json!({"id": "a", "code": r#"s("bd*8")"#}), s, &sink()).unwrap()
+        }
+    }
+
+    #[test]
+    fn leeway_policy_never_refuses_and_drops_the_advisory_line() {
+        let song =
+            "setbpm(120);\n\"<a@1 b@1>\".slow(2).pickRestart({ a: s(\"bd*4\"), b: s(\"sd*2\") })\n";
+        let s = state_with_code(song);
+        *s.agent_policy.lock() = crate::state::AgentPolicy::LEEWAY;
+        for i in 0..4 {
+            let out = tool_upsert_section(
+                &json!({"id": "b", "code": format!("s(\"hh*{}\")", i + 1)}),
+                &s,
+                &sink(),
+            )
+            .unwrap();
+            assert!(out.ok, "take {i}: {out:?}");
+        }
+        // Masking notes exist in this mix; the leeway review does not frame them.
+        let doc = r#"stack(note("a2 e2").s("sawtooth").lpf(300).gain(0.6), note("<[c4,e4,g4]>").s("wt_strings").gain(0.8), note("<e4 g4>").s("wt_choir").lpf(4200).gain(0.5))"#;
+        let r = review_code(doc, 4, &s);
+        assert!(r.warnings.iter().any(|w| w.severity == "note"), "{r:?}");
+        assert!(!r.text.contains("observations, not defects"));
+        *s.agent_policy.lock() = crate::state::AgentPolicy::default();
+        let r = review_code(doc, 4, &s);
+        assert!(r.text.contains("observations, not defects"), "{}", r.text);
+    }
+
+    #[test]
     fn full_play_blocked_after_list_sections_unless_force() {
         let song = r#"setbpm(120);
 const sections = {
@@ -2657,8 +2880,8 @@ mod session_history_tests {
 
 /// Headless agent eval: run real prompts through the real loop against the
 /// configured provider and print what the agent did — every tool row with its
-/// outcome category and timing, the final reply, and a review of the song it
-/// left in the editor. Each song is written to `_eval/<slug>.strudel`.
+/// outcome category and timing, the reply, and a review of the song it
+/// left in the editor. Each song is written to `_eval/<arm>/<slug>.strudel`.
 ///
 /// Uses the app's own data dir (settings, provider key / OAuth, corpus), so a
 /// debug build reads `provider-keys.json` there. Run with:
@@ -2666,10 +2889,14 @@ mod session_history_tests {
 ///   cargo test -p cycletron-app agent_eval -- --ignored --nocapture
 ///
 /// Env: `CYCLETRON_EVAL_PROMPTS` (`;`-separated; default: five genre briefs),
+/// `CYCLETRON_EVAL_SEED` (a `.strudel` file loaded into the editor before every
+/// prompt, so the prompts are edit requests), `CYCLETRON_EVAL_ARMS`
+/// (`guardrails`, `leeway`, or both comma-separated; default `guardrails`),
 /// `CYCLETRON_EVAL_DATA_DIR`, `CYCLETRON_EVAL_OUT`.
 #[cfg(test)]
 mod agent_eval {
     use super::*;
+    use crate::state::AgentPolicy;
     use cycletron_core::session::Session;
     use std::path::PathBuf;
     use std::time::Instant;
@@ -2695,6 +2922,25 @@ mod agent_eval {
             .to_string()
     }
 
+    fn policy_for(arm: &str) -> AgentPolicy {
+        match arm {
+            "leeway" => AgentPolicy::LEEWAY,
+            "guardrails" => AgentPolicy::default(),
+            other => panic!("unknown arm '{other}' (guardrails | leeway)"),
+        }
+    }
+
+    /// What one prompt cost and left behind.
+    #[derive(Default)]
+    struct Run {
+        calls: usize,
+        fails: Vec<String>,
+        blocked: usize,
+        code_chars: usize,
+        rewrites: std::collections::BTreeMap<String, usize>,
+        tool_ms: u64,
+    }
+
     #[tokio::test]
     #[ignore = "manual eval — talks to the configured LLM provider"]
     async fn agent_eval() {
@@ -2708,19 +2954,28 @@ mod agent_eval {
         let out_dir = std::env::var("CYCLETRON_EVAL_OUT")
             .map(PathBuf::from)
             .unwrap_or_else(|_| workspace.join("_eval"));
-        std::fs::create_dir_all(&out_dir).unwrap();
         let prompts: Vec<String> = std::env::var("CYCLETRON_EVAL_PROMPTS")
             .unwrap_or_else(|_| DEFAULT_PROMPTS.to_string())
             .split(';')
             .map(|p| p.trim().to_string())
             .filter(|p| !p.is_empty())
             .collect();
+        let seed = std::env::var("CYCLETRON_EVAL_SEED")
+            .ok()
+            .map(|p| std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("seed {p}: {e}")));
+        let arms: Vec<String> = std::env::var("CYCLETRON_EVAL_ARMS")
+            .unwrap_or_else(|_| "guardrails".to_string())
+            .split(',')
+            .map(|a| a.trim().to_string())
+            .filter(|a| !a.is_empty())
+            .collect();
 
         let state = AppState::new();
         state.initialize(data_dir).expect("initialize app state");
-        *state.sample_paths.lock() = Some(cycletron_render::SampleSetPaths::Cycletron {
+        let samples = cycletron_render::SampleSetPaths::Cycletron {
             manifest: workspace.join("ui/public/cycletron.strudel.json"),
-        });
+        };
+        *state.sample_paths.lock() = Some(samples.clone());
         let active = state.user_settings.lock().llm.active.clone();
         if crate::oauth::refresh_if_stale(&active).await {
             state.rebuild_agent_client();
@@ -2738,113 +2993,202 @@ mod agent_eval {
             .model
             .clone();
         eprintln!(
-            "== agent eval: provider={active} model={model} prompts={} ==",
-            prompts.len()
+            "== agent eval: provider={active} model={model} prompts={} arms={} seed={} ==",
+            prompts.len(),
+            arms.join(","),
+            seed.as_ref()
+                .map_or("none".to_string(), |s| format!("{} chars", s.len()))
         );
 
         let mut rows: Vec<String> = Vec::new();
-        for prompt in &prompts {
-            eprintln!("\n### {prompt}");
-            let tempo = state.config.lock().audio.default_tempo;
-            *state.session.lock() = Session::new(tempo);
-            let messages = {
-                let mut s = state.session.lock();
-                s.add_user_message(prompt.clone());
-                s.messages.clone()
-            };
+        for arm in &arms {
+            *state.agent_policy.lock() = policy_for(arm);
+            let arm_dir = out_dir.join(arm);
+            std::fs::create_dir_all(&arm_dir).unwrap();
+            let mut totals = Run::default();
+            let mut total_wall = 0.0f64;
 
-            let (tx, mut rx) = mpsc::unbounded_channel();
-            let printer = tokio::spawn(async move {
-                let mut calls = 0usize;
-                let mut fails: Vec<String> = Vec::new();
-                let mut tool_ms = 0u64;
-                while let Some(ev) = rx.recv().await {
-                    match ev {
-                        AgentEvent::ToolCall { name, input, .. } => {
-                            let compact = crate::telemetry::truncate(
-                                &serde_json::to_string(&input).unwrap_or_default(),
-                                110,
-                            );
-                            eprintln!("  ⚙ {name} {compact}");
-                        }
-                        AgentEvent::ToolResult {
-                            name,
-                            outcome,
-                            duration_ms,
-                            ..
-                        } => {
-                            calls += 1;
-                            tool_ms += duration_ms;
-                            let cat = outcome
-                                .category
-                                .map(|c| format!(" [{}]", c.as_str()))
-                                .unwrap_or_default();
-                            if !outcome.ok {
-                                fails.push(format!("{name}{cat}"));
+            for prompt in &prompts {
+                eprintln!("\n### [{arm}] {prompt}");
+                let tempo = state.config.lock().audio.default_tempo;
+                let mut session = Session::new(tempo);
+                if let Some(code) = &seed {
+                    session.set_pattern(code.clone());
+                }
+                *state.session.lock() = session;
+                let messages = {
+                    let mut s = state.session.lock();
+                    s.add_user_message(prompt.clone());
+                    s.messages.clone()
+                };
+
+                let (tx, mut rx) = mpsc::unbounded_channel();
+                let printer = tokio::spawn(async move {
+                    let mut run = Run::default();
+                    while let Some(ev) = rx.recv().await {
+                        match ev {
+                            AgentEvent::ToolCall { name, input, .. } => {
+                                let compact = crate::telemetry::truncate(
+                                    &serde_json::to_string(&input).unwrap_or_default(),
+                                    110,
+                                );
+                                eprintln!("  ⚙ {name} {compact}");
+                                run.code_chars +=
+                                    crate::telemetry::code_chars_of(&input).unwrap_or(0);
+                                if name.starts_with("upsert_") {
+                                    let ids: Vec<String> = input["patches"]
+                                        .as_array()
+                                        .map(|a| {
+                                            a.iter()
+                                                .filter_map(|p| p["id"].as_str().map(String::from))
+                                                .collect()
+                                        })
+                                        .unwrap_or_else(|| {
+                                            input["id"]
+                                                .as_str()
+                                                .or(input["name"].as_str())
+                                                .map(|s| vec![s.to_string()])
+                                                .unwrap_or_default()
+                                        });
+                                    for id in ids {
+                                        *run.rewrites.entry(rewrite_key(&id)).or_insert(0) += 1;
+                                    }
+                                }
                             }
-                            eprintln!(
-                                "  {} {name} — {}{cat} ({duration_ms} ms)",
-                                if outcome.ok { "✓" } else { "✗" },
-                                outcome.summary
-                            );
+                            AgentEvent::ToolResult {
+                                name,
+                                outcome,
+                                duration_ms,
+                                ..
+                            } => {
+                                run.calls += 1;
+                                run.tool_ms += duration_ms;
+                                let cat = outcome
+                                    .category
+                                    .map(|c| format!(" [{}]", c.as_str()))
+                                    .unwrap_or_default();
+                                if !outcome.ok {
+                                    run.fails.push(format!("{name}{cat}"));
+                                }
+                                if outcome.category == Some(ToolCategory::BudgetExhausted)
+                                    && name.starts_with("upsert_")
+                                {
+                                    run.blocked += 1;
+                                }
+                                eprintln!(
+                                    "  {} {name} — {}{cat} ({duration_ms} ms)",
+                                    if outcome.ok { "✓" } else { "✗" },
+                                    outcome.summary
+                                );
+                            }
+                            AgentEvent::Error { message } => eprintln!("  !! {message}"),
+                            _ => {}
                         }
-                        AgentEvent::Error { message } => eprintln!("  !! {message}"),
-                        _ => {}
                     }
-                }
-                (calls, fails, tool_ms)
-            });
+                    run
+                });
 
-            let started = Instant::now();
-            let result = run_agent_loop(client.as_ref(), &messages, &state, tx).await;
-            let wall = started.elapsed().as_secs_f64();
-            let (calls, fails, tool_ms) = printer.await.unwrap();
+                let started = Instant::now();
+                let result = run_agent_loop(client.as_ref(), &messages, &state, tx).await;
+                let wall = started.elapsed().as_secs_f64();
+                let run = printer.await.unwrap();
 
-            let reply = match result {
-                Ok((text, tools)) => {
-                    state
-                        .session
-                        .lock()
-                        .add_assistant_message_with_tools(text.clone(), tools);
-                    text
-                }
-                Err(e) => format!("AGENT ERROR: {e}"),
-            };
-            let reply_preview: String = reply.replace('\n', " ").chars().take(240).collect();
-            eprintln!("  ↳ {reply_preview}");
+                let reply = match result {
+                    Ok((text, tools)) => {
+                        state
+                            .session
+                            .lock()
+                            .add_assistant_message_with_tools(text.clone(), tools);
+                        text
+                    }
+                    Err(e) => format!("AGENT ERROR: {e}"),
+                };
+                let reply_preview: String = reply.replace('\n', " ").chars().take(240).collect();
+                eprintln!("  ↳ {reply_preview}");
 
-            let code = state.session.lock().current_pattern.clone();
-            let review = match &code {
-                Some(c) => {
-                    let path = out_dir.join(format!("{}.strudel", slug(prompt)));
-                    std::fs::write(&path, c).unwrap();
-                    let r = review_code(c, 8, &state);
-                    let warns = r.warnings.iter().filter(|w| w.severity == "warn").count();
-                    eprintln!(
-                        "  saved {} ({} chars) — {}",
-                        path.display(),
-                        c.len(),
-                        r.summary
-                    );
-                    if !r.ok {
-                        "INVALID".to_string()
+                let code = state.session.lock().current_pattern.clone();
+                let quality = match &code {
+                    Some(c) if seed.as_deref() == Some(c.as_str()) => {
+                        "unchanged from the seed".to_string()
+                    }
+                    Some(c) => {
+                        let path = arm_dir.join(format!("{}.strudel", slug(prompt)));
+                        std::fs::write(&path, c).unwrap();
+                        let r = review_code(c, 8, &state);
+                        let warns = r.warnings.iter().filter(|w| w.severity == "warn").count();
+                        let notes = r.warnings.iter().filter(|w| w.severity == "note").count();
+                        let heard = {
+                            let (c, samples) = (c.clone(), samples.clone());
+                            tokio::task::spawn_blocking(move || {
+                                cycletron_render::hear(
+                                    &c,
+                                    &samples,
+                                    cycletron_render::HearOptions {
+                                        cycles: Some(4),
+                                        stems: false,
+                                        ..cycletron_render::HearOptions::default()
+                                    },
+                                )
+                            })
+                            .await
+                            .unwrap()
+                            .map(|h| h.verdict)
+                            .unwrap_or_else(|e| format!("hear failed: {e}"))
+                        };
+                        eprintln!(
+                            "  saved {} ({} chars) — {} · hear: {heard}",
+                            path.display(),
+                            c.len(),
+                            r.summary
+                        );
+                        if r.ok {
+                            format!(
+                                "{} chars, {warns} warn, {notes} note, hear {heard}",
+                                c.len()
+                            )
+                        } else {
+                            "INVALID".to_string()
+                        }
+                    }
+                    None => "no song in the editor".to_string(),
+                };
+                let repeats: Vec<String> = run
+                    .rewrites
+                    .iter()
+                    .filter(|(_, n)| **n > 1)
+                    .map(|(k, n)| format!("@{k}×{n}"))
+                    .collect();
+                rows.push(format!(
+                    "{arm:<10} {:<34} {:>4.0}s {:>2} tools {:>6} code chars  blocked {}  fails {:<22} repeats {:<16} song: {quality}",
+                    slug(prompt).chars().take(34).collect::<String>(),
+                    wall,
+                    run.calls,
+                    run.code_chars,
+                    run.blocked,
+                    if run.fails.is_empty() {
+                        "none".to_string()
                     } else {
-                        format!("{} chars, {warns} warn(s)", c.len())
-                    }
-                }
-                None => "no song in the editor".to_string(),
-            };
+                        run.fails.join(",")
+                    },
+                    if repeats.is_empty() {
+                        "-".to_string()
+                    } else {
+                        repeats.join(" ")
+                    },
+                ));
+                totals.calls += run.calls;
+                totals.code_chars += run.code_chars;
+                totals.blocked += run.blocked;
+                totals.fails.extend(run.fails);
+                total_wall += wall;
+            }
             rows.push(format!(
-                "{:<44} {:>5.0}s {:>3} tools ({:>5} ms in tools) fails: {:<28} song: {review}",
-                slug(prompt),
-                wall,
-                calls,
-                tool_ms,
-                if fails.is_empty() {
-                    "none".to_string()
-                } else {
-                    fails.join(", ")
-                },
+                "{arm:<10} TOTAL {:>4.0}s {:>3} tools {:>7} code chars  blocked {}  fails {}",
+                total_wall,
+                totals.calls,
+                totals.code_chars,
+                totals.blocked,
+                totals.fails.len()
             ));
         }
 
