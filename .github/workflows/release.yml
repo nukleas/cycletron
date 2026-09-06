@@ -259,10 +259,14 @@ jobs:
   # Runs after the whole build matrix so every job's latest.json merge is done
   # (patching from inside the linux job would race the other uploads).
   fix-appimage:
-    needs: release
+    needs: [create-release, release]
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      # The release is still a draft here, and the REST "get a release by
+      # tag" endpoint only returns published releases (404 for a draft — how
+      # this job failed on its first run, alpha.18). Address it by id.
+      RELEASE_ID: ${{ needs.create-release.outputs.release-id }}
     steps:
       - name: Strip bundled wayland libs, re-sign, patch latest.json
         env:
@@ -279,7 +283,7 @@ jobs:
           # asset-id URLs (a draft has no working browser_download_url) — so
           # re-uploading the AppImage below retires the very id the updater
           # was told to fetch.
-          OLD_ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+          OLD_ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
             --jq ".assets[] | select(.name == \"$NAME\") | .id")
           chmod +x "$APPIMAGE"
           "$APPIMAGE" --appimage-extract >/dev/null
@@ -313,7 +317,7 @@ jobs:
           # changes every run and latest.json has to carry the new one.
           gh release upload "$GITHUB_REF_NAME" "$APPIMAGE" "$APPIMAGE.sig" \
             --clobber --repo "$GITHUB_REPOSITORY"
-          NEW_ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+          NEW_ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
             --jq ".assets[] | select(.name == \"$NAME\") | .id")
           echo "AppImage asset id: $OLD_ID -> $NEW_ID"
           python3 - "$SIG" "$OLD_ID" "$NEW_ID" "$NAME" <<'EOF'
