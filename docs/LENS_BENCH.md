@@ -152,7 +152,14 @@ prescriptions that ship with Zemax OpticStudio under
   F5 / F5 / N-SK16 / N-SK16, semi-diameters half the sample's surface
   diameters, entrance pupil 33.33 mm, half field 14°. Zemax reports EFL
   99.50068, BFL 57.49797, working f/2.98; the bench's paraxial trace gives
-  99.50 / 57.50.
+  99.50 / 57.50. Current OpticStudio releases ship a different lens under
+  the same name (an f/2 re-optimization: +56.20 / +152.29 / +37.68 / ∞ /
+  +24.23 / stop / −28.38 / ∞ / −37.93 / +177.41 / −79.41, N-SSK2 / N-SK2 /
+  F5, EFL 100.00, BFL 61.49 per O'Shea & Bentley, *Designing Optics Using
+  Zemax OpticStudio*, Table 4.2); the older release is used here because
+  its surface diameters are published, which the off-axis vignetting
+  depends on. The retired fixture's 37.68 radius and N-SSK2 came from that
+  newer variant.
 
 Glass constants are Schott catalog values at the d line: SK16 1.62041 /
 60.32, F2 1.62004 / 36.37, N-SK2 1.60738 / 56.65, F5 1.60342 / 38.03.
