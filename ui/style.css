@@ -356,6 +356,7 @@ header {
 .file-menu-btn-caret {
     opacity: 0.7;
     font-size: 10px;
+    font-variant-emoji: text;
 }
 
 .file-menu-popover {
@@ -707,6 +708,152 @@ button.danger:hover:not(:disabled) {
     box-shadow: 0 0 8px rgba(0, 255, 0, 0.3) !important;
 }
 
+/* Inline stroke/fill icons inside buttons (transport, skip, close, HUD). */
+button > svg,
+.btn-icon {
+    display: block;
+    flex-shrink: 0;
+}
+
+/* =========================================================
+   Form controls — radios, checkboxes, selects
+   Port of cyberdesign checkbox.css + select.css onto Cycletron
+   tokens. Native OS chrome (GTK/WebKit accent tiles, Aqua
+   combo-boxes) is replaced so Samples, Prefs, MIDI Lab, and
+   export all share one look.
+   ========================================================= */
+
+input[type="radio"],
+input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    margin: 0;
+    background: rgba(5, 6, 10, 0.82);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    position: relative;
+    vertical-align: middle;
+    transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+input[type="radio"]:hover:not(:disabled),
+input[type="checkbox"]:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--neon) 55%, transparent);
+}
+
+input[type="radio"]:focus-visible,
+input[type="checkbox"]:focus-visible {
+    outline: 1px solid var(--neon);
+    outline-offset: 2px;
+}
+
+input[type="radio"]:disabled,
+input[type="checkbox"]:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+input[type="checkbox"] {
+    border-radius: 0;
+}
+
+input[type="checkbox"]:checked {
+    background: color-mix(in srgb, var(--neon) 20%, transparent);
+    border-color: var(--neon);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--neon) 30%, transparent);
+}
+
+input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 6px;
+    width: 8px;
+    height: 4px;
+    border-left: 1.5px solid var(--neon);
+    border-bottom: 1.5px solid var(--neon);
+    transform: rotate(-45deg) translateY(-2px);
+}
+
+input[type="checkbox"]:indeterminate {
+    background: color-mix(in srgb, var(--neon) 15%, transparent);
+    border-color: color-mix(in srgb, var(--neon) 60%, transparent);
+}
+
+input[type="checkbox"]:indeterminate::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 50%;
+    width: 9px;
+    height: 1.5px;
+    background: var(--neon);
+    transform: translateY(-50%);
+}
+
+input[type="radio"] {
+    border-radius: 50%;
+}
+
+input[type="radio"]:checked {
+    border-color: var(--neon);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--neon) 30%, transparent);
+}
+
+input[type="radio"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    background: var(--neon);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 4px color-mix(in srgb, var(--neon) 60%, transparent);
+}
+
+/* Select: appearance:none + SVG chevron. `select::after` is ignored
+   by WebKit, so the arrow is a background-image instead of the
+   cyberdesign wrap+pseudo pattern. The dropped list is still the
+   OS popup; color-scheme:dark keeps that list from going Aqua-white. */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    color-scheme: dark;
+    height: 26px;
+    padding: 0 28px 0 8px;
+    background-color: rgba(5, 6, 10, 0.82);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23687797' d='M0 1h10L5 6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 8px 5px;
+    color: var(--neon-bright);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+select:hover:not(:disabled):not(:focus) {
+    border-color: color-mix(in srgb, var(--neon) 55%, transparent);
+}
+
+select:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+select option {
+    background: var(--bg-light);
+    color: var(--text);
+}
 
 /* =========================================================
    Editor Panel
@@ -1272,30 +1419,6 @@ button.danger:hover:not(:disabled) {
     box-shadow: inset 0 0 0 1px rgba(255, 43, 214, 0.06), 0 0 18px rgba(71, 246, 255, 0.08);
 }
 
-.viz-controls {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-}
-
-.viz-controls select {
-    background: rgba(5, 6, 10, 0.78);
-    color: var(--neon-bright);
-    border: 1px solid rgba(71, 246, 255, 0.22);
-    padding: 4px 8px;
-    border-radius: 0;
-    font-family: inherit;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.viz-controls select:focus {
-    border-color: var(--neon-subtle);
-    outline: none;
-    box-shadow: 0 0 6px var(--neon-glow);
-}
-
 /* Scope */
 #scope {
     height: 60px;
@@ -1809,8 +1932,13 @@ button.danger:hover:not(:disabled) {
 }
 
 .status-bar .live.indicator-paused::before {
-    content: '⏸';
-    font-size: 10px;
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 9px;
+    border-left: 2.5px solid currentColor;
+    border-right: 2.5px solid currentColor;
+    box-sizing: border-box;
 }
 
 .status-bar .live.indicator-paused::after {
@@ -2668,6 +2796,7 @@ body.is-drop-target::after {
     font-size: 9px;
     transition: transform 0.12s;
     flex-shrink: 0;
+    font-variant-emoji: text;
 }
 .file-tree-row.is-dir.expanded .chevron { transform: rotate(90deg); }
 .file-tree-row.is-file .chevron { visibility: hidden; }
@@ -2941,7 +3070,6 @@ body.is-drop-target::after {
 }
 .midi-lab-track-row input[type="checkbox"] {
     margin: 0;
-    accent-color: var(--neon);
 }
 .midi-lab-track-channel {
     font-size: 10px;
@@ -2975,7 +3103,7 @@ body.is-drop-target::after {
     color: var(--text-secondary);
 }
 .midi-lab-field span { white-space: nowrap; }
-.midi-lab-field select,
+.midi-lab-field select { min-width: 110px; }
 .midi-lab-field input[type="number"] {
     background: rgba(5, 6, 10, 0.78);
     color: var(--neon-bright);
@@ -2987,7 +3115,6 @@ body.is-drop-target::after {
     min-width: 110px;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
-.midi-lab-field select:focus,
 .midi-lab-field input[type="number"]:focus {
     outline: none;
     border-color: var(--neon-subtle);
@@ -3001,7 +3128,7 @@ body.is-drop-target::after {
     justify-content: flex-start;
     gap: 8px;
 }
-.midi-lab-check input[type="checkbox"] { accent-color: var(--neon); margin: 0; }
+.midi-lab-check input[type="checkbox"] { margin: 0; }
 
 .midi-lab-preview {
     padding: 8px 14px 10px;
@@ -3135,6 +3262,7 @@ body.is-drop-target::after {
     border-radius: 0;
     cursor: pointer;
     transition: all 0.15s;
+    gap: 4px;
 }
 .skip-btn:hover:not(:disabled) {
     color: var(--neon);
@@ -3462,7 +3590,6 @@ body.is-drop-target::after {
     border-color: var(--border);
 }
 .cm-panel.cm-search input[type="checkbox"] {
-    accent-color: var(--neon);
     margin-right: 4px;
 }
 .cm-searchMatch {
@@ -3737,7 +3864,7 @@ body.is-drop-target::after {
     width: 22px;
     height: 22px;
     padding: 0;
-    font-size: 16px;
+    gap: 0;
     line-height: 1;
     /* header sets a glitch text-shadow that doubles the glyph; neutralize it here */
     text-shadow: none;
@@ -3745,6 +3872,7 @@ body.is-drop-target::after {
     border-radius: 0;
     transition: all 0.15s;
 }
+.app-modal-close::before { content: none; }
 .app-modal-close:hover {
     background: var(--accent-subtle);
     box-shadow: 0 0 10px var(--neon-glow);
@@ -4013,8 +4141,7 @@ body.is-drop-target::after {
 .prefs-field span { white-space: nowrap; }
 .prefs-field input[type="text"],
 .prefs-field input[type="password"],
-.prefs-field input[type="number"],
-.prefs-field select#prefsProvider {
+.prefs-field input[type="number"] {
     background: rgba(5, 6, 10, 0.78);
     color: var(--neon-bright);
     border: 1px solid var(--border);
@@ -4025,8 +4152,8 @@ body.is-drop-target::after {
     min-width: 220px;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
-.prefs-field input:focus,
-.prefs-field select#prefsProvider:focus {
+.prefs-field select { min-width: 220px; }
+.prefs-field input:not([type="checkbox"]):not([type="radio"]):focus {
     outline: none;
     border-color: var(--neon-subtle);
     box-shadow: 0 0 6px var(--neon-glow);
@@ -4045,7 +4172,8 @@ body.is-drop-target::after {
     flex-direction: column;
     align-items: stretch;
 }
-.prefs-field-wide input { width: 100%; min-width: 0; }
+.prefs-field-wide input,
+.prefs-field-wide select { width: 100%; min-width: 0; }
 .prefs-row {
     display: flex;
     align-items: center;
@@ -4136,10 +4264,16 @@ body.is-drop-target::after {
     height: 22px;
 }
 .prefs-check {
+    display: inline-flex;
+    align-items: center;
     justify-content: flex-start;
     gap: 10px;
+    cursor: pointer;
 }
-.prefs-check input[type="checkbox"] { accent-color: var(--neon); margin: 0; }
+.prefs-check:has(input:disabled) {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
 .prefs-note {
     font-size: 9px;
     color: var(--text-muted);
@@ -4248,6 +4382,7 @@ body.immersive-viz-active #editor .cm-gutters {
     font-size: 10px;
     cursor: pointer;
     transition: all 80ms ease;
+    gap: 0;
 }
 
 .hud-btn:hover {
@@ -4348,6 +4483,7 @@ body.stage-active #fullscreenVizHUD { display: none; }
     text-transform: uppercase;
     cursor: pointer;
     transition: all 0.12s;
+    font-variant-emoji: text;
 }
 
 .header-menu-btn:hover,
@@ -4435,6 +4571,7 @@ body.stage-active #fullscreenVizHUD { display: none; }
     background: none;
     opacity: 0;
     flex-shrink: 0;
+    font-variant-emoji: text;
 }
 
 .dropdown-menu button[aria-checked="true"] {
@@ -4589,6 +4726,8 @@ body.stage-active #fullscreenVizHUD { display: none; }
 .export-modal-field input,
 .export-modal-field select {
     width: 120px;
+}
+.export-modal-field input {
     padding: 6px 8px;
     background: var(--bg);
     border: 1px solid var(--border);
@@ -4597,8 +4736,7 @@ body.stage-active #fullscreenVizHUD { display: none; }
     font-size: 13px;
 }
 
-.export-modal-field input:focus,
-.export-modal-field select:focus {
+.export-modal-field input:focus {
     outline: none;
     border-color: var(--neon);
 }
@@ -4635,7 +4773,8 @@ body.stage-active #fullscreenVizHUD { display: none; }
     white-space: nowrap;
 }
 .export-length-choices input {
-    width: auto;
+    width: 16px;
+    height: 16px;
     padding: 0;
     margin: 0;
 }
@@ -4737,7 +4876,7 @@ body.stage-active #fullscreenVizHUD { display: none; }
     cursor: pointer;
 }
 .packs-row input {
-    margin-top: 3px;
+    margin-top: 1px;
 }
 .packs-row-body {
     display: flex;

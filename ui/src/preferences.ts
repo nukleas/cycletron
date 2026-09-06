@@ -682,7 +682,7 @@ export class PreferencesModal {
             const clear = document.createElement('button');
             clear.className = 'prefs-inline-btn';
             clear.type = 'button';
-            clear.textContent = '✕';
+            clear.textContent = 'Clear';
             clear.setAttribute('data-tooltip', 'Remove binding');
             clear.addEventListener('click', () => {
                 midiPads.setAssignments(midiPads.getAssignments().filter((a) => a.action !== action.id));
