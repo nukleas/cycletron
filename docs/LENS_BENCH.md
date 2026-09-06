@@ -33,11 +33,7 @@ Every bench number is derived from the prescription at load
   instrument (the Keplerian's crossing between the lenses, 50.9 mm in; the
   riflescope's first image behind its objective, 103.6 mm in) and the
   bloom and note-arrival flare sit there while the screen still shows the
-  collimated output. When the fan never converges (the diverging lens) the
-  exit rays' backward extensions are solved by least squares for the
-  *virtual* focus (−46.8 mm, behind the front vertex), drawn as dashed
-  back-projections with the marker labelled VIRTUAL FOCUS; the view widens
-  to include it.
+  collimated output. A fan that never converges gets no focus at all.
 - **Fan height.** Bisection on the real trace finds the tallest on-axis ray
   that clears every clear aperture (backed off by 0.2% so the rim ray
   survives single-precision storage), then the published f-number caps it
@@ -48,9 +44,9 @@ Every bench number is derived from the prescription at load
   the lens wide open with no vignetting on axis.
 - **Readouts.** The title strip shows the traced EFL, BFL and working
   f-number, the design's half-field, and — for focusing designs — the
-  distortion and tangential field curvature at the full field; screen
-  designs show their virtual EFL, or AFOCAL with the traced magnification
-  (exit over entrance beam height, negative when inverting).
+  distortion and tangential field curvature at the full field; afocal
+  designs show AFOCAL with the traced magnification (exit over entrance
+  beam height, negative when inverting).
 - **Exit pupil.** An afocal instrument flagged `exitPupil` gets its screen
   where the paraxial chief ray crosses the axis behind the eyepiece — the
   eye's position, 49.9 mm behind the riflescope's eyepiece — so every
@@ -62,7 +58,7 @@ Every bench number is derived from the prescription at load
 | Cooke triplet | 1.000 | 50.0 | 42.42 | f/5 (h 5.0) | 42.22 (sample: 42.21) | 0.013 → 0.004 mm |
 | Double Gauss | 1.000 | 99.5 | 57.50 | f/2.99 (h 16.67) | 57.28 (sample: 57.31) | 0.024 → 0.008 mm |
 | Riflescope 4×17 | — | afocal, 3.9× | — | 17 mm objective (h 8.5) | internal, z 103.6 | 0.007 mm |
-| Diverging fan | — | −50.0 | −52.31 | clear aperture | virtual, z −46.8 | — |
+| Telephoto | 1.000 | 200.0 | 50.00 | clear aperture, f/7.3 | 47.67 | 0.10 → 0.040 mm |
 | Keplerian pair | — | afocal | — | clear aperture | internal, z 50.85 | 0.14 mm |
 
 ## Field points and pupil aiming
@@ -94,22 +90,23 @@ the stop.
 - **Vignetting.** Rays that clip elsewhere die exactly as on axis (dimmed
   stubs). Off axis that is the real vignetting of the design: the Double
   Gauss loses a rim ray at 14° exactly as the Zemax sample does, the Cooke
-  passes its whole f/5 pupil out to 20°, the diverging singlet loses its
-  rim ray, and the riflescope loses two at its field edge in the eyepiece.
+  passes its whole f/5 pupil out to 20°, the telephoto loses a rim ray at
+  its rear singlet, and the riflescope loses two at its field edge in the
+  eyepiece.
 - **Tangential focus.** Per field, in closed form: with each surviving ray's
   exit segment `y = a + b·z`, the spread across rays is quadratic in z and its
   minimum is `z* = −cov(a, b) / var(b)`. It is rejected when fewer than three
   rays survive, the exit is collimated, or z* lands more than 0.35·zImg from
-  the design's own focus; the afocal pair fits the segment that straddles its
-  internal crossing instead, the diverging lens the exit segments extended
-  backwards to a virtual field curve. The dotted curve through the five foci
+  the design's own focus; an afocal instrument fits the segment that
+  straddles its internal crossing instead. The dotted curve through the five foci
   is the tangential field curvature, drawn straight on the bench. It is the
   RMS minimum of the live meridional fan, not a Coddington trace, and it
   moves with the pupil fill (the low band) because the circle of least
   confusion of an aberrated fan is aperture-dependent; the numbers below
   are at full fill. At full field it reads −0.48 mm (achromat, 3°), +0.17
-  (Cooke, 20°) and −0.05 (Double Gauss, 14°) — the two anastigmats are
-  flat-field designs, and the bench shows it. Beware reading the number on
+  (Cooke, 20°), −0.05 (Double Gauss, 14°) and −0.99 (telephoto, 2.5°) —
+  the two anastigmats are flat-field designs, the telephoto is not, and the
+  bench shows both. Beware reading the number on
   a fan that has lost its rim ray: the circle of least confusion then
   carries less spherical aberration and shifts, which is not field
   curvature. T-CURV and DIST on the strip are teaching readouts, not
@@ -119,7 +116,8 @@ the stop.
   at load). `efl·tan θ` is the wrong baseline here: the image plane sits ahead
   of paraxial focus by the spherical aberration, and naive f·tanθ would
   read percent-level "distortion" on a fast singlet that has none. The Double Gauss
-  reads −0.87% (barrel) at 14°, the Cooke +0.07% at 20°. Ticks at IMG show
+  reads −0.87% (barrel) at 14°, the Cooke +0.07% at 20°, the telephoto
+  +0.91% (pincushion, the telephoto signature) at 2.5°. Ticks at IMG show
   the ideal and actual chief-ray heights; the F/C chief rays sit beside them
   while the highs hold the lanes open (lateral colour).
 - **Ray-fan inset.** On canvases 560×360 and larger, three panels bottom-left
@@ -202,17 +200,28 @@ eyepiece diameters are limited by the form's edge thickness, and that is
 what vignettes the rim rays at the field edge. Fifteen surfaces, so the
 polyline stride is 18 points per ray.
 
-### Diverging fan — EO 45-028
+### Telephoto 200mm — derived assembly (replaced the diverging fan, September 6, 2026)
+
+The EO 45-028 plano-concave singlet held this slot on its own as a
+"diverging fan" with a virtual focus behind it — a correct trace of a lens
+that forms no image, and nothing to look at. The same element now does the
+job a concave lens is bought for (`telephoto()` in `optics.ts`):
 
 Source: [Edmund Optics 25mm diameter, −50mm focal length PCV lens](https://www.edmundoptics.com/p/250mm-dia-x50-fl-uncoated-plano-concave-lens/5540/).
+Published geometry: radius −25.84, planar rear, centre thickness 3.50,
+clear aperture 24.00, N-BK7, EFL −50.00.
 
-Published geometry: front radius −25.84, planar rear, centre thickness 3.50,
-clear aperture 24.00, N-BK7, EFL −50.00, BFL −52.31.
-The bench screen is placed **35mm after the rear vertex**, a chosen display
-distance rather than the negative BFL. The real rays diverge: no positive image
-plane or central focal glow is claimed. Screen ticks and arrival rings mark
-actual ray intersections. A fixed 30mm view semi-height contains the expanding
-fan without zooming with the music. Field: ±4°, a display choice.
+- **Front group:** the Fraunhofer form at EFL 100, the aperture stop.
+- **Rear group:** the EO 45-028 with its plane toward the converging light
+  and the concave face toward the image, placed by bisection on the
+  paraxial trace at the separation (69.5 mm) that stretches the pair to
+  EFL 200.
+- Result: EFL 200.0, BFL 50.0, working f/7.3 at the achromat's clear
+  aperture, 127.7 mm from front vertex to image — a lens 0.64 times as
+  long as its focal length, which is what a negative rear group buys. The
+  flint-free rear singlet leaves lateral colour the F/C lanes show, and
+  the field is curved (−0.99 mm at 2.5°) with +0.9% pincushion, both the
+  honest signature of the form.
 
 ### Keplerian crossover — derived assembly
 
@@ -237,7 +246,7 @@ gives n_d = 1.51680 and V_d = 64.17; all three added designs use these values.
 
 ## Integration and validation
 
-The riflescope and the two Edmund singlets follow the achromat, Cooke, and
+The riflescope, telephoto and Keplerian follow the achromat, Cooke, and
 Double Gauss in the 16-bar rotation. The title block shows the current design number. The
 achromat retains its original fixture data; the Cooke and Double Gauss are
 the Zemax samples above.
@@ -251,7 +260,6 @@ spread and full pupil: every field keeps at least 9 of 11 d-line rays, every
 chief ray crosses the stop centre to <1e-3 mm, every focusing design has a
 finite tangential focus for all five fields, and distortion stays under
 0.3%. Additional checks
-confirmed divergent output for the negative lens, axis crossing and nearly
-parallel paraxial output for the Keplerian pair, and no focal-gradient rendering
-for screen designs. The checks stubbed audio scheduling and canvas rasterization;
+confirmed axis crossing and nearly parallel paraxial output for the Keplerian
+pair, and no focal-gradient rendering at the screen of afocal designs. The checks stubbed audio scheduling and canvas rasterization;
 they do not establish live frame rate or optical manufacturing accuracy.

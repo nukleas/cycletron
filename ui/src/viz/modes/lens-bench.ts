@@ -98,12 +98,10 @@ class LensBenchMode implements VizMode {
         let sdMax = 0;
         for (const surf of design.surfaces) if (surf.sd > sdMax) sdMax = surf.sd;
         const zImg = optics.zImg;
-        const zMin = Number.isFinite(optics.virtualFocusZ)
-            ? Math.min(optics.zStart, optics.virtualFocusZ - 0.06 * zImg)
-            : optics.zStart;
+        const zMin = optics.zStart;
         const zMax = zImg * 1.04;
         // Tall enough for the widest field's bundle, fixed per design.
-        const yMax = design.viewSemiDiameter ?? Math.max(sdMax * 1.3, optics.yExtent);
+        const yMax = Math.max(sdMax * 1.3, optics.yExtent);
         // Blueprint margins for the callout strip and title block, shrunk
         // proportionally so the sidebar-sized canvas still shows a bench.
         const mL = Math.min(48, this.vw * 0.06), mR = mL;
@@ -167,9 +165,9 @@ class LensBenchMode implements VizMode {
 
         // Where each field's fan is tightest: the tangential focus in closed
         // form, anchored on the design's own focus (internal for an afocal
-        // pair, virtual behind a diverging lens). A fan with no focus of its
-        // own is still read at the anchor so the marker follows the rays.
-        const fz = Number.isFinite(optics.focusZ) ? optics.focusZ : optics.virtualFocusZ;
+        // instrument). A fan with no focus of its own is still read at the
+        // anchor so the marker follows the rays.
+        const fz = optics.focusZ;
         if (Number.isFinite(fz)) {
             const internal = fz > zs[0] && fz < optics.lastVertex;
             const zSeg = internal ? fz : zImg;
@@ -640,7 +638,7 @@ class LensBenchMode implements VizMode {
         ctx.strokeStyle = `rgba(${tr}, ${tg}, ${tb}, 0.45)`;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        const planeHeight = design.screen ? (design.viewSemiDiameter ?? sdMax * 1.3) * 0.9 : sdMax * 1.15;
+        const planeHeight = sdMax * 1.15;
         ctx.moveTo(imgX, sy(planeHeight));
         ctx.lineTo(imgX, sy(-planeHeight));
         ctx.stroke();
@@ -666,35 +664,9 @@ class LensBenchMode implements VizMode {
         }
 
         // Focus markers follow the trace: at the image plane for a focusing
-        // design (placed at best focus), between the elements for an afocal
-        // pair, and behind the lens — exit rays projected back as dashed
-        // lines — for a diverging one. Off-axis fields land wherever their
-        // own fan is tightest, which is the field curvature of the lens.
-        const virtual = !Number.isFinite(optics.focusZ) && Number.isFinite(optics.virtualFocusZ);
-        if (virtual) {
-            ctx.save();
-            ctx.setLineDash([3, 4]);
-            ctx.strokeStyle = theme.neon;
-            ctx.globalAlpha = 0.28;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            for (let f = 0; f < FIELDS; f++) {
-                const fz = this.fieldZ[f];
-                if (!Number.isFinite(fz)) continue;
-                for (let i = 0; i < RAYS; i += CHIEF) {
-                    const idx = rayIndex(0, f, i);
-                    const np = this.polyLen[idx];
-                    if (this.polyClip[idx] >= 0 || np < 2) continue;
-                    const base = idx * MAX_PTS * 2;
-                    const y = yAtZ(this.polys, base, np, fz);
-                    if (!Number.isFinite(y)) continue;
-                    ctx.moveTo(sx(this.polys[base + (np - 2) * 2]), sy(this.polys[base + (np - 2) * 2 + 1]));
-                    ctx.lineTo(sx(fz), sy(y));
-                }
-            }
-            ctx.stroke();
-            ctx.restore();
-        }
+        // design (placed at best focus), at the internal image for an afocal
+        // instrument. Off-axis fields land wherever their own fan is
+        // tightest, which is the field curvature of the lens.
 
         // Tangential field curve through the per-field foci: the sag off the
         // flat IMG line is field curvature, visible at last.
@@ -702,7 +674,7 @@ class LensBenchMode implements VizMode {
         for (let f = 0; f < FIELDS; f++) if (Number.isFinite(this.fieldZ[f]) && Number.isFinite(this.fieldY[f])) curvePts++;
         if (curvePts >= 3) {
             ctx.save();
-            ctx.setLineDash(virtual ? [3, 4] : [2, 3]);
+            ctx.setLineDash([2, 3]);
             ctx.strokeStyle = `rgba(${tr}, ${tg}, ${tb}, ${(0.45 + this.midSm * 0.3).toFixed(3)})`;
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -729,7 +701,7 @@ class LensBenchMode implements VizMode {
             const fx = sx(fz);
             const focalY = sy(fy);
             const bloom = this.bloom[f];
-            const rms = virtual ? 0 : this.fieldRms[f];
+            const rms = this.fieldRms[f];
             const radius = 6 + rms * scale * 2 + bloom * 26;
             ctx.save();
             ctx.translate(fx, focalY);
@@ -762,7 +734,7 @@ class LensBenchMode implements VizMode {
                 ctx.fillStyle = `rgba(${tr}, ${tg}, ${tb}, 0.6)`;
                 ctx.font = `8px ${MONO}`;
                 ctx.textAlign = 'center';
-                ctx.fillText(virtual ? 'VIRTUAL FOCUS' : 'FOCUS', fx, focalY - flare - 6);
+                ctx.fillText('FOCUS', fx, focalY - flare - 6);
             }
         }
 
@@ -853,7 +825,7 @@ class LensBenchMode implements VizMode {
         ctx.fillStyle = `rgba(${tr}, ${tg}, ${tb}, 0.7)`;
         const fieldDeg = design.maxFieldDeg.toFixed(1);
         // Readouts come from the trace, not the label: an afocal pair reads
-        // AFOCAL, a negative lens its (virtual) EFL, everything else EFL/BFL
+        // AFOCAL with its magnification, everything else EFL/BFL
         // and the working f-number of the fan at full aperture. FIELD is the
         // design's half-field; distortion and tangential field curvature
         // are read at that full field.
@@ -863,9 +835,7 @@ class LensBenchMode implements VizMode {
             ? optics.focusZ > optics.lastVertex
                 ? `FOCUS ${(optics.focusZ - optics.lastVertex).toFixed(2)}`
                 : `FOCUS z ${optics.focusZ.toFixed(1)}`
-            : Number.isFinite(optics.virtualFocusZ)
-                ? `VIRTUAL FOCUS z ${optics.virtualFocusZ.toFixed(1)}`
-                : '';
+            : '';
         const eflText = !Number.isFinite(optics.efl)
             ? `AFOCAL  MAG ${optics.magnification.toFixed(1)}×  ${focusText}`
             : design.screen

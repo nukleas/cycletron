@@ -28,7 +28,7 @@ export interface LensDesign {
      * Published focal length in mm. At load the prescription is scaled
      * uniformly so its paraxial EFL equals this (a lens scaled by k has EFL
      * k·f and the same aberration *shape*), and the image plane is moved to
-     * the paraxial focus. Omit for afocal/diverging designs.
+     * the paraxial focus. Omit for afocal designs.
      */
     efl?: number;
     /**
@@ -40,17 +40,15 @@ export interface LensDesign {
     /** Entrance pupil diameter in mm — the aperture spec of an afocal
      *  instrument (a "4×17" scope has a 17 mm objective). Caps the fan. */
     entrancePupil?: number;
-    /** Readout override for designs with no real focus ("VIRTUAL FOCUS"). */
+    /** Readout override for designs whose f-number means nothing ("INVERTING"). */
     focusLabel?: string;
     maxFieldDeg: number;
-    /** Afocal/diverging designs terminate at a display screen, not a focus. */
+    /** Afocal designs terminate at a display screen, not a focus. */
     screen?: boolean;
     /** Put the screen at the paraxial exit pupil (chief rays' crossing after
      *  the last surface) — the eye's position behind an afocal instrument. */
     exitPupil?: boolean;
     screenLabel?: string;
-    /** Fixed world-space framing for expanding beams; avoids audio-driven zoom. */
-    viewSemiDiameter?: number;
     surfaces: LensSurface[];
 }
 
@@ -80,11 +78,6 @@ export interface DesignOptics {
     focusZ: number;
     /** RMS spot radius at that focus, mm. */
     focusRms: number;
-    /**
-     * For a diverging bundle: z where the exit rays' backward extensions
-     * meet (least squares) — the virtual focus a textbook draws dashed.
-     */
-    virtualFocusZ: number;
     /** Surface that acts as the aperture stop (flagged, else the front). */
     stopIdx: number;
     /** Height at the stop of the on-axis ray launched at hMax: the working
@@ -190,12 +183,52 @@ function riflescope(): LensDesign {
     };
 }
 
+/** Edmund Optics EO 45-028, 25 mm dia × −50 mm FL N-BK7 plano-concave
+ *  (docs/LENS_BENCH.md): R −25.84, CT 3.50, clear aperture 24. */
+const EO_45_028 = {r: -25.84, t: 3.5, nd: 1.5168, vd: 64.17, sd: 12, glass: 'N-BK7'};
+
+/**
+ * A telephoto: the Fraunhofer form at EFL 100 in front, the EO 45-028
+ * plano-concave behind it with its plane toward the converging light, at
+ * the separation (bisected on the paraxial trace) that stretches the
+ * pair to EFL 200 — a lens twice as long as its barrel, which is what a
+ * negative rear group is for. The singlet flint-free rear element leaves
+ * the chromatic lanes visibly split, honestly.
+ */
+function telephoto(): LensDesign {
+    const efl0 = -1 / paraxialRay(fraunhofer(1, false, 1), 1, 0, -1).u;
+    const front = fraunhofer(100 / efl0, false, 0);
+    const rear: LensSurface[] = [
+        { r: 0, t: EO_45_028.t, nd: EO_45_028.nd, vd: EO_45_028.vd, sd: EO_45_028.sd, glass: EO_45_028.glass },
+        { r: -EO_45_028.r, t: 40, nd: 1, vd: 0, sd: EO_45_028.sd },
+    ];
+    const S = [...front, ...rear];
+    // Past the objective's focal length minus |f_rear| (50 mm) the pair's
+    // EFL falls monotonically from infinity; bisect on that branch.
+    let lo = 55, hi = 95;
+    for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        front[2].t = mid;
+        const efl = -1 / paraxialRay(S, 1, 0, -1).u;
+        if (efl > 200) lo = mid; else hi = mid;
+    }
+    front[2].t = (lo + hi) / 2;
+    return {
+        name: 'TELEPHOTO 200mm',
+        sheet: 'DERIVED · FRAUNHOFER + EO 45-028',
+        efl: 200,
+        fno: 5.6,
+        maxFieldDeg: 2.5,
+        surfaces: S,
+    };
+}
+
 /**
  * Real prescriptions: the Fraunhofer achromat from the rustoptic import
  * fixtures, the two photographic objectives from the Zemax sample set
- * (docs/LENS_BENCH.md cites the sources), two Edmund Optics catalog
- * singlets, and the derived riflescope. A stop on a plane in air (Double
- * Gauss) is crossed un-refracted (n1 === n2) and still clips.
+ * (docs/LENS_BENCH.md cites the sources), and three assemblies derived
+ * from those forms and Edmund Optics catalog singlets. A stop on a plane
+ * in air (Double Gauss) is crossed un-refracted (n1 === n2) and still clips.
  */
 export const LENS_DESIGNS: LensDesign[] = [
     {
@@ -250,18 +283,7 @@ export const LENS_DESIGNS: LensDesign[] = [
     },
     riflescope(),
     // Manufacturer geometry and derived bench distances: docs/LENS_BENCH.md.
-    {
-        name: 'DIVERGING FAN -50mm',
-        sheet: 'EO 45-028 · PCV',
-        maxFieldDeg: 4,
-        screen: true,
-        viewSemiDiameter: 30,
-        surfaces: [
-            { r: -25.84, t: 3.50, nd: 1.5168, vd: 64.17, sd: 12, glass: 'N-BK7' },
-            // Positive display distance, NOT the manufacturer's negative BFL.
-            { r: 0, t: 35, nd: 1, vd: 0, sd: 12 },
-        ],
-    },
+    telephoto(),
     {
         name: 'KEPLERIAN CROSSOVER',
         sheet: 'DERIVED · 2× EO 47-368',
@@ -469,8 +491,7 @@ export function traceRay(
 /**
  * Height of a traced ray at axial position z, interpolated along its
  * polyline and extended along its first / last segment beyond the ends —
- * so the same call serves a focus inside the system, at the image plane, or
- * a virtual focus behind the lens.
+ * so the same call serves a focus inside the system or at the image plane.
  */
 export function yAtZ(polys: Float32Array, base: number, np: number, z: number): number {
     if (np < 2) return NaN;
@@ -551,8 +572,8 @@ export const FOCUS: FieldFocus = {z: NaN, y: NaN, rms: NaN, n: 0};
  * surviving ray's segment through `zRef` is y_i(z) = a_i + b_i·z, the
  * variance across rays is quadratic in z, and its minimum is
  * z* = −cov(a, b) / var(b). `zSeg` selects the segment: the image plane for
- * a focus past the lens (its exit segment, also extended backwards for a
- * virtual focus), the crossing itself for an internal one. Rejected (NaN)
+ * a focus past the lens (its exit segment), the crossing itself for an
+ * internal one. Rejected (NaN)
  * when fewer than three rays survive, the exit is collimated, or z* lands
  * more than 0.35·zImg from the design's own focus `zAnchor` — a fan that
  * never comes together.
@@ -610,7 +631,6 @@ export function prepareDesign(design: LensDesign): DesignOptics {
             surf.t *= k;
             surf.sd *= k;
         }
-        if (design.viewSemiDiameter !== undefined) design.viewSemiDiameter *= k;
     }
     let {efl, bfl} = paraxial(S);
     if (!design.screen && Number.isFinite(bfl) && bfl > 0) {
@@ -650,9 +670,7 @@ export function prepareDesign(design: LensDesign): DesignOptics {
     // Where does the on-axis fan at full aperture actually come together?
     // Scan the RMS spot along the bench: the minimum is the circle of least
     // confusion — ahead of paraxial focus for a lens with spherical
-    // aberration, between the elements for a Keplerian pair. If the fan
-    // never tightens (a negative lens) the exit rays' backward extensions
-    // give the virtual focus instead.
+    // aberration, between the elements for a Keplerian pair.
     const fan = new Float32Array(FAN_RAYS * MAX_PTS * 2);
     const fanLen = new Uint8Array(FAN_RAYS);
     const fanClip = new Int16Array(FAN_RAYS);
@@ -681,27 +699,9 @@ export function prepareDesign(design: LensDesign): DesignOptics {
     // A real focus is a bundle that has actually converged, not the least
     // bad spot of one that only ever spreads.
     const converges = focusRms < 0.2 * launchRms;
-    let virtualFocusZ = NaN;
     if (!converges) {
         focusZ = NaN;
         focusRms = NaN;
-        let sab = 0;
-        let sbb = 0;
-        for (let i = 0; i < FAN_RAYS; i++) {
-            const np = fanLen[i];
-            if (fanClip[i] >= 0 || np < 2) continue;
-            const base = i * MAX_PTS * 2;
-            const z0 = fan[base + (np - 2) * 2], y0 = fan[base + (np - 2) * 2 + 1];
-            const z1 = fan[base + (np - 1) * 2], y1 = fan[base + (np - 1) * 2 + 1];
-            const b = (y1 - y0) / (z1 - z0);
-            const a = y0 - b * z0;
-            sab += a * b;
-            sbb += b * b;
-        }
-        if (sbb > 0) {
-            const zls = -sab / sbb;
-            if (zls < lastVertex) virtualFocusZ = zls;
-        }
     }
     // Focusing designs image at best focus, not at the paraxial plane.
     if (!design.screen && converges && focusZ > lastVertex) {
@@ -723,7 +723,7 @@ export function prepareDesign(design: LensDesign): DesignOptics {
 
     const optics: DesignOptics = {
         zs, efl, bfl, hMax, fno: efl / (2 * hMax), zImg, zStart, lastVertex,
-        focusZ, focusRms, virtualFocusZ, stopIdx, stopHalf, M, N, chiefGain, yExtent: 0, magnification,
+        focusZ, focusRms, stopIdx, stopHalf, M, N, chiefGain, yExtent: 0, magnification,
     };
     // Framing: the tallest launch or image height any bundle reaches at
     // max field, so the view never zooms with the music.
