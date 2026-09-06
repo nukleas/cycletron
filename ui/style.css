@@ -716,10 +716,11 @@ button > svg,
 }
 
 /* =========================================================
-   Form controls — radios + checkboxes
-   Port of cyberdesign checkbox.css onto Cycletron tokens.
-   Native OS chrome (GTK/WebKit accent tiles) is replaced so
-   Samples, Prefs, MIDI Lab, and export all share one look.
+   Form controls — radios, checkboxes, selects
+   Port of cyberdesign checkbox.css + select.css onto Cycletron
+   tokens. Native OS chrome (GTK/WebKit accent tiles, Aqua
+   combo-boxes) is replaced so Samples, Prefs, MIDI Lab, and
+   export all share one look.
    ========================================================= */
 
 input[type="radio"],
@@ -813,6 +814,45 @@ input[type="radio"]:checked::after {
     border-radius: 50%;
     transform: translate(-50%, -50%);
     box-shadow: 0 0 4px color-mix(in srgb, var(--neon) 60%, transparent);
+}
+
+/* Select: appearance:none + SVG chevron. `select::after` is ignored
+   by WebKit, so the arrow is a background-image instead of the
+   cyberdesign wrap+pseudo pattern. The dropped list is still the
+   OS popup; color-scheme:dark keeps that list from going Aqua-white. */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    color-scheme: dark;
+    height: 26px;
+    padding: 0 28px 0 8px;
+    background-color: rgba(5, 6, 10, 0.82);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23687797' d='M0 1h10L5 6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 8px 5px;
+    color: var(--neon-bright);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+select:hover:not(:disabled):not(:focus) {
+    border-color: color-mix(in srgb, var(--neon) 55%, transparent);
+}
+
+select:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+select option {
+    background: var(--bg-light);
+    color: var(--text);
 }
 
 /* =========================================================
@@ -1377,30 +1417,6 @@ input[type="radio"]:checked::after {
     overflow: hidden;
     transition: none;
     box-shadow: inset 0 0 0 1px rgba(255, 43, 214, 0.06), 0 0 18px rgba(71, 246, 255, 0.08);
-}
-
-.viz-controls {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-}
-
-.viz-controls select {
-    background: rgba(5, 6, 10, 0.78);
-    color: var(--neon-bright);
-    border: 1px solid rgba(71, 246, 255, 0.22);
-    padding: 4px 8px;
-    border-radius: 0;
-    font-family: inherit;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.viz-controls select:focus {
-    border-color: var(--neon-subtle);
-    outline: none;
-    box-shadow: 0 0 6px var(--neon-glow);
 }
 
 /* Scope */
@@ -3087,7 +3103,7 @@ body.is-drop-target::after {
     color: var(--text-secondary);
 }
 .midi-lab-field span { white-space: nowrap; }
-.midi-lab-field select,
+.midi-lab-field select { min-width: 110px; }
 .midi-lab-field input[type="number"] {
     background: rgba(5, 6, 10, 0.78);
     color: var(--neon-bright);
@@ -3099,7 +3115,6 @@ body.is-drop-target::after {
     min-width: 110px;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
-.midi-lab-field select:focus,
 .midi-lab-field input[type="number"]:focus {
     outline: none;
     border-color: var(--neon-subtle);
@@ -4126,8 +4141,7 @@ body.is-drop-target::after {
 .prefs-field span { white-space: nowrap; }
 .prefs-field input[type="text"],
 .prefs-field input[type="password"],
-.prefs-field input[type="number"],
-.prefs-field select#prefsProvider {
+.prefs-field input[type="number"] {
     background: rgba(5, 6, 10, 0.78);
     color: var(--neon-bright);
     border: 1px solid var(--border);
@@ -4138,8 +4152,8 @@ body.is-drop-target::after {
     min-width: 220px;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
-.prefs-field input:not([type="checkbox"]):not([type="radio"]):focus,
-.prefs-field select#prefsProvider:focus {
+.prefs-field select { min-width: 220px; }
+.prefs-field input:not([type="checkbox"]):not([type="radio"]):focus {
     outline: none;
     border-color: var(--neon-subtle);
     box-shadow: 0 0 6px var(--neon-glow);
@@ -4158,7 +4172,8 @@ body.is-drop-target::after {
     flex-direction: column;
     align-items: stretch;
 }
-.prefs-field-wide input { width: 100%; min-width: 0; }
+.prefs-field-wide input,
+.prefs-field-wide select { width: 100%; min-width: 0; }
 .prefs-row {
     display: flex;
     align-items: center;
@@ -4711,6 +4726,8 @@ body.stage-active #fullscreenVizHUD { display: none; }
 .export-modal-field input,
 .export-modal-field select {
     width: 120px;
+}
+.export-modal-field input {
     padding: 6px 8px;
     background: var(--bg);
     border: 1px solid var(--border);
@@ -4719,8 +4736,7 @@ body.stage-active #fullscreenVizHUD { display: none; }
     font-size: 13px;
 }
 
-.export-modal-field input:focus,
-.export-modal-field select:focus {
+.export-modal-field input:focus {
     outline: none;
     border-color: var(--neon);
 }
