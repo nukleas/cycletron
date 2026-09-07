@@ -360,14 +360,19 @@ Band-pass:
 
 IMPORTANT: Use ONLY the exact names listed here. Do not abbreviate, pluralize, or combine them.
 If a name isn't in this list, it does not exist and will produce silence.
-There are NO aliases: `kick`, `snare`, `clap`, `hihat`, `clave`, `cymbal` — none of these exist.
+There are NO aliases: `kick`, `snare`, `clap`, `hihat`, `cymbal` — write `bd`/`sd`/`cp`/`hh`/`cr`.
+`rim` and `rd` ARE on the default kit. Claves are `cl`.
 More sounds via `list_sounds` (includes `drum_machines` and the `.bank()` note).
 
-Default kit (these exact strings only — no machine):
-bd, sd, sn, hh, oh, cp, cr, lt, mt, ht, cb, rs
+Default kit (these exact strings — no machine). Multi-variant: `s("hh:2")`, `s("bd:4")`.
+bd, sd, sn, hh, oh, cp, cr, lt, mt, ht, cb, rs, rim, rd, sh, tb, brk, cl, ma, lc, mc, hc
 bd=kick sd=snare sn=snare2 hh=closed-hat oh=open-hat cp=clap cr=crash
-lt=low-tom mt=mid-tom ht=hi-tom cb=cowbell rs=rimshot
-Default kit uses `rs` for rimshot. Machine kits use `rim` (see below).
+lt=low-tom mt=mid-tom ht=hi-tom cb=cowbell rs=rimshot rim=rs rd=ride
+sh=shaker tb=tambourine brk=amen-style break cl=claves ma=maracas
+lc/mc/hc=808 congas (low/mid/hi)
+Index 0 of bd/sd/hh/oh/cr/toms is the original bundled take. hh:1–5 walk
+uzu hats (the 808 only has one closed hat). Prefer `.n("0 1 3")` on a
+sound that already has hits (`s("hh*8").n("<0 1 3>")`), not constructor `n()`.
 
 Drum machines — prefer `.bank()` on the drum `stack()` only (not on bass/chords).
 `.bank(name)` rewrites every sample to `{Bank}_{sound}`:
@@ -394,8 +399,8 @@ RolandTR909 bd sd hh oh cp rd rim
 RolandTR707 bd sd hh oh cp lt ht
 LinnDrum bd sd hh cp
 BossDR55 bd sd hh rim
-Voice-name trap: default kit = `rs`; machines = `rim`. TR-909 adds `rd`.
-No machine has `cr`. A bare `rim` without `.bank()` is silent.
+Default kit `rs` and `rim` are the same bank; machines still spell it `rim`.
+No machine has `cr` — keep crashes on the default kit.
 
 Percussion & texture colors (bundled offline — each bank is ONE raw one-shot):
 perc=cajon slap click=claves metal=anvil hit east=woodblock hand=conga

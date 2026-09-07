@@ -5,7 +5,7 @@
  * tables in `ui/sample-tables.ts` (the same tables live playback loads).
  *
  * The offline export renderer (src-tauri/src/export.rs) registers this
- * manifest, so an export resolves `bd`, `RolandTR808_bd`, `perc`, `flbass:2`,
+ * manifest, so an export resolves `bd`, `hh:2`, `RolandTR808_bd`, `perc`, `flbass:2`,
  * … to the exact files live playback uses. Regenerated on every dev/build run
  * (checked in; regenerate with `npm run gen:manifest`), so it can never drift
  * from the tables.
@@ -43,8 +43,8 @@ function manifestPath(url) {
 
 const banks = {};
 
-for (const {name, sub} of ESSENTIAL_DRUMS) {
-    banks[name] = [manifestPath(sub)];
+for (const {name, files} of ESSENTIAL_DRUMS) {
+    banks[name] = files.map((f) => manifestPath(f.sub));
 }
 for (const [name, sub] of PERCUSSION_COLORS) {
     banks[name] = [manifestPath(sub)];

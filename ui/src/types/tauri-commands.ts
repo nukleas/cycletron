@@ -96,6 +96,10 @@ export interface CleanupReport {
     notes_after: number;
     removed_short: number;
     removed_duplicates: number;
+    /** Fragments folded into a held note. */
+    merged: number;
+    /** Notes moved onto the snap grid. */
+    snapped: number;
     velocity_adjusted: number;
 }
 
@@ -309,5 +313,9 @@ export interface ImportMidiOptions {
     /** Drop notes shorter than 1/N of a quarter. 0 = off. */
     shortNoteDivisor?: number;
     removeDuplicates?: boolean;
+    /** Join same-pitch re-triggers when one note is shorter than 1/N of a quarter. 0 = off. */
+    mergeFragmentDivisor?: number;
+    /** Snap onsets/releases to N steps per bar. 0 = off. */
+    snapPerBar?: number;
     velocityMode?: 'off' | 'moderate' | 'strong';
 }

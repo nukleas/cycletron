@@ -19,6 +19,9 @@
  */
 export const FISCHER_808_BASE = 'https://raw.githubusercontent.com/tidalcycles/sounds-tr808-fischer/main/';
 
+/** uzu-drumkit (Unlicense) — hat/ride/rim/shaker variants Fischer cannot provide. */
+export const UZU_BASE = 'https://raw.githubusercontent.com/tidalcycles/uzu-drumkit/main/';
+
 /**
  * Streamed drum machine kits live in the upstream tidal-drum-machines repo.
  * That collection carries no license, so we never redistribute it — kits
@@ -27,24 +30,89 @@ export const FISCHER_808_BASE = 'https://raw.githubusercontent.com/tidalcycles/s
  */
 export const TDM_BASE = 'https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/';
 
+/** One file in a default-kit bank. `sub` is under `ui/public/samples/`. */
+export type DrumFile = {
+    sub: string;
+    /** Path inside the Fischer repo (CDN fallback). */
+    fischer?: string;
+    /** Path inside uzu-drumkit (CDN fallback). */
+    uzu?: string;
+};
+
+export type DrumBank = {
+    name: string;
+    files: DrumFile[];
+};
+
+/** Fischer 808 knob positions used in filenames. */
+const KNOBS = ['00', '25', '50', '75', '10'] as const;
+
+function fischer(sub: string, dir8: string, name: string): DrumFile {
+    return {sub: `${sub}/${name}`, fischer: `${dir8}/${name}`};
+}
+
+function uzu(sub: string, rel: string): DrumFile {
+    return {sub: `${sub}/${rel.split('/').pop()!}`, uzu: rel};
+}
+
+/** Two-knob Fischer grid (25 files). `keepFirst` stays `:0` so existing patterns match. */
+function fischerGrid2(bank: string, dir8: string, prefix: string, keepFirst: string): DrumFile[] {
+    const names: string[] = [];
+    for (const a of KNOBS) {
+        for (const b of KNOBS) names.push(`${prefix}${a}${b}.WAV`);
+    }
+    return [keepFirst, ...names.filter((n) => n !== keepFirst)].map((n) => fischer(bank, dir8, n));
+}
+
+/** One-knob Fischer grid (5 files). */
+function fischerGrid1(bank: string, dir8: string, prefix: string, keepFirst: string): DrumFile[] {
+    const names = KNOBS.map((k) => `${prefix}${k}.WAV`);
+    return [keepFirst, ...names.filter((n) => n !== keepFirst)].map((n) => fischer(bank, dir8, n));
+}
+
+const UZU_HH = [
+    'hh/10_hh_switchangel.wav',
+    'hh/11_hh_mot4i.wav',
+    'hh/12_hh_switchangel.wav',
+    'hh/13_hh_switchangel.wav',
+    'hh/14_hh_mot4i.wav',
+];
+const UZU_RIM = [
+    'rim/10_rim_switchangel.wav',
+    'rim/11_rim_switch_angel.wav',
+];
+
 /**
- * The default 12-voice kit: Michael Fischer's 1994 TR-808 set (CC0), bundled
- * in `ui/public/samples/` (offline). `sub` is the bundled path relative to
- * `/samples/`, `src` the path inside the Fischer repo (remote fallback).
+ * Default kit, bundled in `ui/public/samples/` (offline).
+ *
+ * Fischer's 1994 TR-808 (CC0) fills `bd`/`sd`/`oh`/`cr`/toms/congas with every
+ * knob take (`:n` walks them). Closed hat has only one Fischer file, so `hh:1+`
+ * and `rd`/`rim`/`sh`/`tb`/`brk` come from uzu-drumkit (Unlicense).
+ * Index 0 of each pre-existing bank is the file Cycletron already shipped.
  */
-export const ESSENTIAL_DRUMS: Array<{name: string; sub: string; src: string}> = [
-    {name: 'bd', sub: 'bd/BD0050.WAV', src: 'bd8/BD0050.WAV'},
-    {name: 'sd', sub: 'sd/SD5050.WAV', src: 'sd8/SD5050.WAV'},
-    {name: 'sn', sub: 'sn/SD0075.WAV', src: 'sd8/SD0075.WAV'},
-    {name: 'hh', sub: 'hh/CH.WAV',     src: 'ch8/CH.WAV'},
-    {name: 'cp', sub: 'cp/CP.WAV',     src: 'cp8/CP.WAV'},
-    {name: 'oh', sub: 'oh/OH00.WAV',   src: 'oh8/OH00.WAV'},
-    {name: 'ht', sub: 'ht/HT50.WAV',   src: 'ht8/HT50.WAV'},
-    {name: 'mt', sub: 'mt/MT50.WAV',   src: 'mt8/MT50.WAV'},
-    {name: 'lt', sub: 'lt/LT50.WAV',   src: 'lt8/LT50.WAV'},
-    {name: 'cr', sub: 'cr/CY0050.WAV', src: 'cy8/CY0050.WAV'},
-    {name: 'cb', sub: 'cb/CB.WAV',     src: 'cb8/CB.WAV'},
-    {name: 'rs', sub: 'rs/RS.WAV',     src: 'rs8/RS.WAV'},
+export const ESSENTIAL_DRUMS: DrumBank[] = [
+    {name: 'bd', files: fischerGrid2('bd', 'bd8', 'BD', 'BD0050.WAV')},
+    {name: 'sd', files: fischerGrid2('sd', 'sd8', 'SD', 'SD5050.WAV')},
+    {name: 'sn', files: [fischer('sn', 'sd8', 'SD0075.WAV')]},
+    {name: 'hh', files: [fischer('hh', 'ch8', 'CH.WAV'), ...UZU_HH.map((rel) => uzu('hh', rel))]},
+    {name: 'cp', files: [fischer('cp', 'cp8', 'CP.WAV')]},
+    {name: 'oh', files: fischerGrid1('oh', 'oh8', 'OH', 'OH00.WAV')},
+    {name: 'ht', files: fischerGrid1('ht', 'ht8', 'HT', 'HT50.WAV')},
+    {name: 'mt', files: fischerGrid1('mt', 'mt8', 'MT', 'MT50.WAV')},
+    {name: 'lt', files: fischerGrid1('lt', 'lt8', 'LT', 'LT50.WAV')},
+    {name: 'cr', files: fischerGrid2('cr', 'cy8', 'CY', 'CY0050.WAV')},
+    {name: 'cb', files: [fischer('cb', 'cb8', 'CB.WAV')]},
+    {name: 'rs', files: [fischer('rs', 'rs8', 'RS.WAV'), ...UZU_RIM.map((rel) => uzu('rim', rel))]},
+    {name: 'rim', files: [fischer('rs', 'rs8', 'RS.WAV'), ...UZU_RIM.map((rel) => uzu('rim', rel))]},
+    {name: 'rd', files: [uzu('rd', 'rd/10_rd_switchangel.wav')]},
+    {name: 'sh', files: [uzu('sh', 'sh/10_sh_switchangel.wav')]},
+    {name: 'tb', files: [uzu('tb', 'tb/10_tb.wav')]},
+    {name: 'brk', files: [uzu('brk', 'brk/10_break_amen_pprocessed.wav')]},
+    {name: 'cl', files: [fischer('cl', 'cl8', 'CL.WAV')]},
+    {name: 'ma', files: [fischer('ma', 'ma8', 'MA.WAV')]},
+    {name: 'lc', files: fischerGrid1('lc', 'lc8', 'LC', 'LC50.WAV')},
+    {name: 'mc', files: fischerGrid1('mc', 'mc8', 'MC', 'MC50.WAV')},
+    {name: 'hc', files: fischerGrid1('hc', 'hc8', 'HC', 'HC50.WAV')},
 ];
 
 /**

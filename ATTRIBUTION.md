@@ -5,7 +5,7 @@ Cycletron itself is licensed AGPL-3.0-or-later (see [`LICENSE`](LICENSE) and
 third parties and keep their own licenses. Verbatim copies of every upstream
 license/provenance text ship in [`licenses/`](licenses/).
 
-## Default drum kit — `ui/public/samples/{bd,sd,sn,hh,cp,oh,ht,mt,lt,cr,cb,rs}/`
+## Default drum kit — `ui/public/samples/{bd,sd,sn,hh,cp,oh,ht,mt,lt,cr,cb,rs,cl,ma,lc,mc,hc,rd,rim,sh,tb,brk}/`
 
 **Roland TR-808 sample set** recorded by **Michael Fischer (Technopolis, 1994)**
 directly from a TR-808 (serial no. 103852) — see
@@ -15,6 +15,19 @@ directly from a TR-808 (serial no. 103852) — see
 - License: **CC0-1.0** ([`licenses/TR808-Fischer-LICENSE.txt`](licenses/TR808-Fischer-LICENSE.txt)).
   Fischer's own note says the set is "ABSOLUTELY FREE"; the explicit CC0
   dedication was applied by the TidalCycles project when republishing.
+- Every knob take is bundled. `s("bd")` is the original middle-tune/middle-decay
+  hit; `s("bd:1")`… walk the rest of the 25 bass drums. Same pattern for
+  `sd` (25), `cr` (25), `oh` (5), toms (5 each), and congas `lc`/`mc`/`hc`.
+  Extra 808 voices: `cl` (claves), `ma` (maracas). Fischer's closed hat is a
+  single file (`hh` index 0).
+
+**uzu-drumkit** (Unlicense) supplies the voices Fischer cannot:
+hats `hh:1`–`hh:5`, ride `rd`, extra rims on `rs`/`rim`, shaker `sh`,
+tambourine `tb`, and amen-style `brk`.
+
+- Source: https://github.com/tidalcycles/uzu-drumkit
+- License: **Unlicense** ([`licenses/uzu-drumkit-LICENSE.txt`](licenses/uzu-drumkit-LICENSE.txt)).
+- `rim` is registered as the same bank as `rs` (Fischer rimshot + two uzu rims).
 
 ## Percussion & texture colors — `ui/public/samples/{perc,click,metal,east,hand,industrial,space,arpy,tabla,jvbass}/`
 

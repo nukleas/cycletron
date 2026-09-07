@@ -819,6 +819,24 @@
                         <input type="checkbox" id="midiLabRemoveDups" checked>
                         <span>Remove duplicate overlaps</span>
                     </label>
+                    <label class="midi-lab-field" data-tooltip="Join a note that was chopped into fast re-triggers back into one held note: same-pitch notes shorter than the chosen value with rests shorter than half of it. A real staccato riff looks the same to the converter, so check the preview count. Drums are never merged. Chiptune-style pulses: 1/16. Transcribed audio: 1/8.">
+                        <span>Merge re-triggers</span>
+                        <select id="midiLabMerge">
+                            <option value="0" selected>Off</option>
+                            <option value="8">Notes &lt; 1/32</option>
+                            <option value="4">Notes &lt; 1/16</option>
+                            <option value="2">Notes &lt; 1/8</option>
+                        </select>
+                    </label>
+                    <label class="midi-lab-field" data-tooltip="Move onsets and releases to a fixed grid. Lossy for swing and triplets; cleans up transcribed audio.">
+                        <span>Snap to grid</span>
+                        <select id="midiLabSnap">
+                            <option value="0" selected>Off</option>
+                            <option value="8">8ths</option>
+                            <option value="16">16ths</option>
+                            <option value="32">32nds</option>
+                        </select>
+                    </label>
                     <label class="midi-lab-field">
                         <span>Velocity</span>
                         <select id="midiLabVelocity">

@@ -1,39 +1,178 @@
 {
   "bd": [
-    "samples/bd/BD0050.WAV"
+    "samples/bd/BD0050.WAV",
+    "samples/bd/BD0000.WAV",
+    "samples/bd/BD0025.WAV",
+    "samples/bd/BD0075.WAV",
+    "samples/bd/BD0010.WAV",
+    "samples/bd/BD2500.WAV",
+    "samples/bd/BD2525.WAV",
+    "samples/bd/BD2550.WAV",
+    "samples/bd/BD2575.WAV",
+    "samples/bd/BD2510.WAV",
+    "samples/bd/BD5000.WAV",
+    "samples/bd/BD5025.WAV",
+    "samples/bd/BD5050.WAV",
+    "samples/bd/BD5075.WAV",
+    "samples/bd/BD5010.WAV",
+    "samples/bd/BD7500.WAV",
+    "samples/bd/BD7525.WAV",
+    "samples/bd/BD7550.WAV",
+    "samples/bd/BD7575.WAV",
+    "samples/bd/BD7510.WAV",
+    "samples/bd/BD1000.WAV",
+    "samples/bd/BD1025.WAV",
+    "samples/bd/BD1050.WAV",
+    "samples/bd/BD1075.WAV",
+    "samples/bd/BD1010.WAV"
   ],
   "sd": [
-    "samples/sd/SD5050.WAV"
+    "samples/sd/SD5050.WAV",
+    "samples/sd/SD0000.WAV",
+    "samples/sd/SD0025.WAV",
+    "samples/sd/SD0050.WAV",
+    "samples/sd/SD0075.WAV",
+    "samples/sd/SD0010.WAV",
+    "samples/sd/SD2500.WAV",
+    "samples/sd/SD2525.WAV",
+    "samples/sd/SD2550.WAV",
+    "samples/sd/SD2575.WAV",
+    "samples/sd/SD2510.WAV",
+    "samples/sd/SD5000.WAV",
+    "samples/sd/SD5025.WAV",
+    "samples/sd/SD5075.WAV",
+    "samples/sd/SD5010.WAV",
+    "samples/sd/SD7500.WAV",
+    "samples/sd/SD7525.WAV",
+    "samples/sd/SD7550.WAV",
+    "samples/sd/SD7575.WAV",
+    "samples/sd/SD7510.WAV",
+    "samples/sd/SD1000.WAV",
+    "samples/sd/SD1025.WAV",
+    "samples/sd/SD1050.WAV",
+    "samples/sd/SD1075.WAV",
+    "samples/sd/SD1010.WAV"
   ],
   "sn": [
     "samples/sn/SD0075.WAV"
   ],
   "hh": [
-    "samples/hh/CH.WAV"
+    "samples/hh/CH.WAV",
+    "samples/hh/10_hh_switchangel.wav",
+    "samples/hh/11_hh_mot4i.wav",
+    "samples/hh/12_hh_switchangel.wav",
+    "samples/hh/13_hh_switchangel.wav",
+    "samples/hh/14_hh_mot4i.wav"
   ],
   "cp": [
     "samples/cp/CP.WAV"
   ],
   "oh": [
-    "samples/oh/OH00.WAV"
+    "samples/oh/OH00.WAV",
+    "samples/oh/OH25.WAV",
+    "samples/oh/OH50.WAV",
+    "samples/oh/OH75.WAV",
+    "samples/oh/OH10.WAV"
   ],
   "ht": [
-    "samples/ht/HT50.WAV"
+    "samples/ht/HT50.WAV",
+    "samples/ht/HT00.WAV",
+    "samples/ht/HT25.WAV",
+    "samples/ht/HT75.WAV",
+    "samples/ht/HT10.WAV"
   ],
   "mt": [
-    "samples/mt/MT50.WAV"
+    "samples/mt/MT50.WAV",
+    "samples/mt/MT00.WAV",
+    "samples/mt/MT25.WAV",
+    "samples/mt/MT75.WAV",
+    "samples/mt/MT10.WAV"
   ],
   "lt": [
-    "samples/lt/LT50.WAV"
+    "samples/lt/LT50.WAV",
+    "samples/lt/LT00.WAV",
+    "samples/lt/LT25.WAV",
+    "samples/lt/LT75.WAV",
+    "samples/lt/LT10.WAV"
   ],
   "cr": [
-    "samples/cr/CY0050.WAV"
+    "samples/cr/CY0050.WAV",
+    "samples/cr/CY0000.WAV",
+    "samples/cr/CY0025.WAV",
+    "samples/cr/CY0075.WAV",
+    "samples/cr/CY0010.WAV",
+    "samples/cr/CY2500.WAV",
+    "samples/cr/CY2525.WAV",
+    "samples/cr/CY2550.WAV",
+    "samples/cr/CY2575.WAV",
+    "samples/cr/CY2510.WAV",
+    "samples/cr/CY5000.WAV",
+    "samples/cr/CY5025.WAV",
+    "samples/cr/CY5050.WAV",
+    "samples/cr/CY5075.WAV",
+    "samples/cr/CY5010.WAV",
+    "samples/cr/CY7500.WAV",
+    "samples/cr/CY7525.WAV",
+    "samples/cr/CY7550.WAV",
+    "samples/cr/CY7575.WAV",
+    "samples/cr/CY7510.WAV",
+    "samples/cr/CY1000.WAV",
+    "samples/cr/CY1025.WAV",
+    "samples/cr/CY1050.WAV",
+    "samples/cr/CY1075.WAV",
+    "samples/cr/CY1010.WAV"
   ],
   "cb": [
     "samples/cb/CB.WAV"
   ],
   "rs": [
-    "samples/rs/RS.WAV"
+    "samples/rs/RS.WAV",
+    "samples/rim/10_rim_switchangel.wav",
+    "samples/rim/11_rim_switch_angel.wav"
+  ],
+  "rim": [
+    "samples/rs/RS.WAV",
+    "samples/rim/10_rim_switchangel.wav",
+    "samples/rim/11_rim_switch_angel.wav"
+  ],
+  "rd": [
+    "samples/rd/10_rd_switchangel.wav"
+  ],
+  "sh": [
+    "samples/sh/10_sh_switchangel.wav"
+  ],
+  "tb": [
+    "samples/tb/10_tb.wav"
+  ],
+  "brk": [
+    "samples/brk/10_break_amen_pprocessed.wav"
+  ],
+  "cl": [
+    "samples/cl/CL.WAV"
+  ],
+  "ma": [
+    "samples/ma/MA.WAV"
+  ],
+  "lc": [
+    "samples/lc/LC50.WAV",
+    "samples/lc/LC00.WAV",
+    "samples/lc/LC25.WAV",
+    "samples/lc/LC75.WAV",
+    "samples/lc/LC10.WAV"
+  ],
+  "mc": [
+    "samples/mc/MC50.WAV",
+    "samples/mc/MC00.WAV",
+    "samples/mc/MC25.WAV",
+    "samples/mc/MC75.WAV",
+    "samples/mc/MC10.WAV"
+  ],
+  "hc": [
+    "samples/hc/HC50.WAV",
+    "samples/hc/HC00.WAV",
+    "samples/hc/HC25.WAV",
+    "samples/hc/HC75.WAV",
+    "samples/hc/HC10.WAV"
   ],
   "perc": [
     "samples/perc/Cajon_hit1_fff_rr1.wav"
