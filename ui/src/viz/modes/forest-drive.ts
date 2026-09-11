@@ -446,14 +446,16 @@ class ForestDriveMode implements VizMode {
         // Fog target sits between the dusk band and the sky.
         this.fogRgb = mix3(t.bgLightRgb, this.duskRgb, 0.62);
 
-        const leaf = mix3(t.bgLighterRgb, rgbOf(t.neon, [71, 246, 255]), 0.16);
-        // Verge grass: the leaf tint dropped well below the canopy, so the
-        // shoulder never competes with the trees standing on it.
-        this.shoulderRgb = mix3(t.bgRgb, leaf, 0.5);
+        // Verge grass: dusk-tinted, well below the canopy so the shoulder
+        // never competes with the trees standing on it.
+        this.shoulderRgb = mix3(t.bgRgb, this.duskRgb, 0.26);
+        // Ambient forest is scenery, not signal — a flat dusk silhouette with
+        // no accent and no highlight, so anything coloured is a hap.
+        const silhouette = mix3(t.bgRgb, this.duskRgb, 0.3);
         this.ambientColors = this.bandsFor(
-            mix3(t.bgRgb, this.duskRgb, 0.18),
-            leaf,
-            mix3(leaf, this.duskRgb, 0.3),
+            mix3(t.bgRgb, this.duskRgb, 0.13),
+            silhouette,
+            silhouette,
         );
     }
 
@@ -462,7 +464,7 @@ class ForestDriveMode implements VizMode {
         const trunk = kind === 'birch'
             ? mix3(t.bgLighterRgb, [235, 238, 246], 0.55)
             : mix3(t.bgRgb, accent, 0.14);
-        const foliage = mix3(t.bgLighterRgb, accent, 0.34);
+        const foliage = mix3(t.bgLighterRgb, accent, 0.52);
         const lit = mix3(accent, [255, 255, 255], 0.22);
         return this.bandsFor(trunk, foliage, lit);
     }
@@ -875,6 +877,22 @@ class ForestDriveMode implements VizMode {
             }
         }
 
+        // Hap conifers get their whole silhouette outlined in the track colour,
+        // the triangle equivalent of the canopy rim.
+        if (t.hero) {
+            const prev = ctx.globalAlpha;
+            ctx.globalAlpha = prev * 0.5;
+            ctx.strokeStyle = c.lit[band];
+            ctx.lineWidth = Math.max(0.6, wPx * 0.045);
+            ctx.beginPath();
+            ctx.moveTo(x - wPx, skirt);
+            ctx.lineTo(x + lean, top);
+            ctx.lineTo(x + wPx, skirt);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.globalAlpha = prev;
+        }
+
         if (lit > 0.02) this.bloom(ctx, x + lean * 0.5, (top + skirt) * 0.5, wPx * 1.5, c.lit[band], lit);
     }
 
@@ -911,9 +929,7 @@ class ForestDriveMode implements VizMode {
             const h = hash32(t.seed, 40 + i);
             const bx = x + lean + (rand01(h) - 0.5) * wPx * 1.5;
             const by = cy + (rand01(hash32(h, 2)) - 0.5) * hPx * 0.22;
-            ctx.beginPath();
-            ctx.ellipse(bx, by, wPx * 0.62, hPx * 0.16, 0, 0, TAU);
-            ctx.fill();
+            this.mass(ctx, bx, by, wPx * 0.62, hPx * 0.17, hash32(h, 13), t.hero, c.lit[band], wPx * 0.04);
         }
     }
 
@@ -976,25 +992,67 @@ class ForestDriveMode implements VizMode {
             const bx = x + lean + (rand01(h) - 0.5) * wPx * 1.4;
             const by = cy + (rand01(hash32(h, 3)) - 0.5) * hPx * 0.26;
             const rr = wPx * (0.55 + rand01(hash32(h, 7)) * 0.35);
-            ctx.beginPath();
-            ctx.ellipse(bx, by, rr, rr * 0.78, 0, 0, TAU);
-            ctx.fill();
+            this.mass(ctx, bx, by, rr, rr * 0.8, hash32(h, 11), t.hero, c.lit[band], wPx * 0.045);
         }
         if (!simple) {
-            // Shaded underside, then a rim of last light along the top.
+            // Shaded underside, then a wedge of last light on the sunward side.
             ctx.globalAlpha *= 0.45;
             ctx.fillStyle = c.trunk[band];
-            ctx.beginPath();
-            ctx.ellipse(x + lean, cy + hPx * 0.12, wPx * 0.92, hPx * 0.16, 0, 0, TAU);
+            this.facet(ctx, x + lean, cy + hPx * 0.13, wPx * 0.85, hPx * 0.14, t.seed ^ 0x5a);
             ctx.fill();
             ctx.fillStyle = c.lit[band];
-            ctx.beginPath();
-            ctx.ellipse(x + lean - wPx * 0.15, cy - hPx * 0.16, wPx * 0.55, hPx * 0.1, 0, 0, TAU);
+            this.facet(ctx, x + lean - wPx * 0.18, cy - hPx * 0.17, wPx * 0.5, hPx * 0.1, t.seed ^ 0xa5);
             ctx.fill();
             ctx.globalAlpha /= 0.45;
         }
 
         if (lit > 0.02) this.bloom(ctx, x + lean, cy, wPx * 1.7, c.lit[band], lit);
+    }
+
+    /**
+     * Irregular polygon in place of an ellipse — the canopies read as vector
+     * art rather than beach balls, and the jitter is seeded so a given tree
+     * keeps its outline. Builds the path only; the caller fills or strokes.
+     */
+    private facet(
+        ctx: CanvasRenderingContext2D,
+        cx: number, cy: number, rx: number, ry: number, seed: number,
+    ): void {
+        const sides = 7;
+        ctx.beginPath();
+        for (let i = 0; i < sides; i++) {
+            const a = (i / sides) * TAU;
+            const j = 0.72 + rand01(hash32(seed, i)) * 0.5;
+            const px = cx + Math.cos(a) * rx * j;
+            const py = cy + Math.sin(a) * ry * j;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+    }
+
+    /**
+     * Fill one canopy mass, and on a hap tree trace its own outline in the
+     * track colour. The outline has to be the same path as the fill — a
+     * separate, larger polygon reads as a box floating around the tree rather
+     * than as line art on it.
+     */
+    private mass(
+        ctx: CanvasRenderingContext2D,
+        cx: number, cy: number, rx: number, ry: number, seed: number,
+        hero: boolean, edge: string, w: number,
+    ): void {
+        this.facet(ctx, cx, cy, rx, ry, seed);
+        ctx.fill();
+        if (!hero || w < 0.4) return;
+        const fill = ctx.fillStyle;
+        const prev = ctx.globalAlpha;
+        ctx.globalAlpha = prev * 0.5;
+        ctx.strokeStyle = edge;
+        ctx.lineWidth = Math.max(0.6, w);
+        ctx.stroke();
+        ctx.globalAlpha = prev;
+        ctx.fillStyle = fill;
     }
 
     /**
@@ -1053,9 +1111,8 @@ class ForestDriveMode implements VizMode {
             const h = hash32(t.seed, 80 + i);
             const bx = x + (rand01(h) - 0.5) * wPx * 1.6;
             const rr = wPx * (0.45 + rand01(hash32(h, 5)) * 0.35);
-            ctx.beginPath();
-            ctx.ellipse(bx, yBase - hPx * 0.4, rr, Math.max(1, hPx * 0.45), 0, 0, TAU);
-            ctx.fill();
+            this.mass(ctx, bx, yBase - hPx * 0.4, rr, Math.max(1, hPx * 0.45), hash32(h, 17),
+                      t.hero, c.lit[band], wPx * 0.045);
         }
     }
 }
