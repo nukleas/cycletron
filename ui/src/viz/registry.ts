@@ -22,6 +22,7 @@ import {isoCityDef} from './modes/iso-city.js';
 import {lensBenchDef} from './modes/lens-bench.js';
 import {spotFieldDef} from './modes/spot-field.js';
 import {vectorNexusDef} from './modes/vector-nexus.js';
+import {forestDriveDef} from './modes/forest-drive.js';
 
 export const VIZ_MODES: readonly VizModeDef[] = [
     neonCircuitDef,
@@ -40,6 +41,7 @@ export const VIZ_MODES: readonly VizModeDef[] = [
     lensBenchDef,
     spotFieldDef,
     vectorNexusDef,
+    forestDriveDef,
 ];
 
 /** Resolve a persisted mode id to its registry index; unknown ids → 0. */
