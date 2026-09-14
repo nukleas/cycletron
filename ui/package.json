@@ -30,12 +30,12 @@
     "@tauri-apps/plugin-updater": "^2.11.0",
     "codemirror": "^6.0.1",
     "coi-serviceworker": "^0.1.7",
-    "marked": "^18.0.11"
+    "marked": "^18.0.12"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
     "unplugin-inline-enum": "^0.8.3",
-    "vite": "^8.2.2",
+    "vite": "^8.3.0",
     "vite-plugin-tsc": "^0.1.1"
   }
 }
