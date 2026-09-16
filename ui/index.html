@@ -254,9 +254,13 @@
                 </div>
             </div>
 
-            <div class="sidebar-section" id="soundsPanel">
-                <h3>Sounds <span id="soundsCount" class="section-count"></span> <button id="soundsManage" class="prefs-inline-btn sounds-manage-btn" type="button" data-tooltip="Manage sample sets &amp; packs">Manage…</button></h3>
-                <div id="soundsList" class="sounds-list"></div>
+            <div class="sidebar-section snd-panel" id="soundsPanel">
+                <h3>Sounds <span id="soundsCount" class="section-count"></span>
+                    <button id="soundsBrowseAll" class="prefs-inline-btn" type="button" data-tooltip="Open the full Sound Browser (⌘⇧O)">Browse…</button>
+                    <button id="soundsManage" class="prefs-inline-btn sounds-manage-btn" type="button" data-tooltip="Manage sample sets &amp; packs">Manage…</button>
+                </h3>
+                <input id="soundsFilter" class="snd-panel-search" type="search" placeholder="Filter sounds…" autocomplete="off" spellcheck="false" aria-label="Filter sounds" aria-controls="soundsList">
+                <div id="soundsList" class="snd-panel-list" role="listbox" aria-label="Sounds"></div>
             </div>
 
             <div class="sidebar-section sidebar-browse">
@@ -472,6 +476,36 @@
                 <button type="button" id="packsOpenFolder" class="app-modal-link">Open Packs Folder</button>
                 <button type="button" id="packsReload" class="app-modal-link">Reload Enabled</button>
                 <span class="app-modal-spacer"></span>
+                <button data-dismiss class="app-modal-primary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sound Browser: search, audition and insert any playable bank.
+         Rail + one virtualized list; banks expand inline so bank rows and
+         sample rows share a single row pitch (see --row-h). -->
+    <div id="soundBrowser" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="soundBrowserTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window app-modal-window--browser snd-browser" role="document">
+            <div class="app-modal-header">
+                <span id="soundBrowserTitle">Sounds</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
+            </div>
+            <div class="snd-browser-toolbar">
+                <input id="sndSearch" class="snd-search" type="search" placeholder="Search banks…" autocomplete="off" spellcheck="false" aria-label="Search sound banks" aria-controls="sndList">
+                <span id="sndCount" class="snd-result-count"></span>
+            </div>
+            <div class="snd-browser-body">
+                <nav id="sndRail" class="snd-rail" aria-label="Sound categories"></nav>
+                <div class="snd-main">
+                    <div id="sndList" class="snd-list" role="listbox" aria-label="Sound banks" tabindex="0"></div>
+                    <div id="sndEmpty" class="snd-empty" hidden></div>
+                </div>
+            </div>
+            <div class="app-modal-actions">
+                <button type="button" id="sndManage" class="app-modal-link">Manage Sets &amp; Packs…</button>
+                <span class="app-modal-spacer"></span>
+                <span class="snd-hint"><kbd>↑↓</kbd> browse <kbd>Space</kbd> audition <kbd>↩</kbd> insert</span>
                 <button data-dismiss class="app-modal-primary">Close</button>
             </div>
         </div>

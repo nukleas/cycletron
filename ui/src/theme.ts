@@ -15,14 +15,18 @@ const colors = {
     text: 'var(--text)',
     textMuted: 'var(--text-muted)',
     accent: 'var(--neon)',           // electric cyan
-    greenBright: '#52ff9f',
-    purple: '#9d7cff',
-    pink: '#ff4fd8',
-    red: '#ff456c',
-    orange: '#ffb000',
-    yellow: '#f7ff5a',
-    cyan: '#47f6ff',
-    magenta: '#ff2bd6',
+    // These were literal hexes copied from the palette, which meant
+    // desktop-theme.ts repainted the whole app *except* the editor's syntax
+    // colours — and syntax-palette.ts probes CSS for the stage's colours, so
+    // the editor and the stage could disagree about the colour of a string.
+    greenBright: 'var(--green-bright)',
+    purple: 'var(--purple)',
+    pink: 'var(--pink)',
+    red: 'var(--red)',
+    orange: 'var(--orange)',
+    yellow: 'var(--yellow)',
+    cyan: 'var(--cyan)',
+    magenta: 'var(--magenta)',
     selection: 'var(--selection)',
     accentSubtle: 'var(--accent-subtle)'
 } as const;
@@ -32,14 +36,17 @@ export const strudelTheme = EditorView.theme({
     '&': {
         color: colors.text,
         backgroundColor: colors.bg,
-        fontFamily: "'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace",
+        fontFamily: 'var(--font-mono)',
         height: '100%',
-        textShadow: '0 0 3px rgba(71, 246, 255, 0.14)',
     },
     '.cm-content': {
         caretColor: colors.accent,
         padding: '12px 0',
         lineHeight: '1.6',
+        // A glow on 14px running code costs legibility and buys nothing; the
+        // display glow (logo, stat values, viz) carries the look instead. This
+        // used to be opt-in behind .readable-mode.
+        textShadow: '0 0 2px rgba(71, 246, 255, 0.08)',
     },
     '&.cm-focused .cm-cursor': {
         borderLeftColor: colors.accent,

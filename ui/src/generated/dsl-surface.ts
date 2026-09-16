@@ -221,7 +221,7 @@ export const DSL_SYMBOLS: DslSymbol[] = [
     },
     {
         "label": "clip",
-        "detail": "clip(threshold)",
+        "detail": "clip(multiplier)",
         "info": "Distortion & shaping",
         "kind": "method"
     },
@@ -730,6 +730,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "keyword"
     },
     {
+        "label": "if",
+        "detail": "if",
+        "info": "Distortion & shaping",
+        "kind": "method"
+    },
+    {
         "label": "inhabit",
         "detail": "inhabit(...)",
         "info": "Selection / picking",
@@ -793,6 +799,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "layer",
         "detail": "layer(fn, ...)",
         "info": "Stereo & layering",
+        "kind": "method"
+    },
+    {
+        "label": "legato",
+        "detail": "legato",
+        "info": "Distortion & shaping",
         "kind": "method"
     },
     {
@@ -1868,6 +1880,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "detail": "wt_violin",
         "info": "Wavetable — violin timbre",
         "kind": "sound"
+    },
+    {
+        "label": "x",
+        "detail": "x",
+        "info": "Distortion & shaping",
+        "kind": "method"
     },
     {
         "label": "zoom",

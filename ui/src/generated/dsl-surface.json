@@ -205,7 +205,7 @@
   },
   {
     "label": "clip",
-    "detail": "clip(threshold)",
+    "detail": "clip(multiplier)",
     "info": "Distortion & shaping",
     "kind": "method"
   },
@@ -714,6 +714,12 @@
     "kind": "keyword"
   },
   {
+    "label": "if",
+    "detail": "if",
+    "info": "Distortion & shaping",
+    "kind": "method"
+  },
+  {
     "label": "inhabit",
     "detail": "inhabit(...)",
     "info": "Selection / picking",
@@ -777,6 +783,12 @@
     "label": "layer",
     "detail": "layer(fn, ...)",
     "info": "Stereo & layering",
+    "kind": "method"
+  },
+  {
+    "label": "legato",
+    "detail": "legato",
+    "info": "Distortion & shaping",
     "kind": "method"
   },
   {
@@ -1852,6 +1864,12 @@
     "detail": "wt_violin",
     "info": "Wavetable — violin timbre",
     "kind": "sound"
+  },
+  {
+    "label": "x",
+    "detail": "x",
+    "info": "Distortion & shaping",
+    "kind": "method"
   },
   {
     "label": "zoom",

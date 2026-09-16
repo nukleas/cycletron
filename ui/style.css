@@ -304,13 +304,17 @@ body.is-resizing {
     user-select: none;
 }
 
-/* Keyboard-focus glow for interactive controls */
+/* Keyboard-focus ring. 2px + halo, promoted from what used to be
+   .readable-mode's opt-in version: a 1px outline sits below the non-text
+   contrast floor, and the better ring already existed behind a toggle nobody
+   found. */
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
-    outline: 1px solid var(--neon);
-    outline-offset: 1px;
-    box-shadow: 0 0 8px var(--neon-glow);
+select:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--neon);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(71, 246, 255, 0.22);
 }
 
 /* Tooltips (JS-driven — avoids clipping inside overflow:auto containers) */
@@ -1541,14 +1545,21 @@ select option {
 }
 
 .sidebar-section h3 {
-    font-size: 8px;
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    font-size: var(--fs-micro);
     text-transform: uppercase;
-    letter-spacing: 0.25em;
+    letter-spacing: var(--ls-label);
     color: var(--neon-bright);
-    margin-bottom: 6px;
-    font-weight: 700;
+    margin-bottom: var(--sp-3);
+    font-weight: var(--fw-bold);
     text-shadow: 2px 0 0 rgba(255, 43, 214, 0.36), 0 0 4px var(--neon-glow);
 }
+
+/* Inline actions sit at the right of the heading, not wrapped under it. */
+.sidebar-section h3 > .prefs-inline-btn:first-of-type { margin-left: auto; }
+.sidebar-section h3 > .prefs-inline-btn { flex: 0 0 auto; }
 
 .sidebar-section h3::before {
     content: '// ';
@@ -1690,66 +1701,6 @@ select option {
     color: var(--neon-bright);
 }
 
-/* Sounds panel — accurate, clickable list of playable sounds. */
-.sounds-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 220px;
-    overflow-y: auto;
-}
-
-.sound-group-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-}
-
-.sound-group-count {
-    font-size: 8px;
-    font-weight: 400;
-    color: var(--neon);
-    opacity: 0.7;
-}
-
-.sound-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    align-items: center;
-}
-
-.sound-chip {
-    background: var(--bg);
-    padding: 1px 6px;
-    border: 1px solid var(--border);
-    border-radius: 0;
-    font-size: 9px;
-    font-family: inherit;
-    color: var(--neon-bright);
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.sound-chip:hover {
-    border-color: var(--neon);
-    box-shadow: 0 0 6px var(--neon-glow);
-    color: #fff;
-}
-
-.sound-hint,
-.sounds-empty {
-    font-size: 8px;
-    color: var(--text-muted);
-    letter-spacing: 0.03em;
-    font-style: italic;
-}
 
 
 /* =========================================================
@@ -3995,8 +3946,18 @@ body.is-drop-target::after {
         6px 6px 0 rgba(255, 43, 214, 0.18),
         inset 0 0 0 1px rgba(71, 246, 255, 0.05);
 }
-.app-modal-window--small { width: min(420px, 90vw); }
-.app-modal-window--wide { width: min(760px, 92vw); }
+.app-modal-window--small { width: var(--modal-w-small); }
+.app-modal-window--wide { width: var(--modal-w-wide); }
+
+/* Browser-class. Unlike the other steps this sets `height`, not `max-height`:
+   the list viewport must have a resolved height before the virtualizer can
+   work out how many rows fit, and a content-driven modal has none on the
+   first frame. */
+.app-modal-window--browser {
+    width: var(--modal-w-browser);
+    height: var(--modal-h-browser);
+    max-height: var(--modal-h-browser);
+}
 
 .app-modal-header {
     padding: 0 10px;
@@ -4797,47 +4758,14 @@ body.stage-active #fullscreenVizHUD { display: none; }
 }
 
 /* =========================================================
-   READABLE MODE (opt-in, Visuals menu → Display)
-   Bigger floor sizes, dampened running-text glow, strong focus
-   halo. Display glow (logo, stats, viz) stays.
+   EDITOR LEGIBILITY
+   Was .readable-mode's opt-in dampening. A glow on 14px running
+   code is a legibility cost with no aesthetic payoff at that
+   size; the display glow (logo, stat values, viz) is untouched
+   and is where the look actually lives. Everything else the old
+   block did is now token-driven — see the DENSITY LADDER at the
+   top of this file.
    ========================================================= */
-
-.readable-mode {
-    --text-muted: #97a5c4;
-    --text-secondary: #c0cde8;
-}
-
-.readable-mode .menu-section,
-.readable-mode .cmd-palette-hint,
-.readable-mode .files-panel-footer,
-.readable-mode .status-bar,
-.readable-mode .hud-unit { font-size: 11px; }
-
-.readable-mode .bpm-control,
-.readable-mode .gain-control,
-.readable-mode .shortcuts,
-.readable-mode .file-context-menu button,
-.readable-mode .dropdown-menu button,
-.readable-mode .dropdown-menu a,
-.readable-mode .header-menu-btn,
-.readable-mode .stat-label,
-.readable-mode .menu-item-hint,
-.readable-mode .cmd-palette-subtitle,
-.readable-mode .file-tree { font-size: 12px; }
-
-.readable-mode .cmd-palette-title { font-size: 13px; }
-
-.readable-mode .cm-editor { text-shadow: none; }
-.readable-mode .cm-content { text-shadow: 0 0 2px rgba(71, 246, 255, 0.08); }
-
-.readable-mode :focus-visible {
-    outline: 2px solid var(--neon);
-    outline-offset: 2px;
-    box-shadow: 0 0 0 4px rgba(71, 246, 255, 0.22);
-}
-
-.readable-mode .logo h1 { animation: none; }
-.readable-mode .files-panel::after { display: none; }
 
 /* =========================================================
    SCANLINES TOGGLE (Visuals menu → Display; on by default)
@@ -5228,4 +5156,348 @@ body.stage-active #fullscreenVizHUD { display: none; }
     margin: -4px 0 8px 26px;
     font-size: 11px;
     line-height: 1.4;
+}
+
+
+/* =========================================================
+   SOUND BROWSER & SOUNDS PANEL — CYBERPUNK
+   Every size here comes from a token, so the density ladder
+   reaches this panel automatically. The old .readable-mode
+   raised micro type by naming selectors and never named a
+   single one of the Sounds panel's — which is exactly the
+   failure this section is built not to repeat.
+   ========================================================= */
+
+/* The global button rule sets uppercase, 0.1em tracking, a 28px height and a
+   ::before corner pip. Rows and rail items are content, not chrome. */
+.snd-browser button,
+.snd-panel button {
+    height: auto;
+    text-transform: none;
+    letter-spacing: var(--ls-body);
+}
+.snd-browser button::before,
+.snd-panel button::before { content: none; }
+
+/* The Sounds/Mixer counters had no rule at all and were inheriting the h3's
+   8px/0.25em, so they read as part of the heading instead of as data. */
+.section-count {
+    font-size: var(--fs-tiny);
+    font-weight: var(--fw-body);
+    letter-spacing: var(--ls-wide);
+    color: var(--neon);
+    opacity: 0.75;
+    text-shadow: none;
+}
+
+/* ---- Virtualized list scaffolding ---------------------------------- */
+/* Rows are absolutely positioned on a fixed pitch. No gap, no margin: either
+   would desynchronise pitch from height and drift the window. */
+.vlist-spacer { position: relative; width: 100%; }
+.vlist-window { position: absolute; top: 0; left: 0; right: 0; }
+
+/* ---- Browser shell -------------------------------------------------- */
+.snd-browser { display: flex; flex-direction: column; }
+
+.snd-browser-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    padding: var(--sp-3) var(--pad-pane);
+    border-bottom: var(--edge-neon);
+    background: var(--surface-inset);
+}
+
+.snd-search {
+    flex: 1;
+    min-width: 0;
+    height: var(--ctl-h-md);
+    padding: 0 var(--sp-4);
+    background: var(--bg);
+    color: var(--neon-bright);
+    border: var(--edge-hairline);
+    border-radius: var(--r-0);
+    font-family: var(--font-mono);
+    font-size: var(--fs-base);
+    line-height: var(--lh-ui);
+    letter-spacing: var(--ls-code);
+}
+.snd-search:focus {
+    outline: none;
+    border-color: var(--neon);
+    box-shadow: var(--glow-1);
+}
+.snd-search::placeholder { color: var(--text-dim); }
+
+.snd-result-count {
+    flex: 0 0 auto;
+    font-size: var(--fs-tiny);
+    letter-spacing: var(--ls-caps);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.snd-browser-body {
+    flex: 1;
+    /* Without this the grid refuses to shrink and the list scrolls the modal. */
+    min-height: 0;
+    display: grid;
+    grid-template-columns: var(--rail-w) 1fr;
+    gap: 1px;
+    background: var(--border);
+}
+
+.snd-rail,
+.snd-main { background: var(--surface-glass); min-height: 0; min-width: 0; }
+.snd-rail { overflow-y: auto; padding: var(--pad-pane) 0; }
+.snd-main { display: flex; flex-direction: column; }
+
+.snd-rail-item {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    width: 100%;
+    height: var(--row-h);
+    padding: 0 var(--pad-row-x);
+    background: transparent;
+    border: 0;
+    border-left: 2px solid transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    text-align: left;
+    cursor: pointer;
+}
+.snd-rail-item:hover { background: var(--accent-subtle); color: var(--neon-bright); }
+.snd-rail-item.is-active {
+    border-left-color: var(--neon);
+    background: var(--accent-subtle);
+    color: var(--neon-bright);
+    box-shadow: inset 0 0 12px rgba(71, 246, 255, 0.08);
+}
+.snd-rail-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snd-rail-count { margin-left: auto; font-size: var(--fs-tiny); color: var(--text-dim); }
+.snd-rail-item.is-active .snd-rail-count { color: var(--neon); }
+
+/* ---- Rows (shared by the browser and the sidebar) ------------------- */
+.snd-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    position: relative;
+}
+
+.snd-row {
+    /* Normal flow inside .vlist-window, which the virtualizer translates into
+       place. Height is the whole contract: no margin, no flex gap on the
+       window, or the pitch drifts from the scrollbar. */
+    height: var(--row-h);
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    padding-left: calc(var(--pad-row-x) + var(--depth, 0) * var(--sp-5));
+    padding-right: var(--pad-row-x);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+    border-left: 2px solid transparent;
+    color: var(--text-secondary);
+    font-size: var(--fs-base);
+    line-height: var(--lh-tight);
+    letter-spacing: var(--ls-code);
+    cursor: pointer;
+    contain: layout paint;
+}
+.snd-row:hover,
+.snd-row.is-selected {
+    background: var(--accent-subtle);
+    color: var(--neon-bright);
+    border-left-color: var(--neon);
+}
+.snd-row.is-selected { box-shadow: inset 0 0 12px rgba(71, 246, 255, 0.08); }
+
+.snd-row-caret {
+    flex: 0 0 auto;
+    width: var(--sp-5);
+    color: var(--neon-secondary);
+    font-size: var(--fs-tiny);
+}
+.snd-row-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.snd-row--bank > .snd-row-name { color: var(--text); font-weight: var(--fw-med); }
+.snd-row.is-selected > .snd-row-name,
+.snd-row:hover > .snd-row-name { color: inherit; }
+
+.snd-row-kind,
+.snd-row-meta,
+.snd-row-origin {
+    flex: 0 0 auto;
+    font-size: var(--fs-tiny);
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+.snd-row-meta { color: var(--neon); opacity: 0.8; }
+.snd-row-origin {
+    max-width: 14ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.snd-row-tag {
+    flex: 0 0 auto;
+    padding: 0 var(--sp-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-1);
+    color: var(--text-muted);
+    font-size: var(--fs-tiny);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    white-space: nowrap;
+}
+.snd-row-tag[data-flag="live"] { color: var(--orange); border-color: var(--orange-dark); }
+.snd-row-tag[data-flag="shadowed"],
+.snd-row-tag[data-flag="disabled"] { color: var(--text-dim); }
+
+/* ---- Audition ------------------------------------------------------- */
+/* --viz-active (yellow), not cyan: a sounding row and a lit step in the
+   Sequence Grid should read as the same kind of event. */
+.snd-audition {
+    flex: 0 0 auto;
+    width: var(--ctl-h-row);
+    height: var(--ctl-h-row);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r-0);
+    color: var(--text-muted);
+    font-size: var(--fs-tiny);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.1s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.snd-audition-spacer { flex: 0 0 auto; width: var(--ctl-h-row); }
+.snd-row:hover .snd-audition,
+.snd-row:focus-within .snd-audition,
+.snd-audition:focus-visible,
+.snd-audition.is-playing { opacity: 1; }
+.snd-audition:hover {
+    color: var(--neon);
+    border-color: var(--neon-subtle);
+    box-shadow: var(--glow-1);
+}
+.snd-audition.is-playing {
+    color: var(--viz-active);
+    border-color: var(--viz-active);
+    animation: snd-audition-pulse 1.1s ease-in-out infinite;
+}
+.snd-row.is-playing { border-left-color: var(--viz-active); }
+@keyframes snd-audition-pulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(247, 255, 90, 0.35); }
+    50%      { box-shadow: 0 0 14px rgba(247, 255, 90, 0.65); }
+}
+
+/* ---- Empty / error -------------------------------------------------- */
+.snd-empty,
+.snd-error {
+    padding: var(--sp-7) var(--pad-pane);
+    text-align: center;
+    font-size: var(--fs-small);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+}
+.snd-error { color: var(--red); }
+
+.snd-hint {
+    font-size: var(--fs-tiny);
+    color: var(--text-dim);
+    letter-spacing: var(--ls-wide);
+}
+
+/* ---- Sidebar panel -------------------------------------------------- */
+.snd-panel-search {
+    width: 100%;
+    height: var(--ctl-h-sm);
+    margin-bottom: var(--sp-3);
+    padding: 0 var(--sp-3);
+    background: var(--bg);
+    color: var(--neon-bright);
+    border: var(--edge-hairline);
+    border-radius: var(--r-0);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    letter-spacing: var(--ls-code);
+}
+.snd-panel-search:focus {
+    outline: none;
+    border-color: var(--neon);
+    box-shadow: var(--glow-1);
+}
+.snd-panel-search::placeholder { color: var(--text-dim); }
+
+.snd-panel-list {
+    position: relative;
+    /* Eight rows in either density, so the panel keeps its share of the
+       sidebar instead of the 220px that never fit anything. */
+    max-height: calc(var(--row-h) * 8);
+    overflow-y: auto;
+}
+
+.snd-row--group {
+    color: var(--text-muted);
+    font-size: var(--fs-micro);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    background: var(--surface-inset);
+}
+.snd-row--group > .snd-row-name { font-weight: var(--fw-bold); }
+
+.snd-row--more {
+    justify-content: center;
+    color: var(--neon);
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-caps);
+    text-transform: uppercase;
+}
+
+/* ---- Responsive ----------------------------------------------------- */
+@media (max-width: 900px) {
+    .app-modal-window--browser { width: 96vw; height: 92vh; max-height: 92vh; }
+
+    /* Rail becomes a horizontal chip strip: ~8 categories is less than a
+       drawer's worth of chrome. */
+    .snd-browser-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+    .snd-rail {
+        display: flex;
+        gap: var(--sp-2);
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: var(--sp-3) var(--pad-pane);
+    }
+    .snd-rail-item {
+        flex: 0 0 auto;
+        width: auto;
+        border-left: 0;
+        border-bottom: 2px solid transparent;
+    }
+    .snd-rail-item.is-active { border-bottom-color: var(--neon); }
+}
+
+@media (max-width: 400px) {
+    .snd-browser-toolbar { flex-wrap: wrap; }
+    .snd-result-count { order: 3; width: 100%; }
+    /* Name and audition only — the row keeps its pitch, so the virtualizer
+       needs no breakpoint awareness. */
+    .snd-row-kind,
+    .snd-row-origin,
+    .snd-row-tag { display: none; }
 }

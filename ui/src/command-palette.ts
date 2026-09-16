@@ -23,6 +23,7 @@ import {fileManager} from './file-manager.js';
 import {aboutModal} from './about-modal.js';
 import {samplesModal, switchSampleSet} from './samples-modal.js';
 import {scoreText} from './fuzzy.js';
+import {soundBrowser} from './sound-browser.js';
 import {adjustBpm} from './bpm.js';
 import {basename} from './paths.js';
 import {clearSession, toggleAiPanel} from './ai-bridge.js';
@@ -211,6 +212,7 @@ const COMMANDS: Item[] = [
     {id: 'cmd.export_midi', title: 'Export MIDI…',          section: 'Commands',                 run: () => fileManager.exportMidi()},
     {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => midiLab.openEmpty()},
     {id: 'cmd.load_samples',title: 'Load Sample Folder…',   section: 'Commands',                 run: () => requireApp().loadSampleFolder()},
+    {id: 'cmd.sounds',      title: 'Browse Sounds…',        section: 'Commands', hint: '⌘⇧O',   run: () => soundBrowser.open()},
     {id: 'cmd.samples',     title: 'Samples… (sets & packs)', section: 'Commands',               run: () => samplesModal.open()},
     {id: 'cmd.install_pack',title: 'Install Sample Pack…',  section: 'Commands',                 run: () => samplesModal.installFromFolder()},
     {id: 'cmd.preferences', title: 'Preferences…',          section: 'Commands', hint: '⌘,',     run: () => preferencesModal.open()},
