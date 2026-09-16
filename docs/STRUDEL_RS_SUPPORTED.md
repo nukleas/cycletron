@@ -256,7 +256,20 @@ chains.
 ### Distortion & shaping
 
 `dist(amount)` (`distort`, `distortion`), `shape(amount)`, `crush(bits)`,
-`coarse(n)`, `clip(threshold)`.
+`coarse(n)`, `clip(multiplier)` (`legato`).
+
+**`dist` and `shape` are mutually exclusive.** The voice setup is
+`if dist {…} else if shape {…}` — set both and `shape` is silently ignored.
+`dist(x)` → drive `x + 1`; `shape(s)` → drive `(1+s)/(1-s)`. Distortion then
+applies an output trim of `1/(1 + 0.3·(drive − 1))`, so heavier drive is
+*quieter*; compensate with `gain`, which is not clamped. `dist` also selects the
+curve via colon notation — `dist("2:1:2")` is drive 3.0 on hard clip (0 S-curve,
+1 tanh, 2 hard, 3 cubic, 4 diode, 5 asym, 6 foldback, 7 sine-fold, 8 Chebyshev);
+the middle slot (`distortvol`) is a no-op placeholder.
+
+**`clip` is NOT a clipper** — despite the name it is a note-length multiplier
+(`duration × clip`), the same control as `legato`. Use `shape`/`dist` to
+saturate.
 
 ### Pitch modulation / FM
 
