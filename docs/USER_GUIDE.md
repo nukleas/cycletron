@@ -206,16 +206,24 @@ tabla jvbass` …), melodic and speech banks (`flbass uke cpluck cbow speech` �
 pick variants with `s("flbass:2")`), synth waveforms, wavetables, and GM
 soundfonts loaded on demand.
 
-The **Sounds** panel (right sidebar) lists everything currently loaded,
-grouped by category, with usage hints.
+The **Sounds** panel (right sidebar) filters everything currently loaded, with
+groups collapsed until you want them. **Browse…** (or <kbd>⌘⇧O</kbd>) opens the
+**Sound Browser**: search every bank, expand one to see its samples, click to
+hear them, and press <kbd>↩</kbd> to insert at the cursor. Previews play on the
+cue bus, so auditioning while recording never lands in the take.
 
 For more sounds:
 
 | Action | Where |
 |--------|--------|
-| Load a folder for this session | Command palette → **Load Sample Folder…** |
-| Install a folder as a lasting pack | Command palette → **Install Sample Pack…** |
-| Manage packs (enable/disable each, open the folder) | Command palette → **Sample Packs…** |
+| Import a folder or `.zip` as a pack | Palette → **Import Sample Pack…**, or drop it on the window |
+| Manage sets and packs | Palette → **Samples… (sets & packs)** |
+| Find free sample sources | Samples manager → **Get more samples** |
+
+Importing shows you the proposed banks before copying anything: rename them,
+drop what you don't want, and audition first. Flat packs whose filenames carry a
+type tag (`BD-…`, `SNARE-…`) are grouped into real banks rather than becoming
+one bank per file. See [SAMPLE_PACKS.md](./SAMPLE_PACKS.md).
 
 Packs live under `{library}/Packs/`. Format: [SAMPLE_PACKS.md](./SAMPLE_PACKS.md).
 

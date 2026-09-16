@@ -24,6 +24,7 @@ import {aboutModal} from './about-modal.js';
 import {samplesModal, switchSampleSet} from './samples-modal.js';
 import {scoreText} from './fuzzy.js';
 import {soundBrowser} from './sound-browser.js';
+import {packImport} from './pack-import.js';
 import {adjustBpm} from './bpm.js';
 import {basename} from './paths.js';
 import {clearSession, toggleAiPanel} from './ai-bridge.js';
@@ -213,7 +214,8 @@ const COMMANDS: Item[] = [
     {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => midiLab.openEmpty()},
     {id: 'cmd.sounds',      title: 'Browse Sounds…',        section: 'Commands', hint: '⌘⇧O',   run: () => soundBrowser.open()},
     {id: 'cmd.samples',     title: 'Samples… (sets & packs)', section: 'Commands',               run: () => samplesModal.open()},
-    {id: 'cmd.install_pack',title: 'Install Sample Pack…',  section: 'Commands',                 run: () => samplesModal.installFromFolder()},
+    {id: 'cmd.import_folder', title: 'Import Sample Pack (Folder)…', section: 'Commands',        run: () => packImport.openFolderPicker()},
+    {id: 'cmd.import_zip',  title: 'Import Sample Pack (.zip)…', section: 'Commands',           run: () => packImport.openZipPicker()},
     {id: 'cmd.preferences', title: 'Preferences…',          section: 'Commands', hint: '⌘,',     run: () => preferencesModal.open()},
     {id: 'cmd.examples',    title: 'Browse Examples…',      section: 'Commands',                 run: () => requireEl('browseExamples', 'The examples browser').click()},
     {id: 'cmd.help_guide',  title: 'User Guide…',           section: 'Commands',                 run: () => helpModal.open('guide')},

@@ -20,6 +20,7 @@ import {fileExplorer} from './file-explorer.js';
 import {midiLab} from './midi-lab.js';
 import {aboutModal} from './about-modal.js';
 import {samplesModal} from './samples-modal.js';
+import {packImport} from './pack-import.js';
 import {helpModal} from './help-modal.js';
 import {preferencesModal} from './preferences.js';
 import {audioRecorder} from './audio-recorder.js';
@@ -156,6 +157,7 @@ async function boot(): Promise<void> {
     midiLab.init();
     aboutModal.init();
     samplesModal.init();
+    packImport.init();
     helpModal.init();
     preferencesModal.init();
     audioRecorder.init();

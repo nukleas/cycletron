@@ -5501,3 +5501,157 @@ body.stage-active #fullscreenVizHUD { display: none; }
     .snd-row-origin,
     .snd-row-tag { display: none; }
 }
+
+/* ---- Import review --------------------------------------------------- */
+.si-toolbar { gap: var(--gap-stack); flex-wrap: wrap; }
+
+.si-field {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.si-field input {
+    height: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
+    background: var(--bg);
+    color: var(--neon-bright);
+    border: var(--edge-hairline);
+    border-radius: var(--r-0);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    letter-spacing: var(--ls-code);
+    text-transform: none;
+}
+.si-field input:focus { outline: none; border-color: var(--neon); box-shadow: var(--glow-1); }
+
+.si-source {
+    padding: var(--sp-3) var(--pad-pane);
+    font-size: var(--fs-small);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+}
+
+.si-warnings {
+    margin: 0;
+    padding: var(--sp-3) var(--pad-pane) var(--sp-3) calc(var(--pad-pane) + var(--sp-5));
+    list-style: square;
+    font-size: var(--fs-tiny);
+    line-height: var(--lh-body);
+    color: var(--orange);
+    background: var(--surface-inset);
+}
+
+/* Banks left, the selected bank's samples right. Both virtualized. */
+.si-body { grid-template-columns: 1fr 1fr; }
+.si-banks,
+.si-files { background: var(--surface-glass); }
+
+.si-bank.is-dropped { opacity: 0.4; }
+.si-bank.is-dropped .si-bank-name { text-decoration: line-through; }
+
+.si-bank-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: var(--ctl-h-row);
+    padding: 0 var(--sp-2);
+    background: transparent;
+    color: var(--text);
+    border: 1px solid transparent;
+    border-radius: var(--r-0);
+    font-family: var(--font-mono);
+    font-size: var(--fs-base);
+    font-weight: var(--fw-med);
+    letter-spacing: var(--ls-code);
+}
+.si-bank-name:hover { border-color: var(--border); }
+.si-bank-name:focus { outline: none; border-color: var(--neon); box-shadow: var(--glow-1); }
+
+.si-bank-drop,
+.si-file-drop,
+.si-file-up {
+    flex: 0 0 auto;
+    width: var(--ctl-h-row);
+    height: var(--ctl-h-row);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-size: var(--fs-tiny);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.1s, color 0.12s, border-color 0.12s;
+}
+.snd-row:hover .si-bank-drop,
+.snd-row:hover .si-file-drop,
+.snd-row:hover .si-file-up,
+.si-bank-drop:focus-visible,
+.si-file-drop:focus-visible,
+.si-file-up:focus-visible { opacity: 1; }
+.si-bank-drop:hover,
+.si-file-drop:hover { color: var(--red); border-color: var(--red-subtle); }
+.si-file-up:hover { color: var(--neon); border-color: var(--neon-subtle); }
+
+.si-summary {
+    font-size: var(--fs-tiny);
+    color: var(--text-muted);
+    letter-spacing: var(--ls-wide);
+}
+
+/* ---- Get more samples ------------------------------------------------ */
+.snd-sources {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: var(--gap-stack);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.snd-source-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--pad-pane);
+    background: var(--surface-inset);
+    border: var(--edge-neon);
+}
+.snd-source-card:hover { border-color: var(--neon); box-shadow: var(--glow-2); }
+
+.snd-source-open {
+    align-self: flex-start;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: var(--neon-bright);
+    font-family: var(--font-mono);
+    font-size: var(--fs-micro);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    text-shadow: var(--text-glitch);
+    cursor: pointer;
+}
+.snd-source-open:hover { color: var(--neon); }
+.snd-source-blurb {
+    font-size: var(--fs-small);
+    line-height: var(--lh-body);
+    color: var(--text-secondary);
+}
+/* The licence line is never truncated: a half-quoted term is worse than none. */
+.snd-source-license,
+.snd-source-format {
+    font-size: var(--fs-tiny);
+    line-height: var(--lh-body);
+    color: var(--text-dim);
+    letter-spacing: var(--ls-wide);
+}
+
+.samples-getmore-note strong { color: var(--orange-bright); }

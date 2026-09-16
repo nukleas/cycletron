@@ -470,9 +470,22 @@
                 <p class="packs-intro">Optional sample packs live in your library under <code>Packs/</code>. Enabled packs add their banks on top of the active set.</p>
                 <div id="packsList" class="packs-list"></div>
                 <div id="packsEmpty" class="packs-empty" hidden></div>
+
+                <h4 class="samples-heading">Get more samples</h4>
+                <p class="packs-intro samples-getmore-note">
+                    These are third-party sites, not part of Cycletron.
+                    <strong>Cycletron does not host, mirror, or license any of this audio.</strong>
+                    You download it under whatever terms that site states; Cycletron only imports
+                    files you already have. Imported packs are recorded as
+                    <code>LicenseRef-UserProvided</code> — a marker meaning &ldquo;the user supplied
+                    this&rdquo;, not a grant. Check each source&rsquo;s terms before you release
+                    anything made with them.
+                </p>
+                <ul id="samplesSources" class="snd-sources"></ul>
             </div>
             <div class="app-modal-actions">
-                <button type="button" id="packsInstall" class="app-modal-link">Install from Folder…</button>
+                <button type="button" id="packsImportFolder" class="app-modal-link">Import Folder…</button>
+                <button type="button" id="packsImportZip" class="app-modal-link">Import .zip…</button>
                 <button type="button" id="packsOpenFolder" class="app-modal-link">Open Packs Folder</button>
                 <button type="button" id="packsReload" class="app-modal-link">Reload Enabled</button>
                 <span class="app-modal-spacer"></span>
@@ -507,6 +520,35 @@
                 <span class="app-modal-spacer"></span>
                 <span class="snd-hint"><kbd>↑↓</kbd> browse <kbd>Space</kbd> audition <kbd>↩</kbd> insert</span>
                 <button data-dismiss class="app-modal-primary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import review: nothing is copied into the library until the proposed
+         bank mapping has been seen and approved. -->
+    <div id="packImportModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="packImportTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window app-modal-window--browser snd-browser" role="document">
+            <div class="app-modal-header">
+                <span id="packImportTitle">Import samples</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
+            </div>
+            <div class="snd-browser-toolbar si-toolbar">
+                <label class="si-field">Name <input id="siName" type="text" maxlength="64" spellcheck="false"></label>
+                <label class="si-field">Id <input id="siId" type="text" maxlength="63" spellcheck="false" pattern="[a-z0-9][a-z0-9_-]*"></label>
+                <span id="siStats" class="snd-result-count"></span>
+            </div>
+            <p id="siSource" class="si-source"></p>
+            <ul id="siWarnings" class="si-warnings" hidden></ul>
+            <div class="snd-browser-body si-body">
+                <div id="siBanks" class="snd-list si-banks" role="listbox" aria-label="Proposed banks"></div>
+                <div id="siFiles" class="snd-list si-files" role="list" aria-label="Samples in the selected bank"></div>
+            </div>
+            <div class="app-modal-actions">
+                <span id="siSummary" class="si-summary"></span>
+                <span class="app-modal-spacer"></span>
+                <button type="button" id="siCancel" class="app-modal-link">Cancel</button>
+                <button type="button" id="siCommit" class="app-modal-primary">Import</button>
             </div>
         </div>
     </div>

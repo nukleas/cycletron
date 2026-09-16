@@ -17,7 +17,10 @@ import {invoke, isTauri, listen} from './tauri.js';
 import {dismissibleModal} from './modal-utils.js';
 import {escapeHtml} from './html.js';
 import {notify} from './notifications.js';
-import {errorDialog, openPathDialog} from './dialog.js';
+import {packImport} from './pack-import.js';
+import {openExternal} from './external-link.js';
+import {FREE_SAMPLE_SOURCES} from './sample-sources.js';
+import {errorDialog} from './dialog.js';
 import type {SampleSetStatus, SampleSetProgress, UserSettings} from './types/tauri-commands.js';
 
 interface PackBankSummary {
@@ -71,9 +74,14 @@ export class SamplesModal {
         document.getElementById('packsReload')?.addEventListener('click', () => {
             void this.reloadEnabled();
         });
-        document.getElementById('packsInstall')?.addEventListener('click', () => {
-            void this.installFromFolder();
+        document.getElementById('packsImportFolder')?.addEventListener('click', () => {
+            void packImport.openFolderPicker();
         });
+        document.getElementById('packsImportZip')?.addEventListener('click', () => {
+            void packImport.openZipPicker();
+        });
+
+        this.renderSources();
 
         if (isTauri) {
             void listen<SampleSetProgress>('sample-set-progress', (event) => {
@@ -88,6 +96,25 @@ export class SamplesModal {
             });
         }
         this.inited = true;
+    }
+
+    /** Static link list — Cycletron points at these, it does not ship them. */
+    private renderSources(): void {
+        const el = document.getElementById('samplesSources');
+        if (!el) return;
+        el.innerHTML = FREE_SAMPLE_SOURCES.map((src) => `
+            <li class="snd-source-card">
+                <button type="button" class="snd-source-open" data-url="${escapeHtml(src.url)}">
+                    ${escapeHtml(src.name)} &#8599;
+                </button>
+                <span class="snd-source-blurb">${escapeHtml(src.blurb)}</span>
+                <span class="snd-source-license">${escapeHtml(src.license)}</span>
+                <span class="snd-source-format">${escapeHtml(src.format)}</span>
+            </li>`).join('');
+        el.addEventListener('click', (e) => {
+            const btn = (e.target as Element).closest('.snd-source-open') as HTMLElement | null;
+            if (btn?.dataset.url) void openExternal(btn.dataset.url);
+        });
     }
 
     async open(): Promise<void> {
@@ -300,51 +327,6 @@ export class SamplesModal {
             await invoke('reveal_in_os', {path: dir});
         } catch (e) {
             await errorDialog(`Could not open the Packs folder:\n${e}`);
-        }
-    }
-
-    /** Copy a Strudel-style sample folder into Packs/ and enable it. */
-    async installFromFolder(): Promise<void> {
-        this.init();
-        if (!isTauri) return;
-        try {
-            const dir = await openPathDialog({
-                directory: true,
-                title: 'Choose a sample folder to install as a pack',
-            });
-            if (!dir) return;
-
-            void notify('Installing pack…', 'Copying samples into your library');
-            const result = await invoke<{
-                id: string;
-                name: string;
-                banks: string[];
-                renamed: Array<{from: string; to: string}>;
-                file_count: number;
-                load: {banks: Array<{name: string; files: string[]}>; skipped: string[]} | null;
-            }>('install_pack_from_folder', {
-                path: dir,
-                id: null,
-                name: null,
-                enable: true,
-            });
-
-            let loaded = 0;
-            if (result.load?.banks?.length) {
-                loaded = (await window.strudelApp?.loadPackBanks?.(result.load.banks)) ?? 0;
-            }
-
-            const renameNote = result.renamed?.length
-                ? ` Renamed ${result.renamed.length} bank(s) that collide with the core kit.`
-                : '';
-            void notify(
-                'Pack installed',
-                `${result.id}: ${result.file_count} files, ${result.banks.length} banks, ${loaded} loaded.${renameNote}`,
-            );
-            await this.refreshPacks();
-            document.dispatchEvent(new CustomEvent('sounds:changed'));
-        } catch (e) {
-            await errorDialog(`Install failed:\n${e}`);
         }
     }
 
