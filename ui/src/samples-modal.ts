@@ -20,6 +20,11 @@ import {notify} from './notifications.js';
 import {errorDialog, openPathDialog} from './dialog.js';
 import type {SampleSetStatus, SampleSetProgress, UserSettings} from './types/tauri-commands.js';
 
+interface PackBankSummary {
+    name: string;
+    files: string[];
+}
+
 interface PackSummary {
     id: string;
     name: string;
@@ -27,7 +32,7 @@ interface PackSummary {
     spdx: string;
     description: string;
     tags: string[];
-    banks: string[];
+    banks: PackBankSummary[];
     enabled: boolean;
     path: string;
 }
@@ -229,7 +234,11 @@ export class SamplesModal {
             this.packsEmptyEl.hidden = true;
             this.packsListEl.innerHTML = packs
                 .map((p) => {
-                    const banks = p.banks.map((b) => escapeHtml(b)).join(', ');
+                    const samples = p.banks.reduce((n, b) => n + b.files.length, 0);
+                    const names = p.banks.map((b) => escapeHtml(b.name)).join(', ');
+                    const banks = p.banks.length
+                        ? `${p.banks.length} banks · ${samples} samples — ${names}`
+                        : '';
                     const checked = p.enabled ? 'checked' : '';
                     return `<label class="packs-row">
                         <input type="checkbox" data-pack-id="${escapeHtml(p.id)}" ${checked} />

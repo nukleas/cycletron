@@ -73,9 +73,22 @@ pub struct PackSummary {
     pub spdx: String,
     pub description: String,
     pub tags: Vec<String>,
-    pub banks: Vec<String>,
+    pub banks: Vec<PackBankSummary>,
     pub enabled: bool,
     pub path: String,
+}
+
+/// One bank of an installed pack, with absolute file paths.
+///
+/// Carries files (not just the name) so the Sound Browser can show sample
+/// counts and audition a pack that is installed but not enabled — a disabled
+/// pack would otherwise be the one place in the browser with no counts.
+/// Unlike [`resolve_load`] this does not skip core-name collisions: the browser
+/// wants to show a shadowed bank, flagged, rather than pretend it is absent.
+#[derive(Debug, Clone, Serialize)]
+pub struct PackBankSummary {
+    pub name: String,
+    pub files: Vec<String>,
 }
 
 /// Absolute paths ready for `read_audio_file` + frontend decode.
@@ -320,7 +333,22 @@ pub fn list_packs(state: State<'_, AppState>) -> Result<Vec<PackSummary>, String
             spdx: m.spdx,
             description: m.description,
             tags: m.tags,
-            banks: m.banks.iter().map(|b| b.name.clone()).collect(),
+            banks: m
+                .banks
+                .iter()
+                .map(|b| PackBankSummary {
+                    name: b.name.clone(),
+                    files: b
+                        .files
+                        .iter()
+                        // A malformed relative path drops that file rather than
+                        // blanking the whole listing — one bad pack must not
+                        // make the manager look empty.
+                        .filter_map(|f| safe_rel_path(f).ok())
+                        .map(|rel| dir.join(rel).to_string_lossy().into_owned())
+                        .collect(),
+                })
+                .collect(),
             enabled: enabled.contains(&m.id),
             path: dir.to_string_lossy().into_owned(),
         });

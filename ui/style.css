@@ -4,21 +4,47 @@
     padding: 0;
 }
 
+/* =========================================================
+   TOKENS
+   Colour is theme-able (desktop-theme.ts rewrites these on
+   :root at runtime). Everything below colour is the chassis:
+   one ramp for space, one for type, one for elevation. The
+   density ladder further down picks different rungs of the
+   same ramps — it never invents new values and it never names
+   a component, so a new component cannot be forgotten by it
+   the way the Sounds panel was forgotten by .readable-mode.
+   ========================================================= */
+
 :root {
+    /* ---- Surfaces ---------------------------------------------------- */
     /* Neo-retro terminal palette: dark glass, cyan phosphor, magenta edge light. */
     --bg: #05060a;
     --bg-light: #0b0f18;
     --bg-lighter: #111827;
     --border: #26324c;
 
+    --surface-glass: rgba(11, 15, 24, 0.94);
+    /* Derived from --bg so they follow a desktop theme with no extra code in
+       desktop-theme.ts. These replace literal rgba(5, 6, 10, .55/.6/.7/.72). */
+    --surface-inset: color-mix(in srgb, var(--bg) 72%, transparent);
+    --surface-chrome: color-mix(in srgb, var(--bg) 60%, transparent);
+    --panel-shadow: inset 0 0 0 1px rgba(71, 246, 255, 0.04), 0 0 24px rgba(71, 246, 255, 0.07);
+
+    /* ---- Text -------------------------------------------------------- */
     --text: #f2f7ff;
     --text-secondary: #a7b7d6;
     --text-muted: #687797;
+    /* Fourth step. Was referenced nine times and never defined: eight sites
+       passed one of three inconsistent fallbacks, and .ai-consent-fine passed
+       none at all, so it silently inherited its parent's colour. */
+    --text-dim: #55627f;
 
+    /* ---- Accent ------------------------------------------------------ */
     --accent: #47f6ff;
     --accent-subtle: rgba(71, 246, 255, 0.12);
     --selection: rgba(71, 246, 255, 0.24);
 
+    /* ---- Hues -------------------------------------------------------- */
     --green: #0a3025;
     --green-bright: #52ff9f;
     --purple: #9d7cff;
@@ -33,19 +59,10 @@
     --rust: #ff4fd8;
     --magenta: #ff2bd6;
     --violet: #9d7cff;
-
+    --blue: #6aa8ff;
     --danger-hover: #ff7a96;
 
-    --sidebar-width: 300px;
-    --editor-font-size: 14px;
-
-    --sb-thumb: var(--bg-lighter);
-    --sb-track: var(--bg);
-    --sb-size-medium: 10px;
-
-    --surface-glass: rgba(11, 15, 24, 0.94);
-    --panel-shadow: inset 0 0 0 1px rgba(71, 246, 255, 0.04), 0 0 24px rgba(71, 246, 255, 0.07);
-
+    /* ---- Neon layer -------------------------------------------------- */
     --neon: #47f6ff;
     --neon-subtle: rgba(71, 246, 255, 0.20);
     --neon-glow: rgba(71, 246, 255, 0.34);
@@ -57,31 +74,168 @@
     --viz-active: #f7ff5a;
     --viz-hot: #ff2bd6;
 
-    /* Composite cyberpunk effects reused across components. Exact values are
-       preserved so rendering is unchanged; per-element decorative variants
-       (other alphas/glow sizes) stay inline where they're intentionally tuned. */
+    /* ---- Composite effects ------------------------------------------- */
     --text-glitch: 2px 0 0 rgba(255, 43, 214, 0.45), 0 0 6px var(--neon-glow);
     --edge-3d: 3px 3px 0 rgba(255, 43, 214, 0.45);
     --edge-3d-strong: 3px 3px 0 rgba(255, 43, 214, 0.55);
+    --edge-3d-panel: 6px 6px 0 rgba(255, 43, 214, 0.18);
     --backdrop-scanlines: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.18) 2px, rgba(0, 0, 0, 0.18) 4px);
 
-    /* AI panel aliases (kept for backwards compat) */
+    /* ---- Edges & glow elevation -------------------------------------- */
+    /* Three glow steps, because the file otherwise uses 6/8/10/12/18/24/30px
+       blurs interchangeably for the same semantic weight. 1 = hover on a small
+       control, 2 = focused or primary control, 3 = a floating surface. */
+    --edge-hairline: 1px solid var(--border);
+    --edge-neon: 1px solid var(--neon-subtle);
+    --edge-neon-strong: 1px solid var(--neon);
+    --glow-1: 0 0 6px var(--neon-glow);
+    --glow-2: 0 0 12px var(--neon-glow);
+    --glow-3: 0 0 30px var(--neon-glow), 0 0 60px var(--neon-subtle);
+
+    /* ---- Radius ------------------------------------------------------ */
+    /* This system is square: 44 of 52 border-radius declarations are 0.
+       These tokens exist only to name the exceptions. */
+    --r-0: 0;
+    --r-1: 2px;
+    --r-round: 50%;
+    --r-pill: 999px;
+
+    /* ---- Space ------------------------------------------------------- */
+    /* Density-invariant, 2px base. The existing padding histogram is
+       2/4/6/8/10/12/14/16/18/22/24, so a 4px or 8px grid would have forced
+       ~40 rules to move. Density picks rungs of this ramp; it never rescales
+       it, which keeps proportions intact between modes. */
+    --sp-1: 2px;
+    --sp-2: 4px;
+    --sp-3: 6px;
+    --sp-4: 8px;
+    --sp-5: 12px;
+    --sp-6: 16px;
+    --sp-7: 24px;
+
+    /* ---- Type -------------------------------------------------------- */
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+
+    /* Tracking. The 0.25em uppercase micro-label is the house signature and
+       survives — it just stops being 8px. */
+    --ls-label: 0.25em;
+    --ls-caps: 0.15em;
+    --ls-wide: 0.08em;
+    --ls-body: 0.02em;
+    --ls-code: 0;
+
+    --fw-body: 400;
+    --fw-med: 600;
+    --fw-bold: 700;
+    --fw-display: 800;
+
+    --lh-tight: 1.2;
+    --lh-ui: 1.35;
+    --lh-body: 1.5;
+
+    /* Steps above --fs-base are density-invariant: display type, already
+       legible, and scaling them would make Comfortable look zoomed. */
+    --fs-med: 15px;
+    --fs-lg: 18px;
+
+    /* ---- Chrome ------------------------------------------------------ */
+    --sidebar-width: 300px;
+    --editor-font-size: 14px;
+
+    --sb-thumb: var(--bg-lighter);
+    --sb-track: var(--bg);
+    --sb-size-medium: 10px;
+    --sb-size-thin: 4px;
+
+    --modal-w-small: min(420px, 90vw);
+    --modal-w-base: min(560px, 92vw);
+    --modal-w-wide: min(760px, 92vw);
+    --modal-w-browser: min(1080px, 94vw);
+    --modal-h-browser: min(720px, 86vh);
+
+    /* AI panel aliases (removed in a follow-up commit; 75 live call sites) */
     --ai-bg: var(--bg);
     --ai-panel: var(--bg-light);
     --ai-panel-hover: var(--bg-lighter);
     --ai-border: var(--border);
     --ai-text: var(--text);
     --ai-text-muted: var(--text-muted);
-    --ai-text-dim: #4a4060;
+    --ai-text-dim: var(--text-dim);
     --ai-neon: var(--neon);
     --ai-neon-subtle: var(--neon-subtle);
     --ai-neon-glow: var(--neon-glow);
     --ai-neon-bright: var(--neon-bright);
     --ai-magenta: var(--magenta);
     --ai-green: var(--green-bright);
-    --ai-blue: #6aa8ff;
+    --ai-blue: var(--blue);
     --ai-red: var(--red);
 }
+
+/* =========================================================
+   DENSITY LADDER  (Visuals ▸ Display ▸ Density)
+   Comfortable is the default: the app's smallest label was 8px
+   at 0.25em tracking in an unbundled font, below the legibility
+   floor on every platform. Compact is the opt-in that reproduces
+   the pre-refresh metrics, minus the two sizes (8px, 7px) that
+   were never legible.
+   --row-h is load-bearing: the sound browser's virtualizer reads
+   it from getComputedStyle. Keep it an integer.
+   ========================================================= */
+
+:root,
+:root[data-density="comfortable"] {
+    --fs-micro: 10px;   /* uppercase machine labels: h3, stat-label, rail groups */
+    --fs-tiny: 11px;    /* chips, counts, kbd, footer hints                      */
+    --fs-small: 12px;   /* row meta, status bar, secondary copy                  */
+    --fs-base: 13px;    /* list row primary text, body copy                      */
+
+    --pad-pane: var(--sp-5);
+    --pad-row-x: var(--sp-5);
+    --pad-row-y: var(--sp-3);
+    --gap-stack: var(--sp-4);
+    --gap-inline: var(--sp-3);
+
+    --ctl-h-xs: 22px;
+    --ctl-h-sm: 26px;
+    --ctl-h-md: 30px;
+    --ctl-h-lg: 34px;
+
+    /* 13px x 1.35 = 18, + 6 + 6 = 30. Border-box, so the 1px separator
+       lives inside the pitch. */
+    --row-h: 30px;
+    --rail-w: 176px;
+
+    /* Muted text gets one step lighter when the type is larger, because
+       larger glyphs at the same alpha read heavier than they measure. */
+    --text-muted: #7b8aab;
+}
+
+:root[data-density="compact"] {
+    --fs-micro: 9px;
+    --fs-tiny: 10px;
+    --fs-small: 11px;
+    --fs-base: 12px;
+
+    --pad-pane: var(--sp-4);
+    --pad-row-x: var(--sp-4);
+    --pad-row-y: var(--sp-2);
+    --gap-stack: var(--sp-3);
+    --gap-inline: var(--sp-2);
+
+    --ctl-h-xs: 20px;
+    --ctl-h-sm: 24px;
+    --ctl-h-md: 28px;
+    --ctl-h-lg: 32px;
+
+    /* 12px x 1.3 = 16, + 4 + 4 = 24 — the WCAG 2.2 AA minimum target size
+       (24 x 24 CSS px). Do not go below this. */
+    --row-h: 24px;
+    --rail-w: 152px;
+}
+
+/* Derived from --row-h so a row-internal control can never overflow its
+   row in either density. 26px comfortable / 20px compact. */
+:root { --ctl-h-row: calc(var(--row-h) - var(--sp-2)); }
 
 
 /* =========================================================
@@ -89,7 +243,7 @@
    ========================================================= */
 
 body {
-    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+    font-family: var(--font-mono);
     background:
         linear-gradient(90deg, var(--pixel-grid) 1px, transparent 1px),
         linear-gradient(0deg, var(--pixel-grid) 1px, transparent 1px),
@@ -2244,7 +2398,7 @@ body.is-drop-target::after {
     border-right: 1px solid var(--ai-neon-subtle);
     background: var(--surface-glass);
     flex-shrink: 0;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
     position: relative;
     box-shadow: var(--panel-shadow);
 }
@@ -2415,7 +2569,7 @@ body.is-drop-target::after {
 }
 .ai-tool > summary::-webkit-details-marker { display: none; }
 .ai-tool-glyph { flex: none; width: 1em; text-align: center; }
-.ai-tool-name { flex: none; font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace; color: var(--ai-neon); }
+.ai-tool-name { flex: none; font-family: var(--font-mono); color: var(--ai-neon); }
 .ai-tool-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-tool-cat {
     flex: none; font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase;
@@ -2621,7 +2775,7 @@ body.is-drop-target::after {
     border-right: 1px solid var(--neon-subtle);
     background: var(--surface-glass);
     flex-shrink: 0;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
     position: relative;
     box-shadow: var(--panel-shadow);
 }
@@ -3531,7 +3685,7 @@ body.is-drop-target::after {
     background: var(--surface-glass);
     border-top: 1px solid var(--neon-subtle);
     color: var(--text);
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
 }
 .cm-panels-bottom { box-shadow: 0 -4px 18px rgba(71, 246, 255, 0.06); }
@@ -3677,7 +3831,7 @@ body.is-drop-target::after {
     align-items: flex-start;
     justify-content: center;
     padding-top: 12vh;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
 }
 .cmd-palette[hidden] { display: none !important; }
 .cmd-palette-backdrop {
@@ -3818,7 +3972,7 @@ body.is-drop-target::after {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
 }
 .app-modal[hidden] { display: none !important; }
 .app-modal-backdrop {
@@ -4336,7 +4490,7 @@ body.immersive-viz-active #editor .cm-gutters {
     right: 16px;
     bottom: 16px;
     pointer-events: none;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     letter-spacing: 0.08em;
     color: var(--text-muted, #a7b7d6);

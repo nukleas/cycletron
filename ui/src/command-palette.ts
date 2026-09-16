@@ -22,6 +22,7 @@ import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
 import {aboutModal} from './about-modal.js';
 import {samplesModal, switchSampleSet} from './samples-modal.js';
+import {scoreText} from './fuzzy.js';
 import {adjustBpm} from './bpm.js';
 import {basename} from './paths.js';
 import {clearSession, toggleAiPanel} from './ai-bridge.js';
@@ -329,21 +330,7 @@ async function walkLibrary(path: string, depth: number, maxDepth: number): Promi
 // ------------------------------------------------------------------
 
 function score(item: Item, q: string): number {
-    const title = item.title.toLowerCase();
-    const subtitle = (item.subtitle ?? '').toLowerCase();
-    if (title === q) return 1000;
-    if (title.startsWith(q)) return 500 - title.length;
-    const tIdx = title.indexOf(q);
-    if (tIdx >= 0) return 200 - tIdx - title.length * 0.01;
-    const sIdx = subtitle.indexOf(q);
-    if (sIdx >= 0) return 100 - sIdx;
-    // Subsequence match (e.g. "opnf" matches "Open File").
-    let i = 0;
-    for (const ch of title) {
-        if (ch === q[i]) i++;
-        if (i === q.length) return 50;
-    }
-    return 0;
+    return scoreText(item.title, item.subtitle ?? '', q);
 }
 
 function iconFor(section: Item['section']): string {
