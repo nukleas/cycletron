@@ -16,6 +16,7 @@ mod mpris;
 mod oauth;
 mod oauth_store;
 mod osc;
+mod pack_import;
 mod packs;
 mod persistence;
 mod playback;
@@ -189,6 +190,10 @@ pub fn run() {
             // Seed the strudel sample-set bank names for the agent's sound
             // catalog (no-op when the set isn't downloaded).
             sample_sets::refresh_bank_names(app.handle());
+
+            // An import cannot span a restart, so anything still staged is the
+            // residue of a crash or a force-quit mid-review.
+            pack_import::sweep_import_temp(app.handle());
 
             // Native menu — emits `menu:<action>` events consumed by the frontend.
             let recents = app.state::<AppState>().recents.lock().entries.clone();
@@ -382,7 +387,9 @@ pub fn run() {
             packs::disable_pack,
             packs::load_enabled_packs,
             packs::packs_dir,
-            packs::install_pack_from_folder,
+            pack_import::preview_pack_import,
+            pack_import::commit_pack_import,
+            pack_import::cancel_pack_import,
             midi_input::list_midi_input_devices,
             midi_input::start_midi_input_listening,
             midi_input::stop_midi_input_listening,

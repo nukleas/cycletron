@@ -24,7 +24,7 @@ const MAX_BANK_NAME_BYTES: usize = 31;
 /// sample arena or stall the IPC bridge. 64 MB is generous for a single sample.
 const MAX_AUDIO_FILE_BYTES: u64 = 64 * 1024 * 1024;
 
-fn is_audio(path: &Path) -> bool {
+pub(crate) fn is_audio(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .map(str::to_ascii_lowercase)
@@ -259,19 +259,14 @@ pub struct ScannedBank {
     pub files: Vec<PathBuf>,
 }
 
-/// Scan a folder into banks.
+/// Scan a folder into banks, plus the strategy used for the root's loose files.
 ///
 /// Each immediate subdirectory is a bank. Loose audio at the root is grouped by
 /// [`group_audio_files`] rather than becoming one bank per file — see that
 /// function for why. Subdirectories keep their folder name; only their file
-/// order is natural-sorted, so existing Strudel-shaped packs scan exactly as
-/// they always did.
-pub fn scan_folder_banks(root: &Path) -> Result<Vec<ScannedBank>, String> {
-    Ok(scan_folder_banks_detailed(root)?.1)
-}
-
-/// [`scan_folder_banks`] plus the strategy used for the root's loose files,
-/// which the import preview reports to the user.
+/// order is natural-sorted, so existing Strudel-shaped packs scan as they
+/// always did. The strategy is reported so the import preview can tell the user
+/// how their filenames were read.
 pub fn scan_folder_banks_detailed(
     root: &Path,
 ) -> Result<(GroupStrategy, Vec<ScannedBank>), String> {

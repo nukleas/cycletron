@@ -16,7 +16,7 @@ use tauri::State;
 
 pub const PACKS_DIR: &str = "Packs";
 const ENABLED_FILE: &str = "enabled.json";
-const MANIFEST: &str = "pack.json";
+pub(crate) const MANIFEST: &str = "pack.json";
 
 /// SPDX ids accepted for auto-enable. User-imported packs use
 /// `LicenseRef-UserProvided` and are allowed after the user installed them.
@@ -119,7 +119,7 @@ pub fn ensure_packs_dir(library_root: &Path) -> Result<(), String> {
 }
 
 /// `Packs/` under the current library root, best-effort created.
-fn ensured_packs_root(state: &State<'_, AppState>) -> PathBuf {
+pub(crate) fn ensured_packs_root(state: &State<'_, AppState>) -> PathBuf {
     let lib = state.library_root();
     let _ = ensure_packs_dir(&lib);
     packs_root(&lib)
@@ -140,7 +140,7 @@ fn write_enabled(packs: &Path, enabled: &EnabledFile) -> Result<(), String> {
     fs::write(&path, s + "\n").map_err(|e| format!("write {}: {e}", path.display()))
 }
 
-fn is_valid_pack_id(id: &str) -> bool {
+pub(crate) fn is_valid_pack_id(id: &str) -> bool {
     let mut chars = id.chars();
     let Some(first) = chars.next() else {
         return false;
@@ -156,7 +156,7 @@ fn is_valid_pack_id(id: &str) -> bool {
 }
 
 /// Relative path with no `..` / absolute components.
-fn safe_rel_path(rel: &str) -> Result<PathBuf, String> {
+pub(crate) fn safe_rel_path(rel: &str) -> Result<PathBuf, String> {
     if rel.is_empty() || rel.starts_with('/') || rel.contains('\\') {
         return Err(format!("invalid path: {rel}"));
     }
@@ -171,7 +171,7 @@ fn safe_rel_path(rel: &str) -> Result<PathBuf, String> {
     Ok(p.to_path_buf())
 }
 
-fn core_bank_names() -> HashSet<String> {
+pub(crate) fn core_bank_names() -> HashSet<String> {
     let mut set: HashSet<String> = DEFAULT_DRUMS
         .iter()
         .chain(PERCUSSION.iter())
@@ -415,8 +415,8 @@ pub fn packs_dir(state: State<'_, AppState>) -> Result<String, String> {
 
 /// Cap on files copied during install (Dirt-scale libraries are fine; multi-GB
 /// dumps should be thinned first).
-const MAX_INSTALL_FILES: usize = 8_000;
-const MAX_INSTALL_BYTES: u64 = 768 * 1024 * 1024; // 768 MB
+pub(crate) const MAX_INSTALL_FILES: usize = 8_000;
+pub(crate) const MAX_INSTALL_BYTES: u64 = 768 * 1024 * 1024; // 768 MB
 
 #[derive(Debug, Clone, Serialize)]
 pub struct PackInstallResult {
@@ -439,7 +439,7 @@ pub struct PackBankRename {
 }
 
 /// Derive a pack id from a folder name: lowercase, runs of non-alnum → `-`.
-fn pack_id_from_folder_name(raw: &str) -> String {
+pub(crate) fn pack_id_from_folder_name(raw: &str) -> String {
     let mut out = String::new();
     let mut last_dash = false;
     for ch in raw.chars() {
@@ -487,7 +487,7 @@ fn clip_with_suffix(base: &str, suffix: &str) -> String {
 
 /// If `name` collides with a core bank, append `_{pack_id}` (clipped to 31).
 /// Bank tokens are `[a-z0-9_]` only — pack id hyphens become underscores.
-fn bank_name_for_pack(
+pub(crate) fn bank_name_for_pack(
     name: &str,
     pack_id: &str,
     core: &HashSet<String>,
@@ -521,194 +521,13 @@ fn bank_name_for_pack(
     (final_name, rename)
 }
 
-fn copy_file(src: &Path, dest: &Path) -> Result<u64, String> {
+pub(crate) fn copy_file(src: &Path, dest: &Path) -> Result<u64, String> {
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
     }
     fs::copy(src, dest).map_err(|e| format!("copy {} → {}: {e}", src.display(), dest.display()))
 }
-
-/// Install a Strudel-style sample folder as a pack under `Packs/<id>/`.
-///
-/// Copies audio (does not leave the pack pointing at the source). SPDX is
-/// `LicenseRef-UserProvided`. Bank names that collide with the core kit are
-/// renamed (`bd` → `bd_<id>`). Set `enable` to also add the pack to
-/// `enabled.json` and return load paths.
-#[tauri::command]
-pub fn install_pack_from_folder(
-    path: String,
-    id: Option<String>,
-    name: Option<String>,
-    enable: Option<bool>,
-    state: State<'_, AppState>,
-) -> Result<PackInstallResult, String> {
-    let src = PathBuf::from(&path);
-    if !src.is_dir() {
-        return Err(format!("not a folder: {path}"));
-    }
-
-    let folder_label = src.file_name().and_then(|n| n.to_str()).unwrap_or("pack");
-
-    let pack_id = match id {
-        Some(raw) if !raw.is_empty() => {
-            if !is_valid_pack_id(&raw) {
-                return Err(format!("invalid pack id {raw:?}"));
-            }
-            raw
-        }
-        _ => pack_id_from_folder_name(folder_label),
-    };
-
-    let display_name = name
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| folder_label.to_string());
-
-    let lib = state.library_root();
-    ensure_packs_dir(&lib)?;
-    let packs = packs_root(&lib);
-    let dest = packs.join(&pack_id);
-    if dest.exists() {
-        return Err(format!(
-            "pack {pack_id} already exists at {} — remove it or pick another id",
-            dest.display()
-        ));
-    }
-
-    let scanned = crate::sounds::scan_folder_banks(&src)?;
-    if scanned.is_empty() {
-        return Err("no audio files found (expected subfolders of wav/ogg/mp3/flac, or loose audio at the root)".into());
-    }
-
-    let mut file_count = 0usize;
-    let mut total_bytes = 0u64;
-    for bank in &scanned {
-        for f in &bank.files {
-            let meta = fs::metadata(f).map_err(|e| format!("stat {}: {e}", f.display()))?;
-            file_count += 1;
-            total_bytes = total_bytes.saturating_add(meta.len());
-            if file_count > MAX_INSTALL_FILES {
-                return Err(format!(
-                    "too many files (>{MAX_INSTALL_FILES}); thin the folder or install a subset"
-                ));
-            }
-            if total_bytes > MAX_INSTALL_BYTES {
-                return Err(format!(
-                    "pack would exceed {} MB; thin the folder first",
-                    MAX_INSTALL_BYTES / (1024 * 1024)
-                ));
-            }
-        }
-    }
-
-    fs::create_dir_all(&dest).map_err(|e| format!("create {}: {e}", dest.display()))?;
-
-    let core = core_bank_names();
-    let mut used_names: HashSet<String> = HashSet::new();
-    let mut manifest_banks: Vec<PackBank> = Vec::new();
-    let mut renames: Vec<PackBankRename> = Vec::new();
-    let mut bank_names: Vec<String> = Vec::new();
-    let mut copied_bytes = 0u64;
-    let mut copied_files = 0usize;
-
-    for bank in scanned {
-        let (bank_name, rename) = bank_name_for_pack(&bank.name, &pack_id, &core, &mut used_names);
-        if let Some(r) = rename {
-            renames.push(r);
-        }
-
-        let mut rel_files: Vec<String> = Vec::with_capacity(bank.files.len());
-        for (i, src_file) in bank.files.iter().enumerate() {
-            let ext = src_file
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("wav")
-                .to_ascii_lowercase();
-            let stem = src_file
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("sample");
-            // Stable, filesystem-safe filename; keep original stem when unique.
-            let dest_name = format!("{:03}_{stem}.{ext}", i);
-            // Sanitize dest_name lightly (no path seps)
-            let dest_name: String = dest_name
-                .chars()
-                .map(|c| {
-                    if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
-                        c
-                    } else {
-                        '_'
-                    }
-                })
-                .collect();
-            let rel = format!("banks/{bank_name}/{dest_name}");
-            let abs = dest.join(&rel);
-            let n = copy_file(src_file, &abs)?;
-            copied_bytes = copied_bytes.saturating_add(n);
-            copied_files += 1;
-            rel_files.push(rel);
-        }
-
-        bank_names.push(bank_name.clone());
-        manifest_banks.push(PackBank {
-            name: bank_name,
-            files: rel_files,
-        });
-    }
-
-    let license_body = format!(
-        "User-provided sample pack installed into Cycletron.\n\
-         SPDX: LicenseRef-UserProvided\n\
-         Source: {path}\n\
-         Pack id: {pack_id}\n\
-         \n\
-         Cycletron does not claim ownership of these samples. Redistribute only\n\
-         if you have the right to do so under the samples' original license.\n"
-    );
-    fs::write(dest.join("LICENSE"), license_body).map_err(|e| format!("write LICENSE: {e}"))?;
-
-    let manifest = PackManifest {
-        schema: 1,
-        id: pack_id.clone(),
-        name: display_name.clone(),
-        version: "1.0.0".into(),
-        description: format!("Installed from {path}"),
-        spdx: "LicenseRef-UserProvided".into(),
-        license_file: "LICENSE".into(),
-        authors: vec![],
-        source: Some(path.clone()),
-        tags: vec!["user".into(), "installed".into()],
-        banks: manifest_banks,
-    };
-    let manifest_json = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())? + "\n";
-    fs::write(dest.join(MANIFEST), manifest_json).map_err(|e| format!("write pack.json: {e}"))?;
-
-    let do_enable = enable.unwrap_or(true);
-    let load = if do_enable {
-        match enable_pack_inner(&packs, &pack_id) {
-            Ok(r) => Some(r),
-            Err(e) => {
-                // Pack is on disk; report install success without load.
-                tracing::warn!("installed {pack_id} but enable failed: {e}");
-                None
-            }
-        }
-    } else {
-        None
-    };
-
-    Ok(PackInstallResult {
-        id: pack_id,
-        name: display_name,
-        path: dest.to_string_lossy().into_owned(),
-        banks: bank_names,
-        renamed: renames,
-        file_count: copied_files,
-        bytes: copied_bytes,
-        load,
-    })
-}
-
-fn enable_pack_inner(packs: &Path, id: &str) -> Result<PackLoadResult, String> {
+pub(crate) fn enable_pack_inner(packs: &Path, id: &str) -> Result<PackLoadResult, String> {
     let dir = packs.join(id);
     if !dir.is_dir() {
         return Err(format!("pack not installed: {id}"));
@@ -892,7 +711,7 @@ mod tests {
         ensure_packs_dir(&lib).unwrap();
 
         // Inline the install body without AppState: exercise helpers.
-        let scanned = crate::sounds::scan_folder_banks(&src).unwrap();
+        let (_, scanned) = crate::sounds::scan_folder_banks_detailed(&src).unwrap();
         assert_eq!(scanned.len(), 2);
 
         let pack_id = pack_id_from_folder_name("My-Sounds");
