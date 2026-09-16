@@ -53,7 +53,6 @@ export async function switchSampleSet(setId: string): Promise<void> {
 export class SamplesModal {
     private root: HTMLElement | null = null;
     private setListEl: HTMLElement | null = null;
-    private setProgressEl: HTMLProgressElement | null = null;
     private packsListEl: HTMLElement | null = null;
     private packsEmptyEl: HTMLElement | null = null;
     private inited = false;
@@ -64,7 +63,6 @@ export class SamplesModal {
         this.root = document.getElementById('samplesModal');
         if (!this.root) return;
         this.setListEl = document.getElementById('samplesSetList');
-        this.setProgressEl = document.getElementById('samplesSetProgress') as HTMLProgressElement;
         this.packsListEl = document.getElementById('packsList');
         this.packsEmptyEl = document.getElementById('packsEmpty');
 
@@ -86,10 +84,14 @@ export class SamplesModal {
         if (isTauri) {
             void listen<SampleSetProgress>('sample-set-progress', (event) => {
                 const p = event.payload;
-                if (this.setProgressEl) {
-                    this.setProgressEl.hidden = false;
-                    this.setProgressEl.max = p.total;
-                    this.setProgressEl.value = p.done;
+                // Drive the downloading set's own bar: a single shared bar left
+                // the user guessing which set it belonged to.
+                const bar = document.getElementById(`samplesSetBar-${p.set}`);
+                const fill = bar?.firstElementChild as HTMLElement | undefined;
+                if (bar && fill) {
+                    bar.hidden = false;
+                    const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
+                    fill.style.width = `${pct}%`;
                 }
                 const status = document.getElementById(`samplesSetStatus-${p.set}`);
                 if (status) status.textContent = `Downloading ${p.source}… ${p.done}/${p.total}`;
@@ -134,10 +136,17 @@ export class SamplesModal {
 
     // -- Sample sets ---------------------------------------------------------
 
-    /** Render the sample-set registry as a radio list with per-set
-     *  download/delete controls. A set is only selectable once it's on disk
-     *  (the backend enforces the same rule in `set_user_settings`); picking
-     *  a radio switches immediately and reloads the audio engine. */
+    /**
+     * Render the sample-set registry.
+     *
+     * The state of each set has to be unmissable: a set that is not on disk
+     * cannot be activated (the backend enforces the same rule in
+     * `set_user_settings`), and the previous rendering said so in dim grey next
+     * to a silently-disabled radio — so a set that needed one click to fetch
+     * read as a set that was simply empty. Each row now carries an explicit
+     * state chip, and clicking the row does the obvious thing: activate it if
+     * it is ready, download it if it is not.
+     */
     private async refreshSets(): Promise<void> {
         const container = this.setListEl;
         if (!isTauri || !container) return;
@@ -151,77 +160,140 @@ export class SamplesModal {
             console.warn('[samples] list_sample_sets failed:', e);
             return;
         }
-        if (this.setProgressEl) this.setProgressEl.hidden = true;
-
         container.replaceChildren();
         for (const set of sets) {
-            const row = document.createElement('div');
-            row.className = 'prefs-row';
+            container.appendChild(this.setCard(set, active));
+        }
+    }
 
-            const label = document.createElement('label');
-            label.className = 'prefs-check';
-            const radio = document.createElement('input');
-            radio.type = 'radio';
-            radio.name = 'samplesSet';
-            radio.value = set.id;
-            radio.checked = set.id === active;
-            radio.disabled = !set.ready;
-            radio.addEventListener('change', () => {
-                if (!radio.checked) return;
-                void switchSampleSet(set.id)
-                    .then(() => this.refreshSets())
-                    .catch(async (e) => {
-                        await errorDialog(`Could not switch sample set:\n${e}`);
-                        await this.refreshSets();
-                    });
-            });
-            const text = document.createElement('span');
-            text.textContent = set.label;
-            label.append(radio, text);
+    /** One set: state chip, action, description, and its own progress bar. */
+    private setCard(set: SampleSetStatus, active: string): HTMLElement {
+        const isActive = set.id === active;
+        const bundled = set.id === 'cycletron';
+        const ready = bundled || set.ready;
+        const state = isActive ? 'active' : ready ? 'ready' : 'missing';
 
-            const status = document.createElement('span');
-            status.className = 'prefs-hint';
-            status.id = `samplesSetStatus-${set.id}`;
-            status.textContent = set.id === 'cycletron'
+        const card = document.createElement('div');
+        card.className = 'snd-set';
+        card.dataset.state = state;
+
+        const head = document.createElement('div');
+        head.className = 'snd-set-head';
+
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'samplesSet';
+        radio.className = 'snd-set-radio';
+        radio.value = set.id;
+        radio.checked = isActive;
+        radio.disabled = !ready;
+        radio.tabIndex = -1;
+        radio.setAttribute('aria-hidden', 'true');
+
+        const label = document.createElement('span');
+        label.className = 'snd-set-label';
+        label.textContent = set.label;
+
+        const chip = document.createElement('span');
+        chip.className = 'snd-set-chip';
+        chip.textContent = isActive
+            ? 'active'
+            : bundled
                 ? 'built in'
                 : set.ready
-                    ? `downloaded (${(set.bytes / (1024 * 1024)).toFixed(0)} MB)`
+                    ? `downloaded · ${(set.bytes / (1024 * 1024)).toFixed(0)} MB`
                     : 'not downloaded';
 
-            row.append(label, status);
+        head.append(radio, label, chip);
 
-            if (set.id !== 'cycletron') {
-                if (!set.ready) {
-                    const download = document.createElement('button');
-                    download.className = 'prefs-inline-btn';
-                    download.type = 'button';
-                    download.textContent = 'Download';
-                    download.addEventListener('click', () => void this.downloadSet(set.id, download));
-                    row.append(download);
-                } else {
-                    const remove = document.createElement('button');
-                    remove.className = 'prefs-inline-btn';
-                    remove.type = 'button';
-                    remove.textContent = 'Delete';
-                    remove.addEventListener('click', () => void this.removeSet(set.id));
-                    row.append(remove);
-                }
-            }
-            container.appendChild(row);
-            if (set.description) {
-                const blurb = document.createElement('div');
-                blurb.className = 'prefs-note samples-set-blurb';
-                blurb.textContent = set.description;
-                container.appendChild(blurb);
-            }
+        // The whole card is the control: click what you want and it either
+        // activates or fetches. A disabled radio explains nothing on its own.
+        const action = document.createElement('button');
+        action.className = 'snd-set-action';
+        action.type = 'button';
+        if (bundled) {
+            action.textContent = isActive ? 'In use' : 'Use';
+            action.disabled = isActive;
+        } else if (!set.ready) {
+            action.textContent = `Download · ${set.sources.length} source${set.sources.length === 1 ? '' : 's'}`;
+        } else {
+            action.textContent = isActive ? 'In use' : 'Use';
+            action.disabled = isActive;
         }
+        head.append(action);
+        card.append(head);
+
+        if (set.description) {
+            const desc = document.createElement('p');
+            desc.className = 'snd-set-desc';
+            desc.textContent = set.description;
+            card.append(desc);
+        }
+
+        // Per-set progress, so "which one is downloading" is never a guess.
+        const bar = document.createElement('div');
+        bar.className = 'snd-progress';
+        bar.id = `samplesSetBar-${set.id}`;
+        bar.hidden = true;
+        bar.innerHTML = '<div class="snd-progress-fill"></div>';
+        const status = document.createElement('span');
+        status.className = 'snd-set-status';
+        status.id = `samplesSetStatus-${set.id}`;
+        if (!ready) status.textContent = 'Download it to make it selectable.';
+        card.append(bar, status);
+
+        const activate = (): void => {
+            if (isActive) return;
+            void switchSampleSet(set.id)
+                .then(() => this.refreshSets())
+                .catch(async (e) => {
+                    await errorDialog(`Could not switch sample set:\n${e}`);
+                    await this.refreshSets();
+                });
+        };
+
+        const onPick = (e: Event): void => {
+            if ((e.target as Element).closest('.snd-set-remove')) return;
+            if (ready) activate();
+            else void this.downloadSet(set.id, action);
+        };
+        head.addEventListener('click', onPick);
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onPick(e);
+            }
+        });
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-pressed', String(isActive));
+
+        if (!bundled && set.ready) {
+            const remove = document.createElement('button');
+            remove.className = 'prefs-inline-btn snd-set-remove';
+            remove.type = 'button';
+            remove.textContent = 'Delete';
+            remove.addEventListener('click', (e) => {
+                e.stopPropagation();
+                void this.removeSet(set.id);
+            });
+            head.append(remove);
+        }
+
+        return card;
     }
 
     private async downloadSet(setId: string, button: HTMLButtonElement): Promise<void> {
         if (!isTauri) return;
         button.disabled = true;
+        button.textContent = 'Downloading…';
+        const status = document.getElementById(`samplesSetStatus-${setId}`);
+        if (status) status.textContent = 'Starting…';
         try {
             await invoke<SampleSetStatus[]>('download_sample_set', {setId});
+            // A set is downloaded in order to be used; say it is ready to go
+            // rather than leaving the user to work out what changed.
+            void notify('Sample set ready', `${setId} is downloaded — select it to switch.`);
         } catch (e: any) {
             await errorDialog(`Sample set download failed:\n${e}\n\nRun it again to resume — finished files are kept.`);
         } finally {

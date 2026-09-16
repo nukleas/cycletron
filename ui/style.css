@@ -5655,3 +5655,111 @@ body.stage-active #fullscreenVizHUD { display: none; }
 }
 
 .samples-getmore-note strong { color: var(--orange-bright); }
+
+/* ---- Sample set cards ------------------------------------------------ */
+/* State has to be readable at a glance: "not downloaded" rendered as dim grey
+   text beside a silently-disabled radio read as "this set is empty", which is
+   the opposite of what it means. */
+.snd-set {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--pad-row-y) var(--pad-row-x);
+    background: var(--surface-inset);
+    border: var(--edge-hairline);
+    border-left: 2px solid transparent;
+    cursor: pointer;
+}
+.snd-set:hover { border-color: var(--neon-subtle); border-left-color: var(--neon-subtle); }
+.snd-set[data-state="active"] {
+    border-left-color: var(--neon);
+    background: var(--accent-subtle);
+    box-shadow: inset 0 0 12px rgba(71, 246, 255, 0.08);
+}
+.snd-set[data-state="missing"] { opacity: 0.82; }
+.snd-set[data-state="missing"]:hover { opacity: 1; }
+
+.snd-set-head {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+}
+.snd-set-radio { flex: 0 0 auto; pointer-events: none; }
+.snd-set-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--fs-base);
+    font-weight: var(--fw-med);
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.snd-set-chip {
+    flex: 0 0 auto;
+    padding: 0 var(--sp-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-1);
+    font-size: var(--fs-tiny);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--text-muted);
+}
+.snd-set[data-state="active"] .snd-set-chip { color: var(--neon); border-color: var(--neon-subtle); }
+.snd-set[data-state="ready"] .snd-set-chip { color: var(--green-bright); border-color: var(--green); }
+/* Orange, not grey: this is a one-click fix, not a dead end. */
+.snd-set[data-state="missing"] .snd-set-chip { color: var(--orange-bright); border-color: var(--orange-dark); }
+
+.snd-set-action {
+    flex: 0 0 auto;
+    height: var(--ctl-h-sm);
+    padding: 0 var(--sp-4);
+    background: transparent;
+    border: 1px solid var(--neon-subtle);
+    border-radius: var(--r-0);
+    color: var(--neon);
+    font-family: var(--font-mono);
+    font-size: var(--fs-tiny);
+    letter-spacing: var(--ls-caps);
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.snd-set-action:hover:not(:disabled) { border-color: var(--neon); box-shadow: var(--glow-1); }
+.snd-set-action:disabled { opacity: 0.45; cursor: default; }
+.snd-set[data-state="missing"] .snd-set-action {
+    color: var(--orange-bright);
+    border-color: var(--orange-dark);
+}
+.snd-set[data-state="missing"] .snd-set-action:hover {
+    border-color: var(--orange-bright);
+    box-shadow: 0 0 6px rgba(255, 176, 0, 0.35);
+}
+
+.snd-set-desc,
+.snd-set-status {
+    font-size: var(--fs-tiny);
+    line-height: var(--lh-body);
+    color: var(--text-dim);
+}
+.snd-set-status:empty { display: none; }
+
+/* ---- Download progress ---------------------------------------------- */
+/* A div, not <progress>: the native element renders as an Aqua-blue capsule on
+   macOS and its pseudo-elements differ between WKWebView and WebKitGTK, both of
+   which this app ships to. */
+.snd-progress {
+    height: 2px;
+    width: 100%;
+    background: var(--surface-chrome);
+    overflow: hidden;
+}
+.snd-progress-fill {
+    height: 100%;
+    width: 0;
+    background: var(--neon);
+    box-shadow: var(--glow-1);
+    transition: width 0.2s linear;
+}

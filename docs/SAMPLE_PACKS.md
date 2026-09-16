@@ -194,9 +194,12 @@ Define your own sets in `{app_data}/sample-sets.json`:
 `github:user/repo[/branch]` resolves to the repo's `strudel.json` on
 raw.githubusercontent.com, like the engine's `samples()` shortcut. Sets appear
 in the Samples manager (⌘⇧P → "Samples…", the Sounds panel's Manage button,
-or Preferences → Samples → Manage) with their own Download/Delete buttons; a
-set must be fully downloaded before it can be activated. Downloads resume
-(finished files are kept). Switching sets — from the manager or the command
+or Preferences → Samples → Manage). Each row carries an explicit state —
+**active**, **downloaded**, or **not downloaded** — and clicking it does the
+matching thing: switch to it when it is on disk, fetch it when it is not. A set
+must be fully downloaded before it can be activated, and each row shows its own
+progress bar naming the source in flight. Downloads resume (finished files are
+kept). Switching sets — from the manager or the command
 palette's "Sample Set: …" entries — reloads the audio engine with the new
 set immediately (export always follows the setting). The manager also holds
 the Packs list, so all sample management lives in one place.

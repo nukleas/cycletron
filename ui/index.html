@@ -456,16 +456,15 @@
     <!-- Samples manager: sample sets (base sound world) + packs (additive banks) -->
     <div id="samplesModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="samplesTitle">
         <div class="app-modal-backdrop" data-dismiss></div>
-        <div class="app-modal-window" role="document">
+        <div class="app-modal-window app-modal-window--wide" role="document">
             <div class="app-modal-header">
                 <span id="samplesTitle">Samples</span>
                 <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
             </div>
             <div class="packs-modal-body">
                 <h4 class="samples-heading">Sample set</h4>
-                <p class="packs-intro">The active set is the base sound world for playback <em>and</em> export — switching reloads the audio engine. The <strong>strudel-rs</strong> set (Salamander Grand Piano by Alexander Holm CC-BY-3.0, uzu drumkit, uzu wavetables, Dirt-Samples, ~300 MB) is fetched from the upstream repos; define more sets in <code>sample-sets.json</code> in the app data folder.</p>
+                <p class="packs-intro">The active set is the base sound world for playback <em>and</em> export — switching reloads the audio engine. Sets marked <strong>not downloaded</strong> are fetched from their upstream repos on demand; pick one to download it, then pick it again to switch. Downloads resume, and sets that share a source share one copy on disk. Define your own in <code>sample-sets.json</code> in the app data folder.</p>
                 <div id="samplesSetList" class="packs-list"></div>
-                <progress id="samplesSetProgress" max="1" value="0" hidden></progress>
                 <h4 class="samples-heading">Packs</h4>
                 <p class="packs-intro">Optional sample packs live in your library under <code>Packs/</code>. Enabled packs add their banks on top of the active set.</p>
                 <div id="packsList" class="packs-list"></div>
