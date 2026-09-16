@@ -71,7 +71,6 @@ const COMMANDS: &[&str] = &[
     "log_diagnostic",
     "diagnostic_dump",
     "set_dock_badge",
-    "scan_sample_folder",
     "read_audio_file",
     "register_sound_banks",
     "list_sounds",

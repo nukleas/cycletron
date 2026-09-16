@@ -370,7 +370,6 @@ pub fn run() {
             osc::osc_configure,
             osc::osc_transport,
             osc::osc_frame,
-            sounds::scan_sample_folder,
             sounds::read_audio_file,
             sounds::register_sound_banks,
             sounds::list_sounds,

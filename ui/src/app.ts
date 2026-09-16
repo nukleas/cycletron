@@ -23,10 +23,8 @@ import {mixer} from './mixer.js';
 import {oscOut} from './osc-out.js';
 import {linkSync} from './link-sync.js';
 import {ExamplesBrowser} from './examples.js';
-import {notify} from './notifications.js';
 import {invoke, isTauri} from './tauri.js';
 import type {SampleSourceManifest} from './types/tauri-commands.js';
-import {openPathDialog} from './dialog.js';
 import {initTooltips} from './tooltip.js';
 
 /** Decodes bank names out of the missing-manifest-banks ring. */
@@ -1113,65 +1111,6 @@ export class StrudelApp {
         } catch (e) {
             console.warn('[packs] load_enabled_packs failed', e);
             return 0;
-        }
-    }
-
-    /**
-     * Desktop feature: let the user pick one of their own sample folders and
-     * load it into the engine. Each subfolder becomes a bank (`s("<folder>")`)
-     * and loose audio files become one-shot banks. The Rust backend scans the
-     * folder and streams each file's bytes; we decode + register them, then tell
-     * the backend which banks exist so the AI's `list_sounds` tool knows.
-     */
-    async loadSampleFolder(): Promise<void> {
-        if (!this.sampleLoader || !this.isInitialized || !isTauri) return;
-
-        let dir: string | null = null;
-        try {
-            dir = await openPathDialog({directory: true, title: 'Choose a sample folder'});
-        } catch (e) {
-            console.warn('[App] folder picker failed', e);
-            return;
-        }
-        if (!dir) return;
-
-        try {
-            const folder = await invoke<{ root: string; banks: Array<{ name: string; files: string[] }> }>(
-                'scan_sample_folder', {path: dir},
-            );
-            if (!folder.banks.length) {
-                void notify('No samples found', 'That folder has no audio files.');
-                return;
-            }
-
-            this.elements.sampleCount.textContent = 'Loading…';
-            let total = 0;
-            const loadedNames: string[] = [];
-            for (const bank of folder.banks) {
-                const datas = await Promise.all(
-                    bank.files.map(p => invoke<ArrayBuffer>('read_audio_file', {path: p})),
-                );
-                const n = await this.sampleLoader!.loadLocalBank(bank.name, datas);
-                if (!this.isInitialized) return; // disposed mid-load
-                if (n > 0) {
-                    total += n;
-                    loadedNames.push(bank.name);
-                }
-            }
-
-            if (loadedNames.length) {
-                await invoke('register_sound_banks', {names: loadedNames});
-                // Tell the Sounds panel new banks are available.
-                document.dispatchEvent(new CustomEvent('sounds:changed'));
-            }
-
-            this.elements.sampleCount.textContent = `${total} samples`;
-            const preview = loadedNames.slice(0, 8).join(', ') + (loadedNames.length > 8 ? '…' : '');
-            void notify('Samples loaded', `${total} samples in ${loadedNames.length} banks: ${preview}`);
-        } catch (e) {
-            if (!this.isInitialized) return;
-            console.warn('[App] sample folder load failed', e);
-            void notify('Sample load failed', String(e));
         }
     }
 

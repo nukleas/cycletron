@@ -94,7 +94,6 @@
     "allow-log-diagnostic",
     "allow-diagnostic-dump",
     "allow-set-dock-badge",
-    "allow-scan-sample-folder",
     "allow-read-audio-file",
     "allow-register-sound-banks",
     "allow-list-sounds",
