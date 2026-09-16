@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Pull the MusicRepo Supabase strudel corpus to a local JSONL cache, then
-# (optionally) run the corpus-check batch validator over it.
+# Pull the local MusicRepo strudel corpus to a JSONL cache, then (optionally)
+# run the corpus-check batch validator over it.
 #
 #   tools/corpus-fetch/fetch-corpus.sh            # fetch → .corpus-cache/corpus.jsonl
 #   tools/corpus-fetch/fetch-corpus.sh --validate # fetch, then corpus-check it
 #
-# Requires DATABASE_URL in .env (see .env.example). Uses psql -tA so each row
-# prints as one raw JSON object (no COPY escaping); Postgres already escapes
-# newlines inside the JSON string, so one row == one JSONL line.
+# Requires DATABASE_URL in .env (see .env.example). Default is the Homebrew
+# `musicrepo` database loaded by ~/Code/strulibrary/db/load.py. Uses psql -tA
+# so each row prints as one raw JSON object (no COPY escaping); Postgres
+# already escapes newlines inside the JSON string, so one row == one JSONL line.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

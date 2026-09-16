@@ -6,7 +6,7 @@ setbpm(142);
 $: "<intro verse drop acid breakdown out>".slow(8).pickRestart({
   intro: stack(
     // Sub rumble kick build — filter creeps open across the section
-    s("bd*4").gain(0.95).dist(0.45).shape(0.35).lpf(saw.range(1200, 2400).slow(8)),
+    s("bd*4").gain(0.95).dist(0.45).lpf(saw.range(1200, 2400).slow(8)),
     note("<[c1*4] [c1*4] [c1*4] [c1 c1 c1 bb0]>").s("sine")
       .attack(0.001).decay(0.32).sustain(0).release(0.4)
       .lpf(200).resonance(4).dist(0.5)
@@ -19,7 +19,7 @@ $: "<intro verse drop acid breakdown out>".slow(8).pickRestart({
 
   verse: stack(
     // Kick + Sub Rumble
-    s("bd*4").gain(0.95).dist(0.5).shape(0.4).lpf(2800),
+    s("bd*4").gain(0.95).dist(0.5).lpf(2800),
     note("c1*4").s("sine")
       .attack(0.001).decay(0.32).sustain(0).release(0.4)
       .lpf(220).resonance(5).dist(0.55)
@@ -45,7 +45,7 @@ $: "<intro verse drop acid breakdown out>".slow(8).pickRestart({
 
   drop: stack(
     // Max Energy Distorted Kick + Sub Rumble
-    s("bd*4").gain(1.0).dist(0.6).shape(0.45).lpf(3500),
+    s("bd*4").gain(1.0).dist(0.6).lpf(3500),
     note("c1*4").s("sine")
       .attack(0.001).decay(0.35).sustain(0).release(0.42)
       .lpf(240).resonance(6).dist(0.6)
@@ -74,7 +74,7 @@ $: "<intro verse drop acid breakdown out>".slow(8).pickRestart({
 
   acid: stack(
     // Full Beats
-    s("bd*4").gain(1.0).dist(0.55).shape(0.4).lpf(3200),
+    s("bd*4").gain(1.0).dist(0.55).lpf(3200),
     note("c1*4").s("sine").lpf(220).resonance(5).dist(0.5).room(0.6).gain(0.7),
     s("~ cp ~ cp").gain(0.8).hpf(1000),
     s("~ oh ~ oh").gain(0.65).hpf(4500).pan(0.6),

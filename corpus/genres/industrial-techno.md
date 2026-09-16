@@ -50,7 +50,7 @@ the downbeat.
 ```strudel
 setbpm(135);
 stack(
-  s("bd*4").gain(0.95).dist(0.4).shape(0.3).lpf(3200),
+  s("bd*4").gain(0.95).dist(0.4).lpf(3200),
   s("hh*16").gain(0.3).hpf(6500),
   s("~ ~ oh ~").gain(0.35).hpf(4000),
   s("mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ ~").gain(0.42).dist(0.3).hpf(300).pan(0.4)
@@ -76,7 +76,7 @@ multiband/sidechain chain.
 ```strudel
 setbpm(135);
 stack(
-  s("bd*4").gain(0.95).dist(0.45).shape(0.35).lpf(3000),
+  s("bd*4").gain(0.95).dist(0.45).lpf(3000),
   note("c#1*4").s("sine")
     .attack(0.001).decay(0.32).sustain(0).release(0.4)
     .lpf(220).resonance(3).dist(0.5)
@@ -170,13 +170,13 @@ setbpm(135);
     note("<[c#3,e3,g#3]>").s("supersaw").attack(1).release(3).lpf(900).gain(0.25).room(0.6)
   ),
   build: stack(
-    s("bd*4").gain(0.92).dist(0.35).shape(0.25),
+    s("bd*4").gain(0.92).dist(0.35),
     s("hh*16").gain(0.3).hpf(6500),
     note("c#2 c#2 c#3 c#2 c#2 c#2 c#3 c#2 c#2 d2 c#3 c#2 e2 c#2 c#3 c#2")
       .s("sawtooth").lpf(900).resonance(8).dist(0.2).decay(0.09).sustain(0).gain(0.55)
   ),
   main: stack(
-    s("bd*4").gain(0.95).dist(0.45).shape(0.35).lpf(3000),
+    s("bd*4").gain(0.95).dist(0.45).lpf(3000),
     note("c#1*4").s("sine").attack(0.001).decay(0.32).sustain(0).release(0.4)
       .lpf(220).dist(0.5).room(0.55).roomsize(0.85).gain(0.55),
     s("mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ mt ~ ~ ~").gain(0.42).dist(0.3).hpf(300),
@@ -216,8 +216,15 @@ stack(
   layered `sine`/`sbd` sub on the kick's root pitch, long `release` + `room` for
   the tail, `lpf(~220)` to isolate the sub, `dist` for grind. Tune the sub to the
   track root so kick and rumble read "as one".
-- **Distortion**: `dist(amount)` is the workhorse; stack `shape` for extra
-  harmonic drive and `crush(bits)` for digital/metal grit on percussion.
+- **Distortion**: pick `dist` OR `shape` per voice — never both. The engine's
+  voice setup is `if dist {…} else if shape {…}`, so setting both silently
+  discards `shape`. They are different curves of the same knob:
+  `dist(x)` drives `x + 1`, `shape(s)` drives `(1+s)/(1-s)`, so `shape` bites
+  far harder per unit (`shape(0.5)` = drive 3.0, where `dist(0.5)` = 1.5).
+  Distortion also applies its own output trim, `1/(1 + 0.3·(drive − 1))`, so a
+  heavily driven voice comes out quieter — raise `gain` to compensate (it is not
+  clamped, and values above 1 are normal here). `crush(bits)` (integer 1–16)
+  adds digital/metal grit on percussion and is independent of both.
 - **Metallic hits**: `wt_bell` for struck-metal tone; for machine clatter, write
   rim/tom patterns on the grid — a tresillo (`rim ~ ~ rim ~ ~ rim ~`), tom
   pickups into bar ends — with the sample's body intact (hpf ≤ ~2000, a touch of

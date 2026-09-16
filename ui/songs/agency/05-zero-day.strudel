@@ -16,7 +16,7 @@ setbpm(135);
 
 "<intro@2 machine@4 duel@4 vent@2 overload@4 collapse@2>".slow(4).pickRestart({
   intro: stack(
-    s("bd*4").gain(0.95).dist(0.45).shape(0.35).lpf(3000),
+    s("bd*4").gain(0.95).dist(0.45).lpf(3000),
     note("<[c#1*4] [c#1*4] [c#1*4] [c#1 c#1 c#1 b0]>")
       .s("sine").attack(0.001).decay(0.32).sustain(0).release(0.4)
       .lpf(220).resonance(3).dist(0.5)
@@ -24,7 +24,7 @@ setbpm(135);
     s("<[~ ~ ~ ~] [~ ~ ~ ~] [hh*8] [hh*16]>").gain(0.24).hpf(6500)
   ),
   machine: stack(
-    s("bd*4").gain(0.95).dist(0.45).shape(0.35).lpf(3000),
+    s("bd*4").gain(0.95).dist(0.45).lpf(3000),
     note("c#1*4").s("sine").attack(0.001).decay(0.32).sustain(0).release(0.4)
       .lpf(220).dist(0.5).room(0.55).roomsize(0.85).gain(0.55),
     s("hh*16").gain(0.28).hpf(6500),
@@ -35,7 +35,7 @@ setbpm(135);
       .decay(0.09).sustain(0).gain("0.62 0.45")
   ),
   duel: stack(
-    s("bd*4").gain(0.95).dist(0.45).shape(0.35).lpf(3000),
+    s("bd*4").gain(0.95).dist(0.45).lpf(3000),
     note("c#1*4").s("sine").attack(0.001).decay(0.32).sustain(0).release(0.4)
       .lpf(220).dist(0.5).room(0.55).roomsize(0.85).gain(0.55),
     s("hh*16").gain(0.26).hpf(6500),
@@ -62,7 +62,7 @@ setbpm(135);
     note("c#1").s("sine").slow(2).attack(1.5).release(3).gain(0.42)
   ),
   overload: stack(
-    s("bd*4").gain(0.95).dist(0.45).shape(0.35).lpf(3000),
+    s("bd*4").gain(0.95).dist(0.45).lpf(3000),
     note("c#1*4").s("sine").attack(0.001).decay(0.32).sustain(0).release(0.4)
       .lpf(220).dist(0.5).room(0.55).roomsize(0.85).gain(0.55),
     s("hh*16").gain(0.26).hpf(6500),

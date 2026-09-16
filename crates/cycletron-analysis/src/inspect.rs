@@ -78,8 +78,94 @@ pub struct EventDigest {
     pub midi: Option<i32>,
     pub gain: Option<f64>,
     pub pan: Option<f64>,
+    /// Velocity — a SECOND, multiplying gain stage in the engine
+    /// (`voice.rs`: `gain = event.gain * event.velocity * gain_trim`),
+    /// defaulting to 1.0. Commonly used to fake a sidechain duck, since
+    /// strudel-rs has no working `duck`.
+    pub velocity: Option<f64>,
+    /// `shape(s)` waveshaper amount, if set.
+    pub shape: Option<f64>,
+    /// `dist(x)` / `distort(x)` drive amount, if set. Mutually exclusive with
+    /// `shape` in the engine: when both are present `shape` is IGNORED.
+    pub distort: Option<f64>,
     /// Any other controls set on the event (key → stringified value), sorted.
     pub controls: Vec<(String, String)>,
+}
+
+/// The distortion stage's output-gain compensation for a voice, `1.0` when it
+/// is clean. See [`EventDigest::distortion_trim`].
+///
+/// Mirrors `strudel-dsp`'s `Distortion::new`:
+/// `drive = drive.max(1.0); output_gain = lerp(t=0.3, start=1.0, end=drive).recip()`,
+/// and that `lerp` is `start + t·(end − start)`, so the trim is
+/// `1 / (1 + 0.3·(drive − 1))`.
+///
+/// `dist(x)` gives `drive = x + 1`; `shape(s)` gives `drive = (1+s)/(1−s)` —
+/// which is why `shape` bites an order of magnitude harder per unit. The engine
+/// checks `dist` first and only falls back to `shape`, so this does the same.
+pub fn distortion_trim_of(shape: Option<f64>, distort: Option<f64>) -> f64 {
+    let drive = match (distort, shape) {
+        (Some(d), _) => d + 1.0,
+        (None, Some(s)) => {
+            let s = s.clamp(0.0, 0.9999);
+            (1.0 + s) / (1.0 - s)
+        }
+        (None, None) => return 1.0,
+    };
+    1.0 / (1.0 + 0.3 * (drive.max(1.0) - 1.0))
+}
+
+/// Output level a voice contributes, as a multiple of a full-scale source:
+/// `gain × velocity × distortion trim`. See [`EventDigest::effective_gain`].
+pub fn effective_gain_of(
+    gain: Option<f64>,
+    velocity: Option<f64>,
+    shape: Option<f64>,
+    distort: Option<f64>,
+) -> f64 {
+    gain.unwrap_or(1.0) * velocity.unwrap_or(1.0) * distortion_trim_of(shape, distort)
+}
+
+impl EventDigest {
+    /// Output level this event actually contributes, as a multiple of a
+    /// full-scale source.
+    ///
+    /// The engine's voice chain is
+    /// `source → coarse → crush → filters → DISTORTION → tremolo → ×(env·gain) → pan`,
+    /// so distortion shapes a roughly unit-amplitude source *before* `gain`
+    /// scales it. A waveshaper maps ±1 to ±1 and then applies a fixed output
+    /// trim, so for a full-scale source the net level change is exactly that
+    /// trim — and `gain` multiplies it afterwards. Velocity is a further
+    /// multiplier. Hence `gain × velocity × trim`.
+    ///
+    /// Reading raw `gain` alone over-reports any distorted voice, which
+    /// matters because hard/industrial styles deliberately run `gain` above 1
+    /// to compensate for exactly this trim.
+    pub fn effective_gain(&self) -> f64 {
+        effective_gain_of(self.gain, self.velocity, self.shape, self.distort)
+    }
+
+    /// The distortion stage's output-gain compensation, `1.0` when the voice is
+    /// clean.
+    ///
+    /// Mirrors `strudel-dsp`'s `Distortion::new`:
+    /// `drive = drive.max(1.0); output_gain = lerp(t=0.3, start=1.0, end=drive).recip()`,
+    /// where that `lerp` is `start + t·(end − start)`. So the trim is
+    /// `1 / (1 + 0.3·(drive − 1))`.
+    ///
+    /// `dist(x)` gives `drive = x + 1`; `shape(s)` gives `drive = (1+s)/(1−s)`
+    /// — which is why `shape` bites an order of magnitude harder per unit. The
+    /// engine checks `dist` first and only falls back to `shape`, so this does
+    /// the same.
+    pub fn distortion_trim(&self) -> f64 {
+        distortion_trim_of(self.shape, self.distort)
+    }
+
+    /// True when the event sets BOTH `dist` and `shape`. The engine silently
+    /// discards `shape` in that case, so the author's `shape` value is dead.
+    pub fn has_dead_shape(&self) -> bool {
+        self.distort.is_some() && self.shape.is_some()
+    }
 }
 
 /// Build an `EventDigest` from a hap's value plus its control context.
@@ -115,6 +201,9 @@ pub(crate) fn event_from_hap(hap: &Hap<Value>, begin: f64, duration: f64) -> Eve
 
     let gain = context.get(&ContextKey::Gain).and_then(value_to_f64);
     let pan = context.get(&ContextKey::Pan).and_then(value_to_f64);
+    let velocity = context.get(&ContextKey::Velocity).and_then(value_to_f64);
+    let shape = context.get(&ContextKey::Shape).and_then(value_to_f64);
+    let distort = context.get(&ContextKey::Distort).and_then(value_to_f64);
 
     // Surface every other control that's set, so nothing is silently hidden.
     let mut controls: Vec<(String, String)> = context
@@ -126,6 +215,9 @@ pub(crate) fn event_from_hap(hap: &Hap<Value>, begin: f64, duration: f64) -> Eve
                     | ContextKey::Sound
                     | ContextKey::Gain
                     | ContextKey::Pan
+                    | ContextKey::Velocity
+                    | ContextKey::Shape
+                    | ContextKey::Distort
                     | ContextKey::Locations
                     | ContextKey::Type
             )
@@ -143,6 +235,9 @@ pub(crate) fn event_from_hap(hap: &Hap<Value>, begin: f64, duration: f64) -> Eve
         midi,
         gain,
         pan,
+        velocity,
+        shape,
+        distort,
         controls,
     }
 }

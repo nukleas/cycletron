@@ -352,22 +352,20 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
         ToolDefinition {
             name: ToolName::InspectPattern.as_str().to_string(),
             description:
-                "Evaluate pattern code and report what it ACTUALLY emits — your ears while \
-                composing. Returns, over the first N cycles: a per-cycle event list (onset \
-                time, voice, note+MIDI, gain/pan/effects), the distinct sounds that fire, the \
-                pitch range, the detected loop length (how many cycles until it repeats), the \
-                max simultaneous voices, whether it uses panning, and any SILENT cycles. \
-                Use this after writing or editing a pattern to verify it does what you intend \
-                before playing — e.g. to catch a `<...>` branch that never triggers, an empty \
-                cycle, a melody stuck in one octave, or a stack that's secretly mono. \
-                Validation only checks that code parses; this checks that it's musical."
+                "Evaluate the CURRENT EDITOR SONG (omit `code`) and report what it ACTUALLY \
+                emits. Never pass a 1-note toy snippet — that inspects the snippet, not the \
+                song. Returns, over the first N cycles: a per-cycle event list, the distinct \
+                sounds that fire, the pitch range, the detected loop length, the max \
+                simultaneous voices, whether it uses panning, and any SILENT cycles. Use this \
+                after writing or editing to verify it does what you intend before playing."
                     .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Strudel pattern code to inspect"
+                        "description": "Strudel pattern code to inspect. OMIT to inspect \
+                            the current editor document — never pass a toy snippet."
                     },
                     "cycles": {
                         "type": "integer",
@@ -381,38 +379,35 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
                             beyond. summary: high-level facts + per-cycle event counts only. \
                             events: always the full per-event log."
                     }
-                },
-                "required": ["code"]
+                }
             }),
         },
         ToolDefinition {
             name: ToolName::AnalyzeArrangement.as_str().to_string(),
             description:
-                "Analyze a pattern's ARRANGEMENT over time — its structure, not its moment. \
-                Scans up to N cycles, detects the loop length, and segments it into sections \
-                wherever the active instrumentation changes (a part entering or leaving). \
+                "Analyze the CURRENT EDITOR SONG's arrangement over time — its structure, \
+                not its moment. Omit `code` (the default) to scan the editor; never pass a \
+                1-note toy snippet. Scans up to N cycles, detects the loop length, and \
+                segments it into sections wherever the active instrumentation changes. \
                 Returns: the song form as letters (e.g. 'A A B A'), and for each section its \
-                cycle range, wall-clock time window (needs a tempo in the code), the \
-                instruments sounding, and the event density. Use this to reason about song \
-                structure and length — to check a build actually adds energy section by \
-                section, that a drop drops, that sections are the bars you intended, or to \
-                find where to place a transition. Complements inspect_pattern (which shows a \
-                single moment); this shows the whole timeline."
+                cycle range, wall-clock time window, the instruments sounding, and the event \
+                density. Use this to reason about song structure — to check a build actually \
+                adds energy, that a drop drops, or to find where to place a transition."
                     .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Strudel pattern code to analyze"
+                        "description": "Strudel pattern code to analyze. OMIT to analyze \
+                            the current editor document — never pass a toy snippet."
                     },
                     "max_cycles": {
                         "type": "integer",
                         "description": "How many cycles to scan for the loop / form (default 32, \
                             max 64). Raise for long song forms."
                     }
-                },
-                "required": ["code"]
+                }
             }),
         },
         ToolDefinition {
@@ -432,14 +427,14 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Strudel pattern code to critique"
+                        "description": "Strudel pattern code to critique. OMIT to critique \
+                            the current editor document."
                     },
                     "cycles": {
                         "type": "integer",
                         "description": "How many cycles to scan (default 16, max 64)."
                     }
-                },
-                "required": ["code"]
+                }
             }),
         },
         ToolDefinition {
@@ -461,15 +456,15 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "Strudel pattern code to critique for form"
+                        "description": "Strudel pattern code to critique for form. OMIT to \
+                            critique the current editor document."
                     },
                     "cycles": {
                         "type": "integer",
                         "description": "How many cycles to scan for the full form (default 32, \
                             max 64). Raise for long songs."
                     }
-                },
-                "required": ["code"]
+                }
             }),
         },
         ToolDefinition {
@@ -558,13 +553,14 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             name: ToolName::UpsertTrack.as_str().to_string(),
             description:
                 "Surgically add or replace ONE track in the current song, then hot-swap — every \
-                other track stays byte-identical (this is how you 'change the bass' or 'add a \
-                lead' without rewriting the song). `id` selects the track by its @id or 1-based \
-                index; if none matches, a new `$: <code> // @<id>` track is appended. `code` is \
-                just that track's expression (e.g. `note(\"c2 g2\").s(\"sawtooth\").lpf(400)`), \
-                NOT a full document — no `$:`, no `setbpm`. The whole result is re-validated \
-                before it plays. Call list_parts first if unsure of the ids. For several tracks \
-                at once use upsert_tracks."
+                other track stays byte-identical. `id` selects the track by its @id or 1-based \
+                index; if none matches, a new `$: <code> // @<id>` track is appended. Unnamed \
+                MIDI tracks MUST be addressed by index (id: \"1\") — a new name appends a copy. \
+                `code` is just that track's expression (no `$:`, no `setbpm`). If `code` starts \
+                with `.` (e.g. `.s(\"supersaw\").lpf(800).gain(0.7)`), the existing note/sample \
+                body is kept and only the chain is appended — use this to restyle a long MIDI \
+                dump instead of re-streaming the mini-notation. For several tracks at once use \
+                upsert_tracks."
                     .to_string(),
             input_schema: json!({
                 "type": "object",
@@ -572,11 +568,12 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
                     "id": {
                         "type": "string",
                         "description": "Track @id (e.g. 'bass') or 1-based index (e.g. '2'). \
-                            A new, unused id creates a new track."
+                            Unnamed tracks: use the index. A new unused id creates a new track."
                     },
                     "code": {
                         "type": "string",
-                        "description": "The track's strudel expression only (no `$:`, no directives)"
+                        "description": "The track's strudel expression only (no `$:`, no directives). \
+                            Start with `.` to wrap the existing body (instrumentation-only edit)."
                     }
                 },
                 "required": ["id", "code"]
@@ -586,7 +583,10 @@ fn build_tool_definitions() -> Vec<ToolDefinition> {
             name: ToolName::UpsertTracks.as_str().to_string(),
             description:
                 "Batch-add or replace SEVERAL `$:` tracks in one call, then hot-swap once. Prefer \
-                this over N separate upsert_track turns when rebuilding multiple parts."
+                this over N separate upsert_track turns when rebuilding multiple parts. On a MIDI \
+                dump of N unnamed tracks, N patches with new names replace those tracks in order \
+                (and stamp the ids) instead of appending N copies. A chain-suffix `code` (starts \
+                with `.`) restyles the existing body without re-streaming the notes."
                     .to_string(),
             input_schema: json!({
                 "type": "object",
