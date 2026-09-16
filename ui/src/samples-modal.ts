@@ -212,7 +212,7 @@ export class SamplesModal {
             action.textContent = isActive ? 'In use' : 'Use';
             action.disabled = isActive;
         } else if (!set.ready) {
-            action.textContent = `Download · ${set.sources.length} source${set.sources.length === 1 ? '' : 's'}`;
+            action.textContent = 'Download';
         } else {
             action.textContent = isActive ? 'In use' : 'Use';
             action.disabled = isActive;
@@ -236,7 +236,12 @@ export class SamplesModal {
         const status = document.createElement('span');
         status.className = 'snd-set-status';
         status.id = `samplesSetStatus-${set.id}`;
-        if (!ready) status.textContent = 'Download it to make it selectable.';
+        if (!ready) {
+            // Source count belongs here, not on the button: it hints at how big
+            // the fetch is without competing with the action.
+            const n = set.sources.length;
+            status.textContent = `Download it to make it selectable — ${n} source${n === 1 ? '' : 's'}.`;
+        }
         card.append(bar, status);
 
         const activate = (): void => {
