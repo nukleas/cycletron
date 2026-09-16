@@ -16,11 +16,13 @@ import {samplesModal} from './samples-modal.js';
 import {soundBrowser} from './sound-browser.js';
 import {VirtualList, readRowHeight} from './virtual-list.js';
 import {auditionSample, refKey, playingKey, onAuditionChange} from './audition.js';
-import {insertSound} from './sound-insert.js';
+import {insertSound, insertMachine} from './sound-insert.js';
 import {loadCatalog, filterBanks, CATEGORIES, type Bank, type Catalog} from './sound-catalog.js';
 
 type Row =
     | {t: 'group'; id: string; label: string; count: number; open: boolean}
+    /** A drum machine, standing in for its voices — see sound-browser.ts. */
+    | {t: 'machine'; machine: string; count: number}
     | {t: 'bank'; bank: Bank}
     | {t: 'more'; total: number};
 
@@ -101,7 +103,19 @@ export class SoundsPanel {
                 if (!banks.length) continue;
                 const open = this.open.has(def.id);
                 rows.push({t: 'group', id: def.id, label: def.label, count: banks.length, open});
-                if (open) for (const bank of banks) rows.push({t: 'bank', bank});
+                if (!open) continue;
+                if (def.id === 'machines') {
+                    // One row per machine, not per `Machine_voice` — the machine
+                    // is what a player picks.
+                    const byMachine = new Map<string, number>();
+                    for (const b of banks) {
+                        const m = b.machine ?? b.name;
+                        byMachine.set(m, (byMachine.get(m) ?? 0) + 1);
+                    }
+                    for (const [machine, count] of byMachine) rows.push({t: 'machine', machine, count});
+                } else {
+                    for (const bank of banks) rows.push({t: 'bank', bank});
+                }
             }
         }
         rows.push({t: 'more', total: cat.banks.length});
@@ -126,6 +140,17 @@ export class SoundsPanel {
             el.innerHTML =
                 `<span class="snd-row-caret">${row.open ? '▾' : '▸'}</span>` +
                 `<span class="snd-row-name">${escapeHtml(row.label)}</span>` +
+                `<span class="snd-row-meta">${row.count}</span>`;
+            return el;
+        }
+
+        if (row.t === 'machine') {
+            el.className = 'snd-row snd-row--machine';
+            el.dataset.machine = row.machine;
+            el.dataset.tooltip = `Insert s("bd sd").bank("${row.machine}")`;
+            el.innerHTML =
+                '<span class="snd-row-caret"></span>' +
+                `<span class="snd-row-name">${escapeHtml(row.machine)}</span>` +
                 `<span class="snd-row-meta">${row.count}</span>`;
             return el;
         }
@@ -168,6 +193,10 @@ export class SoundsPanel {
             if (this.open.has(row.id)) this.open.delete(row.id);
             else this.open.add(row.id);
             this.rebuild();
+            return;
+        }
+        if (row.t === 'machine') {
+            insertMachine(row.machine);
             return;
         }
 

@@ -16,12 +16,20 @@ import {escapeHtml} from './html.js';
 import {samplesModal} from './samples-modal.js';
 import {VirtualList, readRowHeight} from './virtual-list.js';
 import {auditionSample, stopAudition, onAuditionChange, refKey, playingKey} from './audition.js';
-import {insertSound} from './sound-insert.js';
+import {insertSound, insertMachine} from './sound-insert.js';
 import {loadCatalog, filterBanks, CATEGORIES, type Bank, type Catalog, type SampleRef} from './sound-catalog.js';
 
 /** A rendered line: a bank, or one of its samples while it is expanded. */
+/**
+ * A rendered line. Drum machines get their own level: the engine names their
+ * banks `RolandTR909_bd`, but the *bank* a player types is `RolandTR909` and
+ * `bd` is a voice inside it (`s("bd sd").bank("RolandTR909")`). Listing 683
+ * concatenated names flat would bury the 71 machines that are the actual unit
+ * of choice, so machines collapse into one row and open into their voices.
+ */
 type Row =
-    | {t: 'bank'; bank: Bank}
+    | {t: 'machine'; machine: string; banks: Bank[]}
+    | {t: 'bank'; bank: Bank; depth: number}
     | {t: 'sample'; bank: Bank; ref: SampleRef; index: number};
 
 export class SoundBrowser {
@@ -149,12 +157,37 @@ export class SoundBrowser {
     private rebuild(): void {
         const banks = this.visibleBanks();
         const rows: Row[] = [];
+
+        // Machine voices fold under their machine, in catalogue order.
+        const machines = new Map<string, Bank[]>();
+        const loose: Bank[] = [];
         for (const bank of banks) {
-            rows.push({t: 'bank', bank});
+            if (bank.kind === 'machine-voice' && bank.machine) {
+                const list = machines.get(bank.machine);
+                if (list) list.push(bank);
+                else machines.set(bank.machine, [bank]);
+            } else {
+                loose.push(bank);
+            }
+        }
+
+        const pushBank = (bank: Bank, depth: number): void => {
+            rows.push({t: 'bank', bank, depth});
             if (this.expanded.has(bank.name)) {
                 bank.samples.forEach((ref, index) => rows.push({t: 'sample', bank, ref, index}));
             }
+        };
+
+        for (const [machine, voices] of machines) {
+            rows.push({t: 'machine', machine, banks: voices});
+            // A search that matched inside a machine opens it, so results are
+            // never hidden behind a collapsed row the user did not close.
+            if (this.expanded.has(machine) || this.query.trim()) {
+                for (const voice of voices) pushBank(voice, 1);
+            }
         }
+        for (const bank of loose) pushBank(bank, 0);
+
         this.rows = rows;
         this.list?.setItems(rows);
 
@@ -198,8 +231,29 @@ export class SoundBrowser {
         el.dataset.idx = String(index);
         if (index === this.selected) el.classList.add('is-selected');
 
+        if (row.t === 'machine') {
+            const open = this.expanded.has(row.machine) || this.query.trim().length > 0;
+            const voices = row.banks.map((b) => b.name.slice(row.machine.length + 1)).join(' ');
+            el.classList.add('snd-row--machine');
+            el.dataset.machine = row.machine;
+            el.setAttribute('aria-selected', String(index === this.selected));
+            el.setAttribute('aria-expanded', String(open));
+            el.innerHTML =
+                `<span class="snd-row-caret">${open ? '▾' : '▸'}</span>` +
+                `<span class="snd-row-name">${escapeHtml(row.machine)}</span>` +
+                `<span class="snd-row-voices">${escapeHtml(voices)}</span>` +
+                `<span class="snd-row-meta">${row.banks.length}</span>` +
+                '<span class="snd-audition-spacer"></span>';
+            el.dataset.tooltip = `s("bd sd").bank("${row.machine}")`;
+            return el;
+        }
+
         if (row.t === 'bank') {
             const b = row.bank;
+            if (row.depth) {
+                el.style.setProperty('--depth', String(row.depth));
+                el.classList.add('snd-row--voice');
+            }
             const open = this.expanded.has(b.name);
             el.classList.add('snd-row--bank');
             el.setAttribute('aria-selected', String(index === this.selected));
@@ -212,7 +266,7 @@ export class SoundBrowser {
             ].join('');
             el.innerHTML =
                 `<span class="snd-row-caret">${b.auditionable ? (open ? '▾' : '▸') : ''}</span>` +
-                `<span class="snd-row-name">${escapeHtml(b.name)}</span>` +
+                `<span class="snd-row-name">${escapeHtml(row.depth && b.machine ? b.name.slice(b.machine.length + 1) : b.name)}</span>` +
                 `<span class="snd-row-kind">${escapeHtml(b.kind)}</span>${tags}` +
                 `<span class="snd-row-meta">${b.count || ''}</span>` +
                 `<span class="snd-row-origin">${escapeHtml(b.origin)}</span>` +
@@ -258,6 +312,15 @@ export class SoundBrowser {
 
         this.select(index, false);
 
+        if (row.t === 'machine') {
+            if (this.expanded.has(row.machine)) this.expanded.delete(row.machine);
+            else this.expanded.add(row.machine);
+            this.rebuild();
+            const first = row.banks[0]?.samples[0];
+            if (first) void this.play(first);
+            return;
+        }
+
         // The audition button previews without changing what is inserted.
         if ((e.target as Element).closest('.snd-audition')) {
             const ref = row.t === 'sample' ? row.ref : row.bank.samples[0];
@@ -294,13 +357,18 @@ export class SoundBrowser {
         if (!row) return;
         if (e.key === ' ' && document.activeElement !== this.searchEl) {
             e.preventDefault();
-            const ref = row.t === 'sample' ? row.ref : row.bank.samples[0];
+            const ref = row.t === 'sample'
+                ? row.ref
+                : row.t === 'machine'
+                    ? row.banks[0]?.samples[0]
+                    : row.bank.samples[0];
             if (ref) void this.play(ref);
             return;
         }
         if (e.key === 'Enter') {
             e.preventDefault();
             if (row.t === 'sample') insertSound(row.bank, row.index);
+            else if (row.t === 'machine') insertMachine(row.machine);
             else insertSound(row.bank);
             this.close();
         }

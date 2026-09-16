@@ -5763,3 +5763,23 @@ body.stage-active #fullscreenVizHUD { display: none; }
     box-shadow: var(--glow-1);
     transition: width 0.2s linear;
 }
+
+/* A machine is the unit you actually pick: RolandTR909, not RolandTR909_bd. */
+.snd-row--machine > .snd-row-name {
+    color: var(--neon-bright);
+    font-weight: var(--fw-bold);
+}
+.snd-row-voices {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-tiny);
+    color: var(--text-dim);
+    letter-spacing: var(--ls-wide);
+}
+.snd-row--machine > .snd-row-name { flex: 0 0 auto; }
+/* Under a machine, the kind and origin columns just repeat the parent row. */
+.snd-row--voice .snd-row-kind,
+.snd-row--voice .snd-row-origin { display: none; }

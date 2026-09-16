@@ -25,3 +25,14 @@ export function insertSound(bank: Bank, sampleIndex?: number): void {
 
     editor.insertAtCursor(snippetFor(bank, sampleIndex));
 }
+
+/**
+ * Insert a whole drum machine. The machine is the `.bank()`, and the voices are
+ * ordinary `s()` tokens — so a machine is only useful as a pattern over its
+ * voices, not as a sound on its own.
+ */
+export function insertMachine(machine: string): void {
+    const editor = window.strudelApp?.editor;
+    if (!editor) return;
+    editor.insertAtCursor(`s("bd sd").bank("${machine}")`);
+}
