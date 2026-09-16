@@ -805,6 +805,80 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// The whole path a Legowelt zip takes, minus the Tauri plumbing: stage the
+    /// archive, unwrap the wrapper folder, and scan it into banks. This is the
+    /// case the review step exists for — before grouping, these 12 files became
+    /// 12 one-sample banks.
+    #[test]
+    fn a_flat_hardware_pack_stages_and_scans_into_a_playable_kit() {
+        let dir = tmp("e2e");
+        fs::create_dir_all(&dir).unwrap();
+        let zip_path = dir.join("DX200.zip");
+        let names = [
+            "DX200 Pack/BD-dx200-909ishFilletKick-768kbps.wav",
+            "DX200 Pack/BD-dx200-RotterdamGabberKick-768kbps.wav",
+            "DX200 Pack/BD-dx200-SubBooooom-768kbps.wav",
+            "DX200 Pack/SD-dx200-909Snare-768kbps.wav",
+            "DX200 Pack/SD-dx200-JungleSnare-768kbps.wav",
+            "DX200 Pack/HAT-dx200-909HatOPEN-768kbps.wav",
+            "DX200 Pack/HAT-dx200-AnalogHatCLOSED-768kbps.wav",
+            "DX200 Pack/PERC-dx200-Clave-768kbps.wav",
+            "DX200 Pack/PERC-dx200-Shaker2-768kbps.wav",
+            "DX200 Pack/README.txt",
+        ];
+        let entries: Vec<(&str, &[u8])> = names
+            .iter()
+            .map(|n| {
+                (
+                    *n,
+                    if n.ends_with(".txt") {
+                        &b"terms"[..]
+                    } else {
+                        &b"RIFFfake"[..]
+                    },
+                )
+            })
+            .collect();
+        make_zip(&zip_path, &entries);
+
+        let stage = dir.join("stage");
+        let (files, _, warnings) = stage_zip(&zip_path, &stage).unwrap();
+        assert_eq!(files, 9, "the README is not audio and is not extracted");
+        assert!(warnings.iter().any(|w| w.contains("README.txt")));
+
+        // The single wrapper folder is stripped, so the files are loose again.
+        let root = unwrap_single_root(&stage);
+        assert_eq!(root, stage.join("DX200 Pack"));
+        assert!(!is_folder_shaped(&root));
+
+        let (strategy, banks) = sounds::scan_folder_banks_detailed(&root).unwrap();
+        assert_eq!(strategy, GroupStrategy::LeadingTag);
+        let got: Vec<(String, usize)> = banks
+            .iter()
+            .map(|b| (b.name.clone(), b.files.len()))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                ("bd".to_string(), 3),
+                ("hat".to_string(), 2),
+                ("perc".to_string(), 2),
+                ("sd".to_string(), 2),
+            ]
+        );
+
+        // And the names the user would actually see, post-collision-rename.
+        let core = packs::core_bank_names();
+        let mut used = HashSet::new();
+        let shown: Vec<String> = banks
+            .iter()
+            .map(|b| packs::bank_name_for_pack(&b.name, "dx200", &core, &mut used).0)
+            .collect();
+        assert_eq!(shown, vec!["bd_dx200", "hat", "perc_dx200", "sd_dx200"]);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn a_flat_pack_inside_one_folder_roots_at_that_folder() {
         // The Legowelt shape: PackName/BD-x-Kick.wav, no bank folders. Here the
