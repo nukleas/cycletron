@@ -109,7 +109,21 @@ fn resolve_source_url(url: &str) -> String {
     strudel_sounds::resolve_special_url(url).into_owned()
 }
 
+/// Cache dir names are capped for filesystem sanity.
+const SLUG_MAX: usize = 48;
+/// Hex characters of URL digest appended to a shortened slug.
+const SLUG_HASH_LEN: usize = 8;
+
 /// Readable, filesystem-safe fragment of a source URL for its cache dir name.
+///
+/// Anything long enough to need shortening carries a digest of the full URL,
+/// because a bare truncation is not collision-free: the dough-samples sources
+/// (`piano.json`, `vcsl.json`, `tidal-drum-machines.json`) share a path and
+/// differ only *past* the cap, so all three used to resolve to one directory.
+/// The damage was silent and specific — `is_ready` found whichever manifest had
+/// been downloaded first and reported the other sets as downloaded too, then
+/// activating one loaded the wrong samples. The drum-machines set showed a
+/// single `piano` bank and no drum machines at all.
 fn source_slug(url: &str) -> String {
     let trimmed = url
         .strip_prefix("github:")
@@ -132,12 +146,23 @@ fn source_slug(url: &str) -> String {
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("-");
-    slug.truncate(48);
     if slug.is_empty() {
-        "source".into()
-    } else {
-        slug
+        return "source".into();
     }
+    if slug.len() <= SLUG_MAX {
+        return slug;
+    }
+
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(url.as_bytes());
+    let hash: String = digest
+        .iter()
+        .take(SLUG_HASH_LEN / 2)
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    slug.truncate(SLUG_MAX - SLUG_HASH_LEN - 1);
+    let head = slug.trim_end_matches('-');
+    format!("{head}-{hash}")
 }
 
 /// A built-in downloadable set. Sources are in registration order — the
@@ -1116,16 +1141,52 @@ mod tests {
 
     #[test]
     fn source_slugs_are_readable_and_safe() {
+        // Short URLs keep their readable slug verbatim — these are the cache
+        // dirs already on disk, and renaming them would force a re-download.
         assert_eq!(
             source_slug("github:tidalcycles/uzu-drumkit"),
             "tidalcycles-uzu-drumkit"
         );
         assert_eq!(
-            source_slug(
-                "https://raw.githubusercontent.com/felixroos/dough-samples/main/piano.json"
-            ),
-            "raw-githubusercontent-com-felixroos-dough-sample"
+            source_slug("github:tidalcycles/Dirt-Samples/master"),
+            "tidalcycles-dirt-samples-master"
         );
+        assert_eq!(source_slug("github:yaxu/mrid"), "yaxu-mrid");
         assert!(!source_slug("///").is_empty());
+    }
+
+    /// The dough-samples sources differ only past the 48-character cap, so a
+    /// bare truncation mapped all three onto one cache directory. `is_ready`
+    /// then found whichever manifest had been downloaded first and reported the
+    /// others as downloaded too — activating `drum-machines` loaded piano, and
+    /// the set appeared to contain a single `piano` bank and no drum machines.
+    #[test]
+    fn sources_sharing_a_path_get_distinct_cache_dirs() {
+        const BASE: &str = "https://raw.githubusercontent.com/felixroos/dough-samples/main";
+        let piano = source_slug(&format!("{BASE}/piano.json"));
+        let machines = source_slug(&format!("{BASE}/tidal-drum-machines.json"));
+        let vcsl = source_slug(&format!("{BASE}/vcsl.json"));
+
+        assert_ne!(piano, machines, "piano and drum machines collided");
+        assert_ne!(piano, vcsl, "piano and VCSL collided");
+        assert_ne!(machines, vcsl, "drum machines and VCSL collided");
+
+        for slug in [&piano, &machines, &vcsl] {
+            assert!(slug.len() <= SLUG_MAX, "{slug} exceeds the cap");
+            assert!(
+                slug.starts_with("raw-githubusercontent-com-felixroos"),
+                "{slug} lost its readable head"
+            );
+            assert!(
+                slug.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'),
+                "{slug} is not filesystem-safe"
+            );
+        }
+
+        // Stable across calls, or every launch would re-download.
+        assert_eq!(
+            machines,
+            source_slug(&format!("{BASE}/tidal-drum-machines.json"))
+        );
     }
 }
