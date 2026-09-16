@@ -408,10 +408,10 @@ async fn execute_tool(
         ToolName::ValidatePattern => tool_validate_pattern(input, state),
         ToolName::ReviewPattern => tool_review_pattern(input, state),
         ToolName::HearPattern => tool_hear_pattern(input, state).await,
-        ToolName::InspectPattern => tool_inspect_pattern(input),
-        ToolName::AnalyzeArrangement => tool_analyze_arrangement(input),
-        ToolName::CritiquePattern => tool_critique_pattern(input),
-        ToolName::CritiqueForm => tool_critique_form(input),
+        ToolName::InspectPattern => tool_inspect_pattern(input, state),
+        ToolName::AnalyzeArrangement => tool_analyze_arrangement(input, state),
+        ToolName::CritiquePattern => tool_critique_pattern(input, state),
+        ToolName::CritiqueForm => tool_critique_form(input, state),
         ToolName::GenreRecipe => tool_genre_recipe(input, state),
         ToolName::PlayPattern => tool_play_pattern(input, state, event_tx),
         ToolName::ListParts => tool_list_parts(state),
@@ -1327,8 +1327,8 @@ async fn tool_hear_pattern(input: &serde_json::Value, state: &AppState) -> ToolR
     )
 }
 
-fn tool_inspect_pattern(input: &serde_json::Value) -> ToolResult {
-    let code = req_str(input, "code")?;
+fn tool_inspect_pattern(input: &serde_json::Value, state: &AppState) -> ToolResult {
+    let code = resolve_code_or_editor(input, state)?;
     let cycles = opt_usize(input, "cycles", 8);
     // "auto": full event log for short windows, summary for long forms (a
     // 64-cycle dump is thousands of lines nobody can scan).
@@ -1339,7 +1339,7 @@ fn tool_inspect_pattern(input: &serde_json::Value) -> ToolResult {
         _ => cycles <= 4,
     };
 
-    match strudel::Evaluated::new(code, cycles) {
+    match strudel::Evaluated::new(&code, cycles) {
         Ok(ev) if !want_events => Ok(ToolOutcome::ok(
             format!("digest summary, {cycles} cycles"),
             strudel::digest_to_summary(ev.digest()),
@@ -1357,11 +1357,11 @@ fn tool_inspect_pattern(input: &serde_json::Value) -> ToolResult {
     }
 }
 
-fn tool_analyze_arrangement(input: &serde_json::Value) -> ToolResult {
-    let code = req_str(input, "code")?;
+fn tool_analyze_arrangement(input: &serde_json::Value, state: &AppState) -> ToolResult {
+    let code = resolve_code_or_editor(input, state)?;
     let max_cycles = opt_usize(input, "max_cycles", 32);
 
-    match strudel::Evaluated::new(code, max_cycles) {
+    match strudel::Evaluated::new(&code, max_cycles) {
         Ok(ev) => {
             let a = strudel::analyze(&ev);
             Ok(ToolOutcome::ok(
@@ -1378,11 +1378,11 @@ fn tool_analyze_arrangement(input: &serde_json::Value) -> ToolResult {
     }
 }
 
-fn tool_critique_pattern(input: &serde_json::Value) -> ToolResult {
-    let code = req_str(input, "code")?;
+fn tool_critique_pattern(input: &serde_json::Value, state: &AppState) -> ToolResult {
+    let code = resolve_code_or_editor(input, state)?;
     let cycles = opt_usize(input, "cycles", 16);
 
-    match strudel::Evaluated::new(code, cycles.max(4)) {
+    match strudel::Evaluated::new(&code, cycles.max(4)) {
         Ok(ev) => {
             let c = strudel::critique(&ev);
             Ok(critique_outcome(
@@ -1412,11 +1412,11 @@ fn critique_outcome(what: &str, found: &[strudel::Finding], text: String) -> Too
     ToolOutcome::ok(summary, text).with_warnings(findings(found))
 }
 
-fn tool_critique_form(input: &serde_json::Value) -> ToolResult {
-    let code = req_str(input, "code")?;
+fn tool_critique_form(input: &serde_json::Value, state: &AppState) -> ToolResult {
+    let code = resolve_code_or_editor(input, state)?;
     let cycles = opt_usize(input, "cycles", 32);
 
-    match strudel::Evaluated::new(code, cycles.clamp(8, 64)) {
+    match strudel::Evaluated::new(&code, cycles.clamp(8, 64)) {
         Ok(ev) => {
             let c = strudel::critique_form(&ev);
             Ok(critique_outcome(
@@ -1850,6 +1850,15 @@ fn tool_list_parts(state: &AppState) -> ToolResult {
         "\nEdit one with upsert_track {id, code}; batch with upsert_tracks; \
          silence with mute_track {id}. For pickRestart songs use list_sections / upsert_section.",
     );
+    if parts.iter().any(|p| p.id.is_none()) {
+        out.push_str(
+            "\nUnnamed tracks: address by 1-based index (id: \"1\"). A brand-new name \
+             APPENDS a copy — on MIDI dumps that doubles the song. To restyle a long \
+             note body, pass code starting with '.' (e.g. .s(\"supersaw\").lpf(800)); \
+             the mini-notation is kept. upsert_tracks with one new name per unnamed \
+             track replaces them in order and stamps the ids.",
+        );
+    }
     Ok(ToolOutcome::ok(format!("{} track(s)", parts.len()), out))
 }
 
@@ -2203,6 +2212,26 @@ mod write_path_tests {
         assert!(
             s.last_reviewed_code().as_deref() == Some(r#"s("bd*4")"#),
             "review should stash the buffer"
+        );
+    }
+
+    #[test]
+    fn inspect_and_analyze_without_code_use_editor() {
+        let s = state_with_code(r#"s("bd*4")"#);
+        let inspect =
+            tool_inspect_pattern(&json!({"cycles": 4, "verbosity": "summary"}), &s).unwrap();
+        assert!(inspect.ok, "inspect: {inspect:?}");
+        assert!(
+            inspect.text.to_lowercase().contains("bd") || inspect.text.contains("4 events"),
+            "should inspect the editor, not require a toy snippet: {}",
+            inspect.text
+        );
+        let analyze = tool_analyze_arrangement(&json!({}), &s).unwrap();
+        assert!(analyze.ok, "analyze: {analyze:?}");
+        assert!(
+            !analyze.text.contains("sawtooth"),
+            "must not invent a dummy pattern: {}",
+            analyze.text
         );
     }
 

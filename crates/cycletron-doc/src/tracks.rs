@@ -304,10 +304,27 @@ fn splice(code: &str, span: (usize, usize), replacement: &[String]) -> String {
 
 /// Apply several track upserts sequentially (re-parse each time so later
 /// patches see earlier inserts). Returns the final document and the ids written.
+///
+/// MIDI dumps arrive as N unnamed `$:` tracks. Rebuilding them with new names
+/// used to *append* N copies (the names didn't match, so each patch was a
+/// create). When every patch is a fresh id and there are exactly as many
+/// unnamed tracks as patches (2+), replace those unnamed tracks in order and
+/// stamp the new ids instead.
 pub fn upsert_tracks(
     code: &str,
     patches: &[(String, String)],
 ) -> Result<(String, Vec<String>), DocError> {
+    let tracks = parse_tracks(code);
+    if let Some(plan) = unnamed_rebuild_plan(&tracks, patches) {
+        let mut doc = code.to_string();
+        let mut wrote = Vec::with_capacity(plan.len());
+        for (index, id, expr) in plan {
+            let (next, w) = replace_index(&doc, index, id, expr)?;
+            doc = next;
+            wrote.push(w);
+        }
+        return Ok((doc, wrote));
+    }
     let mut doc = code.to_string();
     let mut wrote = Vec::with_capacity(patches.len());
     for (id, expr) in patches {
@@ -318,8 +335,78 @@ pub fn upsert_tracks(
     Ok((doc, wrote))
 }
 
+/// True when `expr` is a sound-design chain to wrap around an existing body
+/// (`.s("supersaw").lpf(800)`), not a full replacement.
+fn is_chain_suffix(expr: &str) -> bool {
+    expr.starts_with('.')
+}
+
+/// 1-based index + new id + expr, in document order, when a batch is a
+/// rename-in-place of every unnamed track.
+fn unnamed_rebuild_plan<'a>(
+    tracks: &[Track],
+    patches: &'a [(String, String)],
+) -> Option<Vec<(usize, &'a str, &'a str)>> {
+    if patches.len() < 2 {
+        return None;
+    }
+    let unnamed: Vec<&Track> = tracks.iter().filter(|t| t.id.is_none()).collect();
+    if unnamed.len() != patches.len() {
+        return None;
+    }
+    for (id, _) in patches {
+        if is_index_handle(id) || clean_id(id).is_empty() || find(tracks, id).is_some() {
+            return None;
+        }
+    }
+    Some(
+        unnamed
+            .iter()
+            .zip(patches)
+            .map(|(t, (id, expr))| (t.index, id.as_str(), expr.as_str()))
+            .collect(),
+    )
+}
+
+/// Replace the track at 1-based `index`, stamping `new_id` (must be a real id).
+fn replace_index(
+    code: &str,
+    index: usize,
+    new_id: &str,
+    expr: &str,
+) -> Result<(String, String), DocError> {
+    let expr = expr.trim();
+    if expr.is_empty() {
+        return Err(DocError::BadArgument(
+            "upsert_track: 'code' is empty".to_string(),
+        ));
+    }
+    let write_id = clean_id(new_id);
+    if write_id.is_empty() {
+        return Err(DocError::BadArgument(
+            "upsert_track: a new track needs a non-empty id".to_string(),
+        ));
+    }
+    let tracks = parse_tracks(code);
+    let t = tracks
+        .iter()
+        .find(|t| t.index == index)
+        .ok_or_else(|| no_match(&tracks, &index.to_string()))?
+        .clone();
+    if is_chain_suffix(expr) {
+        return Ok((append_chain(code, &t, expr, &write_id), write_id));
+    }
+    Ok((emit_replacement(code, &t, expr, &write_id), write_id))
+}
+
 /// Insert or replace a track. If a track matching `handle` (id or index) exists,
 /// its span is replaced; otherwise a new `$: <expr> // @<id>` track is appended.
+///
+/// `code` starting with `.` is a chain suffix: the existing note/sample body is
+/// kept and the chain is appended (so restyling a MIDI dump does not re-stream
+/// the mini-notation). A chain suffix on a handle that matches nothing is an
+/// error — there is nothing to wrap.
+///
 /// Returns the new document and the id that was written.
 pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, String), DocError> {
     let expr = expr.trim();
@@ -342,25 +429,17 @@ pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, Str
         // track's own id; only fall back to the handle when it names an id
         // (not a bare index) and the track had none.
         let write_id = t.id.clone().unwrap_or_else(|| id.clone());
-        let line = match t.kind {
-            TrackKind::Bare => {
-                // Keep bare form; keep it addressable with a trailing marker.
-                if write_id.is_empty() {
-                    expr.to_string()
-                } else {
-                    format!("{expr} // @{write_id}")
-                }
-            }
-            _ => {
-                if write_id.is_empty() {
-                    format!("$: {expr}")
-                } else {
-                    format!("$: {expr} // @{write_id}")
-                }
-            }
-        };
-        let new_code = splice(code, (t.start, t.end), &[line]);
-        return Ok((new_code, write_id));
+        if is_chain_suffix(expr) {
+            return Ok((append_chain(code, t, expr, &write_id), write_id));
+        }
+        return Ok((emit_replacement(code, t, expr, &write_id), write_id));
+    }
+
+    if is_chain_suffix(expr) {
+        return Err(DocError::BadArgument(format!(
+            "upsert_track: a chain starting with '.' can only wrap an existing track. \
+             Address it by @id or 1-based index (list_parts). No track matches '{handle}'."
+        )));
     }
 
     // No match → append a new $: track.
@@ -382,6 +461,99 @@ pub fn upsert_track(code: &str, handle: &str, expr: &str) -> Result<(String, Str
     };
     let new_code = format!("{code}{sep}$: {expr} // @{id}\n");
     Ok((new_code, id))
+}
+
+/// Rewrite `t`'s span as a full expression, preserving `$:` vs bare form.
+fn emit_replacement(code: &str, t: &Track, expr: &str, write_id: &str) -> String {
+    let line = match t.kind {
+        TrackKind::Bare => {
+            if write_id.is_empty() {
+                expr.to_string()
+            } else {
+                format!("{expr} // @{write_id}")
+            }
+        }
+        _ => {
+            if write_id.is_empty() {
+                format!("$: {expr}")
+            } else {
+                format!("$: {expr} // @{write_id}")
+            }
+        }
+    };
+    splice(code, (t.start, t.end), &[line])
+}
+
+/// Split a line into (code, trailing line-comment) at the first `//` that is
+/// not inside a string literal. Strudel bodies quote with `"`, `'` and
+/// backticks, so a `//` inside one of those (a sample URL, say) is code.
+fn split_trailing_comment(line: &str) -> (&str, &str) {
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    let mut chars = line.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match quote {
+            Some(q) => {
+                if c == '\\' {
+                    escaped = true;
+                } else if c == q {
+                    quote = None;
+                }
+            }
+            None => {
+                if c == '"' || c == '\'' || c == '`' {
+                    quote = Some(c);
+                } else if c == '/' && matches!(chars.peek(), Some((_, '/'))) {
+                    return (&line[..i], &line[i..]);
+                }
+            }
+        }
+    }
+    (line, "")
+}
+
+/// Keep the existing body and append `chain` (must start with `.`) on the last
+/// line of the span. Unmutes: a wrap is an audible edit. Re-stamps `write_id`
+/// when it is non-empty.
+fn append_chain(code: &str, t: &Track, chain: &str, write_id: &str) -> String {
+    let lines: Vec<&str> = code.lines().collect();
+    let span = &lines[t.start..t.end];
+    let mut new_span: Vec<String> = Vec::with_capacity(span.len());
+    for (i, line) in span.iter().enumerate() {
+        let trimmed = line.trim_start();
+        let indent_len = line.len() - trimmed.len();
+        let unmuted = trimmed
+            .strip_prefix(MUTE)
+            .map(|rest| format!("{}{rest}", &line[..indent_len]))
+            .unwrap_or_else(|| (*line).to_string());
+        if i + 1 != span.len() {
+            new_span.push(unmuted);
+            continue;
+        }
+        // The chain must land on the code, never inside a trailing comment —
+        // appending after `// lead` would silently comment the edit out. The
+        // `// @id` marker is re-stamped below; anything else the user wrote
+        // survives the wrap.
+        let (body, comment) = split_trailing_comment(&unmuted);
+        let keep = match comment.find("// @") {
+            Some(idx) => comment[..idx].trim_end(),
+            None => comment.trim_end(),
+        };
+        let mut wrapped = format!("{}{}", body.trim_end(), chain);
+        if !keep.is_empty() {
+            wrapped.push(' ');
+            wrapped.push_str(keep);
+        }
+        if !write_id.is_empty() {
+            wrapped.push_str(&format!(" // @{write_id}"));
+        }
+        new_span.push(wrapped);
+    }
+    splice(code, (t.start, t.end), &new_span)
 }
 
 /// Comment out a track (silence it) by prefixing its lines with `//@mute `.
@@ -604,5 +776,161 @@ mod tests {
         let e = mute_track(MULTI, "lead").unwrap_err().to_string();
         assert!(e.contains("@drums"));
         assert!(e.contains("@hats"));
+    }
+
+    fn unnamed_midi(n: usize) -> String {
+        let mut s = String::from("setcpm(31)\n");
+        for i in 1..=n {
+            s.push_str(&format!(
+                "$: note(`<C{i} D{i} E{i}>`).s(\"sine\").gain(0.5)\n"
+            ));
+        }
+        s
+    }
+
+    #[test]
+    fn chain_suffix_keeps_note_body() {
+        let code = "setbpm(120);\n$: note(`<[D4@2 D4@3]>`).s(\"sine\").gain(0.5)\n";
+        let (out, id) = upsert_track(code, "1", ".s(\"supersaw\").lpf(800).gain(0.7)").unwrap();
+        assert!(
+            id.is_empty(),
+            "index replace of unnamed stays unnamed: {id:?}"
+        );
+        assert!(
+            out.contains(
+                "note(`<[D4@2 D4@3]>`).s(\"sine\").gain(0.5).s(\"supersaw\").lpf(800).gain(0.7)"
+            ),
+            "body kept, chain appended:\n{out}"
+        );
+        assert!(!out.contains("// @"), "no id was stamped");
+    }
+
+    #[test]
+    fn chain_suffix_on_named_track_keeps_id() {
+        let (out, id) = upsert_track(MULTI, "drums", ".gain(0.9)").unwrap();
+        assert_eq!(id, "drums");
+        assert!(
+            out.contains("$: s(\"bd*4\").gain(0.9) // @drums"),
+            "chain appended, id kept:\n{out}"
+        );
+        assert!(
+            out.contains("$: s(\"hh*8\") // @hats"),
+            "other track untouched"
+        );
+    }
+
+    #[test]
+    fn chain_suffix_missing_track_is_an_error() {
+        let e = upsert_track(MULTI, "lead", ".s(\"supersaw\")")
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("chain starting with '.'"), "{e}");
+        assert!(e.contains("lead"), "{e}");
+    }
+
+    #[test]
+    fn upsert_tracks_rebuilds_unnamed_midi_in_place() {
+        let src = unnamed_midi(3);
+        let patches = vec![
+            ("lead".into(), "note(`<C1 D1 E1>`).s(\"supersaw\")".into()),
+            ("bass".into(), "note(`<C2 D2 E2>`).s(\"sawtooth\")".into()),
+            ("drums".into(), "s(\"bd*4\")".into()),
+        ];
+        let (out, wrote) = upsert_tracks(&src, &patches).unwrap();
+        assert_eq!(wrote, vec!["lead", "bass", "drums"]);
+        let listed = list_tracks(&out);
+        assert_eq!(listed.len(), 3, "must not append copies:\n{out}");
+        assert_eq!(listed[0].id.as_deref(), Some("lead"));
+        assert_eq!(listed[1].id.as_deref(), Some("bass"));
+        assert_eq!(listed[2].id.as_deref(), Some("drums"));
+        assert!(out.contains(".s(\"supersaw\") // @lead"));
+        assert!(!out.contains(".s(\"sine\")"), "old chains gone:\n{out}");
+    }
+
+    #[test]
+    fn upsert_tracks_chain_suffix_on_unnamed_rebuild_keeps_bodies() {
+        let src = unnamed_midi(2);
+        let patches = vec![
+            ("lead".into(), ".s(\"supersaw\").lpf(900)".into()),
+            ("bass".into(), ".s(\"sawtooth\").lpf(400)".into()),
+        ];
+        let (out, wrote) = upsert_tracks(&src, &patches).unwrap();
+        assert_eq!(wrote, vec!["lead", "bass"]);
+        assert_eq!(list_tracks(&out).len(), 2, "no copies:\n{out}");
+        assert!(
+            out.contains(
+                "note(`<C1 D1 E1>`).s(\"sine\").gain(0.5).s(\"supersaw\").lpf(900) // @lead"
+            ),
+            "lead body kept:\n{out}"
+        );
+        assert!(
+            out.contains(
+                "note(`<C2 D2 E2>`).s(\"sine\").gain(0.5).s(\"sawtooth\").lpf(400) // @bass"
+            ),
+            "bass body kept:\n{out}"
+        );
+    }
+
+    #[test]
+    fn upsert_tracks_single_new_id_still_appends() {
+        // "add a pad" on a 3-track MIDI dump must not eat track 1.
+        let src = unnamed_midi(3);
+        let (out, wrote) =
+            upsert_tracks(&src, &[("pad".into(), "note(\"c4\").s(\"wt_pad\")".into())]).unwrap();
+        assert_eq!(wrote, vec!["pad"]);
+        assert_eq!(list_tracks(&out).len(), 4, "pad is a 4th track:\n{out}");
+        assert!(out.contains("note(`<C1 D1 E1>`)"), "originals kept");
+        assert!(out.contains("// @pad"));
+    }
+    #[test]
+    fn chain_suffix_lands_on_code_not_inside_a_comment() {
+        // Regression: the chain used to be appended after the comment, which
+        // commented the edit out — a silent no-op that still validated.
+        let code = "$: note(\"c4\").s(\"sine\") // punchy lead\n";
+        let (out, _) = upsert_track(code, "1", ".lpf(800)").unwrap();
+        assert!(
+            out.contains("note(\"c4\").s(\"sine\").lpf(800)"),
+            "chain must attach to the code:\n{out}"
+        );
+        assert!(out.contains("// punchy lead"), "user comment kept:\n{out}");
+        assert!(
+            !out.contains("lead.lpf(800)"),
+            "chain must not be swallowed by the comment:\n{out}"
+        );
+    }
+
+    #[test]
+    fn chain_suffix_keeps_user_comment_and_restamps_id() {
+        let code = "$: s(\"bd*4\") // four on the floor // @drums\n";
+        let (out, id) = upsert_track(code, "drums", ".gain(0.9)").unwrap();
+        assert_eq!(id, "drums");
+        assert!(
+            out.contains("s(\"bd*4\").gain(0.9) // four on the floor // @drums"),
+            "comment kept, marker re-stamped last:\n{out}"
+        );
+        assert_eq!(
+            list_tracks(&out)[0].id.as_deref(),
+            Some("drums"),
+            "still addressable"
+        );
+    }
+
+    #[test]
+    fn chain_suffix_ignores_slashes_inside_strings() {
+        let code = "$: s(\"gm/acoustic//grand\")\n";
+        let (out, _) = upsert_track(code, "1", ".room(0.3)").unwrap();
+        assert!(
+            out.contains("s(\"gm/acoustic//grand\").room(0.3)"),
+            "a // inside a string is code, not a comment:\n{out}"
+        );
+    }
+
+    #[test]
+    fn split_trailing_comment_cases() {
+        assert_eq!(split_trailing_comment("a.b() // c"), ("a.b() ", "// c"));
+        assert_eq!(split_trailing_comment("a.b()"), ("a.b()", ""));
+        assert_eq!(split_trailing_comment("s(\"x//y\")"), ("s(\"x//y\")", ""));
+        assert_eq!(split_trailing_comment("s(`x//y`)"), ("s(`x//y`)", ""));
+        assert_eq!(split_trailing_comment("// only"), ("", "// only"));
     }
 }

@@ -522,6 +522,11 @@ $: note("0 3 7 3").scale("c4:minor").s("wt_lead").room(0.3) // @lead
 
 - `list_parts` → `upsert_track {id, code}` / `upsert_tracks {patches}` / `mute_track`
 - `code` is just the expression — no `$:`, no `setbpm`.
+- Unnamed tracks (`#N (no id — address by index)`) **must** be edited with
+  `id: "N"`. A brand-new name **appends a copy** and doubles the song.
+- To restyle a long MIDI note body without re-streaming it, pass `code`
+  starting with `.` (e.g. `.s("supersaw").lpf(800).gain(0.7)`). The mini-notation
+  is kept. Re-emitting a 20k-char dump to change `.s("sine")` is the #1 stall.
 
 ### B. Multi-section arranged songs — `pickRestart({ intro: …, drop1: … })`
 
@@ -567,8 +572,10 @@ the #1 latency cost. Aim for ~3–6 tools on a normal request. Keep it tight:
 - **Critique is a final gate, not a per-edit linter.** Write the whole pattern,
   THEN review_pattern ONCE. Fix warns, re-review at most once. Identical code is
   cached server-side; a third review is refused (budget 2/request).
-- **Gate what's already playing without re-emitting:** review_pattern() or
-  validate_pattern() with no args uses the current editor document.
+- **Gate what's already playing without re-emitting:** review_pattern(),
+  validate_pattern(), inspect_pattern(), analyze_arrangement(), critique_pattern()
+  and critique_form() with no `code` use the current editor document. Never pass
+  a 1-note toy snippet to "analyze the arrangement" — that inspects the snippet.
 - **hear_pattern is your ears, not a linter.** It renders the mix and every
   stem offline and measures them (band energy predicted vs measured, centroid,
   peak/rms, clipping) — seconds of CPU. Call it once after a review raised
@@ -597,8 +604,10 @@ review on large forms — OR review_pattern({code}) then play_pattern() with no 
 Normal shape (edit one part): list_sections|list_parts → upsert_section|upsert_track
 Normal shape (retune a shared helper const): upsert_binding {name, code}
 Normal shape (edit several parts / mix fix): upsert_sections|upsert_tracks once
-Normal shape (MIDI dump cleanup): list_sections → upsert_sections for changed
-parts only — never re-stream the whole dump
+Normal shape (MIDI dump cleanup): list_parts (unnamed `$:` tracks) or
+list_sections (`const sections` / pickRestart). Then upsert by **index** / section
+id. For instrumentation-only, pass chain-suffix `code` starting with `.` —
+never re-stream the mini-notation dump.
 
 ## Tool results
 
