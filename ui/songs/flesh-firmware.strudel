@@ -1,0 +1,162 @@
+// FLESH / FIRMWARE
+// Neon rain falls through an illegal rooftop concert. Robots wield the
+// instruments; humans plug into the mixing desk and livecode their nerves.
+// Every keystroke changes a throat, a pulse, a memory. The city listens.
+// Industrial electro / cyberpunk opera without words. D minor, 128 BPM.
+// All voices use bundled drums or synthesis; no external samples required.
+//
+// FORM: 128 bars / 4:00, then loops. One cycle = one 4/4 bar.
+//   boot       8  e1  0:00  Rain on the server district; a machine wakes.
+//   robots    16  e3  0:15  Chrome musicians assemble a precise broken beat.
+//   humans    16  e3  0:45  Livecoders become formant instruments, answering.
+//   chorus    16  e4  1:15  Flesh and firmware share the eight-note hook.
+//   blackout   8  e1  1:45  Corporate ICE cuts the grid; hearts keep time.
+//   jailbreak 16  e4  2:00  A human solo rewrites the robot orchestra.
+//   uprising  32  e5  2:30  Full ensemble; the hook returns an octave higher.
+//   dawn      16  e1  3:30  The city exhales; the terminal cursor survives.
+//
+// ROBOT motif: D A C A / F E D rest — hard FM, left of center.
+// HUMAN answer: rest D F A / C A G E — breathy vowels, right of center.
+// CHORUS hook: D F A C / A G E D. Blackout suspends it; dawn resolves it.
+// Imagined refrain (instrumental score, no synthesized spoken lyrics):
+//   "Chrome hands play us / we type the rain.
+//    Flesh is the waveform / nobody owns the mainframe."
+
+setbpm(128);
+
+"<boot@2 robots@4 humans@4 chorus@4 blackout@2 jailbreak@4 uprising@8 dawn@4>".slow(4).pickRestart({
+  boot: stack(
+    note("<[d3,a3,e4] [d3,a3,f4]>").slow(4).s("wt_pad")
+      .attack(1.2).release(2.0).lpf(950).chorus(0.3).room(0.65).gain(0.13).pan(0.4),
+    s("hh*16").hpf(7200).gain("[0.015 0.025 0.01 0.04]*4")
+      .pan(sine.range(0.2, 0.8).slow(3)).room(0.3),
+    note("<[d5 ~ ~ ~ ~ a5 ~ ~] [~ ~ c6 ~ a5 ~ ~ ~] [f5 ~ ~ ~ e5 ~ ~ ~] [d5 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("fm").fmratio(2).fmindex(2.2).decay(0.09).sustain(0).release(0.1)
+      .delay(0.28).delaytime(0.3515625).delayfeedback(0.3).room(0.35).gain(0.12).pan(0.3),
+    note("d1").slow(2).s("sine").attack(0.4).release(0.8).gain(0.2)
+  ),
+
+  robots: stack(
+    s("<[bd ~ ~ bd ~ ~ bd ~] [bd ~ ~ ~ ~ bd bd ~] [bd ~ ~ bd ~ ~ bd ~] [bd ~ ~ ~ bd ~ ~ bd]>")
+      .gain(0.64),
+    s("~ sd ~ sd").hpf(180).room(0.16).gain(0.4),
+    s("hh*8").gain("[0.11 0.055]*4").pan(0.62)
+      .every(4, x => x.ply(2)),
+    s("~ ~ rs ~ ~ rs ~ ~").hpf(1200).gain(0.13).pan(0.25),
+    note("<[d2 ~ d2 a2 ~ c3 a2 ~] [d2 ~ d2 ~ f2 ~ e2 ~] [bb1 ~ bb1 f2 ~ a2 f2 ~] [c2 ~ c2 g2 ~ e2 c2 ~]>")
+      .s("sawtooth").lpf(720).resonance(2).decay(0.12).sustain(0).release(0.07)
+      .dist(0.18).gain(0.26),
+    note("<[d5 a5 c6 a5 f5 e5 d5 ~] [d5 ~ a5 ~ c6 a5 ~ ~] [d5 a5 c6 a5 f5 e5 d5 ~] [f5 ~ e5 ~ d5 ~ ~ ~]>")
+      .every(8, x => x.rev())
+      .s("fm").fmratio(2).fmindex("<2 3 2 4>").decay(0.07).sustain(0).release(0.06)
+      .lpf(4800).delay(0.16).delaytime(0.234375).gain(0.14).pan(0.28)
+  ),
+
+  humans: stack(
+    s("<[bd ~ ~ bd ~ ~ bd ~] [bd ~ ~ ~ ~ bd bd ~]>").gain(0.63),
+    s("~ sd ~ sd").hpf(180).room(0.2).gain(0.39),
+    s("hh*8").gain("[0.10 0.045]*4").pan(0.65),
+    note("<[d2 ~ d2 a2 ~ c3 a2 ~] [d2 ~ d2 ~ f2 ~ e2 ~] [bb1 ~ bb1 f2 ~ a2 f2 ~] [c2 ~ c2 g2 ~ e2 c2 ~]>")
+      .s("sawtooth").lpf(850).decay(0.13).sustain(0).release(0.06).gain(0.27),
+    note("<[~ d4 f4 a4 c5 a4 g4 e4] [d4 ~ f4 ~ e4 ~ d4 ~] [~ d4 f4 a4 c5 a4 g4 e4] [f4 ~ e4 ~ d4 ~ ~ ~]>")
+      .every(8, x => x.rev())
+      .s("sawtooth").vowel("<0 2 3 1>").lpf(3200).attack(0.018)
+      .decay(0.18).sustain(0.12).release(0.12).vib(4).vibmod(0.12)
+      .delay(0.2).delaytime(0.3515625).room(0.22).gain(0.2).pan(0.68),
+    note("<[~ ~ ~ ~ ~ ~ d5 a5] [~ ~ ~ ~ c6 a5 d5 ~]>")
+      .s("fm").fmratio(2).fmindex(2).decay(0.06).sustain(0).release(0.05)
+      .gain(0.1).pan(0.28),
+    note("<[d3,f3,a3] [d3,f3,a3] [bb2,d3,f3] [c3,e3,g3]>")
+      .s("wt_pad").attack(0.3).release(0.5).lpf(1400).hpf(250)
+      .chorus(0.3).room(0.3).gain(0.08).pan(0.4)
+  ),
+
+  chorus: stack(
+    s("bd*4").gain(0.68),
+    s("~ sd ~ sd").hpf(180).room(0.22).gain(0.42),
+    s("hh*8").gain("[0.10 0.05]*4").pan(0.63),
+    s("~ oh ~ oh").gain(0.09).pan(0.35),
+    note("<[d2 d2 ~ a2 d2 ~ c3 a2] [bb1 bb1 ~ f2 bb1 ~ a2 f2] [f2 f2 ~ c3 f2 ~ e3 c3] [c2 c2 ~ g2 c2 ~ bb2 g2]>")
+      .s("sawtooth").lpf(1100).resonance(2).decay(0.13).sustain(0).release(0.07)
+      .dist(0.16).gain(0.27),
+    note("<[d3,f3,a3] [bb2,d3,f3] [f3,a3,c4] [c3,e3,g3]>")
+      .s("supersaw").attack(0.05).release(0.45).hpf(300).lpf(2200)
+      .chorus(0.25).room(0.28).gain(saw.range(0.025, 0.095).fast(4)).pan(0.4),
+    note("<[d5 f5 a5 c6 a5 g5 e5 d5] [f5 ~ d5 ~ c5 d5 f5 ~] [a5 c6 a5 g5 f5 ~ e5 f5] [g5 ~ e5 ~ d5 ~ ~ ~]>")
+      .every(8, x => x.rev())
+      .s("pulse").width(0.38).lpf(3500).attack(0.008).decay(0.16).sustain(0.08)
+      .release(0.12).delay(0.2).delaytime(0.3515625).room(0.23).gain(0.16).pan(0.57),
+    note("<[~ ~ d4 ~ ~ a4 ~ ~] [~ f4 ~ a4 ~ ~ f4 ~] [~ ~ a4 ~ ~ c5 ~ ~] [~ g4 ~ e4 d4 ~ ~ ~]>")
+      .s("sawtooth").vowel("<0 1 2 3>").attack(0.025).decay(0.17).sustain(0.1)
+      .release(0.12).room(0.3).gain(0.13).pan(0.72)
+  ),
+
+  blackout: stack(
+    s("bd ~ ~ ~ ~ bd ~ ~").lpf(350).gain(0.36),
+    note("<[d3,a3,e4] [bb2,f3,a3]>").slow(4).s("wt_choir")
+      .attack(0.8).release(1.8).lpf(1100).chorus(0.3).room(0.65).gain(0.12).pan(0.42),
+    note("<[d4 ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ a4 ~ ~ ~] [~ ~ f4 ~ ~ ~ ~ ~] [e4 ~ ~ ~ ~ ~ ~ ~]>")
+      .s("sawtooth").vowel("<4 3 1 0>").attack(0.1).decay(0.3).sustain(0.1)
+      .release(0.4).delay(0.35).delaytime(0.3515625).delayfeedback(0.4)
+      .room(0.55).gain(0.17).pan(0.68),
+    note("<d6 ~ ~ a5>").s("fm").fmratio(5).fmindex(4).decay(0.045)
+      .sustain(0).release(0.06).crush(7).delay(0.25).gain(0.055).pan(0.22)
+  ),
+
+  jailbreak: stack(
+    s("<[bd ~ ~ bd ~ ~ bd ~] [bd ~ ~ ~ bd ~ bd bd]>").gain(0.65),
+    s("< [~ sd ~ sd] [~ sd ~ sd] [~ sd ~ sd] [~ sd ~ [sd sd sd ~]] >")
+      .hpf(200).room(0.18).gain(0.38),
+    s("hh*16").gain("[0.085 0.03 0.055 0.03]*4").pan(0.63),
+    note("<[d2 ~ d2 a2 ~ d3 c3 a2] [eb2 ~ eb2 bb2 ~ a2 g2 ~] [d2 ~ d2 a2 ~ c3 a2 ~] [a1 ~ a2 ~ c#3 ~ e2 ~]>")
+      .s("sawtooth").lpf(saw.range(650, 1700).slow(16)).resonance(2)
+      .decay(0.12).sustain(0).release(0.06).dist(0.22).gain(0.27),
+    note("<[d4 [f4 a4] ~ c5 a4 ~ [g4 f4] e4] [eb4 g4 bb4 [d5 c5] bb4 ~ g4 eb4] [d4 f4 [a4 c5] d5 ~ c5 a4 g4] [a4 ~ g4 e4 c#4 e4 a4 ~]>")
+      .every(8, x => x.rev())
+      .s("sawtooth").vowel("0 2 1 3").lpf(3800).attack(0.012)
+      .decay(0.14).sustain(0.1).release(0.09).vib(5).vibmod(0.16)
+      .delay(0.22).delaytime(0.3515625).gain(0.2).pan(0.68),
+    note("<[~ d5 ~ a5 ~ c6 ~ a5] [~ eb5 ~ bb5 ~ d6 ~ bb5] [~ d5 ~ a5 ~ c6 ~ a5] [~ a5 ~ e5 ~ c#5 ~ e5]>")
+      .s("fm").fmratio(2).fmindex(3).decay(0.06).sustain(0).release(0.05)
+      .lpf(4500).gain(0.12).pan(0.28),
+    s("<~ ~ ~ [~ ~ ~ sd*4]>").hpf(1200).gain(0.13).pan(0.4)
+  ),
+
+  uprising: stack(
+    s("bd*4").gain(0.7),
+    s("~ sd ~ sd").hpf(180).room(0.23).gain(0.43),
+    s("hh*16").gain("[0.095 0.035 0.06 0.035]*4").pan(0.65),
+    s("~ oh ~ oh").gain(0.09).pan(0.35),
+    s("<~ ~ ~ [~ ~ rs [rs rs]]>").gain(0.13).pan(0.25),
+    note("<[d2 d2 ~ a2 d2 ~ c3 a2] [bb1 bb1 ~ f2 bb1 ~ a2 f2] [f2 f2 ~ c3 f2 ~ e3 c3] [c2 c2 ~ g2 c2 ~ bb2 g2]>")
+      .s("sawtooth").lpf("<1200 1500 1700 1400>").resonance(2)
+      .decay(0.13).sustain(0).release(0.07).dist(0.2).gain(0.27),
+    note("<[d3,f3,a3] [bb2,d3,f3] [f3,a3,c4] [c3,e3,g3]>")
+      .s("supersaw").attack(0.05).release(0.45).hpf(300).lpf(2600)
+      .chorus(0.3).room(0.28).gain(saw.range(0.025, 0.09).fast(4)).pan(0.4),
+    note("<[d5 f5 a5 c6 a5 g5 e5 d5] [f5 ~ d5 ~ c5 d5 f5 ~] [a5 c6 a5 g5 f5 ~ e5 f5] [g5 ~ e5 ~ d5 ~ ~ ~] [d6 ~ c6 a5 g5 a5 f5 d5] [f5 a5 c6 d6 c6 ~ a5 f5] [a5 c6 [d6 c6] a5 g5 ~ f5 e5] [g5 e5 c5 e5 d5 ~ ~ ~]>")
+      .every(16, x => x.rev())
+      .s("pulse").width(0.38).lpf(3900).attack(0.008).decay(0.16).sustain(0.08)
+      .release(0.12).delay(0.18).delaytime(0.3515625).room(0.23).gain(0.15).pan(0.57),
+    note("<[~ d4 f4 a4 ~ a4 g4 e4] [f4 ~ d4 ~ c4 d4 f4 ~] [~ f4 a4 c5 ~ c5 a4 g4] [g4 ~ e4 ~ d4 ~ ~ ~]>")
+      .s("sawtooth").vowel("<0 1 2 3>").attack(0.025).decay(0.17)
+      .sustain(0.1).release(0.12).room(0.26).gain(0.14).pan(0.73),
+    note("<[~ ~ ~ ~ d5 a5 c6 a5] [~ ~ ~ ~ f5 d5 ~ ~] [~ ~ ~ ~ a5 c6 a5 f5] [~ ~ ~ ~ g5 e5 d5 ~]>")
+      .s("fm").fmratio(2).fmindex(2.5).decay(0.06).sustain(0).release(0.05)
+      .lpf(4500).gain(0.09).pan(0.25)
+  ),
+
+  dawn: stack(
+    note("<[bb2,d3,f3,a3] [c3,e3,g3] [d3,f3,a3,e4] [d3,f3,a3]>").slow(4)
+      .s("wt_pad").attack(0.9).release(1.8).lpf(isaw.range(500, 1600).slow(16))
+      .chorus(0.35).room(0.6).gain(0.12).pan(0.4),
+    note("<bb1 c2 d2 d2>").slow(4).s("sine").attack(0.3).release(1.0).gain(0.2),
+    note("<[d5 ~ f5 ~ a5 ~ c6 ~] [a5 ~ g5 ~ e5 ~ d5 ~] [f5 ~ ~ ~ e5 ~ ~ ~] [d5 ~ ~ ~ ~ ~ ~ ~]>").slow(2)
+      .s("fm").fmratio(1).fmindex(0.7).attack(0.02).decay(0.25).sustain(0)
+      .release(0.3).delay(0.3).delaytime(0.3515625).room(0.55).gain(0.12).pan(0.3),
+    note("<[~ ~ a4 ~] [g4 ~ e4 ~] [f4 ~ e4 ~] [d4 ~ ~ ~]>").slow(4)
+      .s("sawtooth").vowel("<3 1 0 4>").attack(0.15).decay(0.4).sustain(0.08)
+      .release(0.8).room(0.6).gain(0.13).pan(0.68),
+    s("hh*8").hpf(7500).gain(isaw.range(0.005, 0.035).slow(16)).pan(0.6)
+  )
+})
