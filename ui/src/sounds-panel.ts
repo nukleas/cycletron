@@ -32,8 +32,13 @@ export class SoundsPanel {
     private list: VirtualList<Row> | null = null;
     private catalog: Catalog | null = null;
     private rows: Row[] = [];
-    /** Only `drums` starts open — the rest are one click away. */
-    private open = new Set<string>(['drums']);
+    /**
+     * Every group starts collapsed. Opening one by default buried the rest:
+     * Drums alone is 22 banks, which is more than the panel's height, so every
+     * other category sat below the fold and the panel looked like it held
+     * nothing but drums. Collapsed, the whole catalogue is legible at a glance.
+     */
+    private open = new Set<string>();
     private query = '';
 
     async init(): Promise<void> {
