@@ -11,6 +11,16 @@ use crate::inspect::{
     CycleDigest, EventDigest, NoteRef, PatternDigest, event_from_hap, smallest_period,
 };
 
+/// Hard ceiling on the analysis window, in cycles.
+///
+/// This used to be 64, which silently truncated any full song: `lockout.strudel`
+/// is 108 cycles, so its last three sections were never looked at — while the
+/// form critique cheerfully told you to "re-run with cycles=108", advice the
+/// clamp made impossible to follow. 512 covers a long arrangement with room to
+/// spare; cost is linear in the window and callers still pass small windows
+/// (the in-app default is 8) for fragments.
+pub const MAX_ANALYSIS_CYCLES: usize = 512;
+
 /// A pattern evaluated once over a fixed cycle window: the raw per-cycle haps
 /// (unfiltered — sustained and continuous events included) plus the folded
 /// [`PatternDigest`].
@@ -24,10 +34,10 @@ pub struct Evaluated {
 }
 
 impl Evaluated {
-    /// Parse + execute once, query `cycles` cycles once (clamped 1..=64), and
-    /// fold the digest.
+    /// Parse + execute once, query `cycles` cycles once (clamped to
+    /// `1..=`[`MAX_ANALYSIS_CYCLES`]), and fold the digest.
     pub fn new(code: &str, cycles: usize) -> Result<Self, String> {
-        let cycles = cycles.clamp(1, 64);
+        let cycles = cycles.clamp(1, MAX_ANALYSIS_CYCLES);
         let out = execute(code)?;
         let bpm = out.tempo.map(|t| t.to_bpm());
         let seconds_per_cycle = out.tempo.map(|t| 1.0 / t.cps);

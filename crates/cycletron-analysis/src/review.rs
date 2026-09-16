@@ -4,6 +4,7 @@
 //! tool and the `song-check` CLI both render; each caller appends its own
 //! VERDICT line and error framing.
 
+use crate::evaluated::MAX_ANALYSIS_CYCLES;
 use crate::sounds::SoundSet;
 use crate::{Evaluated, Finding};
 
@@ -23,9 +24,9 @@ pub fn review_report(code: &str, cycles: usize, known: &SoundSet) -> ReviewOutco
     // Form checks need ≥8 cycles; the mix critique needs ≥4.
     let has_form = code.contains("pickRestart") || code.contains("arrange");
     let window = if has_form {
-        cycles.clamp(8, 64)
+        cycles.clamp(8, MAX_ANALYSIS_CYCLES)
     } else {
-        cycles.clamp(4, 64)
+        cycles.clamp(4, MAX_ANALYSIS_CYCLES)
     };
     let ev = match Evaluated::new(code, window) {
         Ok(ev) => ev,

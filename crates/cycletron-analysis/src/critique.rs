@@ -95,18 +95,25 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
             }
             let group = &cd.events[i..j];
 
-            // Loudness estimate at this instant, two corrections over a raw
-            // gain-sum: (1) chord tones from ONE source (same sound + gain,
+            // Loudness estimate at this instant, three corrections over a raw
+            // gain-sum: (1) chord tones from ONE source (same sound + level,
             // e.g. `note("[a3,c4,e4,g4]")`) are uncorrelated voices — they
             // sum in power (~g·√n), not amplitude (g·n); (2) drum hits are
             // millisecond transients, not sustained energy — weight them 0.5×
-            // so a kick+clap+hat backbeat doesn't read like three held saws.
+            // so a kick+clap+hat backbeat doesn't read like three held saws;
+            // (3) the level is `EventDigest::effective_gain()`, not raw
+            // `gain` — it folds in `velocity` (a second multiplying stage,
+            // the usual stand-in for the engine's non-functional `duck`) and
+            // the distortion output trim. Without (3) any heavily driven mix
+            // reads several times hotter than it is, and hard/industrial
+            // styles legitimately run `gain` above 1 precisely because the
+            // shaper trims it back down.
             let mut sources: std::collections::HashMap<(String, u64), usize> =
                 std::collections::HashMap::new();
             for e in group {
                 let key = (
                     e.sound.clone().unwrap_or_default(),
-                    e.gain.unwrap_or(1.0).to_bits(),
+                    e.effective_gain().to_bits(),
                 );
                 *sources.entry(key).or_insert(0) += 1;
             }
@@ -142,12 +149,51 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
         }
     }
 
+    // --- dist + shape on the same voice ------------------------------------
+    // `strudel-dsp`'s voice setup is `if dist {…} else if shape {…}`, so
+    // setting both silently discards `shape`. It is an easy mistake to make
+    // (they read as complementary "more grit" knobs) and it is invisible:
+    // the pattern validates, plays, and is simply less distorted than written.
+    {
+        let mut dead: Vec<String> = Vec::new();
+        for cd in &d.cycles[..span] {
+            for e in &cd.events {
+                if e.has_dead_shape() {
+                    let who = e.sound.clone().unwrap_or_else(|| e.value.clone());
+                    if !dead.contains(&who) {
+                        dead.push(who);
+                    }
+                }
+            }
+        }
+        if !dead.is_empty() {
+            let shown = dead.iter().take(3).cloned().collect::<Vec<_>>().join(", ");
+            let more = if dead.len() > 3 {
+                format!(" (+{} more)", dead.len() - 3)
+            } else {
+                String::new()
+            };
+            findings.push(warn(
+                "dist-shape-conflict",
+                format!(
+                    "{} voice(s) set BOTH dist() and shape() — {shown}{more}. The engine \
+                     applies dist and IGNORES shape, so the shape value is dead. Keep one \
+                     per voice: dist(x) drives (x+1), shape(s) drives (1+s)/(1-s), so shape \
+                     is far stronger per unit.",
+                    dead.len()
+                ),
+            ));
+        }
+    }
+
     if peak_gain > 2.0 {
         let (cyc, srcs) = peak_at.unwrap_or((0, 0));
         let msg = format!(
             "Loudest instant: {srcs} independent source(s) at cycle {cyc} summing to \
-             ~{peak_gain:.1} (1.0 = full; chords count once at g·√notes, drum transients \
-             weighted 0.5×). Lower gains or split to separate orbits.",
+             ~{peak_gain:.1} (1.0 = full; level = gain×velocity×distortion-trim; chords \
+             count once at g·√notes, drum transients weighted 0.5×). The master bus \
+             soft-clips at x/(1+x), so a summed 2.0 emerges at 0.67 and the transients \
+             flatten. Lower gains or thin the stack.",
         );
         // Hard clipping territory is a warn (blocks the gate); a hot-but-
         // plausible mix is a note so pad stacks don't make the gate unpassable.

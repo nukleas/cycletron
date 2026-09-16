@@ -24,7 +24,7 @@ pub mod spectrum;
 
 pub use arrangement::*;
 pub use critique::*;
-pub use evaluated::{Evaluated, validate_emits};
+pub use evaluated::{Evaluated, MAX_ANALYSIS_CYCLES, validate_emits};
 pub use execute::execute;
 pub use form::*;
 pub use inspect::*;
@@ -60,7 +60,8 @@ mod tests {
     }
 
     fn critique_form_code(code: &str, cycles: usize) -> Result<Critique, String> {
-        Evaluated::new(code, cycles.clamp(8, 64)).map(|ev| critique_form(&ev))
+        Evaluated::new(code, cycles.clamp(8, evaluated::MAX_ANALYSIS_CYCLES))
+            .map(|ev| critique_form(&ev))
     }
 
     #[test]
@@ -573,6 +574,106 @@ $: "<intro drop drop outro>".slow(8).pickRestart({
         assert_eq!(label_energy("intro"), 1);
         assert_eq!(label_energy("break"), 1);
         assert_eq!(label_energy("verse"), 2); // default/mid
+    }
+
+    // --- level model: gain × velocity × distortion trim ---------------------
+
+    /// Pin the trim against `strudel-dsp`'s `Distortion::new`, which computes
+    /// `output_gain = lerp(t=0.3, start=1.0, end=drive).recip()` where that
+    /// lerp is `start + t·(end − start)` — i.e. `1/(1 + 0.3·(drive − 1))`.
+    /// Getting the lerp argument order wrong yields `1/(0.3 + 0.7·drive)`,
+    /// which is wrong in the same direction everywhere and quietly makes every
+    /// driven voice look quieter than it is.
+    #[test]
+    fn distortion_trim_matches_the_engine_formula() {
+        let ev = |shape: Option<f64>, distort: Option<f64>| EventDigest {
+            begin: 0.0,
+            duration: 1.0,
+            value: String::new(),
+            sound: Some("bd".into()),
+            note: None,
+            midi: None,
+            gain: Some(1.0),
+            pan: None,
+            velocity: None,
+            shape,
+            distort,
+            controls: vec![],
+        };
+        // Clean voice: no trim at all.
+        assert!((ev(None, None).distortion_trim() - 1.0).abs() < 1e-9);
+        // dist(x) -> drive = x+1. dist(1.0) -> drive 2 -> 1/(1+0.3) = 0.769…
+        assert!((ev(None, Some(1.0)).distortion_trim() - 1.0 / 1.3).abs() < 1e-9);
+        // shape(s) -> drive = (1+s)/(1-s). shape(0.5) -> drive 3 -> 1/(1+0.6).
+        assert!((ev(Some(0.5), None).distortion_trim() - 1.0 / 1.6).abs() < 1e-9);
+        // Both set: the engine applies dist and ignores shape, so must we.
+        let both = ev(Some(0.9), Some(1.0));
+        assert!((both.distortion_trim() - 1.0 / 1.3).abs() < 1e-9);
+        assert!(both.has_dead_shape());
+    }
+
+    #[test]
+    fn effective_gain_folds_in_velocity() {
+        let d = inspect_code(r#"s("bd*4").gain(0.8).velocity(0.5)"#, 1).unwrap();
+        let e = &d.cycles[0].events[0];
+        assert_eq!(e.gain, Some(0.8));
+        assert_eq!(e.velocity, Some(0.5));
+        assert!((e.effective_gain() - 0.4).abs() < 1e-9);
+    }
+
+    #[test]
+    fn critique_does_not_false_positive_on_a_driven_mix() {
+        // Four sustained sources at gain 1.4 would sum to 5.6 on raw gain and
+        // read as hard clipping. Each is shape(0.6) -> drive 4 -> trim 0.526,
+        // so the real sum is ~2.9... still hot, but the point is the model is
+        // applied at all: without the trim this is 5.6, with it 2.95.
+        let c = critique_code(
+            r#"stack(note("c2").s("sawtooth").gain(1.4).shape(0.6), note("e3").s("sine").gain(1.4).shape(0.6))"#,
+            8,
+        )
+        .unwrap();
+        // 2 sources × 1.4 × 0.526 = 1.47 -> under the 2.0 threshold, clean.
+        assert!(
+            !has_code(&c, "clipping") && !has_code(&c, "hot-mix"),
+            "driven mix false-positived: {:?}",
+            c.findings
+        );
+    }
+
+    #[test]
+    fn critique_counts_a_velocity_duck_as_quieter() {
+        // The standard fake sidechain: static gain, velocity carries the duck.
+        // Raw gain would read 0.9 per source; at the downbeat velocity is 0.3.
+        let c = critique_code(
+            r#"stack(note("c2").s("sawtooth").gain(0.9).velocity(0.3), note("e3").s("sawtooth").gain(0.9).velocity(0.3), note("g3").s("sawtooth").gain(0.9).velocity(0.3))"#,
+            8,
+        )
+        .unwrap();
+        assert!(
+            !has_code(&c, "clipping") && !has_code(&c, "hot-mix"),
+            "ducked mix false-positived: {:?}",
+            c.findings
+        );
+    }
+
+    #[test]
+    fn critique_flags_dist_and_shape_on_one_voice() {
+        // The engine applies dist and silently discards shape. Cycletron's own
+        // corpus/genres/industrial-techno.md does this, so the lint has real work.
+        let c = critique_code(r#"s("bd*4").dist(0.4).shape(0.3)"#, 4).unwrap();
+        assert!(has_code(&c, "dist-shape-conflict"), "{:?}", c.findings);
+        // One or the other alone is fine.
+        let ok = critique_code(r#"s("bd*4").shape(0.3)"#, 4).unwrap();
+        assert!(!has_code(&ok, "dist-shape-conflict"), "{:?}", ok.findings);
+    }
+
+    #[test]
+    fn analysis_window_covers_a_whole_song() {
+        // The old clamp capped every analysis at 64 cycles, so a 108-cycle song
+        // had its last three sections silently skipped.
+        let d = inspect_code(r#"s("bd*4")"#, 108).unwrap();
+        assert_eq!(d.cycles_queried, 108);
+        const { assert!(MAX_ANALYSIS_CYCLES >= 108) };
     }
 
     #[test]

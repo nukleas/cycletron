@@ -252,7 +252,23 @@ fn accumulate_voices<'a>(haps: impl Iterator<Item = &'a Hap<Value>>) -> Vec<Voic
         let cutoff = getf(h, ContextKey::Cutoff);
         let hpf = getf(h, ContextKey::Hpf);
         let f0 = hap_fundamental(h);
-        let gain = getf(h, ContextKey::Gain).unwrap_or(1.0);
+        // Weight by the level the voice actually contributes, not raw `gain`:
+        // `velocity` is a second multiplying stage and distortion applies a
+        // fixed output trim BEFORE gain (see `inspect::effective_gain_of`).
+        // Reading raw gain here over-weights every driven voice, which skews
+        // the whole balance — a distorted kick at `gain(1.9).shape(0.6)` counted
+        // ~2× too loud buries the hats and misreports the mix as dull.
+        //
+        // Caveat: this models distortion's LEVEL, not the harmonics it
+        // generates. A driven voice really does carry more high-frequency
+        // energy than its clean spectrum, so `presence`/`air` stay slightly
+        // conservative on saturated material.
+        let gain = crate::inspect::effective_gain_of(
+            getf(h, ContextKey::Gain),
+            getf(h, ContextKey::Velocity),
+            getf(h, ContextKey::Shape),
+            getf(h, ContextKey::Distort),
+        );
 
         let e = event_energy(&sound, f0, cutoff, hpf);
         let g2 = gain * gain; // power
@@ -337,7 +353,19 @@ pub(crate) fn spectral_findings(ev: &crate::Evaluated, cycles: usize) -> Vec<Fin
 
     let mut findings = Vec::new();
     findings.extend(masking_findings(&voices, &band_total));
-    findings.extend(balance_findings(&band_total, voices.len()));
+    // A voice counts as "bright" when a real share of ITS OWN energy sits above
+    // ~2.5 kHz — that is what distinguishes a mix with no top-end source from
+    // one whose hats are merely buried. Without this the dull note asserted
+    // "no hats, cymbals, or bright voices" at tracks with a 16th hat grid.
+    let bright: Vec<&str> = voices
+        .iter()
+        .filter(|v| {
+            let own: f64 = v.energy.iter().sum();
+            own > 0.0 && (v.energy[4] + v.energy[5]) / own > 0.30
+        })
+        .map(|v| v.label.as_str())
+        .collect();
+    findings.extend(balance_findings(&band_total, voices.len(), &bright));
     findings
 }
 
@@ -423,12 +451,14 @@ fn masking_findings(voices: &[Voice], band_total: &[f64; NB]) -> Vec<Finding> {
 /// Flag a lopsided overall spectrum. Two independent axes that can co-occur (a
 /// mix can be both muddy AND dark), so this returns a Vec:
 ///  - `spectral-balance`: the dominant tilt (mud / harsh / scooped);
-///  - `dull`: a near-empty top end (no air/definition).
+///  - `dull`: a near-empty top end (no air/definition). `bright` names the
+///    voices that are themselves top-weighted, so the message can distinguish
+///    "nothing up there" from "there is, but it is buried".
 ///
 /// `band_energy` may be raw or normalised — it is read as shares of the
 /// *symbolic* estimate; the measured spectrum has its own thresholds
 /// (`cycletron_render::hear`), since physical power is bass-heavy by nature.
-fn balance_findings(band_energy: &[f64; NB], nvoices: usize) -> Vec<Finding> {
+fn balance_findings(band_energy: &[f64; NB], nvoices: usize, bright: &[&str]) -> Vec<Finding> {
     let grand: f64 = band_energy.iter().sum();
     if grand <= 0.0 {
         return Vec::new();
@@ -474,12 +504,22 @@ fn balance_findings(band_energy: &[f64; NB], nvoices: usize) -> Vec<Finding> {
     // voices) so a lone sub-bass sketch isn't nagged. Co-fires with low-heavy on
     // a muddy, hat-less mix — which is exactly the pile-up we want to name twice.
     if nvoices >= 3 && air < 0.03 && presence < 0.10 {
+        let cause = if bright.is_empty() {
+            "nothing in the arrangement is generating it — add a hi-hat/cymbal layer or \
+             brighten a voice for sparkle."
+                .to_string()
+        } else {
+            format!(
+                "{} IS a top-end source but it is buried — the low end is drowning it. Lift it, \
+                 or pull down whatever dominates below 800 Hz.",
+                bright.join(" + ")
+            )
+        };
         out.push(note(
             "dull",
             format!(
                 "Almost no energy above ~2.5 kHz (presence+air = {:.0}%) — the mix is dark and \
-                 lacks air/definition: no hats, cymbals, or bright voices to open the top end. \
-                 Add a hi-hat/cymbal layer or brighten a voice for sparkle.",
+                 lacks air/definition: {cause}",
                 (presence + air) * 100.0
             ),
         ));
@@ -559,6 +599,62 @@ mod tests {
             codes(&fs, "dull"),
             1,
             "dark hat-less mix should be dull: {fs:?}"
+        );
+    }
+
+    #[test]
+    fn dull_names_a_buried_hat_instead_of_claiming_there_is_none() {
+        // A hard-techno balance: huge driven kick + sub against a real 16th hat
+        // grid. The top end IS too quiet, but the old message asserted "no hats,
+        // cymbals, or bright voices" — plainly false, and it sent you looking
+        // for a layer that was already there.
+        let doc = r#"stack(
+          s("bd*4").shape(0.6).lpf(3200).gain(1.9),
+          note("a1*4").s("sine").lpf(220).shape(0.6).gain(1.3),
+          s("hh*16").hpf(6800).gain(0.3)
+        )"#;
+        let fs = spectral_findings(&crate::Evaluated::new(doc, 2).unwrap(), 2);
+        let dull = fs.iter().find(|f| f.code == "dull");
+        if let Some(d) = dull {
+            assert!(
+                d.message.contains("buried"),
+                "dull must name the buried source, got: {}",
+                d.message
+            );
+            assert!(
+                !d.message.contains("no hats"),
+                "dull must not claim the hats are absent: {}",
+                d.message
+            );
+        }
+    }
+
+    #[test]
+    fn spectral_balance_uses_effective_level_not_raw_gain() {
+        // Same mix twice; the second states its level as gain×velocity rather
+        // than folding the duck into gain. Raw-gain weighting would read the
+        // second as ~3x louder in the low end and tilt the whole balance.
+        let raw = r#"stack(
+          s("bd*4").gain(0.3),
+          note("c2").s("sawtooth").lpf(400).gain(0.3),
+          s("hh*8").gain(0.3)
+        )"#;
+        let ducked = r#"stack(
+          s("bd*4").gain(0.9).velocity(0.3333333333),
+          note("c2").s("sawtooth").lpf(400).gain(0.9).velocity(0.3333333333),
+          s("hh*8").gain(0.9).velocity(0.3333333333)
+        )"#;
+        let a = spectral_findings(&crate::Evaluated::new(raw, 2).unwrap(), 2);
+        let b = spectral_findings(&crate::Evaluated::new(ducked, 2).unwrap(), 2);
+        let codes = |fs: &[Finding]| {
+            let mut c: Vec<String> = fs.iter().map(|f| f.code.clone()).collect();
+            c.sort();
+            c
+        };
+        assert_eq!(
+            codes(&a),
+            codes(&b),
+            "velocity must be folded into the level like gain is"
         );
     }
 
