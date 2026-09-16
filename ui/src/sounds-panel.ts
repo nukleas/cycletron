@@ -56,9 +56,6 @@ export class SoundsPanel {
         this.listEl.addEventListener('click', (e) => this.onClick(e));
 
         document.getElementById('soundsManage')?.addEventListener('click', () => void samplesModal.open());
-        document.getElementById('soundsBrowseAll')?.addEventListener('click', () => {
-            void soundBrowser.open(this.query);
-        });
 
         document.addEventListener('sounds:changed', () => void this.refresh());
         document.addEventListener('density:changed', () => this.list?.setRowHeight(readRowHeight()));

@@ -584,14 +584,14 @@ header {
 }
 
 .file-menu-row-hint {
-    color: var(--text-dim, rgba(255, 255, 255, 0.4));
+    color: var(--text-dim);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.05em;
 }
 
 .file-menu-row-caret {
-    color: var(--text-dim, rgba(255, 255, 255, 0.4));
+    color: var(--text-dim);
     font-size: 10px;
 }
 
@@ -1079,7 +1079,7 @@ select option {
 .editor-empty-state-text {
     font-size: 13px;
     line-height: 1.5;
-    color: var(--text-dim, rgba(255, 255, 255, 0.65));
+    color: var(--text-dim);
     margin-bottom: 16px;
 }
 
@@ -4919,26 +4919,28 @@ body.stage-active #fullscreenVizHUD { display: none; }
     margin: 0 0 12px;
     font-size: 12px;
     line-height: 1.45;
-    color: var(--text-dim, #9aa);
+    color: var(--text-dim);
 }
 .samples-heading {
-    margin: 14px 0 6px;
-    font-size: 12px;
-    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    margin: var(--sp-6) 0 var(--sp-3);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-med);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-dim, #9aa);
+    letter-spacing: var(--ls-wide);
+    color: var(--text-muted);
 }
+/* Section actions sit at the right of their heading rather than piling up in
+   the modal footer. */
+.samples-heading > .prefs-inline-btn:first-of-type { margin-left: auto; }
+.samples-heading > .prefs-inline-btn { flex: 0 0 auto; }
 .samples-heading:first-child {
     margin-top: 0;
 }
-#samplesSetProgress {
-    width: 100%;
-    margin: 6px 0 4px;
-}
 .sounds-manage-btn {
-    float: right;
-    font-weight: 400;
+    font-weight: var(--fw-body);
     text-transform: none;
 }
 .packs-intro code {
@@ -4974,16 +4976,16 @@ body.stage-active #fullscreenVizHUD { display: none; }
     margin-left: 8px;
     font-size: 11px;
     font-weight: 400;
-    color: var(--text-dim, #9aa);
+    color: var(--text-dim);
 }
 .packs-row-banks {
     font-size: 11px;
-    color: var(--text-dim, #9aa);
+    color: var(--text-dim);
     word-break: break-all;
 }
 .packs-empty {
     font-size: 12px;
-    color: var(--text-dim, #9aa);
+    color: var(--text-dim);
     line-height: 1.45;
 }
 

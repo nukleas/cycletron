@@ -69,9 +69,6 @@ export class SamplesModal {
         document.getElementById('packsOpenFolder')?.addEventListener('click', () => {
             void this.openFolder();
         });
-        document.getElementById('packsReload')?.addEventListener('click', () => {
-            void this.reloadEnabled();
-        });
         document.getElementById('packsImportFolder')?.addEventListener('click', () => {
             void packImport.openFolderPicker();
         });
@@ -402,16 +399,6 @@ export class SamplesModal {
         }
     }
 
-    private async reloadEnabled(): Promise<void> {
-        try {
-            const n = await window.strudelApp?.loadEnabledPacks?.();
-            void notify('Packs reloaded', `${n ?? 0} samples from enabled packs`);
-            await this.refreshPacks();
-            document.dispatchEvent(new CustomEvent('sounds:changed'));
-        } catch (e) {
-            await errorDialog(`Reload failed:\n${e}`);
-        }
-    }
 }
 
 export const samplesModal = new SamplesModal();

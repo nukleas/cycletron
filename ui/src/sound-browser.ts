@@ -13,7 +13,6 @@
 
 import {dismissibleModal} from './modal-utils.js';
 import {escapeHtml} from './html.js';
-import {samplesModal} from './samples-modal.js';
 import {VirtualList, readRowHeight} from './virtual-list.js';
 import {auditionSample, stopAudition, onAuditionChange, refKey, playingKey} from './audition.js';
 import {insertSound, insertMachine} from './sound-insert.js';
@@ -80,11 +79,6 @@ export class SoundBrowser {
         this.listEl?.addEventListener('click', (e) => this.onListClick(e));
         this.listEl?.addEventListener('keydown', (e) => this.onKeydown(e));
         this.searchEl?.addEventListener('keydown', (e) => this.onKeydown(e));
-
-        document.getElementById('sndManage')?.addEventListener('click', () => {
-            this.close();
-            void samplesModal.open();
-        });
 
         // The catalog is rebuilt on sounds:changed; only re-read it while open.
         document.addEventListener('sounds:changed', () => {
@@ -269,17 +263,21 @@ export class SoundBrowser {
                 `<span class="snd-row-name">${escapeHtml(row.depth && b.machine ? b.name.slice(b.machine.length + 1) : b.name)}</span>` +
                 `<span class="snd-row-kind">${escapeHtml(b.kind)}</span>${tags}` +
                 `<span class="snd-row-meta">${b.count || ''}</span>` +
-                `<span class="snd-row-origin">${escapeHtml(b.origin)}</span>` +
+                // Origin only where it distinguishes something: every bank of
+                // the active set shares one, so printing it on all 220 rows was
+                // a truncated "Cycletron (b…" repeated down the whole list.
+                (b.source === 'pack' ? `<span class="snd-row-origin">${escapeHtml(b.origin)}</span>` : '') +
                 (b.auditionable
                     ? `<button class="snd-audition" type="button" data-audition="0" data-tooltip="Audition">▶</button>`
                     : '<span class="snd-audition-spacer"></span>');
+            el.dataset.tooltip = `${b.name} · ${b.kind} · ${b.origin}`;
             if (b.samples[0] && playingKey() === refKey(b.samples[0])) {
                 el.classList.add('is-playing');
                 el.querySelector('.snd-audition')?.classList.add('is-playing');
             }
             // A pack bank plays live but is not yet resolved during export.
             if (b.source === 'pack') {
-                el.dataset.tooltip = 'Pack bank — plays live; not yet included in audio export';
+                el.dataset.tooltip = `${b.name} · pack ${b.origin} — plays live; not yet included in audio export`;
             }
             return el;
         }

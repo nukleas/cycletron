@@ -256,7 +256,6 @@
 
             <div class="sidebar-section snd-panel" id="soundsPanel">
                 <h3>Sounds <span id="soundsCount" class="section-count"></span>
-                    <button id="soundsBrowseAll" class="prefs-inline-btn" type="button" data-tooltip="Open the full Sound Browser (⌘⇧O)">Browse…</button>
                     <button id="soundsManage" class="prefs-inline-btn sounds-manage-btn" type="button" data-tooltip="Manage sample sets &amp; packs">Manage…</button>
                 </h3>
                 <input id="soundsFilter" class="snd-panel-search" type="search" placeholder="Filter sounds…" autocomplete="off" spellcheck="false" aria-label="Filter sounds" aria-controls="soundsList">
@@ -465,7 +464,11 @@
                 <h4 class="samples-heading">Sample set</h4>
                 <p class="packs-intro">The active set is the base sound world for playback <em>and</em> export — switching reloads the audio engine. Sets marked <strong>not downloaded</strong> are fetched from their upstream repos on demand; pick one to download it, then pick it again to switch. Downloads resume, and sets that share a source share one copy on disk. Define your own in <code>sample-sets.json</code> in the app data folder.</p>
                 <div id="samplesSetList" class="packs-list"></div>
-                <h4 class="samples-heading">Packs</h4>
+                <h4 class="samples-heading">Packs
+                    <button type="button" id="packsImportZip" class="prefs-inline-btn" data-tooltip="Import a .zip sample pack">Import .zip…</button>
+                    <button type="button" id="packsImportFolder" class="prefs-inline-btn" data-tooltip="Import a folder of samples">Import folder…</button>
+                    <button type="button" id="packsOpenFolder" class="prefs-inline-btn" data-tooltip="Reveal the Packs folder">Open folder</button>
+                </h4>
                 <p class="packs-intro">Optional sample packs live in your library under <code>Packs/</code>. Enabled packs add their banks on top of the active set.</p>
                 <div id="packsList" class="packs-list"></div>
                 <div id="packsEmpty" class="packs-empty" hidden></div>
@@ -483,10 +486,6 @@
                 <ul id="samplesSources" class="snd-sources"></ul>
             </div>
             <div class="app-modal-actions">
-                <button type="button" id="packsImportFolder" class="app-modal-link">Import Folder…</button>
-                <button type="button" id="packsImportZip" class="app-modal-link">Import .zip…</button>
-                <button type="button" id="packsOpenFolder" class="app-modal-link">Open Packs Folder</button>
-                <button type="button" id="packsReload" class="app-modal-link">Reload Enabled</button>
                 <span class="app-modal-spacer"></span>
                 <button data-dismiss class="app-modal-primary">Close</button>
             </div>
@@ -515,7 +514,6 @@
                 </div>
             </div>
             <div class="app-modal-actions">
-                <button type="button" id="sndManage" class="app-modal-link">Manage Sets &amp; Packs…</button>
                 <span class="app-modal-spacer"></span>
                 <span class="snd-hint"><kbd>↑↓</kbd> browse <kbd>Space</kbd> audition <kbd>↩</kbd> insert</span>
                 <button data-dismiss class="app-modal-primary">Close</button>
