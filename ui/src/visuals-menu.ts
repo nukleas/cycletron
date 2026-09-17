@@ -17,7 +17,24 @@ import {VIZ_MODES} from './viz/registry.js';
 import {VizMode} from './types/visualizer.js';
 
 const GRID_MODE_KEY = 'visualizer-mode';
-const READABLE_KEY = 'readable-mode';
+const DENSITY_KEY = 'ui-density';
+
+export type Density = 'comfortable' | 'compact';
+
+/**
+ * Comfortable is the default. The old Readable Mode was opt-in, which meant the
+ * app shipped an 8px uppercase micro-label as its normal state — below the
+ * legibility floor on every platform, in a font that isn't bundled. Compact
+ * reproduces the pre-refresh metrics for anyone who wants the density back.
+ *
+ * The old `readable-mode` key is deliberately not migrated: it cannot express a
+ * preference the new default doesn't already satisfy, and Comfortable is not
+ * the old Readable Mode anyway.
+ */
+const DENSITIES: ReadonlyArray<{id: Density; label: string; hint: string}> = [
+    {id: 'comfortable', label: 'Density: Comfortable', hint: 'default'},
+    {id: 'compact', label: 'Density: Compact', hint: 'more on screen'},
+];
 // Missing key = on: the CRT scanline overlay is part of the house style.
 const SCANLINES_KEY = 'scanlines';
 
@@ -40,7 +57,7 @@ class VisualsMenu {
     private ambientToggleItem: HTMLButtonElement | null = null;
     private ambientHint: HTMLSpanElement | null = null;
     private autoCycleItem: HTMLButtonElement | null = null;
-    private readableItem: HTMLButtonElement | null = null;
+    private densityItems: HTMLButtonElement[] = [];
     private scanlinesItem: HTMLButtonElement | null = null;
     private modeItems: HTMLButtonElement[] = [];
     private stageToggleItem: HTMLButtonElement | null = null;
@@ -56,7 +73,7 @@ class VisualsMenu {
         this.menu = document.getElementById('visualsMenu') as HTMLDivElement | null;
         if (!this.btn || !this.menu) return;
 
-        applyReadableMode(localStorage.getItem(READABLE_KEY) === '1');
+        applyDensity(storedDensity());
         applyScanlines(localStorage.getItem(SCANLINES_KEY) !== '0');
 
         this.build();
@@ -193,14 +210,16 @@ class VisualsMenu {
         menu.appendChild(document.createElement('hr'));
 
         menu.appendChild(this.section('Display'));
-        this.readableItem = this.item('Readable Mode', 'menuitemcheckbox', () => {
-            const on = !(localStorage.getItem(READABLE_KEY) === '1');
-            localStorage.setItem(READABLE_KEY, on ? '1' : '0');
-            applyReadableMode(on);
-            this.refresh();
+        this.densityItems = DENSITIES.map((d) => {
+            const b = this.item(d.label, 'menuitemradio', () => {
+                localStorage.setItem(DENSITY_KEY, d.id);
+                applyDensity(d.id);
+                this.refresh();
+            });
+            b.appendChild(this.hint(d.hint));
+            menu.appendChild(b);
+            return b;
         });
-        this.readableItem.appendChild(this.hint('bigger text, less glow'));
-        menu.appendChild(this.readableItem);
 
         this.scanlinesItem = this.item('Scanlines', 'menuitemcheckbox', () => {
             const on = localStorage.getItem(SCANLINES_KEY) === '0'; // flipping
@@ -244,7 +263,8 @@ class VisualsMenu {
                 : 'Ctrl+Shift+V';
         }
         this.autoCycleItem?.setAttribute('aria-checked', String(ambientViz.isAutoCycle()));
-        this.readableItem?.setAttribute('aria-checked', String(localStorage.getItem(READABLE_KEY) === '1'));
+        const density = storedDensity();
+        this.densityItems.forEach((b, i) => b?.setAttribute('aria-checked', String(DENSITIES[i].id === density)));
         this.scanlinesItem?.setAttribute('aria-checked', String(localStorage.getItem(SCANLINES_KEY) !== '0'));
 
         this.stageToggleItem?.setAttribute('aria-checked', String(stage.isActive()));
@@ -266,8 +286,19 @@ class VisualsMenu {
 
 }
 
-function applyReadableMode(on: boolean): void {
-    document.documentElement.classList.toggle('readable-mode', on);
+function storedDensity(): Density {
+    return localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'comfortable';
+}
+
+/**
+ * Density is a data attribute, not a class, so the CSS ladder can define it on
+ * `:root[data-density=...]`. The `density:changed` event matches the existing
+ * `sounds:changed` convention; the virtualized lists listen for it because the
+ * row pitch (`--row-h`) moves with density.
+ */
+function applyDensity(d: Density): void {
+    document.documentElement.dataset.density = d;
+    document.dispatchEvent(new CustomEvent('density:changed', {detail: {density: d}}));
 }
 
 function applyScanlines(on: boolean): void {

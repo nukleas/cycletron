@@ -9,11 +9,15 @@
 
 import {isTauri} from './tauri.js';
 import {fileManager} from './file-manager.js';
+import {packImport} from './pack-import.js';
 import {midiLab} from './midi-lab.js';
 import {diag} from './diagnostics.js';
 import {basename} from './paths.js';
 
 const STRUDEL_EXT = /\.(strudel|js)$/i;
+const ZIP_EXT = /\.zip$/i;
+/** A dropped folder arrives as a path with no extension. */
+const NO_EXT = /(^|[\\/])[^.\\/]+$/;
 const MIDI_EXT = /\.(mid|midi)$/i;
 
 // Tracks the last seen Shift state — Tauri drag-drop events don't carry
@@ -80,7 +84,16 @@ function handleDrop(paths: string[]): void {
         void fileManager.openPath(strudel);
         return;
     }
-    flash(`Unsupported file. Drop .strudel, .js, or .mid.`);
+    // A sample pack: a .zip, or a dropped folder. Extensionless paths go to the
+    // importer too — the backend can tell a folder from a stray file and says
+    // so precisely, which beats a generic "unsupported" toast.
+    const pack = paths.find(p => ZIP_EXT.test(p)) ?? paths.find(p => NO_EXT.test(p));
+    if (pack) {
+        flash(`Reading ${basename(pack)}…`);
+        void packImport.openFromPath(pack);
+        return;
+    }
+    flash(`Unsupported file. Drop .strudel, .js, .mid, a .zip sample pack, or a folder.`);
 }
 
 

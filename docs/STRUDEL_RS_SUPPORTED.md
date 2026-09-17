@@ -435,13 +435,14 @@ load with no network. `ui/sample-loader.ts` is offline-first (bundled path →
 CDN fallback), so other GM instruments and the TR-808/909 kits still stream from
 the network when referenced.
 
-**Local sample folders (desktop):** users can load their own samples from disk
-via the command palette → "Load Sample Folder…" (`ui/src/app.ts`
-`loadSampleFolder` → Rust `scan_sample_folder` + `read_audio_file` in
-`src-tauri/src/sounds.rs`). Each subfolder becomes a bank `s("<folder>")` (files
-indexed alphabetically, `<folder>:1` etc.); loose audio files become one-shot
-banks named after the file stem. Bank names are sanitized to ≤31 bytes. Loaded
-bank names are reported to the agent via the `list_sounds` tool.
+**Local sample folders (desktop):** users install their own samples as a pack
+(command palette → "Install Sample Pack…"; `src-tauri/src/packs.rs` +
+`src-tauri/src/sounds.rs` `scan_folder_banks`). Each subfolder becomes a bank
+`s("<folder>")` with files indexed in natural order (`<folder>:1` etc.); loose
+audio at the root is grouped by filename convention — `BD-…`/`SNARE-…` become
+`bd`/`snare`, falling back to one indexed bank when no convention is present.
+Bank names are sanitized to ≤31 bytes, and names colliding with the core kit are
+suffixed with the pack id. Loaded bank names reach the agent via `list_sounds`.
 
 ## 7. Notes, scales, chords
 

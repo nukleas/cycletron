@@ -77,24 +77,70 @@ same name is skipped. Prefer distinct names for expansion packs
 
 | Command | Role |
 |---------|------|
-| `list_packs` | Installed packs + enabled flag |
-| `get_pack` | Full manifest |
+| `list_packs` | Installed packs + enabled flag, with each bank's files |
 | `enable_pack` / `disable_pack` | Persist + return load paths |
 | `load_enabled_packs` | Startup batch |
 | `packs_dir` | Absolute Packs path |
+| `preview_pack_import` | Stage a folder or `.zip`, propose a bank mapping |
+| `commit_pack_import` | Copy the reviewed mapping into `Packs/<id>/` |
+| `cancel_pack_import` | Discard the staging directory |
 
-## Install from folder
+## Import samples
 
-Palette → **Install Sample Pack…** (or Sample Packs → **Install from Folder…**).
+Palette → **Import Sample Pack (Folder)…** or **(.zip)…**, the Samples manager's
+Import buttons, or drop a `.zip` or a folder onto the window.
 
-Picks a Strudel-style folder (subfolder = bank, or loose audio at root), copies
-it into `Packs/<id>/`, writes `pack.json` + `LICENSE` (`LicenseRef-UserProvided`),
-and enables the pack.
+Importing is a two-step flow: Cycletron stages the source and *proposes* a bank
+mapping, you review it, and only then is anything copied into your library.
 
-- Pack id defaults from the folder name (`Dirt-Samples` → `dirt-samples`)
-- Core bank name collisions are renamed: `bd` → `bd_dirt_samples`
-- Caps: 8000 files, 768 MB (thin large libraries first)
-- Source path is recorded in `pack.json` for provenance; audio is **copied**, not linked
+### How banks are derived
+
+Each immediate subfolder is a bank, as before. Loose audio at the root goes
+through a three-rung ladder, because that is how hardware sample packs actually
+ship — flat, with the voice type in the filename:
+
+1. **Leading tag** — the run before the first `-`, `_` or space.
+   `BD-dx200-909ishKick-768kbps.wav` → `bd`, `SNARE 3.wav` → `snare`.
+2. **Trailing index** — a trailing number stripped from the stem.
+   `BD0050.WAV` → `bd`.
+3. **Single bank** — everything in one indexed bank named after the folder.
+
+A rung is rejected if it produces more than 64 banks or if most banks would hold
+a single file, since that means the convention isn't really there. Files within
+a bank are natural-sorted (`BD 2` before `BD 10`), and that order *is* the `:n`.
+
+### The review step
+
+- Bank names are shown **after** core-collision renaming (`bd` → `bd_<pack id>`),
+  so what you read is what you will type.
+- Rename a bank, drop one, reorder or remove a sample.
+- Audition anything before committing — staged files are real files on disk.
+- File count and size are shown up front against the 8000 file / 768 MB caps.
+- Cancelling (or Escape, or the backdrop) removes the staging directory. Staging
+  lives in the app cache and is swept at startup, so a crash leaves nothing.
+
+### Archive handling
+
+Only audio is extracted. Path traversal and symlink entries are refused,
+`__MACOSX` and dotfiles are skipped, and the caps are enforced from the declared
+sizes *before* extraction as well as during it. A `LICENSE`/`README` in the
+archive is reported by name and never extracted — Cycletron tells you terms
+exist, it does not read or grant them.
+
+Imported packs are written with `spdx: LicenseRef-UserProvided` and a `LICENSE`
+recording the source path. That marker means "the user supplied this"; it is not
+a grant.
+
+## Where to get more samples
+
+The Samples manager links to free sources (Legowelt, Freesound, the Internet
+Archive, SampleRadar, 99Sounds, and VCSL — which is already a built-in set).
+
+**Cycletron does not host, mirror, or license any of that audio.** Each entry
+quotes the publisher's own stated terms, which can change; check them before
+releasing anything made with them. Several of those sources grant use in
+productions but not redistribution, which is exactly why they are links rather
+than downloadable sample sets.
 
 ## Sample sets (Samples manager)
 
@@ -148,18 +194,24 @@ Define your own sets in `{app_data}/sample-sets.json`:
 `github:user/repo[/branch]` resolves to the repo's `strudel.json` on
 raw.githubusercontent.com, like the engine's `samples()` shortcut. Sets appear
 in the Samples manager (⌘⇧P → "Samples…", the Sounds panel's Manage button,
-or Preferences → Samples → Manage) with their own Download/Delete buttons; a
-set must be fully downloaded before it can be activated. Downloads resume
-(finished files are kept). Switching sets — from the manager or the command
+or Preferences → Samples → Manage). Each row carries an explicit state —
+**active**, **downloaded**, or **not downloaded** — and clicking it does the
+matching thing: switch to it when it is on disk, fetch it when it is not. A set
+must be fully downloaded before it can be activated, and each row shows its own
+progress bar naming the source in flight. Downloads resume (finished files are
+kept). Switching sets — from the manager or the command
 palette's "Sample Set: …" entries — reloads the audio engine with the new
 set immediately (export always follows the setting). The manager also holds
 the Packs list, so all sample management lives in one place.
 
-Known gaps (all sets): enabled Packs are live-only — export does not load
-them; GM soundfonts stream from the WebAudioFont data during export.
+Known gap (all sets): enabled Packs are **live-only — audio export does not load
+them**, so a pattern using a pack bank exports with that part silent. This is
+now the only live/export divergence left. GM soundfonts stream from the
+WebAudioFont data during export.
 
 ## Not yet
 
+- Pack-aware audio export (see the known gap above)
 - Remote download of Packs (sample sets above have their own downloader)
 - Agent `list_packs` / `enable_pack` tools
 - Pitched multisample metadata

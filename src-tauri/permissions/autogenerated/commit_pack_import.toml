@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-commit-pack-import"
+description = "Enables the commit_pack_import command without any pre-configured scope."
+commands.allow = ["commit_pack_import"]
+
+[[permission]]
+identifier = "deny-commit-pack-import"
+description = "Denies the commit_pack_import command without any pre-configured scope."
+commands.deny = ["commit_pack_import"]

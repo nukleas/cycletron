@@ -4,21 +4,47 @@
     padding: 0;
 }
 
+/* =========================================================
+   TOKENS
+   Colour is theme-able (desktop-theme.ts rewrites these on
+   :root at runtime). Everything below colour is the chassis:
+   one ramp for space, one for type, one for elevation. The
+   density ladder further down picks different rungs of the
+   same ramps — it never invents new values and it never names
+   a component, so a new component cannot be forgotten by it
+   the way the Sounds panel was forgotten by .readable-mode.
+   ========================================================= */
+
 :root {
+    /* ---- Surfaces ---------------------------------------------------- */
     /* Neo-retro terminal palette: dark glass, cyan phosphor, magenta edge light. */
     --bg: #05060a;
     --bg-light: #0b0f18;
     --bg-lighter: #111827;
     --border: #26324c;
 
+    --surface-glass: rgba(11, 15, 24, 0.94);
+    /* Derived from --bg so they follow a desktop theme with no extra code in
+       desktop-theme.ts. These replace literal rgba(5, 6, 10, .55/.6/.7/.72). */
+    --surface-inset: color-mix(in srgb, var(--bg) 72%, transparent);
+    --surface-chrome: color-mix(in srgb, var(--bg) 60%, transparent);
+    --panel-shadow: inset 0 0 0 1px rgba(71, 246, 255, 0.04), 0 0 24px rgba(71, 246, 255, 0.07);
+
+    /* ---- Text -------------------------------------------------------- */
     --text: #f2f7ff;
     --text-secondary: #a7b7d6;
     --text-muted: #687797;
+    /* Fourth step. Was referenced nine times and never defined: eight sites
+       passed one of three inconsistent fallbacks, and .ai-consent-fine passed
+       none at all, so it silently inherited its parent's colour. */
+    --text-dim: #55627f;
 
+    /* ---- Accent ------------------------------------------------------ */
     --accent: #47f6ff;
     --accent-subtle: rgba(71, 246, 255, 0.12);
     --selection: rgba(71, 246, 255, 0.24);
 
+    /* ---- Hues -------------------------------------------------------- */
     --green: #0a3025;
     --green-bright: #52ff9f;
     --purple: #9d7cff;
@@ -33,19 +59,10 @@
     --rust: #ff4fd8;
     --magenta: #ff2bd6;
     --violet: #9d7cff;
-
+    --blue: #6aa8ff;
     --danger-hover: #ff7a96;
 
-    --sidebar-width: 300px;
-    --editor-font-size: 14px;
-
-    --sb-thumb: var(--bg-lighter);
-    --sb-track: var(--bg);
-    --sb-size-medium: 10px;
-
-    --surface-glass: rgba(11, 15, 24, 0.94);
-    --panel-shadow: inset 0 0 0 1px rgba(71, 246, 255, 0.04), 0 0 24px rgba(71, 246, 255, 0.07);
-
+    /* ---- Neon layer -------------------------------------------------- */
     --neon: #47f6ff;
     --neon-subtle: rgba(71, 246, 255, 0.20);
     --neon-glow: rgba(71, 246, 255, 0.34);
@@ -57,31 +74,168 @@
     --viz-active: #f7ff5a;
     --viz-hot: #ff2bd6;
 
-    /* Composite cyberpunk effects reused across components. Exact values are
-       preserved so rendering is unchanged; per-element decorative variants
-       (other alphas/glow sizes) stay inline where they're intentionally tuned. */
+    /* ---- Composite effects ------------------------------------------- */
     --text-glitch: 2px 0 0 rgba(255, 43, 214, 0.45), 0 0 6px var(--neon-glow);
     --edge-3d: 3px 3px 0 rgba(255, 43, 214, 0.45);
     --edge-3d-strong: 3px 3px 0 rgba(255, 43, 214, 0.55);
+    --edge-3d-panel: 6px 6px 0 rgba(255, 43, 214, 0.18);
     --backdrop-scanlines: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.18) 2px, rgba(0, 0, 0, 0.18) 4px);
 
-    /* AI panel aliases (kept for backwards compat) */
+    /* ---- Edges & glow elevation -------------------------------------- */
+    /* Three glow steps, because the file otherwise uses 6/8/10/12/18/24/30px
+       blurs interchangeably for the same semantic weight. 1 = hover on a small
+       control, 2 = focused or primary control, 3 = a floating surface. */
+    --edge-hairline: 1px solid var(--border);
+    --edge-neon: 1px solid var(--neon-subtle);
+    --edge-neon-strong: 1px solid var(--neon);
+    --glow-1: 0 0 6px var(--neon-glow);
+    --glow-2: 0 0 12px var(--neon-glow);
+    --glow-3: 0 0 30px var(--neon-glow), 0 0 60px var(--neon-subtle);
+
+    /* ---- Radius ------------------------------------------------------ */
+    /* This system is square: 44 of 52 border-radius declarations are 0.
+       These tokens exist only to name the exceptions. */
+    --r-0: 0;
+    --r-1: 2px;
+    --r-round: 50%;
+    --r-pill: 999px;
+
+    /* ---- Space ------------------------------------------------------- */
+    /* Density-invariant, 2px base. The existing padding histogram is
+       2/4/6/8/10/12/14/16/18/22/24, so a 4px or 8px grid would have forced
+       ~40 rules to move. Density picks rungs of this ramp; it never rescales
+       it, which keeps proportions intact between modes. */
+    --sp-1: 2px;
+    --sp-2: 4px;
+    --sp-3: 6px;
+    --sp-4: 8px;
+    --sp-5: 12px;
+    --sp-6: 16px;
+    --sp-7: 24px;
+
+    /* ---- Type -------------------------------------------------------- */
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+
+    /* Tracking. The 0.25em uppercase micro-label is the house signature and
+       survives — it just stops being 8px. */
+    --ls-label: 0.25em;
+    --ls-caps: 0.15em;
+    --ls-wide: 0.08em;
+    --ls-body: 0.02em;
+    --ls-code: 0;
+
+    --fw-body: 400;
+    --fw-med: 600;
+    --fw-bold: 700;
+    --fw-display: 800;
+
+    --lh-tight: 1.2;
+    --lh-ui: 1.35;
+    --lh-body: 1.5;
+
+    /* Steps above --fs-base are density-invariant: display type, already
+       legible, and scaling them would make Comfortable look zoomed. */
+    --fs-med: 15px;
+    --fs-lg: 18px;
+
+    /* ---- Chrome ------------------------------------------------------ */
+    --sidebar-width: 300px;
+    --editor-font-size: 14px;
+
+    --sb-thumb: var(--bg-lighter);
+    --sb-track: var(--bg);
+    --sb-size-medium: 10px;
+    --sb-size-thin: 4px;
+
+    --modal-w-small: min(420px, 90vw);
+    --modal-w-base: min(560px, 92vw);
+    --modal-w-wide: min(760px, 92vw);
+    --modal-w-browser: min(1080px, 94vw);
+    --modal-h-browser: min(720px, 86vh);
+
+    /* AI panel aliases (removed in a follow-up commit; 75 live call sites) */
     --ai-bg: var(--bg);
     --ai-panel: var(--bg-light);
     --ai-panel-hover: var(--bg-lighter);
     --ai-border: var(--border);
     --ai-text: var(--text);
     --ai-text-muted: var(--text-muted);
-    --ai-text-dim: #4a4060;
+    --ai-text-dim: var(--text-dim);
     --ai-neon: var(--neon);
     --ai-neon-subtle: var(--neon-subtle);
     --ai-neon-glow: var(--neon-glow);
     --ai-neon-bright: var(--neon-bright);
     --ai-magenta: var(--magenta);
     --ai-green: var(--green-bright);
-    --ai-blue: #6aa8ff;
+    --ai-blue: var(--blue);
     --ai-red: var(--red);
 }
+
+/* =========================================================
+   DENSITY LADDER  (Visuals ▸ Display ▸ Density)
+   Comfortable is the default: the app's smallest label was 8px
+   at 0.25em tracking in an unbundled font, below the legibility
+   floor on every platform. Compact is the opt-in that reproduces
+   the pre-refresh metrics, minus the two sizes (8px, 7px) that
+   were never legible.
+   --row-h is load-bearing: the sound browser's virtualizer reads
+   it from getComputedStyle. Keep it an integer.
+   ========================================================= */
+
+:root,
+:root[data-density="comfortable"] {
+    --fs-micro: 10px;   /* uppercase machine labels: h3, stat-label, rail groups */
+    --fs-tiny: 11px;    /* chips, counts, kbd, footer hints                      */
+    --fs-small: 12px;   /* row meta, status bar, secondary copy                  */
+    --fs-base: 13px;    /* list row primary text, body copy                      */
+
+    --pad-pane: var(--sp-5);
+    --pad-row-x: var(--sp-5);
+    --pad-row-y: var(--sp-3);
+    --gap-stack: var(--sp-4);
+    --gap-inline: var(--sp-3);
+
+    --ctl-h-xs: 22px;
+    --ctl-h-sm: 26px;
+    --ctl-h-md: 30px;
+    --ctl-h-lg: 34px;
+
+    /* 13px x 1.35 = 18, + 6 + 6 = 30. Border-box, so the 1px separator
+       lives inside the pitch. */
+    --row-h: 30px;
+    --rail-w: 176px;
+
+    /* Muted text gets one step lighter when the type is larger, because
+       larger glyphs at the same alpha read heavier than they measure. */
+    --text-muted: #7b8aab;
+}
+
+:root[data-density="compact"] {
+    --fs-micro: 9px;
+    --fs-tiny: 10px;
+    --fs-small: 11px;
+    --fs-base: 12px;
+
+    --pad-pane: var(--sp-4);
+    --pad-row-x: var(--sp-4);
+    --pad-row-y: var(--sp-2);
+    --gap-stack: var(--sp-3);
+    --gap-inline: var(--sp-2);
+
+    --ctl-h-xs: 20px;
+    --ctl-h-sm: 24px;
+    --ctl-h-md: 28px;
+    --ctl-h-lg: 32px;
+
+    /* 12px x 1.3 = 16, + 4 + 4 = 24 — the WCAG 2.2 AA minimum target size
+       (24 x 24 CSS px). Do not go below this. */
+    --row-h: 24px;
+    --rail-w: 152px;
+}
+
+/* Derived from --row-h so a row-internal control can never overflow its
+   row in either density. 26px comfortable / 20px compact. */
+:root { --ctl-h-row: calc(var(--row-h) - var(--sp-2)); }
 
 
 /* =========================================================
@@ -89,7 +243,7 @@
    ========================================================= */
 
 body {
-    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+    font-family: var(--font-mono);
     background:
         linear-gradient(90deg, var(--pixel-grid) 1px, transparent 1px),
         linear-gradient(0deg, var(--pixel-grid) 1px, transparent 1px),
@@ -150,13 +304,17 @@ body.is-resizing {
     user-select: none;
 }
 
-/* Keyboard-focus glow for interactive controls */
+/* Keyboard-focus ring. 2px + halo, promoted from what used to be
+   .readable-mode's opt-in version: a 1px outline sits below the non-text
+   contrast floor, and the better ring already existed behind a toggle nobody
+   found. */
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
-    outline: 1px solid var(--neon);
-    outline-offset: 1px;
-    box-shadow: 0 0 8px var(--neon-glow);
+select:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--neon);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(71, 246, 255, 0.22);
 }
 
 /* Tooltips (JS-driven — avoids clipping inside overflow:auto containers) */
@@ -426,14 +584,14 @@ header {
 }
 
 .file-menu-row-hint {
-    color: var(--text-dim, rgba(255, 255, 255, 0.4));
+    color: var(--text-dim);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.05em;
 }
 
 .file-menu-row-caret {
-    color: var(--text-dim, rgba(255, 255, 255, 0.4));
+    color: var(--text-dim);
     font-size: 10px;
 }
 
@@ -921,7 +1079,7 @@ select option {
 .editor-empty-state-text {
     font-size: 13px;
     line-height: 1.5;
-    color: var(--text-dim, rgba(255, 255, 255, 0.65));
+    color: var(--text-dim);
     margin-bottom: 16px;
 }
 
@@ -1387,14 +1545,21 @@ select option {
 }
 
 .sidebar-section h3 {
-    font-size: 8px;
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    font-size: var(--fs-micro);
     text-transform: uppercase;
-    letter-spacing: 0.25em;
+    letter-spacing: var(--ls-label);
     color: var(--neon-bright);
-    margin-bottom: 6px;
-    font-weight: 700;
+    margin-bottom: var(--sp-3);
+    font-weight: var(--fw-bold);
     text-shadow: 2px 0 0 rgba(255, 43, 214, 0.36), 0 0 4px var(--neon-glow);
 }
+
+/* Inline actions sit at the right of the heading, not wrapped under it. */
+.sidebar-section h3 > .prefs-inline-btn:first-of-type { margin-left: auto; }
+.sidebar-section h3 > .prefs-inline-btn { flex: 0 0 auto; }
 
 .sidebar-section h3::before {
     content: '// ';
@@ -1536,66 +1701,6 @@ select option {
     color: var(--neon-bright);
 }
 
-/* Sounds panel — accurate, clickable list of playable sounds. */
-.sounds-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 220px;
-    overflow-y: auto;
-}
-
-.sound-group-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-}
-
-.sound-group-count {
-    font-size: 8px;
-    font-weight: 400;
-    color: var(--neon);
-    opacity: 0.7;
-}
-
-.sound-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    align-items: center;
-}
-
-.sound-chip {
-    background: var(--bg);
-    padding: 1px 6px;
-    border: 1px solid var(--border);
-    border-radius: 0;
-    font-size: 9px;
-    font-family: inherit;
-    color: var(--neon-bright);
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.sound-chip:hover {
-    border-color: var(--neon);
-    box-shadow: 0 0 6px var(--neon-glow);
-    color: #fff;
-}
-
-.sound-hint,
-.sounds-empty {
-    font-size: 8px;
-    color: var(--text-muted);
-    letter-spacing: 0.03em;
-    font-style: italic;
-}
 
 
 /* =========================================================
@@ -2244,7 +2349,7 @@ body.is-drop-target::after {
     border-right: 1px solid var(--ai-neon-subtle);
     background: var(--surface-glass);
     flex-shrink: 0;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
     position: relative;
     box-shadow: var(--panel-shadow);
 }
@@ -2415,7 +2520,7 @@ body.is-drop-target::after {
 }
 .ai-tool > summary::-webkit-details-marker { display: none; }
 .ai-tool-glyph { flex: none; width: 1em; text-align: center; }
-.ai-tool-name { flex: none; font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace; color: var(--ai-neon); }
+.ai-tool-name { flex: none; font-family: var(--font-mono); color: var(--ai-neon); }
 .ai-tool-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-tool-cat {
     flex: none; font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase;
@@ -2621,7 +2726,7 @@ body.is-drop-target::after {
     border-right: 1px solid var(--neon-subtle);
     background: var(--surface-glass);
     flex-shrink: 0;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
     position: relative;
     box-shadow: var(--panel-shadow);
 }
@@ -3531,7 +3636,7 @@ body.is-drop-target::after {
     background: var(--surface-glass);
     border-top: 1px solid var(--neon-subtle);
     color: var(--text);
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
 }
 .cm-panels-bottom { box-shadow: 0 -4px 18px rgba(71, 246, 255, 0.06); }
@@ -3677,7 +3782,7 @@ body.is-drop-target::after {
     align-items: flex-start;
     justify-content: center;
     padding-top: 12vh;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
 }
 .cmd-palette[hidden] { display: none !important; }
 .cmd-palette-backdrop {
@@ -3818,7 +3923,7 @@ body.is-drop-target::after {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
 }
 .app-modal[hidden] { display: none !important; }
 .app-modal-backdrop {
@@ -3841,8 +3946,18 @@ body.is-drop-target::after {
         6px 6px 0 rgba(255, 43, 214, 0.18),
         inset 0 0 0 1px rgba(71, 246, 255, 0.05);
 }
-.app-modal-window--small { width: min(420px, 90vw); }
-.app-modal-window--wide { width: min(760px, 92vw); }
+.app-modal-window--small { width: var(--modal-w-small); }
+.app-modal-window--wide { width: var(--modal-w-wide); }
+
+/* Browser-class. Unlike the other steps this sets `height`, not `max-height`:
+   the list viewport must have a resolved height before the virtualizer can
+   work out how many rows fit, and a content-driven modal has none on the
+   first frame. */
+.app-modal-window--browser {
+    width: var(--modal-w-browser);
+    height: var(--modal-h-browser);
+    max-height: var(--modal-h-browser);
+}
 
 .app-modal-header {
     padding: 0 10px;
@@ -4336,7 +4451,7 @@ body.immersive-viz-active #editor .cm-gutters {
     right: 16px;
     bottom: 16px;
     pointer-events: none;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     letter-spacing: 0.08em;
     color: var(--text-muted, #a7b7d6);
@@ -4643,47 +4758,14 @@ body.stage-active #fullscreenVizHUD { display: none; }
 }
 
 /* =========================================================
-   READABLE MODE (opt-in, Visuals menu → Display)
-   Bigger floor sizes, dampened running-text glow, strong focus
-   halo. Display glow (logo, stats, viz) stays.
+   EDITOR LEGIBILITY
+   Was .readable-mode's opt-in dampening. A glow on 14px running
+   code is a legibility cost with no aesthetic payoff at that
+   size; the display glow (logo, stat values, viz) is untouched
+   and is where the look actually lives. Everything else the old
+   block did is now token-driven — see the DENSITY LADDER at the
+   top of this file.
    ========================================================= */
-
-.readable-mode {
-    --text-muted: #97a5c4;
-    --text-secondary: #c0cde8;
-}
-
-.readable-mode .menu-section,
-.readable-mode .cmd-palette-hint,
-.readable-mode .files-panel-footer,
-.readable-mode .status-bar,
-.readable-mode .hud-unit { font-size: 11px; }
-
-.readable-mode .bpm-control,
-.readable-mode .gain-control,
-.readable-mode .shortcuts,
-.readable-mode .file-context-menu button,
-.readable-mode .dropdown-menu button,
-.readable-mode .dropdown-menu a,
-.readable-mode .header-menu-btn,
-.readable-mode .stat-label,
-.readable-mode .menu-item-hint,
-.readable-mode .cmd-palette-subtitle,
-.readable-mode .file-tree { font-size: 12px; }
-
-.readable-mode .cmd-palette-title { font-size: 13px; }
-
-.readable-mode .cm-editor { text-shadow: none; }
-.readable-mode .cm-content { text-shadow: 0 0 2px rgba(71, 246, 255, 0.08); }
-
-.readable-mode :focus-visible {
-    outline: 2px solid var(--neon);
-    outline-offset: 2px;
-    box-shadow: 0 0 0 4px rgba(71, 246, 255, 0.22);
-}
-
-.readable-mode .logo h1 { animation: none; }
-.readable-mode .files-panel::after { display: none; }
 
 /* =========================================================
    SCANLINES TOGGLE (Visuals menu → Display; on by default)
@@ -4837,26 +4919,28 @@ body.stage-active #fullscreenVizHUD { display: none; }
     margin: 0 0 12px;
     font-size: 12px;
     line-height: 1.45;
-    color: var(--text-dim, #9aa);
+    color: var(--text-dim);
 }
 .samples-heading {
-    margin: 14px 0 6px;
-    font-size: 12px;
-    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    margin: var(--sp-6) 0 var(--sp-3);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-med);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-dim, #9aa);
+    letter-spacing: var(--ls-wide);
+    color: var(--text-muted);
 }
+/* Section actions sit at the right of their heading rather than piling up in
+   the modal footer. */
+.samples-heading > .prefs-inline-btn:first-of-type { margin-left: auto; }
+.samples-heading > .prefs-inline-btn { flex: 0 0 auto; }
 .samples-heading:first-child {
     margin-top: 0;
 }
-#samplesSetProgress {
-    width: 100%;
-    margin: 6px 0 4px;
-}
 .sounds-manage-btn {
-    float: right;
-    font-weight: 400;
+    font-weight: var(--fw-body);
     text-transform: none;
 }
 .packs-intro code {
@@ -4892,16 +4976,16 @@ body.stage-active #fullscreenVizHUD { display: none; }
     margin-left: 8px;
     font-size: 11px;
     font-weight: 400;
-    color: var(--text-dim, #9aa);
+    color: var(--text-dim);
 }
 .packs-row-banks {
     font-size: 11px;
-    color: var(--text-dim, #9aa);
+    color: var(--text-dim);
     word-break: break-all;
 }
 .packs-empty {
     font-size: 12px;
-    color: var(--text-dim, #9aa);
+    color: var(--text-dim);
     line-height: 1.45;
 }
 
@@ -5075,3 +5159,629 @@ body.stage-active #fullscreenVizHUD { display: none; }
     font-size: 11px;
     line-height: 1.4;
 }
+
+
+/* =========================================================
+   SOUND BROWSER & SOUNDS PANEL — CYBERPUNK
+   Every size here comes from a token, so the density ladder
+   reaches this panel automatically. The old .readable-mode
+   raised micro type by naming selectors and never named a
+   single one of the Sounds panel's — which is exactly the
+   failure this section is built not to repeat.
+   ========================================================= */
+
+/* The global button rule sets uppercase, 0.1em tracking, a 28px height and a
+   ::before corner pip. Rows and rail items are content, not chrome. */
+.snd-browser button,
+.snd-panel button {
+    height: auto;
+    text-transform: none;
+    letter-spacing: var(--ls-body);
+}
+.snd-browser button::before,
+.snd-panel button::before { content: none; }
+
+/* The Sounds/Mixer counters had no rule at all and were inheriting the h3's
+   8px/0.25em, so they read as part of the heading instead of as data. */
+.section-count {
+    font-size: var(--fs-tiny);
+    font-weight: var(--fw-body);
+    letter-spacing: var(--ls-wide);
+    color: var(--neon);
+    opacity: 0.75;
+    text-shadow: none;
+}
+
+/* ---- Virtualized list scaffolding ---------------------------------- */
+/* Rows are absolutely positioned on a fixed pitch. No gap, no margin: either
+   would desynchronise pitch from height and drift the window. */
+.vlist-spacer { position: relative; width: 100%; }
+.vlist-window { position: absolute; top: 0; left: 0; right: 0; }
+
+/* ---- Browser shell -------------------------------------------------- */
+.snd-browser { display: flex; flex-direction: column; }
+
+.snd-browser-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    padding: var(--sp-3) var(--pad-pane);
+    border-bottom: var(--edge-neon);
+    background: var(--surface-inset);
+}
+
+.snd-search {
+    flex: 1;
+    min-width: 0;
+    height: var(--ctl-h-md);
+    padding: 0 var(--sp-4);
+    background: var(--bg);
+    color: var(--neon-bright);
+    border: var(--edge-hairline);
+    border-radius: var(--r-0);
+    font-family: var(--font-mono);
+    font-size: var(--fs-base);
+    line-height: var(--lh-ui);
+    letter-spacing: var(--ls-code);
+}
+.snd-search:focus {
+    outline: none;
+    border-color: var(--neon);
+    box-shadow: var(--glow-1);
+}
+.snd-search::placeholder { color: var(--text-dim); }
+
+.snd-result-count {
+    flex: 0 0 auto;
+    font-size: var(--fs-tiny);
+    letter-spacing: var(--ls-caps);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.snd-browser-body {
+    flex: 1;
+    /* Without this the grid refuses to shrink and the list scrolls the modal. */
+    min-height: 0;
+    display: grid;
+    grid-template-columns: var(--rail-w) 1fr;
+    gap: 1px;
+    background: var(--border);
+}
+
+.snd-rail,
+.snd-main { background: var(--surface-glass); min-height: 0; min-width: 0; }
+.snd-rail { overflow-y: auto; padding: var(--pad-pane) 0; }
+.snd-main { display: flex; flex-direction: column; }
+
+.snd-rail-item {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    width: 100%;
+    height: var(--row-h);
+    padding: 0 var(--pad-row-x);
+    background: transparent;
+    border: 0;
+    border-left: 2px solid transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    text-align: left;
+    cursor: pointer;
+}
+.snd-rail-item:hover { background: var(--accent-subtle); color: var(--neon-bright); }
+.snd-rail-item.is-active {
+    border-left-color: var(--neon);
+    background: var(--accent-subtle);
+    color: var(--neon-bright);
+    box-shadow: inset 0 0 12px rgba(71, 246, 255, 0.08);
+}
+.snd-rail-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snd-rail-count { margin-left: auto; font-size: var(--fs-tiny); color: var(--text-dim); }
+.snd-rail-item.is-active .snd-rail-count { color: var(--neon); }
+
+/* ---- Rows (shared by the browser and the sidebar) ------------------- */
+.snd-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    position: relative;
+}
+
+.snd-row {
+    /* Normal flow inside .vlist-window, which the virtualizer translates into
+       place. Height is the whole contract: no margin, no flex gap on the
+       window, or the pitch drifts from the scrollbar. */
+    height: var(--row-h);
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    padding-left: calc(var(--pad-row-x) + var(--depth, 0) * var(--sp-5));
+    padding-right: var(--pad-row-x);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+    border-left: 2px solid transparent;
+    color: var(--text-secondary);
+    font-size: var(--fs-base);
+    line-height: var(--lh-tight);
+    letter-spacing: var(--ls-code);
+    cursor: pointer;
+    contain: layout paint;
+}
+.snd-row:hover,
+.snd-row.is-selected {
+    background: var(--accent-subtle);
+    color: var(--neon-bright);
+    border-left-color: var(--neon);
+}
+.snd-row.is-selected { box-shadow: inset 0 0 12px rgba(71, 246, 255, 0.08); }
+
+.snd-row-caret {
+    flex: 0 0 auto;
+    width: var(--sp-5);
+    color: var(--neon-secondary);
+    font-size: var(--fs-tiny);
+}
+.snd-row-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.snd-row--bank > .snd-row-name { color: var(--text); font-weight: var(--fw-med); }
+.snd-row.is-selected > .snd-row-name,
+.snd-row:hover > .snd-row-name { color: inherit; }
+
+.snd-row-kind,
+.snd-row-meta,
+.snd-row-origin {
+    flex: 0 0 auto;
+    font-size: var(--fs-tiny);
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+.snd-row-meta { color: var(--neon); opacity: 0.8; }
+.snd-row-origin {
+    max-width: 14ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.snd-row-tag {
+    flex: 0 0 auto;
+    padding: 0 var(--sp-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-1);
+    color: var(--text-muted);
+    font-size: var(--fs-tiny);
+    text-transform: uppercase;
+    letter-spacing: var(--ls-wide);
+    white-space: nowrap;
+}
+.snd-row-tag[data-flag="live"] { color: var(--orange); border-color: var(--orange-dark); }
+.snd-row-tag[data-flag="shadowed"],
+.snd-row-tag[data-flag="disabled"] { color: var(--text-dim); }
+
+/* ---- Audition ------------------------------------------------------- */
+/* --viz-active (yellow), not cyan: a sounding row and a lit step in the
+   Sequence Grid should read as the same kind of event. */
+.snd-audition {
+    flex: 0 0 auto;
+    width: var(--ctl-h-row);
+    height: var(--ctl-h-row);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r-0);
+    color: var(--text-muted);
+    font-size: var(--fs-tiny);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.1s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.snd-audition-spacer { flex: 0 0 auto; width: var(--ctl-h-row); }
+.snd-row:hover .snd-audition,
+.snd-row:focus-within .snd-audition,
+.snd-audition:focus-visible,
+.snd-audition.is-playing { opacity: 1; }
+.snd-audition:hover {
+    color: var(--neon);
+    border-color: var(--neon-subtle);
+    box-shadow: var(--glow-1);
+}
+.snd-audition.is-playing {
+    color: var(--viz-active);
+    border-color: var(--viz-active);
+    animation: snd-audition-pulse 1.1s ease-in-out infinite;
+}
+.snd-row.is-playing { border-left-color: var(--viz-active); }
+@keyframes snd-audition-pulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(247, 255, 90, 0.35); }
+    50%      { box-shadow: 0 0 14px rgba(247, 255, 90, 0.65); }
+}
+
+/* ---- Empty / error -------------------------------------------------- */
+.snd-empty,
+.snd-error {
+    padding: var(--sp-7) var(--pad-pane);
+    text-align: center;
+    font-size: var(--fs-small);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+}
+.snd-error { color: var(--red); }
+
+.snd-hint {
+    font-size: var(--fs-tiny);
+    color: var(--text-dim);
+    letter-spacing: var(--ls-wide);
+}
+
+/* ---- Sidebar panel -------------------------------------------------- */
+.snd-panel-search {
+    width: 100%;
+    height: var(--ctl-h-sm);
+    margin-bottom: var(--sp-3);
+    padding: 0 var(--sp-3);
+    background: var(--bg);
+    color: var(--neon-bright);
+    border: var(--edge-hairline);
+    border-radius: var(--r-0);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    letter-spacing: var(--ls-code);
+}
+.snd-panel-search:focus {
+    outline: none;
+    border-color: var(--neon);
+    box-shadow: var(--glow-1);
+}
+.snd-panel-search::placeholder { color: var(--text-dim); }
+
+.snd-panel-list {
+    position: relative;
+    /* Eight rows in either density, so the panel keeps its share of the
+       sidebar instead of the 220px that never fit anything. */
+    max-height: calc(var(--row-h) * 8);
+    overflow-y: auto;
+}
+
+.snd-row--group {
+    color: var(--text-muted);
+    font-size: var(--fs-micro);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    background: var(--surface-inset);
+}
+.snd-row--group > .snd-row-name { font-weight: var(--fw-bold); }
+
+.snd-row--more {
+    justify-content: center;
+    color: var(--neon);
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-caps);
+    text-transform: uppercase;
+}
+
+/* ---- Responsive ----------------------------------------------------- */
+@media (max-width: 900px) {
+    .app-modal-window--browser { width: 96vw; height: 92vh; max-height: 92vh; }
+
+    /* Rail becomes a horizontal chip strip: ~8 categories is less than a
+       drawer's worth of chrome. */
+    .snd-browser-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+    .snd-rail {
+        display: flex;
+        gap: var(--sp-2);
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: var(--sp-3) var(--pad-pane);
+    }
+    .snd-rail-item {
+        flex: 0 0 auto;
+        width: auto;
+        border-left: 0;
+        border-bottom: 2px solid transparent;
+    }
+    .snd-rail-item.is-active { border-bottom-color: var(--neon); }
+}
+
+@media (max-width: 400px) {
+    .snd-browser-toolbar { flex-wrap: wrap; }
+    .snd-result-count { order: 3; width: 100%; }
+    /* Name and audition only — the row keeps its pitch, so the virtualizer
+       needs no breakpoint awareness. */
+    .snd-row-kind,
+    .snd-row-origin,
+    .snd-row-tag { display: none; }
+}
+
+/* ---- Import review --------------------------------------------------- */
+.si-toolbar { gap: var(--gap-stack); flex-wrap: wrap; }
+
+.si-field {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.si-field input {
+    height: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
+    background: var(--bg);
+    color: var(--neon-bright);
+    border: var(--edge-hairline);
+    border-radius: var(--r-0);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    letter-spacing: var(--ls-code);
+    text-transform: none;
+}
+.si-field input:focus { outline: none; border-color: var(--neon); box-shadow: var(--glow-1); }
+
+.si-source {
+    padding: var(--sp-3) var(--pad-pane);
+    font-size: var(--fs-small);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+}
+
+.si-warnings {
+    margin: 0;
+    padding: var(--sp-3) var(--pad-pane) var(--sp-3) calc(var(--pad-pane) + var(--sp-5));
+    list-style: square;
+    font-size: var(--fs-tiny);
+    line-height: var(--lh-body);
+    color: var(--orange);
+    background: var(--surface-inset);
+}
+
+/* Banks left, the selected bank's samples right. Both virtualized. */
+.si-body { grid-template-columns: 1fr 1fr; }
+.si-banks,
+.si-files { background: var(--surface-glass); }
+
+.si-bank.is-dropped { opacity: 0.4; }
+.si-bank.is-dropped .si-bank-name { text-decoration: line-through; }
+
+.si-bank-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: var(--ctl-h-row);
+    padding: 0 var(--sp-2);
+    background: transparent;
+    color: var(--text);
+    border: 1px solid transparent;
+    border-radius: var(--r-0);
+    font-family: var(--font-mono);
+    font-size: var(--fs-base);
+    font-weight: var(--fw-med);
+    letter-spacing: var(--ls-code);
+}
+.si-bank-name:hover { border-color: var(--border); }
+.si-bank-name:focus { outline: none; border-color: var(--neon); box-shadow: var(--glow-1); }
+
+.si-bank-drop,
+.si-file-drop,
+.si-file-up {
+    flex: 0 0 auto;
+    width: var(--ctl-h-row);
+    height: var(--ctl-h-row);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-size: var(--fs-tiny);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.1s, color 0.12s, border-color 0.12s;
+}
+.snd-row:hover .si-bank-drop,
+.snd-row:hover .si-file-drop,
+.snd-row:hover .si-file-up,
+.si-bank-drop:focus-visible,
+.si-file-drop:focus-visible,
+.si-file-up:focus-visible { opacity: 1; }
+.si-bank-drop:hover,
+.si-file-drop:hover { color: var(--red); border-color: var(--red-subtle); }
+.si-file-up:hover { color: var(--neon); border-color: var(--neon-subtle); }
+
+.si-summary {
+    font-size: var(--fs-tiny);
+    color: var(--text-muted);
+    letter-spacing: var(--ls-wide);
+}
+
+/* ---- Get more samples ------------------------------------------------ */
+.snd-sources {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: var(--gap-stack);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.snd-source-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--pad-pane);
+    background: var(--surface-inset);
+    border: var(--edge-neon);
+}
+.snd-source-card:hover { border-color: var(--neon); box-shadow: var(--glow-2); }
+
+.snd-source-open {
+    align-self: flex-start;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: var(--neon-bright);
+    font-family: var(--font-mono);
+    font-size: var(--fs-micro);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    text-shadow: var(--text-glitch);
+    cursor: pointer;
+}
+.snd-source-open:hover { color: var(--neon); }
+.snd-source-blurb {
+    font-size: var(--fs-small);
+    line-height: var(--lh-body);
+    color: var(--text-secondary);
+}
+/* The licence line is never truncated: a half-quoted term is worse than none. */
+.snd-source-license,
+.snd-source-format {
+    font-size: var(--fs-tiny);
+    line-height: var(--lh-body);
+    color: var(--text-dim);
+    letter-spacing: var(--ls-wide);
+}
+
+.samples-getmore-note strong { color: var(--orange-bright); }
+
+/* ---- Sample set cards ------------------------------------------------ */
+/* State has to be readable at a glance: "not downloaded" rendered as dim grey
+   text beside a silently-disabled radio read as "this set is empty", which is
+   the opposite of what it means. */
+.snd-set {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--pad-row-y) var(--pad-row-x);
+    background: var(--surface-inset);
+    border: var(--edge-hairline);
+    border-left: 2px solid transparent;
+    cursor: pointer;
+}
+.snd-set:hover { border-color: var(--neon-subtle); border-left-color: var(--neon-subtle); }
+.snd-set[data-state="active"] {
+    border-left-color: var(--neon);
+    background: var(--accent-subtle);
+    box-shadow: inset 0 0 12px rgba(71, 246, 255, 0.08);
+}
+.snd-set[data-state="missing"] { opacity: 0.82; }
+.snd-set[data-state="missing"]:hover { opacity: 1; }
+
+.snd-set-head {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-inline);
+}
+.snd-set-radio { flex: 0 0 auto; pointer-events: none; }
+.snd-set-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--fs-base);
+    font-weight: var(--fw-med);
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.snd-set-chip {
+    flex: 0 0 auto;
+    padding: 0 var(--sp-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-1);
+    font-size: var(--fs-tiny);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--text-muted);
+}
+.snd-set[data-state="active"] .snd-set-chip { color: var(--neon); border-color: var(--neon-subtle); }
+.snd-set[data-state="ready"] .snd-set-chip { color: var(--green-bright); border-color: var(--green); }
+/* Orange, not grey: this is a one-click fix, not a dead end. */
+.snd-set[data-state="missing"] .snd-set-chip { color: var(--orange-bright); border-color: var(--orange-dark); }
+
+.snd-set-action {
+    flex: 0 0 auto;
+    height: var(--ctl-h-sm);
+    padding: 0 var(--sp-4);
+    background: transparent;
+    border: 1px solid var(--neon-subtle);
+    border-radius: var(--r-0);
+    color: var(--neon);
+    font-family: var(--font-mono);
+    font-size: var(--fs-tiny);
+    letter-spacing: var(--ls-caps);
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.snd-set-action:hover:not(:disabled) { border-color: var(--neon); box-shadow: var(--glow-1); }
+.snd-set-action:disabled { opacity: 0.45; cursor: default; }
+.snd-set[data-state="missing"] .snd-set-action {
+    color: var(--orange-bright);
+    border-color: var(--orange-dark);
+}
+.snd-set[data-state="missing"] .snd-set-action:hover {
+    border-color: var(--orange-bright);
+    box-shadow: 0 0 6px rgba(255, 176, 0, 0.35);
+}
+
+.snd-set-desc,
+.snd-set-status {
+    font-size: var(--fs-tiny);
+    line-height: var(--lh-body);
+    color: var(--text-dim);
+}
+.snd-set-status:empty { display: none; }
+
+/* ---- Download progress ---------------------------------------------- */
+/* A div, not <progress>: the native element renders as an Aqua-blue capsule on
+   macOS and its pseudo-elements differ between WKWebView and WebKitGTK, both of
+   which this app ships to. */
+.snd-progress {
+    height: 2px;
+    width: 100%;
+    background: var(--surface-chrome);
+    overflow: hidden;
+}
+.snd-progress-fill {
+    height: 100%;
+    width: 0;
+    background: var(--neon);
+    box-shadow: var(--glow-1);
+    transition: width 0.2s linear;
+}
+
+/* A machine is the unit you actually pick: RolandTR909, not RolandTR909_bd. */
+.snd-row--machine > .snd-row-name {
+    color: var(--neon-bright);
+    font-weight: var(--fw-bold);
+}
+.snd-row-voices {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-tiny);
+    color: var(--text-dim);
+    letter-spacing: var(--ls-wide);
+}
+.snd-row--machine > .snd-row-name { flex: 0 0 auto; }
+/* Under a machine, the kind and origin columns just repeat the parent row. */
+.snd-row--voice .snd-row-kind,
+.snd-row--voice .snd-row-origin { display: none; }

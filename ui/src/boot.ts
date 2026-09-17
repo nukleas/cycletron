@@ -14,11 +14,13 @@ import {confirmDialog} from './dialog.js';
 import {fileManager} from './file-manager.js';
 import {initMenuEvents} from './menu-events.js';
 import {initDragDrop} from './drag-drop.js';
-import {soundsBrowser} from './sounds-browser.js';
+import {soundsPanel} from './sounds-panel.js';
+import {soundBrowser} from './sound-browser.js';
 import {fileExplorer} from './file-explorer.js';
 import {midiLab} from './midi-lab.js';
 import {aboutModal} from './about-modal.js';
 import {samplesModal} from './samples-modal.js';
+import {packImport} from './pack-import.js';
 import {helpModal} from './help-modal.js';
 import {preferencesModal} from './preferences.js';
 import {audioRecorder} from './audio-recorder.js';
@@ -56,6 +58,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // audio, and boot() returns early without a Tauri shell. Wiring it here
     // means ⌘⇧F works from the moment the page is up, including in a browser.
     stage.init();
+    // Same reasoning for the sound views: the catalog's bundled branch is a
+    // plain fetch of the generated manifest and auditions bundled samples by
+    // URL, so browsing and previewing work with no Tauri shell at all. Packs,
+    // synths and downloaded sets fill in once the backend is there.
+    soundBrowser.init();
+    void soundsPanel.init();
     void boot();
 });
 
@@ -108,6 +116,9 @@ function setupAppShortcuts(): void {
         if (key === 'o' && !e.shiftKey) {
             e.preventDefault();
             void fileManager.openFile();
+        } else if (key === 'o' && e.shiftKey) {
+            e.preventDefault();
+            void soundBrowser.open();
         } else if (key === 's' && !e.shiftKey) {
             e.preventDefault();
             void fileManager.saveCurrent();
@@ -146,6 +157,7 @@ async function boot(): Promise<void> {
     midiLab.init();
     aboutModal.init();
     samplesModal.init();
+    packImport.init();
     helpModal.init();
     preferencesModal.init();
     audioRecorder.init();
@@ -166,7 +178,6 @@ async function boot(): Promise<void> {
     await Promise.all([
         initMenuEvents(),
         initDragDrop(),
-        soundsBrowser.init(),
         fileManager.init(),
         fileExplorer.init(),
         initPlaybackBridge(),

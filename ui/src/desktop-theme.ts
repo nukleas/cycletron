@@ -91,6 +91,9 @@ function apply(theme: DesktopTheme | null): void {
     set('--text', pick('bright_foreground', 'light_foreground', 'color15') ?? foreground);
     set('--text-secondary', foreground);
     set('--text-muted', pick('dark_foreground', 'muted', 'color8'));
+    // Fourth text step. --surface-inset/--surface-chrome need no entry here:
+    // they are color-mix over --bg, which this function already overrides.
+    set('--text-dim', mix(pick('muted', 'dark_foreground', 'color8') ?? foreground, background, 0.35));
 
     set('--accent', accent);
     set('--accent-subtle', alpha(accent, 0.12));

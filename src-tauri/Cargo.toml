@@ -61,6 +61,10 @@ rusty_link = "0.4"
 # Free-space query for the recording sink. Pure Rust — no new -sys crate, so
 # the macOS-universal / AppImage / NSIS jobs are unaffected.
 fs4 = "1.1"
+# .zip import for sample packs (see src/pack_import.rs). Already in Cargo.lock
+# at 4.6.1 via tauri-plugin-updater, so this is a feature union rather than a
+# new dependency; deflate is pure Rust (flate2), so no new -sys crate either.
+zip = { version = "4", default-features = false, features = ["deflate"] }
 
 # For proper production SAB support:
 # We embed the frontend and serve it over real http://127.0.0.1 so WebKit

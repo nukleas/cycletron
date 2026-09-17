@@ -3,13 +3,14 @@
 //! engine can currently play (synths, GM instruments, drums, user banks).
 //!
 //! The web REPL can only stream samples over HTTP; on the desktop we read the
-//! filesystem directly. The frontend picks a folder, calls [`scan_sample_folder`]
+//! filesystem directly. The frontend picks a folder, previews the banks
 //! to get a bank manifest, then [`read_audio_file`] per file (raw bytes →
 //! `decodeAudioData` → the existing `sendSampleBatch` pipeline), and finally
 //! [`register_sound_banks`] so the agent knows the new sounds exist.
 
 use crate::state::AppState;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tauri::State;
 
@@ -23,21 +24,7 @@ const MAX_BANK_NAME_BYTES: usize = 31;
 /// sample arena or stall the IPC bridge. 64 MB is generous for a single sample.
 const MAX_AUDIO_FILE_BYTES: u64 = 64 * 1024 * 1024;
 
-#[derive(Serialize)]
-pub struct SampleBank {
-    /// Name to use in `s("…")`. Sanitized, lowercase, ≤31 bytes.
-    pub name: String,
-    /// Absolute paths to the audio files, in index order (`name:0`, `name:1`, …).
-    pub files: Vec<String>,
-}
-
-#[derive(Serialize)]
-pub struct SampleFolder {
-    pub root: String,
-    pub banks: Vec<SampleBank>,
-}
-
-fn is_audio(path: &Path) -> bool {
+pub(crate) fn is_audio(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .map(str::to_ascii_lowercase)
@@ -85,6 +72,186 @@ fn audio_files_in(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
+/// How a directory of loose audio files was turned into banks.
+///
+/// Reported so the import UI can say what it did — a user who sees
+/// "one indexed bank" knows to look for a foldered download instead of
+/// wondering why their kit has one voice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum GroupStrategy {
+    /// `BD-dx200-Kick.wav` → `bd`. A leading type tag before the first separator.
+    LeadingTag,
+    /// `BD0050.WAV` → `bd`. A trailing index run stripped from the stem.
+    TrailingIndex,
+    /// Everything in one bank named after the folder. The honest floor.
+    SingleBank,
+}
+
+/// A kit does not have 65 voice types; past this the grouping is noise.
+const MAX_GROUPS: usize = 64;
+/// Above this share of one-file groups, the convention isn't really there.
+const MAX_SINGLETON_RATIO: f32 = 0.70;
+
+/// Compare so `BD 2` sorts before `BD 10`.
+///
+/// Array order *is* the `:n` the user will type, so a plain lexical sort would
+/// silently scramble which sample is `:2`.
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let (mut i, mut j) = (0usize, 0usize);
+    while i < a.len() && j < b.len() {
+        let (ca, cb) = (a[i], b[j]);
+        if ca.is_ascii_digit() && cb.is_ascii_digit() {
+            let si = i;
+            let sj = j;
+            while i < a.len() && a[i].is_ascii_digit() {
+                i += 1;
+            }
+            while j < b.len() && b[j].is_ascii_digit() {
+                j += 1;
+            }
+            // Compare as numbers, ignoring leading zeros.
+            let na = &a[si..i];
+            let nb = &b[sj..j];
+            let ta = na
+                .iter()
+                .position(|c| *c != b'0')
+                .map_or(&na[..0], |p| &na[p..]);
+            let tb = nb
+                .iter()
+                .position(|c| *c != b'0')
+                .map_or(&nb[..0], |p| &nb[p..]);
+            match ta.len().cmp(&tb.len()).then_with(|| ta.cmp(tb)) {
+                std::cmp::Ordering::Equal => {}
+                other => return other,
+            }
+            continue;
+        }
+        match ca.to_ascii_lowercase().cmp(&cb.to_ascii_lowercase()) {
+            std::cmp::Ordering::Equal => {}
+            other => return other,
+        }
+        i += 1;
+        j += 1;
+    }
+    (a.len() - i).cmp(&(b.len() - j))
+}
+
+/// `BD-dx200-909ishKick-768kbps` → `bd`. The leading run before the first
+/// separator, which is how hardware sample packs tag voice type.
+fn leading_tag(stem: &str) -> String {
+    let head: String = stem
+        .chars()
+        .take_while(|c| *c != '-' && *c != '_' && *c != ' ' && *c != '.')
+        .collect();
+    sanitize_bank_name(&head)
+}
+
+/// `BD0050` → `bd`, `Snaredrum-01` → `snaredrum`. Strips a trailing digit run
+/// (and the separators in front of it) from the stem.
+fn trailing_index(stem: &str) -> String {
+    let t = stem.trim_end_matches(|c: char| c.is_ascii_digit());
+    let t = t.trim_end_matches([' ', '_', '-', '.']);
+    sanitize_bank_name(t)
+}
+
+/// Bucket `files` by `key`, preserving natural order within each bucket and
+/// first-appearance order between them. `None` when the keying is unusable.
+fn bucket_by(
+    files: &[PathBuf],
+    key: impl Fn(&str) -> String,
+) -> Option<Vec<(String, Vec<PathBuf>)>> {
+    let mut order: Vec<String> = Vec::new();
+    let mut groups: std::collections::HashMap<String, Vec<PathBuf>> =
+        std::collections::HashMap::new();
+
+    for f in files {
+        let stem = f.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
+        let k = key(stem);
+        if k.is_empty() {
+            return None; // keying produced nothing usable for this file
+        }
+        if !groups.contains_key(&k) {
+            order.push(k.clone());
+        }
+        groups.entry(k).or_default().push(f.clone());
+    }
+
+    if order.len() > MAX_GROUPS {
+        return None;
+    }
+    let singletons = groups.values().filter(|v| v.len() == 1).count();
+    if !order.is_empty() && singletons as f32 / order.len() as f32 > MAX_SINGLETON_RATIO {
+        return None;
+    }
+
+    let mut out = Vec::with_capacity(order.len());
+    for k in order {
+        let mut v = groups.remove(&k).unwrap_or_default();
+        v.sort_by(|a, b| {
+            natural_cmp(
+                a.file_name().and_then(|s| s.to_str()).unwrap_or_default(),
+                b.file_name().and_then(|s| s.to_str()).unwrap_or_default(),
+            )
+        });
+        out.push((k, v));
+    }
+    Some(out)
+}
+
+/// Turn a flat directory of audio files into banks.
+///
+/// Before this, every loose file became its own single-sample bank named after
+/// the file stem. A flat 85-file hardware pack (`BD-dx200-Kick.wav`,
+/// `SD-dx200-Snare.wav`, …) imported as 85 one-sample banks: `:n` indexing was
+/// dead, autocomplete and the agent's sound list filled with junk, and the kit
+/// was unplayable. The ladder below recovers `bd`/`sd`/`hat`/… instead, and
+/// falls back to exactly the old single-bank behaviour when no convention is
+/// present rather than guessing.
+pub(crate) fn group_audio_files(
+    dir_label: &str,
+    files: &[PathBuf],
+    used: &mut HashSet<String>,
+) -> (GroupStrategy, Vec<ScannedBank>) {
+    let build = |groups: Vec<(String, Vec<PathBuf>)>, used: &mut HashSet<String>| {
+        groups
+            .into_iter()
+            .map(|(name, files)| ScannedBank {
+                name: unique_name(name, used),
+                files,
+            })
+            .collect::<Vec<_>>()
+    };
+
+    if let Some(groups) = bucket_by(files, leading_tag) {
+        return (GroupStrategy::LeadingTag, build(groups, used));
+    }
+    if let Some(groups) = bucket_by(files, trailing_index) {
+        return (GroupStrategy::TrailingIndex, build(groups, used));
+    }
+
+    // Floor: one bank named after the folder, files in natural order.
+    let mut sorted = files.to_vec();
+    sorted.sort_by(|a, b| {
+        natural_cmp(
+            a.file_name().and_then(|s| s.to_str()).unwrap_or_default(),
+            b.file_name().and_then(|s| s.to_str()).unwrap_or_default(),
+        )
+    });
+    let name = unique_name(sanitize_bank_name(dir_label), used);
+    if name.is_empty() || sorted.is_empty() {
+        return (GroupStrategy::SingleBank, Vec::new());
+    }
+    (
+        GroupStrategy::SingleBank,
+        vec![ScannedBank {
+            name,
+            files: sorted,
+        }],
+    )
+}
+
 /// One bank from a folder scan: sanitized name + absolute source paths.
 #[derive(Debug, Clone)]
 pub struct ScannedBank {
@@ -92,9 +259,17 @@ pub struct ScannedBank {
     pub files: Vec<PathBuf>,
 }
 
-/// Scan a folder into banks (Strudel layout: each subfolder is a bank; loose
-/// audio files at the root are one-shot banks named after the file stem).
-pub fn scan_folder_banks(root: &Path) -> Result<Vec<ScannedBank>, String> {
+/// Scan a folder into banks, plus the strategy used for the root's loose files.
+///
+/// Each immediate subdirectory is a bank. Loose audio at the root is grouped by
+/// [`group_audio_files`] rather than becoming one bank per file — see that
+/// function for why. Subdirectories keep their folder name; only their file
+/// order is natural-sorted, so existing Strudel-shaped packs scan as they
+/// always did. The strategy is reported so the import preview can tell the user
+/// how their filenames were read.
+pub fn scan_folder_banks_detailed(
+    root: &Path,
+) -> Result<(GroupStrategy, Vec<ScannedBank>), String> {
     if !root.is_dir() {
         return Err(format!("not a folder: {}", root.display()));
     }
@@ -107,14 +282,21 @@ pub fn scan_folder_banks(root: &Path) -> Result<Vec<ScannedBank>, String> {
     entries.sort();
 
     let mut banks: Vec<ScannedBank> = Vec::new();
-    let mut used_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut used_names: HashSet<String> = HashSet::new();
+    let mut loose: Vec<PathBuf> = Vec::new();
 
     for entry in &entries {
         if entry.is_dir() {
-            let files = audio_files_in(entry);
+            let mut files = audio_files_in(entry);
             if files.is_empty() {
                 continue;
             }
+            files.sort_by(|a, b| {
+                natural_cmp(
+                    a.file_name().and_then(|s| s.to_str()).unwrap_or_default(),
+                    b.file_name().and_then(|s| s.to_str()).unwrap_or_default(),
+                )
+            });
             let raw = entry
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -125,44 +307,24 @@ pub fn scan_folder_banks(root: &Path) -> Result<Vec<ScannedBank>, String> {
             }
             banks.push(ScannedBank { name, files });
         } else if entry.is_file() && is_audio(entry) {
-            let raw = entry
-                .file_stem()
-                .and_then(|n| n.to_str())
-                .unwrap_or_default();
-            let name = unique_name(sanitize_bank_name(raw), &mut used_names);
-            if name.is_empty() {
-                continue;
-            }
-            banks.push(ScannedBank {
-                name,
-                files: vec![entry.clone()],
-            });
+            loose.push(entry.clone());
         }
     }
 
-    banks.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(banks)
-}
+    let label = root
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("samples");
+    let strategy = if loose.is_empty() {
+        GroupStrategy::SingleBank
+    } else {
+        let (strategy, grouped) = group_audio_files(label, &loose, &mut used_names);
+        banks.extend(grouped);
+        strategy
+    };
 
-/// Scan a folder into sample banks using the Strudel convention:
-/// each immediate subfolder is a bank (its audio files become indices 0,1,2…
-/// in alphabetical order); each loose audio file at the root is a one-shot
-/// bank named after the file stem.
-#[tauri::command]
-pub fn scan_sample_folder(path: String) -> Result<SampleFolder, String> {
-    let root = PathBuf::from(&path);
-    let banks = scan_folder_banks(&root)?
-        .into_iter()
-        .map(|b| SampleBank {
-            name: b.name,
-            files: b
-                .files
-                .iter()
-                .map(|p| p.to_string_lossy().into_owned())
-                .collect(),
-        })
-        .collect();
-    Ok(SampleFolder { root: path, banks })
+    banks.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok((strategy, banks))
 }
 
 /// Disambiguate colliding sanitized names by suffixing `_2`, `_3`, … (kept ≤31 bytes).
@@ -343,6 +505,128 @@ pub fn list_sounds(state: State<'_, AppState>) -> serde_json::Value {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+
+    /// Real filenames from Legowelt's Yamaha DX200 pack (flat, no subfolders).
+    /// Verified against an archive.org mirror of the pack.
+    const DX200: &[&str] = &[
+        "BASS-dx200-FilteredWaveC-768kbps.wav",
+        "BASS-dx200-RaveBassC-768kbps.wav",
+        "BASS-dx200-RealBassG-768kbps.wav",
+        "BD-dx200-909ishFilletKick-768kbps.wav",
+        "BD-dx200-RotterdamGabberKick-768kbps.wav",
+        "BD-dx200-SubBooooom-768kbps.wav",
+        "BD-dx200-realbdz-768kbps.wav",
+        "BD-dx200-realbdz2-768kbps.wav",
+        "CLAP-dx200-Clapzzz-768kbps.wav",
+        "CYMB-dx200-909ishCrash-768kbps.wav",
+        "CYMB-dx200-JazzyRide-768kbps.wav",
+        "HAT-dx200-909HatOPEN-768kbps.wav",
+        "HAT-dx200-AnalogHatCLOSED-768kbps.wav",
+        "HAT-dx200-RealhatOPEN-768kbps.wav",
+        "PERC-dx200-Clave-768kbps.wav",
+        "PERC-dx200-Indianstyle1-768kbps.wav",
+        "PERC-dx200-Shaker2-768kbps.wav",
+        "SD-dx200-909Snare-768kbps.wav",
+        "SD-dx200-JungleSnare-768kbps.wav",
+        "SD-dx200-Realsnare1-768kbps.wav",
+        "TOM-dx200-909Tom-768kbps.wav",
+        "TOM-dx200-LazerTom-768kbps.wav",
+    ];
+
+    fn paths(names: &[&str]) -> Vec<PathBuf> {
+        names
+            .iter()
+            .map(|n| PathBuf::from("/pack").join(n))
+            .collect()
+    }
+
+    fn group(names: &[&str]) -> (GroupStrategy, Vec<ScannedBank>) {
+        let mut used = HashSet::new();
+        group_audio_files("pack", &paths(names), &mut used)
+    }
+
+    #[test]
+    fn leading_tag_recovers_a_playable_kit_from_a_flat_pack() {
+        let (strategy, banks) = group(DX200);
+        assert_eq!(strategy, GroupStrategy::LeadingTag);
+        let got: Vec<(String, usize)> = banks
+            .iter()
+            .map(|b| (b.name.clone(), b.files.len()))
+            .collect();
+        // Every file lands in a typed bank instead of becoming its own.
+        assert_eq!(
+            got,
+            vec![
+                ("bass".to_string(), 3),
+                ("bd".to_string(), 5),
+                ("clap".to_string(), 1),
+                ("cymb".to_string(), 2),
+                ("hat".to_string(), 3),
+                ("perc".to_string(), 3),
+                ("sd".to_string(), 3),
+                ("tom".to_string(), 2),
+            ]
+        );
+    }
+
+    #[test]
+    fn trailing_index_groups_a_fischer_style_grid() {
+        // BD0050.WAV etc. have no leading tag separator, so the ladder falls
+        // through to stripping the index run.
+        let (strategy, banks) = group(&[
+            "BD0000.WAV",
+            "BD0025.WAV",
+            "BD0050.WAV",
+            "SD0000.WAV",
+            "SD0025.WAV",
+        ]);
+        assert_eq!(strategy, GroupStrategy::TrailingIndex);
+        assert_eq!(banks.len(), 2);
+        assert_eq!(banks[0].name, "bd");
+        assert_eq!(banks[0].files.len(), 3);
+        assert_eq!(banks[1].name, "sd");
+    }
+
+    #[test]
+    fn note_named_files_fall_back_to_one_bank() {
+        // A pitched multisample: every stem is unique, so neither tag nor index
+        // grouping is real. One bank named after the folder is the honest answer.
+        let (strategy, banks) = group(&["B2.mp3", "Ds3.mp3", "Gs3.mp3", "Cs4.mp3", "Fs4.mp3"]);
+        assert_eq!(strategy, GroupStrategy::SingleBank);
+        assert_eq!(banks.len(), 1);
+        assert_eq!(banks[0].name, "pack");
+        assert_eq!(banks[0].files.len(), 5);
+    }
+
+    #[test]
+    fn too_many_distinct_names_fall_back_rather_than_guess() {
+        let names: Vec<String> = (0..80).map(|i| format!("unique{i}name.wav")).collect();
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let (strategy, banks) = group(&refs);
+        assert_eq!(strategy, GroupStrategy::SingleBank);
+        assert_eq!(banks.len(), 1);
+        assert_eq!(banks[0].files.len(), 80);
+    }
+
+    #[test]
+    fn index_order_is_natural_so_bd_2_precedes_bd_10() {
+        let (_, banks) = group(&["BD 10.wav", "BD 2.wav", "BD 1.wav", "SD 1.wav", "SD 2.wav"]);
+        let bd = banks.iter().find(|b| b.name == "bd").expect("bd bank");
+        let order: Vec<&str> = bd
+            .files
+            .iter()
+            .map(|f| f.file_name().unwrap().to_str().unwrap())
+            .collect();
+        assert_eq!(order, vec!["BD 1.wav", "BD 2.wav", "BD 10.wav"]);
+    }
+
+    #[test]
+    fn natural_cmp_orders_numeric_runs_by_value() {
+        use std::cmp::Ordering;
+        assert_eq!(natural_cmp("a2", "a10"), Ordering::Less);
+        assert_eq!(natural_cmp("a010", "a10"), Ordering::Equal);
+        assert_eq!(natural_cmp("b1", "a9"), Ordering::Greater);
+    }
 
     #[test]
     fn sanitize_lowercases_and_collapses_separators() {
