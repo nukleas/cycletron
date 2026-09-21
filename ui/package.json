@@ -26,11 +26,11 @@
     "@tauri-apps/plugin-global-shortcut": "^2.3.1",
     "@tauri-apps/plugin-notification": "^2.4.0",
     "@tauri-apps/plugin-opener": "^2.5.5",
-    "@tauri-apps/plugin-store": "^2.4.3",
+    "@tauri-apps/plugin-store": "^2.4.5",
     "@tauri-apps/plugin-updater": "^2.11.0",
     "codemirror": "^6.0.1",
     "coi-serviceworker": "^0.1.7",
-    "marked": "^18.0.12"
+    "marked": "^18.0.13"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
