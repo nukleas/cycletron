@@ -91,6 +91,21 @@ struct DownloadProgress<'a> {
     total: usize,
 }
 
+/// Emitted once per source that finished with dead upstream links. The
+/// download succeeded — this says what the set came up short by, so the UI
+/// doesn't have to present "done" and "8 files 404'd" as the same thing.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DownloadNotice<'a> {
+    set: &'a str,
+    source: &'a str,
+    missing: usize,
+    total: usize,
+    /// Banks that lost every one of their samples and were removed outright.
+    dropped_banks: &'a [String],
+    first_error: &'a str,
+}
+
 /// A source's localized manifest, handed to the frontend so live playback
 /// can lazy-load banks from the same files export renders from.
 #[derive(Debug, Clone, Serialize)]
@@ -766,29 +781,66 @@ async fn download_source(
                     },
                 );
             }
-            result.map_err(|e| format!("{url}: {e}"))
+            result.map_err(|e| (rel, format!("{url}: {}", e.message()), e))
         });
     }
 
-    let mut failures = Vec::new();
+    let mut gone: Vec<(String, String)> = Vec::new();
+    let mut transient: Vec<String> = Vec::new();
     while let Some(joined) = tasks.join_next().await {
         match joined {
             Ok(Ok(())) => {}
-            Ok(Err(e)) => failures.push(e),
-            Err(e) => failures.push(format!("download task panicked: {e}")),
+            Ok(Err((rel, msg, FetchError::Gone(_)))) => gone.push((rel, msg)),
+            Ok(Err((_, msg, _))) => transient.push(msg),
+            Err(e) => transient.push(format!("download task panicked: {e}")),
         }
     }
-    if !failures.is_empty() {
+
+    // Transient failures are worth another go, so leave the source unfinished
+    // (no localized manifest) and say so — finished files are kept, and the
+    // next run picks up where this one stopped.
+    if !transient.is_empty() {
         return Err(format!(
             "source '{source_url}': {} of {total} files failed (re-run the download to resume). First error: {}",
-            failures.len(),
-            failures[0]
+            transient.len(),
+            transient[0]
         ));
     }
 
-    // All files present — write the localized manifest last, atomically.
-    // `_base` was already stripped above; relative paths now resolve against
-    // this manifest's own directory.
+    // Files upstream no longer has: drop them from the localized manifest so
+    // everything that *did* arrive is usable. Failing the source here threw
+    // away 1,900 good files over 8 dead links and told the user to re-run a
+    // download that could never succeed.
+    if !gone.is_empty() {
+        let missing: std::collections::HashSet<&str> =
+            gone.iter().map(|(rel, _)| rel.as_str()).collect();
+        let dropped_banks = prune_missing(&mut manifest, &missing);
+        tracing::warn!(
+            target: "cycletron::sample_sets",
+            set = set_id,
+            source = slug,
+            missing = gone.len(),
+            total,
+            dropped_banks = ?dropped_banks,
+            first_error = %gone[0].1,
+            "upstream is missing files; pruned them from the localized manifest"
+        );
+        let _ = app.emit(
+            "sample-set-notice",
+            DownloadNotice {
+                set: set_id,
+                source: &slug,
+                missing: gone.len(),
+                total,
+                dropped_banks: &dropped_banks,
+                first_error: &gone[0].1,
+            },
+        );
+    }
+
+    // Everything reachable is on disk — write the localized manifest last,
+    // atomically. `_base` was already stripped above; relative paths now
+    // resolve against this manifest's own directory.
     let json = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?;
     let tmp = dir.join(format!("{LOCAL_MANIFEST}.tmp"));
     std::fs::write(&tmp, json).map_err(|e| format!("write {}: {e}", tmp.display()))?;
@@ -862,6 +914,45 @@ fn encode_rel_url(rel: &str) -> String {
     out
 }
 
+/// Drop every `missing` relative path from a manifest, and with it any bank
+/// left holding nothing. Returns the names of banks removed outright.
+///
+/// Mirrors the shapes [`relative_sample_paths`] reads: a bank is a bare path,
+/// a list of paths, or a note→path map.
+fn prune_missing(
+    manifest: &mut serde_json::Value,
+    missing: &std::collections::HashSet<&str>,
+) -> Vec<String> {
+    let Some(obj) = manifest.as_object_mut() else {
+        return Vec::new();
+    };
+    let mut dropped = Vec::new();
+    for (bank, def) in obj.iter_mut() {
+        if bank.starts_with('_') {
+            continue;
+        }
+        let emptied = match def {
+            serde_json::Value::String(s) => missing.contains(s.as_str()),
+            serde_json::Value::Array(items) => {
+                items.retain(|i| !i.as_str().is_some_and(|s| missing.contains(s)));
+                items.is_empty()
+            }
+            serde_json::Value::Object(map) => {
+                map.retain(|_, v| !v.as_str().is_some_and(|s| missing.contains(s)));
+                map.is_empty()
+            }
+            _ => false,
+        };
+        if emptied {
+            dropped.push(bank.clone());
+        }
+    }
+    for bank in &dropped {
+        obj.remove(bank);
+    }
+    dropped
+}
+
 fn push_rel(out: &mut Vec<String>, path: &str) {
     if path.starts_with("http://") || path.starts_with("https://") {
         return;
@@ -884,51 +975,98 @@ async fn fetch_text(client: &reqwest::Client, url: &str) -> Result<String, Strin
     resp.text().await.map_err(|e| e.to_string())
 }
 
+/// Why one file failed. The distinction decides what happens to the whole
+/// source: a transient failure is worth resuming, a [`FetchError::Gone`] one
+/// never will be, so the set has to be able to complete without it.
+#[derive(Debug)]
+enum FetchError {
+    /// Upstream does not have this file and will not grow it back. Third-party
+    /// manifests rot: dough-samples' `vcsl.json` still points the whole
+    /// `tom_mallet` bank at `Struck Membranophones/...`, a path VCSL has since
+    /// nested under `Membranophones/`.
+    Gone(String),
+    /// Network error, 5xx, or a rate limit. Finished files are kept, so
+    /// re-running the download resumes and has a real chance of succeeding.
+    Transient(String),
+}
+
+impl FetchError {
+    fn message(&self) -> &str {
+        match self {
+            Self::Gone(m) | Self::Transient(m) => m,
+        }
+    }
+}
+
+/// A 4xx means the server understood the request and the answer is no. Only
+/// 408 (timeout) and 429 (rate limit) are worth asking again.
+fn is_permanent(status: reqwest::StatusCode) -> bool {
+    status.is_client_error()
+        && status != reqwest::StatusCode::REQUEST_TIMEOUT
+        && status != reqwest::StatusCode::TOO_MANY_REQUESTS
+}
+
 /// Download one file with retries; skips work when `dest` already exists
 /// (resume). Writes via a `.part` file + rename so a torn download never
 /// masquerades as a finished sample.
-async fn fetch_file(client: &reqwest::Client, url: &str, dest: &Path) -> Result<(), String> {
+async fn fetch_file(client: &reqwest::Client, url: &str, dest: &Path) -> Result<(), FetchError> {
     if dest.metadata().map(|m| m.len() > 0).unwrap_or(false) {
         return Ok(());
     }
     if let Some(parent) = dest.parent() {
         tokio::fs::create_dir_all(parent)
             .await
-            .map_err(|e| format!("create {}: {e}", parent.display()))?;
+            .map_err(|e| FetchError::Transient(format!("create {}: {e}", parent.display())))?;
     }
 
-    let mut last_err = String::new();
+    let mut last_err = FetchError::Transient(String::new());
     for attempt in 0..RETRIES {
         if attempt > 0 {
             tokio::time::sleep(std::time::Duration::from_millis(500 * u64::from(attempt))).await;
         }
         match try_fetch_file(client, url, dest).await {
             Ok(()) => return Ok(()),
+            // Re-asking for a 404 only burns the retry budget and its backoff.
+            Err(e @ FetchError::Gone(_)) => return Err(e),
             Err(e) => last_err = e,
         }
     }
     Err(last_err)
 }
 
-async fn try_fetch_file(client: &reqwest::Client, url: &str, dest: &Path) -> Result<(), String> {
+async fn try_fetch_file(
+    client: &reqwest::Client,
+    url: &str,
+    dest: &Path,
+) -> Result<(), FetchError> {
     let resp = client
         .get(url)
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .error_for_status()
-        .map_err(|e| e.to_string())?;
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+        .map_err(|e| FetchError::Transient(e.to_string()))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let msg = format!("HTTP {status}");
+        return Err(if is_permanent(status) {
+            FetchError::Gone(msg)
+        } else {
+            FetchError::Transient(msg)
+        });
+    }
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| FetchError::Transient(e.to_string()))?;
     let part = dest.with_extension(match dest.extension().and_then(|e| e.to_str()) {
         Some(ext) => format!("{ext}.part"),
         None => "part".to_string(),
     });
     tokio::fs::write(&part, &bytes)
         .await
-        .map_err(|e| format!("write {}: {e}", part.display()))?;
+        .map_err(|e| FetchError::Transient(format!("write {}: {e}", part.display())))?;
     tokio::fs::rename(&part, dest)
         .await
-        .map_err(|e| format!("finalize {}: {e}", dest.display()))?;
+        .map_err(|e| FetchError::Transient(format!("finalize {}: {e}", dest.display())))?;
     Ok(())
 }
 
@@ -978,6 +1116,75 @@ mod tests {
                 "piano/e4.mp3"
             ]
         );
+    }
+
+    #[test]
+    fn prune_missing_drops_entries_and_empties_banks() {
+        let mut manifest = serde_json::json!({
+            "_base": "https://example.com/x/",
+            // Every file gone: the bank itself should disappear. This is
+            // dough-samples' tom_mallet, whose 8 files all 404.
+            "tom_mallet": ["tom/a.wav", "tom/b.wav"],
+            // Partially gone: keep the bank, drop the dead entry.
+            "bd": ["bd/a.wav", "bd/gone.wav", "bd/c.wav"],
+            // Note maps prune per note.
+            "piano": {"C4": "piano/c4.mp3", "E4": "piano/gone.mp3"},
+            // A bare-string bank that is gone.
+            "single": "one.wav",
+            "kept": "two.wav",
+        });
+        let missing = std::collections::HashSet::from([
+            "tom/a.wav",
+            "tom/b.wav",
+            "bd/gone.wav",
+            "piano/gone.mp3",
+            "one.wav",
+        ]);
+
+        let mut dropped = prune_missing(&mut manifest, &missing);
+        dropped.sort();
+        assert_eq!(dropped, vec!["single", "tom_mallet"]);
+
+        let obj = manifest.as_object().unwrap();
+        assert!(!obj.contains_key("tom_mallet"));
+        assert!(!obj.contains_key("single"));
+        assert_eq!(obj["bd"], serde_json::json!(["bd/a.wav", "bd/c.wav"]));
+        assert_eq!(obj["piano"], serde_json::json!({"C4": "piano/c4.mp3"}));
+        assert_eq!(obj["kept"], serde_json::json!("two.wav"));
+        // `_` keys are metadata, never pruned.
+        assert!(obj.contains_key("_base"));
+    }
+
+    #[test]
+    fn prune_missing_leaves_a_healthy_manifest_alone() {
+        let before = serde_json::json!({"bd": ["bd/a.wav"], "sn": "sn/a.wav"});
+        let mut manifest = before.clone();
+        assert!(prune_missing(&mut manifest, &std::collections::HashSet::new()).is_empty());
+        assert_eq!(manifest, before);
+    }
+
+    #[test]
+    fn only_hopeless_statuses_are_permanent() {
+        use reqwest::StatusCode;
+        // Gone for good — pruned, never retried.
+        for s in [
+            StatusCode::NOT_FOUND,
+            StatusCode::GONE,
+            StatusCode::FORBIDDEN,
+            StatusCode::UNAUTHORIZED,
+        ] {
+            assert!(is_permanent(s), "{s} should be permanent");
+        }
+        // Worth resuming — a re-run can still succeed.
+        for s in [
+            StatusCode::REQUEST_TIMEOUT,
+            StatusCode::TOO_MANY_REQUESTS,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::BAD_GATEWAY,
+            StatusCode::SERVICE_UNAVAILABLE,
+        ] {
+            assert!(!is_permanent(s), "{s} should be transient");
+        }
     }
 
     #[test]

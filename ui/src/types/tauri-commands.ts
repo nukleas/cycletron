@@ -237,6 +237,18 @@ export interface SampleSetProgress {
     total: number;
 }
 
+/** Emitted when a source finished but upstream had dead links (`sample-set-notice`).
+ *  The download succeeded; these entries were pruned from the local manifest. */
+export interface SampleSetNotice {
+    set: string;
+    source: string;
+    missing: number;
+    total: number;
+    /** Banks that lost every sample and were removed outright. */
+    droppedBanks: string[];
+    firstError: string;
+}
+
 /** One source of the active downloaded set (`get_active_sample_set_manifests`). */
 export interface SampleSourceManifest {
     id: string;
