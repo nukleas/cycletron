@@ -21,7 +21,7 @@ import {packImport} from './pack-import.js';
 import {openExternal} from './external-link.js';
 import {FREE_SAMPLE_SOURCES} from './sample-sources.js';
 import {errorDialog} from './dialog.js';
-import type {SampleSetStatus, SampleSetProgress, UserSettings} from './types/tauri-commands.js';
+import type {SampleSetStatus, SampleSetProgress, SampleSetNotice, UserSettings} from './types/tauri-commands.js';
 
 interface PackBankSummary {
     name: string;
@@ -92,6 +92,21 @@ export class SamplesModal {
                 }
                 const status = document.getElementById(`samplesSetStatus-${p.set}`);
                 if (status) status.textContent = `Downloading ${p.source}… ${p.done}/${p.total}`;
+            });
+
+            // A source can finish having skipped files upstream no longer has.
+            // The set is usable, so this is a note rather than an error — but
+            // silently dropping banks would leave the user hunting for a kit
+            // that never arrived.
+            void listen<SampleSetNotice>('sample-set-notice', (event) => {
+                const n = event.payload;
+                const banks = n.droppedBanks.length
+                    ? ` Unavailable upstream: ${n.droppedBanks.join(', ')}.`
+                    : '';
+                notify(
+                    'Sample set incomplete',
+                    `${n.source}: ${n.missing} of ${n.total} files are gone from the source.${banks}`,
+                );
             });
         }
         this.inited = true;
