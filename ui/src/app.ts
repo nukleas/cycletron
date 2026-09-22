@@ -51,6 +51,12 @@ function setTransportLabel(btn: HTMLButtonElement, text: string, icon?: Transpor
     btn.appendChild(span);
 }
 
+/** An optional numeric browser property, or 0 when the engine doesn't implement it.
+ *  Guards against `undefined` silently turning arithmetic into NaN. */
+function finiteOr0(value: number | undefined): number {
+    return Number.isFinite(value) ? value! : 0;
+}
+
 interface AppElements {
     // -- Header controls --
     transportBtn: HTMLButtonElement;
@@ -814,7 +820,15 @@ export class StrudelApp {
             audioContext
         );
         this.scheduler.audioManager = this.audioManager;
-        this.scheduler.visualLatency = audioContext.outputLatency + audioContext.baseLatency;
+        // Both are optional in the Web Audio spec. WebKit only shipped
+        // outputLatency in Safari 18.4 (March 2025), so on macOS 15.x it reads
+        // `undefined` and `undefined + baseLatency` is NaN. visualLatency feeds
+        // only the rAF loop, never _liveCurrentCycle, so a NaN there keeps audio
+        // playing while every cycle-driven visual — the cycle strip, Stage /
+        // COCKPIT, and the active-note flash — silently draws nothing and the
+        // Cycle readout shows NaN (#80).
+        this.scheduler.visualLatency =
+            finiteOr0(audioContext.outputLatency) + finiteOr0(audioContext.baseLatency);
 
         // Scheduler callbacks
         this.scheduler.onCycleUpdate = this.handleCycleUpdate;
