@@ -50,6 +50,7 @@ export class FullscreenVisualizer {
         high: 0,
         freqData: null,
         timeData: null,
+        sampleRate: 48000,
         sensitivity: 1.0,
         patternSource: null,
     };
@@ -109,7 +110,8 @@ export class FullscreenVisualizer {
         this.analyser = analyser;
         const binCount = analyser.frequencyBinCount;
         this.services.freqData = new Uint8Array(binCount);
-        this.services.timeData = new Uint8Array(binCount);
+        this.services.timeData = new Float32Array(binCount);
+        this.services.sampleRate = analyser.context.sampleRate;
     }
 
     /** Wire in pattern-data access for schedule-driven modes. */
@@ -264,7 +266,7 @@ export class FullscreenVisualizer {
 
         // Cast is required by current TS DOM lib (ArrayBufferLike constraint).
         this.analyser.getByteFrequencyData(s.freqData as Uint8Array<ArrayBuffer>);
-        this.analyser.getByteTimeDomainData(s.timeData as Uint8Array<ArrayBuffer>);
+        this.analyser.getFloatTimeDomainData(s.timeData as Float32Array<ArrayBuffer>);
 
         const len = s.freqData.length;
         const lowEnd = Math.floor(len * 0.08);

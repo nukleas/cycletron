@@ -346,7 +346,7 @@ class CockpitMode implements VizMode {
             const td = s.timeData;
             // Every 4th sample is plenty to catch a clip and a quarter the work.
             for (let i = 0; i < td.length; i += 4) {
-                const v = Math.abs(td[i] - 128) / 128;
+                const v = Math.abs(td[i]);
                 if (v > peak) peak = v;
             }
             this.clipPeak = Math.max(peak, this.clipPeak);

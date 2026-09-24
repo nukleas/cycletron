@@ -70,7 +70,10 @@ export interface VizServices {
     readonly high: number;
     /** Raw analyser data for per-bin work; null before audio init. */
     readonly freqData: Uint8Array | null;
-    readonly timeData: Uint8Array | null;
+    /** Waveform, -1..1 at full float precision (bytes quantize quiet signals). */
+    readonly timeData: Float32Array | null;
+    /** Audio sample rate behind `timeData`, Hz (48000 until audio init). */
+    readonly sampleRate: number;
     readonly sensitivity: number;
     readonly patternSource: PatternSource | null;
 }

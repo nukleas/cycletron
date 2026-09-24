@@ -174,7 +174,7 @@ class VectorNexusMode implements VizMode {
         ctx.beginPath();
         for (let i = 0; i <= 128; i++) {
             const data = s.timeData;
-            const sample = data?.length ? (data[Math.floor(i / 128 * (data.length - 1))] - 128) / 128 : 0;
+            const sample = data?.length ? data[Math.floor(i / 128 * (data.length - 1))] : 0;
             const x = (i / 128 - 0.5) * r * 1.5;
             const y = sample * r * 0.13;
             if (i === 0) ctx.moveTo(x, y);

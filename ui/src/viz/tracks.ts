@@ -78,16 +78,22 @@ export class TrackModel {
         const pattern = source?.scheduler.pattern ?? null;
         const bar = Math.floor(cycle);
 
+        const phase = cycle - bar;
         if (pattern && source && (pattern !== this.lastPattern || bar !== this.lastBar)) {
+            const nextBar = this.lastPattern !== null && bar === this.lastBar + 1;
+            const sameBar = this.lastPattern !== null && bar === this.lastBar;
             this.lastPattern = pattern;
             this.lastBar = bar;
             this.rebuild(pattern, source, bar, theme);
-            // Let begin=0 haps fire on the downbeat we just crossed.
-            this.prevPhase = -1e-6;
+            // Crossing into the next bar: let begin=0 haps fire on the downbeat.
+            // A live edit within the bar keeps scanning from the last frame.
+            // Entering mid-bar, starting, or seeking fires nothing already past,
+            // so earlier haps are never replayed as one burst.
+            if (nextBar) this.prevPhase = -1e-6;
+            else if (!sameBar) this.prevPhase = phase;
         }
         if (!pattern) this.lastPattern = null;
 
-        const phase = cycle - bar;
         const prevPhase = this.prevPhase;
         this.prevPhase = phase;
         return { pattern, phase, prevPhase };
