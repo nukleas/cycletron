@@ -5,8 +5,10 @@
  *   lane          → each track owns an equal band of columns (in track
  *                   order); pitched notes sit by pitch within the band,
  *                   drums hash to a column. Small track labels head each band.
- *   onset         → a stream spawns exactly on the hap, in the track accent
- *                   (the theme's green for FFT and idle streams).
+ *   onset         → a stream spawns exactly on the hap. The rain is all
+ *                   green: each track gets its own shade of the theme's
+ *                   green (deep to pale, by slot); FFT and idle streams use
+ *                   the green itself.
  *   duration      → longer notes fall slower and further; hats are quick.
  *   activity      → glyph brightness follows the track's onset envelope.
  *   no pattern    → FFT transients spawn streams in kick / snare / hat
@@ -44,6 +46,8 @@ const DRIZZLE_EVERY = 0.45;
 
 /** Base fall speed (screen heights/s) by instrument family. */
 const FAMILY_SPEED = {kick: 0.85, snare: 1.0, hat: 1.35, perc: 0.9} as const;
+/** Track shade levels of the theme green: -x = toward the background, +x = toward white. */
+const GREEN_LEVELS = [0, -0.45, 0.35, -0.22, 0.18, -0.6];
 const PITCHED_SPEED = 0.7;
 
 interface RainColor {
@@ -86,6 +90,8 @@ class MatrixRainMode implements VizMode {
     private cursor = 0;
     private readonly colors = new Map<string, RainColor>();
     private base: RainColor = {body: [], head: []};
+    /** Per-track shades of the theme green, picked by track slot. */
+    private shades: RainColor[] = [];
     private pendingFade = 0;
     private sinceSpawn = 0;
     private drizzleClock = 0;
@@ -119,7 +125,7 @@ class MatrixRainMode implements VizMode {
             (lane + clamp01(within)) / n,
             base / (0.7 + dur * 1.5) * (0.9 + rand01(h >>> 3) * 0.2),
             Math.min(1.3, 0.35 + dur * 3),
-            this.colorFor(track.accentCss, track.accent),
+            this.shades[track.slot % this.shades.length] ?? this.base,
             track, 1,
         );
     };
@@ -143,6 +149,11 @@ class MatrixRainMode implements VizMode {
         this.colors.clear();
         const green = t.accentPool[2] ?? t.accentPool[0];
         this.base = this.colorFor('base', green);
+        // Shades alternate deep / pale so neighbouring tracks stay distinct:
+        // negative levels sink toward the background, positive lift to white.
+        this.shades = GREEN_LEVELS.map((level, i) => this.colorFor(`shade${i}`, level < 0
+            ? mixRgb(green, t.bgRgb, -level)
+            : mixRgb(green, [255, 255, 255], level)));
 
         // Resize keeps the rain: the old layer is scaled into the new one.
         const lw = Math.max(1, Math.ceil(s.width * s.dpr));
@@ -176,6 +187,33 @@ class MatrixRainMode implements VizMode {
         return c;
     }
 
+    /**
+     * Nudge a new stream off a column whose last stream is still near the top
+     * — chord notes would otherwise stack into one smeared column. Tries the
+     * nearest columns either side, then gives up and shares.
+     */
+    private freeColumn(x: number): number {
+        const cols = this.cols;
+        if (cols <= 0) return x;
+        const want = Math.min(cols - 1, Math.floor(x * cols));
+        const fresh = 4 / Math.max(1, this.rows);
+        for (let d = 0; d <= 3; d++) {
+            for (let sign = 1; sign >= -1; sign -= 2) {
+                const c = want + d * sign;
+                if (c < 0 || c >= cols || (d === 0 && sign < 0)) continue;
+                let busy = false;
+                for (const o of this.streams) {
+                    if (o.alive && o.y < fresh && Math.min(cols - 1, Math.floor(o.x * cols)) === c) {
+                        busy = true;
+                        break;
+                    }
+                }
+                if (!busy) return (c + 0.5) / cols;
+            }
+        }
+        return x;
+    }
+
     private spawn(x: number, speed: number, travel: number, color: RainColor, track: VizTrack | null, level: number): void {
         // Prefer a free slot; when the pool is full, recycle the next in turn.
         let slot = this.cursor;
@@ -189,7 +227,7 @@ class MatrixRainMode implements VizMode {
         this.cursor = (slot + 1) % MAX_STREAMS;
         const st = this.streams[slot];
         st.alive = true;
-        st.x = Math.min(0.999, Math.max(0, x));
+        st.x = this.freeColumn(Math.min(0.999, Math.max(0, x)));
         st.y = -1 / Math.max(1, this.rows);
         st.speed = speed;
         st.remaining = travel;
