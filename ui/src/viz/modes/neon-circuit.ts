@@ -212,6 +212,27 @@ const IDLE_PARTS: ReadonlyArray<{label: string; kind: Kind}> = [
     {label: 'HIGH', kind: 'sot23'},
 ];
 
+/**
+ * Lane for a row, 0 = the outermost lane (nearest SEQ on the way in,
+ * nearest J1 on the way out) .. 1 = the innermost (next to the parts).
+ *
+ * Routes fan out from the middle, so the rows furthest from it must take
+ * the outermost lanes for the routes to nest instead of crossing — above
+ * the middle *and* below it. Rows are ordered by distance from the middle,
+ * alternating above and below (so the two halves never share a lane and
+ * no two vertical legs line up), with a centred odd row innermost; it runs
+ * straight across and has no vertical leg at all.
+ */
+function laneFor(rank: number, rows: number): number {
+    if (rows <= 1) return 0.5;
+    const above = Math.floor(rows / 2);
+    let order: number;
+    if (rows % 2 === 1 && rank === above) order = rows - 1;
+    else if (rank < above) order = rank * 2;
+    else order = (rows - 1 - rank) * 2 + 1;
+    return order / (rows - 1);
+}
+
 /** Ease out: parts decelerate as they finish rising. */
 function easeOut(t: number): number {
     const k = 1 - clamp01(t);
@@ -433,8 +454,7 @@ class NeonCircuitMode implements VizMode {
             if (p.alive) {
                 // Targets for this part's row; a new part starts there.
                 const ty = rowsTop + pitch * (p.rank + 0.5);
-                const f = rows <= 1 ? 0.5 : p.rank / (rows - 1);
-                const tLane = f;
+                const tLane = laneFor(p.rank, rows);
                 const tSeq = seqY + this.seqH * ((p.rank + 0.5) / rows);
                 const tJ = BOARD_H / 2 + (tSeq - BOARD_H / 2) * 1.1;
                 if (Number.isNaN(p.y)) {
