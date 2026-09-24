@@ -79,7 +79,7 @@ export function hueOf(color: string, fallback: number): number {
 }
 
 /** Canvas stand-in for CSS `color-mix(in srgb, a (1-t)%, b t%)`. */
-export function lerpRgb(a: [number, number, number], b: [number, number, number], t: number): string {
+export function lerpRgb(a: readonly [number, number, number], b: readonly [number, number, number], t: number): string {
     const r = Math.round(a[0] + (b[0] - a[0]) * t);
     const g = Math.round(a[1] + (b[1] - a[1]) * t);
     const bl = Math.round(a[2] + (b[2] - a[2]) * t);
