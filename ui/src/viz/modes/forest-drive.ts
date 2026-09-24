@@ -24,8 +24,8 @@
 
 import type {PatternHandle} from '../../../pkg';
 import type {PatternSource, Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {MAX_TRACKS, VIEW_CAPACITY} from '../tracks.js';
-import {TAU, TransientDetector, lerpRgb, rgbOf} from '../util.js';
+import {MAX_TRACKS, VIEW_CAPACITY, instrumentFamily, type InstrumentFamily} from '../tracks.js';
+import {TAU, TransientDetector, hash32, lerpRgb, mixRgb, rand01, rgbOf} from '../util.js';
 
 /** Metres of road per cycle. With 1 cycle = 1 bar this sets the driving speed. */
 const Z_PER_CYCLE = 52;
@@ -53,6 +53,13 @@ const AMBIENT_PER_SLAB = 3;
 const LOD_DEPTH = 46;
 
 type TreeKind = 'conifer' | 'birch' | 'sapling' | 'oak' | 'shrub';
+
+const TREE_BY_FAMILY: Record<InstrumentFamily, TreeKind> = {
+    kick: 'conifer',
+    snare: 'birch',
+    hat: 'sapling',
+    perc: 'shrub',
+};
 
 /** Fog-banded canvas colours, mixed once per track per rebuild. */
 interface TreeColors {
@@ -89,24 +96,7 @@ interface Tree {
  */
 function treeKindFor(name: string, hasPitch: boolean): TreeKind {
     if (hasPitch) return 'oak';
-    const n = name.toLowerCase();
-    if (/^(bd|kick|808)/.test(n)) return 'conifer';
-    if (/^(sd|sn|cp|clap|rim|lt|mt|ht)/.test(n)) return 'birch';
-    if (/^(hh|oh|hat|shaker|cb|rd|cr)/.test(n)) return 'sapling';
-    return 'shrub';
-}
-
-/** Deterministic 32-bit mix — `ui/src/viz` has no RNG, and we need stability. */
-function hash32(a: number, b: number): number {
-    let h = Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul(b | 0, 0x165667b1);
-    h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
-    h = Math.imul(h ^ (h >>> 13), 0x297a2d39);
-    return (h ^ (h >>> 16)) >>> 0;
-}
-
-/** 0..1 from a hash, taking the high bits. */
-function rand01(h: number): number {
-    return (h >>> 8) / 0x1000000;
+    return TREE_BY_FAMILY[instrumentFamily(name)];
 }
 
 /** Road centreline offset at a given distance — a slow sum of sines. */
@@ -117,18 +107,6 @@ function curveAt(z: number): number {
 /** Road surface height — crests and dips, much slower than the bends. */
 function hillAt(z: number): number {
     return Math.sin(z * 0.0075 + 0.6) * 1.5 + Math.sin(z * 0.0031) * 2.3;
-}
-
-function mix3(
-    a: [number, number, number],
-    b: [number, number, number],
-    t: number,
-): [number, number, number] {
-    return [
-        a[0] + (b[0] - a[0]) * t,
-        a[1] + (b[1] - a[1]) * t,
-        a[2] + (b[2] - a[2]) * t,
-    ];
 }
 
 /** Rebuild scratch — module-level so a bar boundary allocates nothing. */
@@ -442,18 +420,18 @@ class ForestDriveMode implements VizMode {
         const magenta = rgbOf(t.neonSecondary, [255, 43, 214]);
         // Dusk band at the horizon: the app's own violet/magenta, heavily
         // darkened so it reads as last light rather than neon.
-        this.duskRgb = mix3(mix3(t.bgLightRgb, violet, 0.42), magenta, 0.18);
+        this.duskRgb = mixRgb(mixRgb(t.bgLightRgb, violet, 0.42), magenta, 0.18);
         // Fog target sits between the dusk band and the sky.
-        this.fogRgb = mix3(t.bgLightRgb, this.duskRgb, 0.62);
+        this.fogRgb = mixRgb(t.bgLightRgb, this.duskRgb, 0.62);
 
         // Verge grass: dusk-tinted, well below the canopy so the shoulder
         // never competes with the trees standing on it.
-        this.shoulderRgb = mix3(t.bgRgb, this.duskRgb, 0.26);
+        this.shoulderRgb = mixRgb(t.bgRgb, this.duskRgb, 0.26);
         // Ambient forest is scenery, not signal — a flat dusk silhouette with
         // no accent and no highlight, so anything coloured is a hap.
-        const silhouette = mix3(t.bgRgb, this.duskRgb, 0.3);
+        const silhouette = mixRgb(t.bgRgb, this.duskRgb, 0.3);
         this.ambientColors = this.bandsFor(
-            mix3(t.bgRgb, this.duskRgb, 0.13),
+            mixRgb(t.bgRgb, this.duskRgb, 0.13),
             silhouette,
             silhouette,
         );
@@ -462,10 +440,10 @@ class ForestDriveMode implements VizMode {
     private colorsFor(accent: [number, number, number], kind: TreeKind): TreeColors {
         const t = this.theme;
         const trunk = kind === 'birch'
-            ? mix3(t.bgLighterRgb, [235, 238, 246], 0.55)
-            : mix3(t.bgRgb, accent, 0.14);
-        const foliage = mix3(t.bgLighterRgb, accent, 0.52);
-        const lit = mix3(accent, [255, 255, 255], 0.22);
+            ? mixRgb(t.bgLighterRgb, [235, 238, 246], 0.55)
+            : mixRgb(t.bgRgb, accent, 0.14);
+        const foliage = mixRgb(t.bgLighterRgb, accent, 0.52);
+        const lit = mixRgb(accent, [255, 255, 255], 0.22);
         return this.bandsFor(trunk, foliage, lit);
     }
 
@@ -614,7 +592,7 @@ class ForestDriveMode implements VizMode {
         const vx = this.cx - this.yaw * this.focal;
         const r = this.vh * (0.26 + s.low * 0.1);
         const g = ctx.createRadialGradient(vx, this.horizon, 0, vx, this.horizon, r);
-        const glow = mix3(this.duskRgb, [255, 214, 170], 0.5);
+        const glow = mixRgb(this.duskRgb, [255, 214, 170], 0.5);
         g.addColorStop(0, `rgba(${glow.map(Math.round).join(',')}, ${0.5 + s.low * 0.25})`);
         g.addColorStop(0.45, `rgba(${this.duskRgb.map(Math.round).join(',')}, 0.28)`);
         g.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -752,7 +730,7 @@ class ForestDriveMode implements VizMode {
         const xFar = this.sx(curveAt(zf), camX, scale);
 
         const g = ctx.createLinearGradient(0, yNear, 0, yFar);
-        const warm = mix3(this.fogRgb, [255, 236, 198], 0.7);
+        const warm = mixRgb(this.fogRgb, [255, 236, 198], 0.7);
         const a = 0.1 + this.headlight * 0.1 + this.onsetPulse * 0.14;
         g.addColorStop(0, `rgba(${warm.map(Math.round).join(',')}, ${a})`);
         g.addColorStop(1, 'rgba(0, 0, 0, 0)');

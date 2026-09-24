@@ -144,3 +144,92 @@ export class TransientDetector {
         return { kick, snare, hat };
     }
 }
+
+/** Monospace stack for instrument labels — the drafting modes' one typeface. */
+export const MONO_FONT = "'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, ui-monospace, monospace";
+
+export function clamp01(v: number): number {
+    return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+/**
+ * Deterministic 32-bit mix. The viz modes use this instead of `Math.random`
+ * so shapes are stable across rebuilds, resizes and re-entry.
+ */
+export function hash32(a: number, b: number): number {
+    let h = Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul(b | 0, 0x165667b1);
+    h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+    h = Math.imul(h ^ (h >>> 13), 0x297a2d39);
+    return (h ^ (h >>> 16)) >>> 0;
+}
+
+/** 0..1 from a hash, taking the high bits. */
+export function rand01(h: number): number {
+    return (h >>> 8) / 0x1000000;
+}
+
+/** Seeded stream of 0..1 values for modes that draw many in sequence. */
+export class SeededRandom {
+    private n = 0;
+
+    constructor(private readonly seed: number) {}
+
+    next(): number {
+        return rand01(hash32(this.seed, this.n++));
+    }
+
+    range(lo: number, hi: number): number {
+        return lo + (hi - lo) * this.next();
+    }
+}
+
+/**
+ * One step of an asymmetric follower: rises at `attack` and falls at
+ * `release` (both rates per second), frame-rate independent. Fast attack /
+ * slow release keeps transients readable without jitter.
+ */
+export function follow(current: number, target: number, dt: number, attack: number, release: number): number {
+    const rate = target > current ? attack : release;
+    return current + (target - current) * (1 - Math.exp(-dt * rate));
+}
+
+/**
+ * Precomputed `rgba()` strings for one colour at `steps` evenly spaced alphas
+ * (index 0 = transparent, last = opaque), so hot loops pick a string instead
+ * of building one. Pick with {@link rampAt}.
+ */
+export function alphaRamp(rgb: readonly [number, number, number], steps = 32): string[] {
+    const out = new Array<string>(steps);
+    for (let i = 0; i < steps; i++) {
+        out[i] = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${(i / (steps - 1)).toFixed(3)})`;
+    }
+    return out;
+}
+
+export function rampAt(ramp: readonly string[], alpha: number): string {
+    return ramp[Math.round(clamp01(alpha) * (ramp.length - 1))];
+}
+
+export function mixRgb(
+    a: readonly [number, number, number],
+    b: readonly [number, number, number],
+    t: number,
+): [number, number, number] {
+    return [
+        Math.round(a[0] + (b[0] - a[0]) * t),
+        Math.round(a[1] + (b[1] - a[1]) * t),
+        Math.round(a[2] + (b[2] - a[2]) * t),
+    ];
+}
+
+/** Small instrument label, as on the drafting modes' rails. */
+export function drawLabel(
+    ctx: CanvasRenderingContext2D, text: string, x: number, y: number,
+    color: string, size = 10, align: CanvasTextAlign = 'left',
+): void {
+    ctx.fillStyle = color;
+    ctx.font = `${size}px ${MONO_FONT}`;
+    ctx.textAlign = align;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+}

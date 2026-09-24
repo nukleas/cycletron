@@ -12,7 +12,7 @@
 
 import type {PatternHandle} from '../../../pkg';
 import type {PatternSource, Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {MAX_TRACKS, VIEW_CAPACITY} from '../tracks.js';
+import {MAX_TRACKS, VIEW_CAPACITY, instrumentFamily} from '../tracks.js';
 import {TAU, TransientDetector, beatEnv, lerpRgb, rgbOf} from '../util.js';
 
 const ISO_W = 36;   // px per unit along (i - j)
@@ -149,11 +149,7 @@ function isoY(i: number, j: number, k: number): number {
  */
 function cityKindFor(name: string, hasPitch: boolean): CityKind {
     if (hasPitch) return 'pitched';
-    const n = name.toLowerCase();
-    if (/^(bd|kick|808)/.test(n)) return 'kick';
-    if (/^(sd|sn|cp|clap|rim|lt|mt|ht)/.test(n)) return 'snare';
-    if (/^(hh|oh|hat|shaker|cb|rd|cr)/.test(n)) return 'hat';
-    return 'perc';
+    return instrumentFamily(name);
 }
 
 class IsoCityMode implements VizMode {

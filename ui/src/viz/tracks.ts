@@ -38,6 +38,20 @@ export interface VizTrack {
     seen: boolean;
 }
 
+/** Drum family read from a track's sound name; `perc` for anything else. */
+export type InstrumentFamily = 'kick' | 'snare' | 'hat' | 'perc';
+
+export function instrumentFamily(name: string): InstrumentFamily {
+    const n = name.toLowerCase();
+    if (/^(bd|kick|808)/.test(n)) return 'kick';
+    if (/^(sd|sn|cp|clap|rim|lt|mt|ht)/.test(n)) return 'snare';
+    if (/^(hh|oh|hat|shaker|cb|rd|cr)/.test(n)) return 'hat';
+    return 'perc';
+}
+
+/** Called once per hap whose onset was crossed this frame; `e` indexes the track's arrays. */
+export type OnsetHandler = (track: VizTrack, e: number) => void;
+
 export interface TrackSync {
     pattern: PatternHandle | null;
     /** Bar phase pair for onset scanning: fire haps with begin ∈ (prev, phase]. */
@@ -77,6 +91,24 @@ export class TrackModel {
         const prevPhase = this.prevPhase;
         this.prevPhase = phase;
         return { pattern, phase, prevPhase };
+    }
+
+    /**
+     * Visit every hap whose onset lies in (prevPhase, phase] of this frame's
+     * sync, bumping the track's activity envelope by `bump`. No-op when
+     * stopped or when the phase wrapped backwards (seek / bar rebuild).
+     */
+    forEachOnset(sync: TrackSync, fn: OnsetHandler, bump = 0.5): void {
+        if (!sync.pattern || sync.phase < sync.prevPhase) return;
+        for (const track of this.tracks) {
+            for (let e = 0; e < track.count; e++) {
+                const begin = track.begins[e];
+                if (begin > sync.prevPhase && begin <= sync.phase) {
+                    track.activity = Math.min(1, track.activity + bump);
+                    fn(track, e);
+                }
+            }
+        }
     }
 
     /** Decay all track activity envelopes; call once per frame. */

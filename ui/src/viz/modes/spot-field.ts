@@ -66,23 +66,15 @@ class SpotFieldMode implements VizMode {
 
         // Hap onsets: burst the track's cloud; pitched notes steer it.
         const sync = this.tracks.sync(s.patternSource, s.cycle, s.theme);
-        if (sync.pattern && sync.phase >= sync.prevPhase) {
-            for (const track of this.tracks.tracks) {
-                for (let e = 0; e < track.count; e++) {
-                    const begin = track.begins[e];
-                    if (begin > sync.prevPhase && begin <= sync.phase) {
-                        track.activity = Math.min(1, track.activity + 0.5);
-                        const anim = this.animFor(track.name);
-                        anim.burst = 1;
-                        const note = track.notes[e];
-                        if (Number.isFinite(note)) {
-                            // C4-centered: low notes sink, high notes rise.
-                            anim.noteTarget = -((note - 60) / 36);
-                        }
-                    }
-                }
+        this.tracks.forEachOnset(sync, (track, e) => {
+            const anim = this.animFor(track.name);
+            anim.burst = 1;
+            const note = track.notes[e];
+            if (Number.isFinite(note)) {
+                // C4-centered: low notes sink, high notes rise.
+                anim.noteTarget = -((note - 60) / 36);
             }
-        }
+        });
         this.tracks.decay(dt);
 
         // Anim envelopes.

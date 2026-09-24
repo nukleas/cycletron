@@ -12,6 +12,7 @@
 import {currentBpm} from '../../bpm.js';
 import {VIZ_MODES} from '../registry.js';
 import type {VizLayer, VizServices} from '../types.js';
+import {MONO_FONT} from '../util.js';
 
 const REFERENCE_HEIGHT = 1080;
 const MARGIN = 0.055;
@@ -83,12 +84,12 @@ export class StageHudLayer implements VizLayer {
 
         ctx.textAlign = 'right';
 
-        ctx.font = `600 ${this.labelPx}px ${FONT}`;
+        ctx.font = `600 ${this.labelPx}px ${MONO_FONT}`;
         ctx.fillStyle = s.theme.neon;
         ctx.globalAlpha = 0.85;
         ctx.fillText(VIZ_MODES[this.getModeIndex()]?.name ?? '', x, y);
 
-        ctx.font = `${this.fontPx}px ${FONT}`;
+        ctx.font = `${this.fontPx}px ${MONO_FONT}`;
         const [r, g, b] = s.theme.textRgb;
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.globalAlpha = 0.6;
@@ -104,7 +105,7 @@ export class StageHudLayer implements VizLayer {
     /** Bottom-left: the way out. */
     private drawHint(ctx: CanvasRenderingContext2D, s: VizServices, alpha: number): void {
         ctx.textAlign = 'left';
-        ctx.font = `${this.fontPx}px ${FONT}`;
+        ctx.font = `${this.fontPx}px ${MONO_FONT}`;
         const [r, g, b] = s.theme.textRgb;
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.globalAlpha = 0.55 * alpha;
@@ -113,4 +114,3 @@ export class StageHudLayer implements VizLayer {
     }
 }
 
-const FONT = "'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, ui-monospace, monospace";
