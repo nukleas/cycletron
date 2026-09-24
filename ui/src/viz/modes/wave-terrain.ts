@@ -13,13 +13,14 @@
  *                     which then rides that ridge back to the horizon
  *   stopped         → a flat, calm grid still rolling on a slow time clock
  *
- * Each ridge is filled with the background before its stroke goes on top,
- * drawn far → near, so nearer ridges hide what's behind them.
+ * Each ridge is filled with an opaque neon tint of the background (deeper
+ * toward the front) before its stroke goes on top, drawn far → near, so
+ * nearer ridges hide what's behind them.
  */
 
 import {TrackModel, type VizTrack} from '../tracks.js';
 import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {alphaRamp, follow, rampAt, rgbOf} from '../util.js';
+import {alphaRamp, follow, mixRgb, rampAt, rgbOf} from '../util.js';
 import {SpectrumSampler, onsetAxis} from './flame-graph/spectrum.js';
 
 const ROWS = 48;
@@ -30,6 +31,10 @@ const IDLE_RATE = 4;
 /** Depth of the oldest row relative to the newest; sets the perspective. */
 const Z_FAR = 4;
 const MAX_MARKS = 96;
+// Ridge fill: neon mixed into the background, faint far away, deeper up front.
+const FILL_STEPS = 24;
+const FILL_FAR = 0.05;
+const FILL_NEAR = 0.2;
 
 class WaveTerrainMode implements VizMode {
     private readonly sampler = new SpectrumSampler(BANDS);
@@ -70,6 +75,8 @@ class WaveTerrainMode implements VizMode {
     private theme: Theme | null = null;
     private lineRamp: string[] = [];
     private beatRamp: string[] = [];
+    /** Opaque bg→neon fills by depth: the blue under each ridge, still occluding. */
+    private readonly fillCss: string[] = new Array<string>(FILL_STEPS).fill('');
     private horizonCss = '';
 
     constructor() {
@@ -153,8 +160,14 @@ class WaveTerrainMode implements VizMode {
     private ensurePalette(t: Theme): void {
         if (t === this.theme) return;
         this.theme = t;
-        this.lineRamp = alphaRamp(t.textRgb);
-        this.beatRamp = alphaRamp(rgbOf(t.neon, t.textRgb));
+        const neon = rgbOf(t.neon, t.textRgb);
+        this.lineRamp = alphaRamp(mixRgb(t.textRgb, neon, 0.55));
+        this.beatRamp = alphaRamp(neon);
+        for (let i = 0; i < FILL_STEPS; i++) {
+            const tint = FILL_FAR + (FILL_NEAR - FILL_FAR) * (i / (FILL_STEPS - 1));
+            const [r, g, b] = mixRgb(t.bgRgb, neon, tint);
+            this.fillCss[i] = `rgb(${r}, ${g}, ${b})`;
+        }
         const [r, g, b] = t.borderRgb;
         this.horizonCss = `rgb(${r}, ${g}, ${b})`;
     }
@@ -213,7 +226,7 @@ class WaveTerrainMode implements VizMode {
             }
             // Open path: fill closes along the baseline (the tapered ends sit
             // on it), stroke draws only the ridge.
-            ctx.fillStyle = s.theme.bg;
+            ctx.fillStyle = this.fillCss[Math.round(near * (FILL_STEPS - 1))];
             ctx.fill();
 
             const kind = this.rowKind[idx];

@@ -14,13 +14,15 @@
  * pattern, band transients send occasional neutral packets on top of a slow
  * idle heartbeat, so the board never goes dark.
  *
- * The graph is fixed and built in layout(): positions and the edge list scale
- * with the canvas, and nothing is distance-tested per frame. Packets live in
- * fixed round-robin pools.
+ * The board spins in musical time — once every 16 bars — and each kick onset
+ * shoves it forward; the inner relays lag behind the shove, so the spokes
+ * twist on the kick and relax back. The edge list is fixed; node positions
+ * are re-placed along their ellipses each frame, so packets, traces and
+ * labels ride the spin. Packets live in fixed round-robin pools.
  */
 
 import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {TrackModel, type TrackSync, type VizTrack} from '../tracks.js';
+import {TrackModel, instrumentFamily, type TrackSync, type VizTrack} from '../tracks.js';
 import {
     TAU, TransientDetector, alphaRamp, clamp01, drawLabel, follow, hash32, rampAt, rgbOf,
 } from '../util.js';
@@ -45,6 +47,15 @@ const PACKET_SPEED = 5;
 const BUS_SPEED = 1.3;
 const SHOCK_SECONDS = 0.9;
 const IDLE_HEARTBEAT = 1.6;
+/** Outer-ring turns per bar while playing (one per 16 bars). */
+const SPIN_PER_BAR = TAU / 16;
+/** Seconds of shove the inner relays lag by — the twist on a kick. */
+const INNER_LAG = 0.45;
+/** Radians per second when nothing is scheduled. */
+const IDLE_SPIN = 0.06;
+/** Angular velocity a kick onset adds (rad/s), decaying at SPIN_DECAY. */
+const KICK_SHOVE = 0.55;
+const SPIN_DECAY = 3;
 
 /** Track slot → outer ring position. 5 is coprime with 16, so a few tracks spread out. */
 function ringPosition(slot: number): number {
@@ -85,6 +96,9 @@ class NeonCircuitMode implements VizMode {
     private bNext = 0;
 
     private hubEnv = 0;
+    private spin = 0;
+    private spinVel = 0;
+    private lastCycle = NaN;
     private lowF = 0;
     private shockAge = SHOCK_SECONDS;
     private lastBar = NaN;
@@ -123,16 +137,21 @@ class NeonCircuitMode implements VizMode {
         this.rx = Math.min(w * 0.4, h * 0.38 * 1.5);
         this.ry = Math.min(h * 0.36, w * 0.4 * 1.2);
         this.busHalf = Math.max(0, w / 2 - Math.max(12, w * 0.03));
+        this.placeNodes();
+    }
 
-        const base = -Math.PI / 2;
+    /** Nodes along their ellipses at the current spin; the hub stays put. */
+    private placeNodes(): void {
+        const outer = -Math.PI / 2 + this.spin;
         for (let i = 0; i < OUTER; i++) {
-            const a = base + (i / OUTER) * TAU;
+            const a = outer + (i / OUTER) * TAU;
             this.nodeX[i] = this.cx + Math.cos(a) * this.rx;
             this.nodeY[i] = this.cy + Math.sin(a) * this.ry;
         }
+        const inner = -Math.PI / 2 + this.spin - this.spinVel * INNER_LAG;
         for (let j = 0; j < INNER; j++) {
-            // Between the two outer nodes that feed it.
-            const a = base + ((j * 2 + 0.5) / OUTER) * TAU;
+            // Starts between the two outer nodes that feed it.
+            const a = inner + ((j * 2 + 0.5) / OUTER) * TAU;
             this.nodeX[OUTER + j] = this.cx + Math.cos(a) * this.rx * 0.5;
             this.nodeY[OUTER + j] = this.cy + Math.sin(a) * this.ry * 0.5;
         }
@@ -171,6 +190,7 @@ class NeonCircuitMode implements VizMode {
 
     private readonly onOnset = (track: VizTrack): void => {
         this.launch(ringPosition(track.slot), track.accentCss);
+        if (instrumentFamily(track.name) === 'kick') this.spinVel += KICK_SHOVE;
     };
 
     update(dt: number, s: VizServices): void {
@@ -209,6 +229,17 @@ class NeonCircuitMode implements VizMode {
         } else {
             this.idleTimer = 0;
         }
+
+        // Spin: musical time while playing (a seek or stall moves nothing),
+        // a slow drift when idle, plus the decaying kick shove.
+        const dCycle = s.cycle - this.lastCycle;
+        this.lastCycle = s.cycle;
+        const advance = playing
+            ? (dCycle > 0 && dCycle < 0.25 ? dCycle * SPIN_PER_BAR : 0)
+            : dt * IDLE_SPIN;
+        this.spinVel *= Math.exp(-dt * SPIN_DECAY);
+        this.spin = (this.spin + advance + this.spinVel * dt) % TAU;
+        this.placeNodes();
 
         // Shockwave only on a downbeat reached by playing forward, never on
         // mode entry or a seek.
