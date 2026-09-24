@@ -1,23 +1,29 @@
 /**
  * NEON CIRCUIT — the pattern as a two-layer circuit board, seen in ISO CITY's
  * 2:1 dimetric projection and drawn in the flat PCB-viewer idiom (KiCad /
- * tscircuit): copper traces, vias with drill holes, silkscreen, and chips as
+ * tscircuit): copper traces, vias with drill holes, silkscreen, and parts as
  * lit isometric packages standing on the board.
  *
  *   U0 SEQ          → the scheduler chip at the back; every note leaves here
- *   U1…U8           → one IC package per track, a row across the middle,
- *                     reference and name engraved on its top face
+ *   one part/track  → a row across the middle, its package chosen by what the
+ *                     track plays: kick → QFP flat pack, snare → SOIC,
+ *                     hat → SOT-23, bass notes → TO-220 power package,
+ *                     other pitched parts → DIP, other percussion → crystal
  *   J1 OUT          → the output header at the front
  *   copper          → runs along the board's x on the top layer in the
  *                     track's accent, along y on the bottom layer, a via at
  *                     every layer change — so crossings are legal
- *   scheduled hap   → a pulse leaves SEQ ahead of time and reaches the IC's
+ *   scheduled hap   → a pulse leaves SEQ ahead of time and reaches the part's
  *                     input pin exactly on the onset, flashing each via it
  *                     passes; the package lights and the signal carries on
  *                     to J1
  *   kick onsets     → the power rails along the board edges surge
- *   no pattern      → four idle ICs; FFT transients and a slow clock tick
- *                     send the pulses
+ *   no pattern      → four idle parts (a clock crystal among them); FFT
+ *                     transients and a slow clock tick send the pulses
+ *
+ * Parts are keyed by track name, so the board changes smoothly: a new track's
+ * part rises out of the board and fades in, a removed one sinks and fades,
+ * and the rest glide to their new rows with their traces following.
  *
  * Everything flat is laid out on a fixed virtual board and drawn through one
  * isometric canvas transform; packages are extruded boxes lit like ISO CITY's
@@ -29,23 +35,28 @@
 import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
 import {TrackModel, instrumentFamily, type TrackSync, type VizTrack} from '../tracks.js';
 import {
-    TransientDetector, alphaRamp, clamp01, drawLabel, lerpRgb, mixRgb, rampAt, rgbOf,
+    TransientDetector, alphaRamp, clamp01, drawLabel, follow, lerpRgb, mixRgb, rampAt, rgbOf,
 } from '../util.js';
 import {currentBpm} from '../../bpm.js';
 
-const MAX_CHIPS = 8;
-const IDLE_CHIPS = 4;
-const IDLE_NAMES = ['CLK', 'LOW', 'MID', 'HIGH'];
-/** Seconds a pulse takes from SEQ to its IC — it launches this far ahead. */
+const MAX_LIVE = 8;
+/** Live parts plus ones still fading out. */
+const MAX_PARTS = 16;
+/** Seconds a pulse takes from SEQ to its part — it launches this far ahead. */
 const IN_SECONDS = 0.45;
-/** Seconds from an IC to the output header. */
+/** Seconds from a part to the output header. */
 const OUT_SECONDS = 0.35;
 const MAX_PULSES = 64;
 /** Points per route: pin → via → via → pin. */
 const ROUTE_POINTS = 4;
 const IDLE_CLOCK = 1.2;
-/** Pads per side on a track IC. */
-const IC_PINS = 4;
+/** Parts rise in / sink out at these rates (per second). */
+const RISE = 3.5;
+const SINK = 2.5;
+/** Rows, pins and lanes glide to new positions at this rate. */
+const GLIDE = 5;
+/** Notes below this (MIDI) make a pitched track a bass part. */
+const BASS_NOTE = 48;
 
 // The virtual board every flat thing is laid out on (board units).
 const BOARD_W = 1000;
@@ -55,15 +66,49 @@ const UNIT = 1.3;
 // ISO CITY's 2:1 dimetric ratios (36 : 18 : 22 px per unit).
 const ISO_Y = 0.5;
 const ISO_Z = 22 / 36;
-// Package heights (board units).
-const IC_Z = 26;
 const SEQ_Z = 30;
 const J1_Z = 12;
-const PIN_Z = 7;
 /** Quantized flash levels for the cached package face colours. */
 const FLASH_LEVELS = 8;
 
 type RGB = readonly [number, number, number];
+type Kind = 'qfp' | 'soic' | 'sot23' | 'to220' | 'dip' | 'xtal';
+
+/**
+ * Package shapes, in multiples of the row's base size: footprint, body
+ * height, pins on the back (input) and front (output) sides and on the two
+ * long sides, which pin carries the signal, and trim.
+ */
+interface PackageSpec {
+    w: number;
+    h: number;
+    z: number;
+    /** Pins along the back (x-min) and front (x-max) edges. */
+    ends: number;
+    /** Pins along the two y edges (quad packages). */
+    sides: number;
+    /** Input / output pin index along the back / front edge. */
+    inPin: number;
+    outPin: number;
+    pinLen: number;
+    pinZ: number;
+    /** Metal can instead of epoxy. */
+    metal: boolean;
+    notch: boolean;
+    /** Heat tab behind the back edge (TO-220). */
+    tab: boolean;
+}
+
+const PACKAGES: Record<Kind, PackageSpec> = {
+    qfp: {w: 1.5, h: 1.25, z: 0.55, ends: 4, sides: 4, inPin: 1, outPin: 2, pinLen: 0.14, pinZ: 0.18, metal: false, notch: false, tab: false},
+    soic: {w: 2.5, h: 0.85, z: 0.6, ends: 4, sides: 0, inPin: 1, outPin: 2, pinLen: 0.16, pinZ: 0.2, metal: false, notch: false, tab: false},
+    sot23: {w: 0.9, h: 0.55, z: 0.42, ends: 2, sides: 0, inPin: 0, outPin: 1, pinLen: 0.14, pinZ: 0.16, metal: false, notch: false, tab: false},
+    to220: {w: 1.05, h: 1.0, z: 0.75, ends: 3, sides: 0, inPin: 1, outPin: 1, pinLen: 0.34, pinZ: 0.16, metal: false, notch: false, tab: true},
+    dip: {w: 2.7, h: 0.95, z: 0.95, ends: 4, sides: 0, inPin: 1, outPin: 2, pinLen: 0.2, pinZ: 0.34, metal: false, notch: true, tab: false},
+    xtal: {w: 1.35, h: 0.62, z: 0.6, ends: 2, sides: 0, inPin: 0, outPin: 1, pinLen: 0.14, pinZ: 0.16, metal: true, notch: false, tab: false},
+};
+/** Widest package footprint — sets the column the lanes route around. */
+const MAX_W = Math.max(...Object.values(PACKAGES).map((p) => p.w + p.pinLen * 2));
 
 /** One pin-to-pin run: top layer, a via, bottom layer, a via, top layer. */
 interface Route {
@@ -85,14 +130,26 @@ interface Faces {
     stroke: string;
 }
 
-interface Chip {
-    name: string;
+interface Part {
+    /** Track name, or `#idle:<n>` for the idle board. */
+    key: string;
+    label: string;
+    kind: Kind;
     color: string;
-    rgb: RGB;
     track: VizTrack | null;
-    /** Footprint on the board (board units). */
-    x: number;
+    /** Still in the live set this frame; false while fading out. */
+    alive: boolean;
+    /** 0..1 — rises in, sinks out. */
+    presence: number;
+    /** Target row (0-based) and the gliding values that follow it. */
+    rank: number;
     y: number;
+    lane: number;
+    seqPin: number;
+    jPin: number;
+    /** Footprint this frame (board units). */
+    x: number;
+    top: number;
     w: number;
     h: number;
     in: Route;
@@ -132,14 +189,44 @@ function emptyFaces(): Faces {
     return {key: '', top: [], left: [], right: [], stroke: ''};
 }
 
+/** The package that suits a track: by drum family, or by register if pitched. */
+function kindFor(track: VizTrack): Kind {
+    let low = Infinity;
+    for (let e = 0; e < track.count; e++) {
+        const n = track.notes[e];
+        if (Number.isFinite(n) && n < low) low = n;
+    }
+    if (Number.isFinite(low)) return low < BASS_NOTE ? 'to220' : 'dip';
+    switch (instrumentFamily(track.name)) {
+        case 'kick': return 'qfp';
+        case 'snare': return 'soic';
+        case 'hat': return 'sot23';
+        default: return 'xtal';
+    }
+}
+
+const IDLE_PARTS: ReadonlyArray<{label: string; kind: Kind}> = [
+    {label: 'CLK', kind: 'xtal'},
+    {label: 'LOW', kind: 'qfp'},
+    {label: 'MID', kind: 'soic'},
+    {label: 'HIGH', kind: 'sot23'},
+];
+
+/** Ease out: parts decelerate as they finish rising. */
+function easeOut(t: number): number {
+    const k = 1 - clamp01(t);
+    return 1 - k * k * k;
+}
+
 class NeonCircuitMode implements VizMode {
     /** Two bars, so a pulse can leave before the bar line for an early hap. */
     private readonly tracks = new TrackModel(2);
     private readonly transients = new TransientDetector(0.3, 0.35, 0.5);
 
-    private readonly chips: Chip[] = [];
-    private chipCount = -1;
-    private readonly live: VizTrack[] = [];
+    /** Every part on the board, live or fading; kept sorted back to front. */
+    private readonly parts: Part[] = [];
+    private readonly byKey = new Map<string, Part>();
+    private liveCount = 0;
     private playing = false;
     private phase = 0;
     /** Cycles an inbound pulse spends on its route at the current tempo. */
@@ -153,22 +240,20 @@ class NeonCircuitMode implements VizMode {
     private ox = 0;
     private oy = 0;
 
-    // Board layout (board units).
+    // Board layout (board units); SEQ height and the row base size glide.
     private readonly trace = 3;
-    private seqX = 0;
-    private seqY = 0;
-    private seqW = 0;
-    private seqH = 0;
-    private jX = 0;
-    private readonly seqPinY = new Float32Array(MAX_CHIPS);
-    private readonly jPinY = new Float32Array(MAX_CHIPS);
+    private readonly seqX = BOARD_W * 0.08;
+    private readonly seqW = Math.min(BOARD_W * 0.09, 70 * UNIT);
+    private seqH = 4 * 30 * UNIT;
+    private base = 56 * UNIT;
+    private readonly jX = BOARD_W * 0.92;
 
-    // Pulse pools, struct of arrays; chip -1 = free. Idle pulses run inbound
-    // on their own clock, outbound pulses run chip → J1.
-    private readonly iChip = new Int8Array(MAX_PULSES).fill(-1);
+    // Pulse pools; null = free. Idle pulses run inbound on their own clock,
+    // outbound pulses run part → J1.
+    private readonly iPart: (Part | null)[] = new Array<Part | null>(MAX_PULSES).fill(null);
     private readonly iT = new Float32Array(MAX_PULSES);
     private iNext = 0;
-    private readonly oChip = new Int8Array(MAX_PULSES).fill(-1);
+    private readonly oPart: (Part | null)[] = new Array<Part | null>(MAX_PULSES).fill(null);
     private readonly oT = new Float32Array(MAX_PULSES);
     private oNext = 0;
 
@@ -190,26 +275,27 @@ class NeonCircuitMode implements VizMode {
     private readonly idleCss: string[] = [];
     private seqFaces = emptyFaces();
     private j1Faces = emptyFaces();
+    private tabFaces = emptyFaces();
 
     // Scratch for pointAt() / project().
     private px = 0;
     private py = 0;
+
+    private readonly backToFront = (a: Part, b: Part): number => a.y - b.y;
 
     layout(s: VizServices): void {
         this.w = s.width;
         this.h = s.height;
         if (!(s.width > 0 && s.height > 0)) return;
         // Fit the board's isometric diamond (plus package height) to the canvas.
-        const span = BOARD_W + BOARD_H;
         // The diamond may run slightly past the sides: its corners are bare board.
+        const span = BOARD_W + BOARD_H;
         const kx = Math.min((s.width * 1.06) / span, (s.height * 0.9) / (span * ISO_Y + SEQ_Z * ISO_Z));
         this.kx = Math.max(0.05, kx);
         const cx = (BOARD_W - BOARD_H) / 2;
         const cy = span / 2;
         this.ox = s.width / 2 - cx * this.kx;
         this.oy = s.height / 2 - cy * this.kx * ISO_Y + (SEQ_Z * ISO_Z * this.kx) / 2;
-        if (this.chipCount < 0) return;
-        this.placeChips(this.chipCount);
     }
 
     private ensureTheme(t: Theme): void {
@@ -235,130 +321,168 @@ class NeonCircuitMode implements VizMode {
             this.idleRgb.push(c);
             this.idleCss.push(css(c));
         }
-        // SEQ and J1 are dark epoxy / black plastic, barely tinted.
-        this.seqFaces = this.facesFor(emptyFaces(), 'seq', t.textRgb, 0.35);
-        this.j1Faces = this.facesFor(emptyFaces(), 'j1', t.borderRgb, 0.35);
-        for (const c of this.chips) c.faces.key = '';
+        // SEQ, J1 and heat tabs are dark epoxy, black plastic and bare metal.
+        this.seqFaces = this.facesFor(emptyFaces(), 'seq', t.textRgb, false, 0.35);
+        this.j1Faces = this.facesFor(emptyFaces(), 'j1', t.borderRgb, false, 0.35);
+        this.tabFaces = this.facesFor(emptyFaces(), 'tab', t.textRgb, true, 0.2);
+        for (const p of this.parts) p.faces.key = '';
     }
 
     /**
      * ISO CITY's colour-mix face lighting for one package colour: dark sides,
      * a lighter top, all rising toward the accent as the package flashes.
+     * Metal cans start from the theme's text grey instead of the background.
      */
-    private facesFor(f: Faces, key: string, a: RGB, tint = 1): Faces {
+    private facesFor(f: Faces, key: string, a: RGB, metal: boolean, tint = 1): Faces {
         if (f.key === key) return f;
         const t = this.theme!;
         f.key = key;
         f.top.length = f.left.length = f.right.length = 0;
+        const top = metal ? mixRgb(t.textRgb, t.bgLighterRgb, 0.35) : t.bgLighterRgb;
+        const side = metal ? mixRgb(t.textRgb, t.bgRgb, 0.55) : t.bgRgb;
         for (let i = 0; i < FLASH_LEVELS; i++) {
             const lit = i / (FLASH_LEVELS - 1);
-            f.top.push(lerpRgb(t.bgLighterRgb, a, (0.14 + lit * 0.45) * tint));
-            f.left.push(lerpRgb(t.bgRgb, a, (0.06 + lit * 0.34) * tint));
-            f.right.push(lerpRgb(t.bgLighterRgb, a, (0.2 + lit * 0.4) * tint));
+            const base = metal ? 0.08 : 0.14;
+            f.top.push(lerpRgb(top, a, (base + lit * 0.45) * tint));
+            f.left.push(lerpRgb(side, a, (base * 0.5 + lit * 0.34) * tint));
+            f.right.push(lerpRgb(top, a, (base * 1.4 + lit * 0.4) * tint));
         }
         f.stroke = lerpRgb(t.borderRgb, a, 0.45 * tint);
         return f;
     }
 
-    /** Chips follow the live track list while playing; four idle chips otherwise. */
-    private syncChips(): void {
-        const live = this.live;
-        live.length = 0;
-        if (this.playing) {
-            for (const tr of this.tracks.tracks) {
-                if (live.length >= MAX_CHIPS) break;
-                if (tr.count > 0 || tr.activity > 0.02) live.push(tr);
-            }
-        }
-        const n = this.playing ? live.length : IDLE_CHIPS;
-        if (n !== this.chipCount) this.placeChips(n);
-        for (let i = 0; i < n; i++) {
-            const c = this.chips[i];
-            if (this.playing) {
-                c.track = live[i];
-                c.name = live[i].name;
-                c.color = live[i].accentCss;
-                c.rgb = live[i].accent;
-            } else {
-                c.track = null;
-                c.name = IDLE_NAMES[i];
-                c.color = this.idleCss[i];
-                c.rgb = this.idleRgb[i];
-            }
-            this.facesFor(c.faces, c.color, c.rgb);
-        }
+    private partFor(key: string, label: string, kind: Kind): Part {
+        let p = this.byKey.get(key);
+        if (p) return p;
+        p = {
+            key, label, kind, color: '', track: null, alive: true, presence: 0,
+            rank: 0, y: NaN, lane: NaN, seqPin: NaN, jPin: NaN,
+            x: 0, top: 0, w: 0, h: 0, in: newRoute(), out: newRoute(),
+            flash: 0, viaIn: new Float32Array(2), viaOut: new Float32Array(2),
+            faces: emptyFaces(),
+        };
+        this.byKey.set(key, p);
+        this.parts.push(p);
+        return p;
     }
 
-    /** Lay the board out for `n` chips: SEQ at the back, ICs across, J1 in front. */
-    private placeChips(n: number): void {
-        this.chipCount = n;
-        while (this.chips.length < n) {
-            this.chips.push({
-                name: '', color: '', rgb: [0, 0, 0], track: null,
-                x: 0, y: 0, w: 0, h: 0, in: newRoute(), out: newRoute(),
-                flash: 0, viaIn: new Float32Array(2), viaOut: new Float32Array(2),
-                faces: emptyFaces(),
-            });
+    /**
+     * Reconcile the live set (tracks while playing, idle parts otherwise),
+     * then glide every part toward its row and rebuild its routes.
+     */
+    private syncParts(dt: number): void {
+        for (const p of this.parts) p.alive = false;
+        let n = 0;
+        if (this.playing) {
+            for (const tr of this.tracks.tracks) {
+                if (n >= MAX_LIVE) break;
+                if (tr.count === 0 && tr.activity <= 0.02) continue;
+                const p = this.partFor(tr.name, tr.name.toUpperCase(), kindFor(tr));
+                p.track = tr;
+                p.color = tr.accentCss;
+                this.facesFor(p.faces, p.color, tr.accent, PACKAGES[p.kind].metal);
+                p.alive = true;
+                p.rank = n++;
+            }
+        } else {
+            for (let i = 0; i < IDLE_PARTS.length; i++) {
+                const spec = IDLE_PARTS[i];
+                const p = this.partFor(`#idle:${i}`, spec.label, spec.kind);
+                p.track = null;
+                p.color = this.idleCss[i];
+                this.facesFor(p.faces, p.color, this.idleRgb[i], PACKAGES[p.kind].metal);
+                p.alive = true;
+                p.rank = n++;
+            }
         }
-        const bw = BOARD_W;
-        const bh = BOARD_H;
-        const midY = bh / 2;
-        const u = UNIT;
+        this.liveCount = n;
+        // Rapid edits can churn parts faster than they fade: past the cap,
+        // the most-faded leaving parts go at once.
+        while (this.parts.length > MAX_PARTS) {
+            let drop = -1;
+            for (let k = 0; k < this.parts.length; k++) {
+                const q = this.parts[k];
+                if (!q.alive && (drop < 0 || q.presence < this.parts[drop].presence)) drop = k;
+            }
+            if (drop < 0) break;
+            this.byKey.delete(this.parts[drop].key);
+            this.parts.splice(drop, 1);
+        }
 
-        // SEQ: a long chip near the back edge, one output pin per track.
-        this.seqW = Math.min(bw * 0.09, 70 * u);
-        this.seqH = Math.min(bh * 0.66, Math.max(n, 4) * 30 * u);
-        this.seqX = bw * 0.08;
-        this.seqY = midY - this.seqH / 2;
-        // J1: a pin header near the front edge.
-        this.jX = bw - bw * 0.08;
-        // SEQ output pins sit exactly on its pads (drawPackage spaces them the same).
-        for (let i = 0; i < n; i++) {
-            this.seqPinY[i] = this.seqY + this.seqH * ((i + 0.5) / n);
-            this.jPinY[i] = midY + (this.seqPinY[i] - midY) * 1.1;
-        }
+        // Row geometry for the live count; SEQ and the base size glide to it.
+        const rows = Math.max(1, n);
+        const pitch = (BOARD_H * 0.84) / rows;
+        this.base = follow(this.base, Math.min(pitch * 0.6, 44 * UNIT), dt, GLIDE, GLIDE);
+        this.seqH = follow(this.seqH, Math.min(BOARD_H * 0.66, Math.max(n, 4) * 30 * UNIT), dt, GLIDE, GLIDE);
+        const seqY = BOARD_H / 2 - this.seqH / 2;
+        const rowsTop = BOARD_H * 0.08;
+        const colW = MAX_W * this.base;
+        const inLane0 = this.seqX + this.seqW + BOARD_W * 0.05;
+        const inLane1 = BOARD_W * 0.5 - colW / 2 - BOARD_W * 0.04;
+        const outLane0 = BOARD_W * 0.5 + colW / 2 + BOARD_W * 0.04;
+        const outLane1 = this.jX - BOARD_W * 0.05;
 
-        // The IC row, with each track's own lane on both sides.
-        const rowsTop = bh * 0.08;
-        const pitch = (bh * 0.84) / Math.max(1, n);
-        const icW = Math.min(bw * 0.13, 110 * u);
-        const icH = Math.min(pitch * 0.62, 56 * u);
-        const icX = bw * 0.5 - icW / 2;
-        const inLane0 = this.seqX + this.seqW + bw * 0.05;
-        const inLane1 = icX - bw * 0.05;
-        const outLane0 = icX + icW + bw * 0.05;
-        const outLane1 = this.jX - bw * 0.05;
-        for (let i = 0; i < n; i++) {
-            const c = this.chips[i];
-            c.w = icW;
-            c.h = icH;
-            c.x = icX;
-            c.y = rowsTop + pitch * (i + 0.5) - icH / 2;
-            const f = n <= 1 ? 0.5 : i / (n - 1);
-            // Input on the IC's second pin along the back side, output on the
-            // third along the front side (of IC_PINS per side).
-            setRoute(c.in, this.seqX + this.seqW, this.seqPinY[i],
-                inLane0 + (inLane1 - inLane0) * f, icX, c.y + icH * (1.5 / IC_PINS));
-            setRoute(c.out, icX + icW, c.y + icH * (2.5 / IC_PINS),
-                outLane1 - (outLane1 - outLane0) * f, this.jX, this.jPinY[i]);
+        for (let k = this.parts.length - 1; k >= 0; k--) {
+            const p = this.parts[k];
+            p.presence = follow(p.presence, p.alive ? 1 : 0, dt, RISE, SINK);
+            if (!p.alive && p.presence < 0.01) {
+                this.parts.splice(k, 1);
+                this.byKey.delete(p.key);
+                continue;
+            }
+            if (p.alive) {
+                // Targets for this part's row; a new part starts there.
+                const ty = rowsTop + pitch * (p.rank + 0.5);
+                const f = rows <= 1 ? 0.5 : p.rank / (rows - 1);
+                const tLane = f;
+                const tSeq = seqY + this.seqH * ((p.rank + 0.5) / rows);
+                const tJ = BOARD_H / 2 + (tSeq - BOARD_H / 2) * 1.1;
+                if (Number.isNaN(p.y)) {
+                    p.y = ty; p.lane = tLane; p.seqPin = tSeq; p.jPin = tJ;
+                }
+                p.y = follow(p.y, ty, dt, GLIDE, GLIDE);
+                p.lane = follow(p.lane, tLane, dt, GLIDE, GLIDE);
+                p.seqPin = follow(p.seqPin, tSeq, dt, GLIDE, GLIDE);
+                p.jPin = follow(p.jPin, tJ, dt, GLIDE, GLIDE);
+            }
+            const spec = PACKAGES[p.kind];
+            p.w = spec.w * this.base;
+            p.h = spec.h * this.base;
+            p.x = BOARD_W * 0.5 - p.w / 2;
+            p.top = p.y - p.h / 2;
+            const inY = p.top + p.h * ((spec.inPin + 0.5) / spec.ends);
+            const outY = p.top + p.h * ((spec.outPin + 0.5) / spec.ends);
+            const inX = p.x - (spec.tab ? spec.pinLen * this.base : 0);
+            setRoute(p.in, this.seqX + this.seqW, p.seqPin,
+                inLane0 + (inLane1 - inLane0) * p.lane, inX, inY);
+            setRoute(p.out, p.x + p.w, outY,
+                outLane1 - (outLane1 - outLane0) * p.lane, this.jX, p.jPin);
         }
+        this.parts.sort(this.backToFront);
     }
 
     private readonly onOnset = (track: VizTrack): void => {
         if (instrumentFamily(track.name) === 'kick') this.rail = 1;
-        for (let i = 0; i < this.chipCount; i++) {
-            if (this.chips[i].track !== track) continue;
-            this.chips[i].flash = 1;
-            this.launch(this.oChip, this.oT, i, true);
-        }
+        const p = this.byKey.get(track.name);
+        if (!p || !p.alive) return;
+        p.flash = 1;
+        this.launchOut(p);
     };
 
-    private launch(pool: Int8Array, ts: Float32Array, chip: number, out: boolean): void {
-        const k = out ? this.oNext : this.iNext;
-        if (out) this.oNext = (k + 1) % MAX_PULSES;
-        else this.iNext = (k + 1) % MAX_PULSES;
-        pool[k] = chip;
-        ts[k] = 0;
+    private launchOut(p: Part): void {
+        const k = this.oNext;
+        this.oNext = (k + 1) % MAX_PULSES;
+        this.oPart[k] = p;
+        this.oT[k] = 0;
+    }
+
+    private launchIdle(i: number): void {
+        const p = this.byKey.get(`#idle:${i}`);
+        if (!p) return;
+        const k = this.iNext;
+        this.iNext = (k + 1) % MAX_PULSES;
+        this.iPart[k] = p;
+        this.iT[k] = 0;
     }
 
     update(dt: number, s: VizServices): void {
@@ -369,7 +493,7 @@ class NeonCircuitMode implements VizMode {
         this.phase = sync.phase;
         this.bar = Math.floor(s.cycle);
         this.travel = Math.max(0.01, IN_SECONDS * currentBpm() / 240);
-        this.syncChips();
+        this.syncParts(dt);
         this.tracks.forEachOnset(sync, this.onOnset);
         this.tracks.decay(dt);
 
@@ -379,15 +503,15 @@ class NeonCircuitMode implements VizMode {
         const hits = this.transients.update(dt, low, mid, high);
         if (!this.playing) {
             if (hits.kick) {
-                this.launch(this.iChip, this.iT, 1, false);
+                this.launchIdle(1);
                 this.rail = Math.max(this.rail, 0.6);
             }
-            if (hits.snare) this.launch(this.iChip, this.iT, 2, false);
-            if (hits.hat) this.launch(this.iChip, this.iT, 3, false);
+            if (hits.snare) this.launchIdle(2);
+            if (hits.hat) this.launchIdle(3);
             this.idleTimer += dt;
             if (this.idleTimer >= IDLE_CLOCK) {
                 this.idleTimer = 0;
-                this.launch(this.iChip, this.iT, 0, false);
+                this.launchIdle(0);
             }
         } else {
             this.idleTimer = 0;
@@ -395,47 +519,46 @@ class NeonCircuitMode implements VizMode {
 
         const fk = Math.exp(-dt * 5);
         const vk = Math.exp(-dt * 6);
-        for (let i = 0; i < this.chipCount; i++) {
-            const c = this.chips[i];
-            c.flash *= fk;
-            c.viaIn[0] *= vk; c.viaIn[1] *= vk;
-            c.viaOut[0] *= vk; c.viaOut[1] *= vk;
+        for (const p of this.parts) {
+            p.flash *= fk;
+            p.viaIn[0] *= vk; p.viaIn[1] *= vk;
+            p.viaOut[0] *= vk; p.viaOut[1] *= vk;
         }
         this.rail *= Math.exp(-dt * 3.5);
 
-        // Idle inbound pulses run on time; arriving fires the chip.
+        // Idle inbound pulses run on time; arriving fires the part.
         for (let k = 0; k < MAX_PULSES; k++) {
-            const ci = this.iChip[k];
-            if (ci < 0) continue;
-            if (ci >= this.chipCount) { this.iChip[k] = -1; continue; }
+            const p = this.iPart[k];
+            if (!p) continue;
             const t = this.iT[k] + dt / IN_SECONDS;
-            if (t >= 1) {
-                this.iChip[k] = -1;
-                this.chips[ci].flash = 1;
-                this.launch(this.oChip, this.oT, ci, true);
+            if (t >= 1 || !p.alive) {
+                this.iPart[k] = null;
+                if (t >= 1 && p.alive) {
+                    p.flash = 1;
+                    this.launchOut(p);
+                }
                 continue;
             }
             this.iT[k] = t;
-            this.touchVias(this.chips[ci].in, this.chips[ci].viaIn, t);
+            this.touchVias(p.in, p.viaIn, t);
         }
         for (let k = 0; k < MAX_PULSES; k++) {
-            const ci = this.oChip[k];
-            if (ci < 0) continue;
-            if (ci >= this.chipCount) { this.oChip[k] = -1; continue; }
+            const p = this.oPart[k];
+            if (!p) continue;
             const t = this.oT[k] + dt / OUT_SECONDS;
-            if (t >= 1) { this.oChip[k] = -1; continue; }
+            if (t >= 1 || p.presence < 0.05) { this.oPart[k] = null; continue; }
             this.oT[k] = t;
-            this.touchVias(this.chips[ci].out, this.chips[ci].viaOut, t);
+            this.touchVias(p.out, p.viaOut, t);
         }
 
         // Scheduled inbound pulses: stateless, placed by the time left to the onset.
         if (this.playing) {
-            for (let i = 0; i < this.chipCount; i++) {
-                const c = this.chips[i];
-                const tr = c.track!;
+            for (const p of this.parts) {
+                const tr = p.track;
+                if (!tr || !p.alive) continue;
                 for (let e = 0; e < tr.count; e++) {
                     const left = tr.begins[e] - this.phase;
-                    if (left > 0 && left <= this.travel) this.touchVias(c.in, c.viaIn, 1 - left / this.travel);
+                    if (left > 0 && left <= this.travel) this.touchVias(p.in, p.viaIn, 1 - left / this.travel);
                 }
             }
         }
@@ -501,8 +624,7 @@ class NeonCircuitMode implements VizMode {
     }
 
     render(ctx: CanvasRenderingContext2D, _s: VizServices): void {
-        if (!(this.w > 0 && this.h > 0) || this.chipCount < 0) return;
-        const n = this.chipCount;
+        if (!(this.w > 0 && this.h > 0) || !this.theme) return;
         const labels = this.w >= 360 && this.h >= 240;
 
         // Board thickness first: the two front edges of the slab.
@@ -523,25 +645,32 @@ class NeonCircuitMode implements VizMode {
         // Everything flat, drawn in the board plane.
         ctx.save();
         this.enterPlane(ctx, 0);
-        this.drawBoardPlane(ctx, n, labels);
+        this.drawBoardPlane(ctx, labels);
         ctx.restore();
 
-        // Packages, back to front: SEQ is furthest back, then the ICs in
-        // order, then J1 at the front.
+        // Packages, back to front: SEQ is furthest back, then the parts by
+        // row, then J1 at the front.
         ctx.save();
         ctx.lineJoin = 'miter';
-        this.drawPackage(ctx, this.seqX, this.seqY, this.seqW, this.seqH, SEQ_Z,
-            this.seqFaces, 0, 'U0', 'SEQ', Math.max(1, n), null, labels);
-        for (let i = 0; i < n; i++) {
-            const c = this.chips[i];
-            this.drawPackage(ctx, c.x, c.y, c.w, c.h, IC_Z, c.faces, c.flash,
-                `U${i + 1}`, c.name.toUpperCase(), IC_PINS, c, labels);
+        const n = Math.max(1, this.liveCount);
+        const seqY = BOARD_H / 2 - this.seqH / 2;
+        this.drawPackage(ctx, this.seqX, seqY, this.seqW, this.seqH, SEQ_Z, this.seqFaces, 0,
+            'SEQ', 'U0', n, 0, 7 * UNIT, 6, false, false, false, null, labels);
+        for (let i = 0; i < this.parts.length; i++) {
+            const p = this.parts[i];
+            const spec = PACKAGES[p.kind];
+            const rise = easeOut(p.presence);
+            ctx.globalAlpha = clamp01(p.presence * 1.4);
+            this.drawPackage(ctx, p.x, p.top, p.w, p.h, spec.z * this.base * rise, p.faces, p.flash,
+                p.label, `U${p.rank + 1}`, spec.ends, spec.sides, spec.pinLen * this.base,
+                spec.pinZ * this.base * rise, spec.notch, spec.tab, spec.metal, p, labels);
         }
-        this.drawHeader(ctx, n, labels);
+        ctx.globalAlpha = 1;
+        this.drawHeader(ctx, labels);
         ctx.restore();
     }
 
-    private drawBoardPlane(ctx: CanvasRenderingContext2D, n: number, labels: boolean): void {
+    private drawBoardPlane(ctx: CanvasRenderingContext2D, labels: boolean): void {
         const tr = this.trace;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -562,7 +691,7 @@ class NeonCircuitMode implements VizMode {
         }
         ctx.fill();
 
-        // Power rails along the long edges, stubs to SEQ and the end ICs.
+        // Power rails along the long edges, stubs to SEQ.
         const inset = step * 0.6;
         const railA = inset;
         const railB = BOARD_H - inset;
@@ -578,70 +707,69 @@ class NeonCircuitMode implements VizMode {
         ctx.lineWidth = tr;
         ctx.beginPath();
         const seqMid = this.seqX + this.seqW * 0.5;
+        const seqY = BOARD_H / 2 - this.seqH / 2;
         ctx.moveTo(seqMid, railA);
-        ctx.lineTo(seqMid, this.seqY);
-        ctx.moveTo(seqMid, this.seqY + this.seqH);
+        ctx.lineTo(seqMid, seqY);
+        ctx.moveTo(seqMid, seqY + this.seqH);
         ctx.lineTo(seqMid, railB);
-        if (n > 0) {
-            const first = this.chips[0];
-            const last = this.chips[n - 1];
-            ctx.moveTo(first.x + first.w * 0.5, railA);
-            ctx.lineTo(first.x + first.w * 0.5, first.y);
-            ctx.moveTo(last.x + last.w * 0.5, last.y + last.h);
-            ctx.lineTo(last.x + last.w * 0.5, railB);
-        }
         ctx.stroke();
 
-        // Bottom-layer copper: every middle leg, one batched path.
-        ctx.strokeStyle = rampAt(this.bottomRamp, 0.75);
-        ctx.beginPath();
-        for (let i = 0; i < n; i++) {
-            const c = this.chips[i];
-            if (c.in.vias) this.leg(ctx, c.in, 1);
-            if (c.out.vias) this.leg(ctx, c.out, 1);
-        }
-        ctx.stroke();
-
-        // Top-layer copper in the chip's colour.
-        for (let i = 0; i < n; i++) {
-            const c = this.chips[i];
-            ctx.strokeStyle = c.color;
-            ctx.globalAlpha = 0.34 + c.flash * 0.3;
+        // Copper, per part, faded with its presence. Bottom layer first.
+        ctx.lineWidth = tr;
+        for (const p of this.parts) {
+            if (!p.in.vias && !p.out.vias) continue;
+            ctx.globalAlpha = p.presence;
+            ctx.strokeStyle = rampAt(this.bottomRamp, 0.75);
             ctx.beginPath();
-            this.leg(ctx, c.in, 0);
-            this.leg(ctx, c.in, 2);
-            this.leg(ctx, c.out, 0);
-            this.leg(ctx, c.out, 2);
-            if (!c.in.vias) this.leg(ctx, c.in, 1);
-            if (!c.out.vias) this.leg(ctx, c.out, 1);
+            if (p.in.vias) this.leg(ctx, p.in, 1);
+            if (p.out.vias) this.leg(ctx, p.out, 1);
             ctx.stroke();
         }
-        ctx.globalAlpha = 1;
+        for (const p of this.parts) {
+            ctx.strokeStyle = p.color;
+            ctx.globalAlpha = (0.34 + p.flash * 0.3) * p.presence;
+            ctx.beginPath();
+            this.leg(ctx, p.in, 0);
+            this.leg(ctx, p.in, 2);
+            this.leg(ctx, p.out, 0);
+            this.leg(ctx, p.out, 2);
+            if (!p.in.vias) this.leg(ctx, p.in, 1);
+            if (!p.out.vias) this.leg(ctx, p.out, 1);
+            ctx.stroke();
+        }
 
         // Vias: annular ring, drill hole, the track's colour while a pulse passes.
-        for (let i = 0; i < n; i++) {
-            const c = this.chips[i];
-            this.drawVias(ctx, c.in, c.viaIn, c.color);
-            this.drawVias(ctx, c.out, c.viaOut, c.color);
+        for (const p of this.parts) {
+            ctx.globalAlpha = p.presence;
+            this.drawVias(ctx, p.in, p.viaIn, p.color);
+            this.drawVias(ctx, p.out, p.viaOut, p.color);
         }
 
         // Pulses.
         if (this.playing) {
-            for (let i = 0; i < n; i++) {
-                const c = this.chips[i];
-                const track = c.track!;
+            for (const p of this.parts) {
+                const track = p.track;
+                if (!track || !p.alive) continue;
+                ctx.globalAlpha = p.presence;
                 for (let e = 0; e < track.count; e++) {
                     const left = track.begins[e] - this.phase;
-                    if (left > 0 && left <= this.travel) this.drawPulse(ctx, c.in, 1 - left / this.travel, c.color);
+                    if (left > 0 && left <= this.travel) this.drawPulse(ctx, p.in, 1 - left / this.travel, p.color);
                 }
             }
         }
         for (let k = 0; k < MAX_PULSES; k++) {
-            const ci = this.iChip[k];
-            if (ci >= 0 && ci < n) this.drawPulse(ctx, this.chips[ci].in, this.iT[k], this.chips[ci].color);
-            const co = this.oChip[k];
-            if (co >= 0 && co < n) this.drawPulse(ctx, this.chips[co].out, this.oT[k], this.chips[co].color);
+            const pi = this.iPart[k];
+            if (pi) {
+                ctx.globalAlpha = pi.presence;
+                this.drawPulse(ctx, pi.in, this.iT[k], pi.color);
+            }
+            const po = this.oPart[k];
+            if (po) {
+                ctx.globalAlpha = po.presence;
+                this.drawPulse(ctx, po.out, this.oT[k], po.color);
+            }
         }
+        ctx.globalAlpha = 1;
 
         // Silkscreen along the front edge.
         if (labels) {
@@ -654,6 +782,7 @@ class NeonCircuitMode implements VizMode {
     private drawVias(ctx: CanvasRenderingContext2D, r: Route, glow: Float32Array, color: string): void {
         if (!r.vias) return;
         const viaR = this.trace * 2.2;
+        const alpha = ctx.globalAlpha;
         for (let v = 0; v < 2; v++) {
             const x = r.xs[v + 1];
             const y = r.ys[v + 1];
@@ -662,10 +791,10 @@ class NeonCircuitMode implements VizMode {
             ctx.fillStyle = this.padCss;
             ctx.fill();
             if (glow[v] > 0.02) {
-                ctx.globalAlpha = clamp01(glow[v]);
+                ctx.globalAlpha = alpha * clamp01(glow[v]);
                 ctx.fillStyle = color;
                 ctx.fill();
-                ctx.globalAlpha = 1;
+                ctx.globalAlpha = alpha;
             }
             ctx.beginPath();
             ctx.arc(x, y, viaR * 0.42, 0, Math.PI * 2);
@@ -684,26 +813,28 @@ class NeonCircuitMode implements VizMode {
     ): void {
         ctx.lineWidth = 1;
         ctx.strokeStyle = stroke;
-        // Face along the y = y + h edge.
-        ctx.beginPath();
-        this.project(x, y + h, z1); ctx.moveTo(this.px, this.py);
-        this.project(x + w, y + h, z1); ctx.lineTo(this.px, this.py);
-        this.project(x + w, y + h, z0); ctx.lineTo(this.px, this.py);
-        this.project(x, y + h, z0); ctx.lineTo(this.px, this.py);
-        ctx.closePath();
-        ctx.fillStyle = left;
-        ctx.fill();
-        ctx.stroke();
-        // Face along the x = x + w edge.
-        ctx.beginPath();
-        this.project(x + w, y, z1); ctx.moveTo(this.px, this.py);
-        this.project(x + w, y + h, z1); ctx.lineTo(this.px, this.py);
-        this.project(x + w, y + h, z0); ctx.lineTo(this.px, this.py);
-        this.project(x + w, y, z0); ctx.lineTo(this.px, this.py);
-        ctx.closePath();
-        ctx.fillStyle = right;
-        ctx.fill();
-        ctx.stroke();
+        if (z1 - z0 > 0.2) {
+            // Face along the y = y + h edge.
+            ctx.beginPath();
+            this.project(x, y + h, z1); ctx.moveTo(this.px, this.py);
+            this.project(x + w, y + h, z1); ctx.lineTo(this.px, this.py);
+            this.project(x + w, y + h, z0); ctx.lineTo(this.px, this.py);
+            this.project(x, y + h, z0); ctx.lineTo(this.px, this.py);
+            ctx.closePath();
+            ctx.fillStyle = left;
+            ctx.fill();
+            ctx.stroke();
+            // Face along the x = x + w edge.
+            ctx.beginPath();
+            this.project(x + w, y, z1); ctx.moveTo(this.px, this.py);
+            this.project(x + w, y + h, z1); ctx.lineTo(this.px, this.py);
+            this.project(x + w, y + h, z0); ctx.lineTo(this.px, this.py);
+            this.project(x + w, y, z0); ctx.lineTo(this.px, this.py);
+            ctx.closePath();
+            ctx.fillStyle = right;
+            ctx.fill();
+            ctx.stroke();
+        }
         // Top.
         ctx.beginPath();
         this.project(x, y, z1); ctx.moveTo(this.px, this.py);
@@ -717,74 +848,120 @@ class NeonCircuitMode implements VizMode {
     }
 
     /**
-     * An IC package: gull-wing pins along both long sides (the back row drawn
-     * before the body, the front row after), the lit body, and reference,
-     * name and pin-1 dot engraved on the top face.
+     * A package: pins behind the body first (back edge, back quad side), the
+     * lit body, then pins in front; a heat tab or notch where the package has
+     * one; reference, name and pin-1 dot engraved on the top face, or
+     * silkscreened beside a part too small to carry them.
      */
     private drawPackage(
         ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, z: number,
-        faces: Faces, flash: number, ref: string, value: string, pinsPerSide: number,
-        chip: Chip | null, labels: boolean,
+        faces: Faces, flash: number, name: string, ref: string, ends: number, sides: number,
+        pinLen: number, pinZ: number, notch: boolean, tab: boolean, metal: boolean,
+        part: Part | null, labels: boolean,
     ): void {
         const lvl = Math.min(FLASH_LEVELS - 1, Math.round(clamp01(flash) * (FLASH_LEVELS - 1)));
-        const pinLen = 7 * UNIT;
-        const pinW = Math.max(3, Math.min(h / (pinsPerSide * 2.2), 7 * UNIT));
-        const pinTop = this.padCss;
+        const pinW = Math.max(3, Math.min(h / (ends * 2.2), 7 * UNIT));
         const pinSide = faces.left[0];
-        const liveIn = chip ? chip.in.ys[3] : NaN;
-        const liveOut = chip ? chip.out.ys[0] : NaN;
+        const liveIn = part ? part.in.ys[3] : NaN;
+        const liveOut = part ? part.out.ys[0] : NaN;
+        const pinColor = (py: number, live: number): string =>
+            part !== null && Math.abs(py - live) < 0.5 ? part.color : this.padCss;
 
-        // Pins on the back side (x - pinLen … x): behind the body.
-        for (let p = 0; p < pinsPerSide; p++) {
-            const py = y + h * ((p + 0.5) / pinsPerSide);
-            const live = chip !== null && Math.abs(py - liveIn) < 0.5;
-            const c = live ? chip.color : pinTop;
-            this.box(ctx, x - pinLen, py - pinW / 2, pinLen, pinW, 0, PIN_Z, c, pinSide, c, faces.stroke);
+        if (tab) {
+            // TO-220 heat tab: a metal plate behind the body with a mounting hole.
+            const f = this.tabFaces;
+            this.box(ctx, x - pinLen, y + h * 0.08, pinLen, h * 0.84, 0, Math.max(0.5, pinZ * 0.7),
+                f.top[0], f.left[0], f.right[0], f.stroke);
+            ctx.save();
+            this.enterPlane(ctx, Math.max(0.5, pinZ * 0.7));
+            ctx.beginPath();
+            ctx.arc(x - pinLen * 0.5, y + h / 2, Math.min(pinLen, h) * 0.22, 0, Math.PI * 2);
+            ctx.fillStyle = this.holeCss;
+            ctx.fill();
+            ctx.restore();
+        } else {
+            for (let p = 0; p < ends; p++) {
+                const py = y + h * ((p + 0.5) / ends);
+                const c = pinColor(py, liveIn);
+                this.box(ctx, x - pinLen, py - pinW / 2, pinLen, pinW, 0, pinZ, c, pinSide, c, faces.stroke);
+            }
         }
+        for (let p = 0; p < sides; p++) {
+            const px = x + w * ((p + 0.5) / sides);
+            this.box(ctx, px - pinW / 2, y - pinLen, pinW, pinLen, 0, pinZ,
+                this.padCss, pinSide, this.padCss, faces.stroke);
+        }
+
         this.box(ctx, x, y, w, h, 0, z, faces.top[lvl], faces.left[lvl], faces.right[lvl], faces.stroke);
-        // Pins on the front side (x + w … x + w + pinLen): in front of the body.
-        for (let p = 0; p < pinsPerSide; p++) {
-            const py = y + h * ((p + 0.5) / pinsPerSide);
-            const live = chip !== null && Math.abs(py - liveOut) < 0.5;
-            const c = live ? chip.color : pinTop;
-            this.box(ctx, x + w, py - pinW / 2, pinLen, pinW, 0, PIN_Z, c, pinSide, c, faces.stroke);
+
+        for (let p = 0; p < sides; p++) {
+            const px = x + w * ((p + 0.5) / sides);
+            this.box(ctx, px - pinW / 2, y + h, pinW, pinLen, 0, pinZ,
+                this.padCss, pinSide, this.padCss, faces.stroke);
+        }
+        for (let p = 0; p < ends; p++) {
+            const py = y + h * ((p + 0.5) / ends);
+            const c = pinColor(py, liveOut);
+            this.box(ctx, x + w, py - pinW / 2, pinLen, pinW, 0, pinZ, c, pinSide, c, faces.stroke);
         }
 
         // Engraving on the top face.
         ctx.save();
         this.enterPlane(ctx, z);
-        const dotR = 3.2 * UNIT;
-        ctx.beginPath();
-        ctx.arc(x + dotR * 2.4, y + dotR * 2.4, dotR, 0, Math.PI * 2);
-        ctx.fillStyle = rampAt(this.silkRamp, 0.6);
-        ctx.fill();
-        if (labels) {
-            const fs = Math.min(15, h * 0.3);
-            const maxChars = Math.max(2, Math.floor((w - 10) / (fs * 0.62)));
-            const text = value.length > maxChars ? value.slice(0, maxChars - 1) + '…' : value;
+        if (notch) {
+            ctx.beginPath();
+            ctx.arc(x, y + h / 2, h * 0.14, -Math.PI / 2, Math.PI / 2);
+            ctx.fillStyle = faces.left[lvl];
+            ctx.fill();
+        }
+        if (!metal) {
+            const dotR = Math.min(3.2 * UNIT, h * 0.08);
+            ctx.beginPath();
+            ctx.arc(x + dotR * 2.4, y + dotR * 2.4, dotR, 0, Math.PI * 2);
+            ctx.fillStyle = rampAt(this.silkRamp, 0.6);
+            ctx.fill();
+        }
+        const fs = Math.min(15, h * 0.3);
+        const maxChars = Math.floor((w - 10) / (fs * 0.62));
+        const engrave = labels && maxChars >= 3;
+        if (engrave) {
+            const text = name.length > maxChars ? name.slice(0, maxChars - 1) + '…' : name;
             drawLabel(ctx, text, x + w / 2, y + h * 0.56, rampAt(this.silkRamp, 0.62 + flash * 0.38), fs, 'center');
-            drawLabel(ctx, ref, x + w - 6, y + fs * 0.75, rampAt(this.silkRamp, 0.5), fs * 0.75, 'right');
+            if (maxChars >= 6) drawLabel(ctx, ref, x + w - 6, y + fs * 0.75, rampAt(this.silkRamp, 0.5), fs * 0.75, 'right');
         }
         ctx.restore();
+        if (labels && !engrave) {
+            // Too small to engrave: silkscreen the name on the board in front.
+            ctx.save();
+            this.enterPlane(ctx, 0);
+            drawLabel(ctx, name, x + w / 2, y + h + pinLen + 14, rampAt(this.silkRamp, 0.6 + flash * 0.4), 12, 'center');
+            ctx.restore();
+        }
     }
 
     /** J1: a black plastic header with a pin standing in each hole. */
-    private drawHeader(ctx: CanvasRenderingContext2D, n: number, labels: boolean): void {
-        if (n === 0) return;
-        const pitch = n > 1 ? this.jPinY[1] - this.jPinY[0] : 30;
-        const hw = Math.min(26 * UNIT, pitch * 0.9);
-        const top = this.jPinY[0] - hw / 2 - 4;
-        const len = this.jPinY[n - 1] - this.jPinY[0] + hw + 8;
+    private drawHeader(ctx: CanvasRenderingContext2D, labels: boolean): void {
+        const pins = this.parts;
+        if (pins.length === 0) return;
+        let lo = Infinity;
+        let hi = -Infinity;
+        for (const p of pins) {
+            if (p.jPin < lo) lo = p.jPin;
+            if (p.jPin > hi) hi = p.jPin;
+        }
+        const hw = 26 * UNIT;
+        const top = lo - hw / 2 - 4;
+        const len = hi - lo + hw + 8;
         const f = this.j1Faces;
         this.box(ctx, this.jX - hw / 2, top, hw, len, 0, J1_Z, f.top[0], f.left[0], f.right[0], f.stroke);
         const pin = hw * 0.26;
-        for (let i = 0; i < n; i++) {
-            const c = this.chips[i];
-            const lit = c.flash > 0.08;
-            const col = lit ? c.color : this.padCss;
-            this.box(ctx, this.jX - pin / 2, this.jPinY[i] - pin / 2, pin, pin, J1_Z, J1_Z + 10,
-                col, this.j1Faces.left[0], col, f.stroke);
+        for (const p of pins) {
+            const col = p.flash > 0.08 ? p.color : this.padCss;
+            ctx.globalAlpha = p.presence;
+            this.box(ctx, this.jX - pin / 2, p.jPin - pin / 2, pin, pin, J1_Z, J1_Z + 10 * easeOut(p.presence),
+                col, f.left[0], col, f.stroke);
         }
+        ctx.globalAlpha = 1;
         if (labels) {
             ctx.save();
             this.enterPlane(ctx, 0);
