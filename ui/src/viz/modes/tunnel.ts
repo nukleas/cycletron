@@ -9,8 +9,9 @@
  *
  * Scheduled events ride the tunnel too: each non-kick hap is a lit side of
  * the octagon at an angle hashed per track (pitched notes step round by
- * pitch), in the track's accent, approaching from about a bar out and
- * landing on the gate on its onset; kicks are whole accent rings. Kick
+ * pitch), in the track's accent, read two bars ahead so it approaches from
+ * well down the tunnel — visible about seven beats out, fully lit by four —
+ * and lands on the gate on its onset; kicks are whole accent rings. Kick
  * onsets punch the field of view and brighten the gate. The whole tunnel
  * turns once every 16 bars.
  *
@@ -32,15 +33,18 @@ const SIDES = 8;
 const D_HIT = 1;           // depth (beats) of the gate
 const NEAR = 0.32;         // rings vanish past the camera here
 const FAR = 24;            // draw distance, beats
-/** Scheduled events become visible this many beats before the gate. */
-const AHEAD = 4.5;
+/** Scheduled events start fading in this many beats before the gate… */
+const AHEAD = 7;
+/** …over this many beats, fully lit from AHEAD - FADE_IN beats out. */
+const FADE_IN = 3;
 const TWIST = 0.035;       // radians per beat of depth
 const IDLE_RATE = 0.7;     // beats per second when nothing is scheduled
 const MAX_LANDED = 96;
 const SIDE_ANGLE = TAU / SIDES;
 
 class TunnelMode implements VizMode {
-    private readonly tracks = new TrackModel();
+    /** Two bars: the next bar's haps are already on their way in. */
+    private readonly tracks = new TrackModel(2);
     private readonly transients = new TransientDetector(0.35, 0.4, 0.3);
 
     private u = 0;
@@ -252,7 +256,7 @@ class TunnelMode implements VizMode {
         this.octagon(ctx, f, this.angleAt(D_HIT));
         ctx.stroke();
 
-        // Incoming scheduled events of this bar.
+        // Incoming scheduled events, this bar and the next.
         if (this.playing) {
             for (const t of this.tracks.tracks) {
                 if (t.count === 0) continue;
@@ -262,7 +266,7 @@ class TunnelMode implements VizMode {
                     const b = t.begins[e];
                     if (b <= this.phase) continue;
                     const d = (this.bar + b) * BEATS + off;
-                    const vis = clamp01((AHEAD + D_HIT - d) / 2) * this.visibility(d);
+                    const vis = clamp01((AHEAD + D_HIT - d) / FADE_IN) * this.visibility(d);
                     if (vis < 0.02) continue;
                     ctx.globalAlpha = vis;
                     ctx.lineWidth = lw * Math.min(2.5, Math.max(0.8, D_HIT / d)) * (kick ? 1.3 : 2);

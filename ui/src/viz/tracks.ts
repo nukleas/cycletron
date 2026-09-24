@@ -26,7 +26,11 @@ export interface VizTrack {
     slot: number;
     accent: [number, number, number];
     accentCss: string;
-    /** Bar-relative hap data, parallel arrays truncated to the cap. */
+    /**
+     * Bar-relative hap data, parallel arrays truncated to the cap. Begins run
+     * 0..1 for the current bar, and on up to the model's `bars` span when it
+     * looks ahead (1..2 = the next bar).
+     */
     begins: Float32Array;
     ends: Float32Array;
     /** MIDI note 0-127, or NaN for unpitched haps. */
@@ -68,6 +72,13 @@ export class TrackModel {
     private prevPhase = 0;
     private nextSlot = 0;
     private registryVersion = -1;
+
+    /**
+     * @param bars How many bars each rebuild reads, starting at the current
+     *   one. Modes that draw notes approaching before they sound pass 2;
+     *   onsets still fire only for the current bar.
+     */
+    constructor(private readonly bars = 1) {}
 
     /**
      * Query/reconcile for the current bar; rebuilds on live edit (each
@@ -124,7 +135,8 @@ export class TrackModel {
     }
 
     private rebuild(pattern: PatternHandle, source: PatternSource, bar: number, theme: Theme): void {
-        pattern.queryCycleViewData(bar, 1);
+        const span = this.bars;
+        pattern.queryCycleViewData(bar, span);
         // Fresh view per query — WASM memory growth detaches cached views.
         const data = new Float32Array(source.memory.buffer, source.cycleViewPtr, VIEW_CAPACITY);
 
@@ -183,10 +195,10 @@ export class TrackModel {
                 const begin = data[idx++];
                 const end = data[idx++];
                 const note = data[idx++];
-                if (end <= 0 || begin >= 1) continue;
+                if (end <= 0 || begin >= span) continue;
                 if (n < MAX_EVENTS_PER_TRACK) {
                     track.begins[n] = begin < 0 ? 0 : begin;
-                    track.ends[n] = Math.min(end, 1);
+                    track.ends[n] = Math.min(end, span);
                     track.notes[n] = note;
                     n++;
                 }
