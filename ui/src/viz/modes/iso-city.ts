@@ -4,6 +4,15 @@
  * district pad on a spiral plot grid; each hap in the current bar is a
  * building on that pad, flashing as the playhead crosses its onset.
  *
+ * Traffic follows the schedule too: kick-district onsets flood the avenues
+ * with freight and flash the floor grid, hat-district onsets send a courier
+ * along the flyover lane, and the mid band sets ambient street traffic. FFT
+ * kick/hat transients stand in only when nothing is scheduled.
+ *
+ * Flat faces and fine outlines, source-over throughout; stroke widths and car
+ * sizes are CSS pixels scaled modestly with the canvas, the camera fits the
+ * city to the canvas, and labels stay screen-space mono.
+ *
  * This mode parses the shared cycle-view buffer itself (it needs per-slot
  * dedup, not the flat track model) but follows the same buffer discipline:
  * parse fully + synchronously right after its own query, fresh Float32Array
@@ -13,7 +22,9 @@
 import type {PatternHandle} from '../../../pkg';
 import type {PatternSource, Theme, VizMode, VizModeDef, VizServices} from '../types.js';
 import {MAX_TRACKS, VIEW_CAPACITY, instrumentFamily} from '../tracks.js';
-import {TAU, TransientDetector, beatEnv, lerpRgb, rgbOf} from '../util.js';
+import {
+    MONO_FONT, SeededRandom, TAU, TransientDetector, alphaRamp, beatEnv, lerpRgb, mixRgb, rampAt, rgbOf,
+} from '../util.js';
 
 const ISO_W = 36;   // px per unit along (i - j)
 const ISO_H = 18;   // px per unit along (i + j)
@@ -24,6 +35,13 @@ const CITY_PLOT_STRIDE = 5.5;  // pad + street gap, in tiles
 const CITY_SLOTS = 16;         // hap onsets quantize to 16ths of the bar
 const CITY_MAX_PLOTS = 32;
 const CITY_DEMOLISH_SECS = 0.6;
+const MAX_TRAFFIC = 96;
+/** Traffic stream seed — deterministic spawns, stable across re-entry. */
+const TRAFFIC_SEED = 0x1c17c0de;
+/** World-unit dash rhythms for the two street classes (scale with the camera). */
+const DASH_MAGENTA = [3, 17];
+const DASH_CYAN = [8, 12];
+const NO_DASH: number[] = [];
 
 /**
  * Deterministic diamond-spiral plot table: index → (plotI, plotJ). Ring 0 is
@@ -60,6 +78,8 @@ interface CityColors {
     strokeTop: string;
     strokeSide: string;
     accent: string;
+    /** Accent rgb, kept so a theme change can recolor without a rebuild. */
+    rgb: [number, number, number];
     pad: string;
     padSide: string;
     padStroke: string;
@@ -117,7 +137,8 @@ interface CityTraffic {
     dj: number;
     speed: number;
     life: number;
-    rgb: [number, number, number];
+    /** Palette index into the traffic ramps: 0 neon, 1 secondary, 2 active. */
+    color: number;
     /** Height above the street — hat cars ride the flyover lane. */
     lift: number;
     size: number;
@@ -165,7 +186,10 @@ class IsoCityMode implements VizMode {
     /** Painter-sorted building draw list, rebuilt only on structural change. */
     private drawBuildings: Array<{ b: CityBuilding; d: CityDistrict }> = [];
     private pads: CityDistrict[] = [];
-    private traffic: CityTraffic[] = [];
+    /** Fixed pool; the first `trafficCount` entries are live. */
+    private readonly traffic: CityTraffic[] = [];
+    private trafficCount = 0;
+    private readonly rng = new SeededRandom(TRAFFIC_SEED);
     /** City extent in tiles from the origin — grid + traffic range. */
     private extent = CITY_PAD_TILES;
     private rings = 0;
@@ -183,22 +207,82 @@ class IsoCityMode implements VizMode {
     private readonly transients = new TransientDetector(0.1, 0.08, 0.04);
     private vw = 0;
     private vh = 0;
-    private theme!: Theme;
+    private theme: Theme | null = null;
+    /** min(w, h) / 720 — the canvas unit. */
+    private u = 1;
+    /** Modest CSS-px stroke/size multiplier (1 at 720p, ≤ 1.75 at 4K). */
+    private lineU = 1;
+    private labelPx = 10;
+    private labelFont = `10px ${MONO_FONT}`;
+    // Palette caches, rebuilt in layout() when the theme changes.
+    private sky: CanvasGradient | null = null;
+    private skyH = 0;
+    private neonRgb: [number, number, number] = [0, 229, 255];
+    private bgRgb: [number, number, number] = [0, 0, 0];
+    private gridRamp: string[] = [];
+    /** Street lanes: [0] cyan-class, [1] magenta-class. */
+    private laneRamps: string[][] = [];
+    /** Traffic: neon, secondary, active — fill ramps and head outlines. */
+    private carRamps: string[][] = [];
+    private carOutline: string[][] = [];
+
+    constructor() {
+        for (let n = 0; n < MAX_TRAFFIC; n++) {
+            this.traffic.push({
+                i: 0, j: 0, di: 0, dj: 0, speed: 0, life: 0, color: 0, lift: 0, size: 0, flicker: -1,
+            });
+        }
+    }
 
     layout(s: VizServices): void {
-        // Resize/mode entry: refit the camera to whatever city stands and
-        // force a fresh query on the next update tick.
+        // Resize/mode entry: rescale and refit the camera to whatever city
+        // stands. The city itself is in tile space and is never reset here.
         this.vw = s.width;
         this.vh = s.height;
-        this.theme = s.theme;
+        const u = Math.min(s.width, s.height) / 720;
+        this.u = u;
+        this.lineU = Math.min(1.75, Math.max(1, Math.sqrt(u)));
+        this.labelPx = Math.round(Math.min(11, Math.max(9, 10 * u)));
+        this.labelFont = `${this.labelPx}px ${MONO_FONT}`;
+        if (s.theme !== this.theme) {
+            this.theme = s.theme;
+            this.buildPalette(s.theme);
+            for (const d of this.districts) d.colors = this.colorsFor(d.colors.rgb, s.theme);
+            this.sky = null;
+        }
         this.refit();
-        this.lastBar = -1;
+    }
+
+    private buildPalette(t: Theme): void {
+        const neon = rgbOf(t.neon, t.accentPool[0]);
+        this.neonRgb = neon;
+        this.bgRgb = t.bgRgb;
+        this.gridRamp = alphaRamp(neon);
+        this.laneRamps = [alphaRamp(t.accentPool[0]), alphaRamp(t.accentPool[1 % t.accentPool.length])];
+        const cars: Array<[number, number, number]> = [
+            neon,
+            rgbOf(t.neonSecondary, [255, 43, 214]),
+            rgbOf(t.active, [255, 214, 10]),
+        ];
+        this.carRamps = cars.map((c) => alphaRamp(c));
+        this.carOutline = cars.map((c) => alphaRamp(mixRgb(c, t.textRgb, 0.55)));
+    }
+
+    /** Top-of-frame sky wash: one cached gradient at unit alpha, faded by globalAlpha. */
+    private skyFor(ctx: CanvasRenderingContext2D, h: number): CanvasGradient {
+        if (!this.sky || this.skyH !== h) {
+            // Neon pulled toward the background — the old 40%-lightness sky.
+            const [r, g, b] = mixRgb(this.neonRgb, this.bgRgb, 0.35);
+            const sky = ctx.createLinearGradient(0, 0, 0, h * 0.7);
+            sky.addColorStop(0, `rgb(${r}, ${g}, ${b})`);
+            sky.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+            this.sky = sky;
+            this.skyH = h;
+        }
+        return this.sky;
     }
 
     update(dt: number, s: VizServices): void {
-        this.vw = s.width;
-        this.vh = s.height;
-        this.theme = s.theme;
         const {low, mid, high} = s;
         const source = s.patternSource;
         const pattern = source?.scheduler.pattern ?? null;
@@ -218,6 +302,8 @@ class IsoCityMode implements VizMode {
         // Schedule-accurate onset flashes — latency-compensated cycle means
         // these land on the audible hits.
         const phase = s.cycle - bar;
+        let kickHit = false;
+        let hatHits = 0;
         if (pattern && phase >= this.prevPhase) {
             const prev = this.prevPhase;
             for (const d of this.districts) {
@@ -226,6 +312,8 @@ class IsoCityMode implements VizMode {
                     if (b.begin > prev && b.begin <= phase) {
                         b.flash = 1;
                         d.activity = Math.min(1, d.activity + 0.45);
+                        if (d.kind === 'kick') kickHit = true;
+                        else if (d.kind === 'hat') hatHits++;
                     }
                 }
             }
@@ -257,37 +345,47 @@ class IsoCityMode implements VizMode {
             this.refit();
         }
 
-        // Transients: kick floods the avenues + flashes the floor grid, hats
-        // send a single fast car.
+        // Kicks flood the avenues + flash the floor grid; hats send a single
+        // fast car each. Scheduled onsets drive this; FFT transients only
+        // stand in when nothing is scheduled.
         const hits = this.transients.update(dt, low, mid, high);
-        if (hits.kick) {
+        if (!pattern) {
+            kickHit = hits.kick;
+            hatHits = hits.hat ? 1 : 0;
+        }
+        if (kickHit) {
             this.floorFlash = 1;
-            for (let n = 0; n < 4; n++) this.spawnTraffic(1.5 + Math.random() * 0.8, 'kick');
+            for (let n = 0; n < 4; n++) this.spawnTraffic(this.rng.range(1.5, 2.3), 'kick');
         }
-        if (hits.hat) {
-            this.spawnTraffic(2.4, 'hat');
-        }
+        // A catch-up frame (dt clamp) can cross several hats; two cars is plenty.
+        for (let n = Math.min(2, hatHits); n > 0; n--) this.spawnTraffic(2.4, 'hat');
         this.floorFlash *= Math.exp(-dt * 8);
 
         // Street packet trains scroll with musical time: a linear crawl that
         // surges on every quarter note (the cyberdesign dash-offset trick,
         // tempo-locked).
-        this.dashT += dt * (14 + beatEnv(s.cycle * 4) * 30 + mid * 20);
+        this.dashT += dt * (14 + beatEnv(s.cycle * 4) * 30 + Math.min(1.5, mid) * 20);
 
         // Ambient traffic — mid band drives street activity.
-        if (this.districts.length > 0 && Math.random() < (0.4 + mid * 5) * dt) {
-            this.spawnTraffic(1 + mid * 1.5, 'ambient');
+        const midC = Math.min(1.5, mid);
+        if (this.districts.length > 0 && this.rng.next() < (0.4 + midC * 5) * dt) {
+            this.spawnTraffic(1 + midC * 1.5, 'ambient');
         }
-        for (let n = this.traffic.length - 1; n >= 0; n--) {
+        // Swap-remove keeps the pool dense; draw order among cars is free.
+        for (let n = this.trafficCount - 1; n >= 0; n--) {
             const t = this.traffic[n];
             t.i += t.di * t.speed * dt;
             t.j += t.dj * t.speed * dt;
             t.life -= dt;
-            if (t.life <= 0) this.traffic.splice(n, 1);
+            if (t.life <= 0) {
+                const last = --this.trafficCount;
+                this.traffic[n] = this.traffic[last];
+                this.traffic[last] = t;
+            }
         }
 
         // Camera eases toward the fit; drift clock for the lissajous pan.
-        const cl = Math.min(1, dt * 2.5);
+        const cl = 1 - Math.exp(-dt * 2.5);
         this.camScale += (this.camTargetScale - this.camScale) * cl;
         this.camX += (this.camTargetX - this.camX) * cl;
         this.camY += (this.camTargetY - this.camY) * cl;
@@ -464,6 +562,7 @@ class IsoCityMode implements VizMode {
             strokeTop: lerpRgb(t.borderRgb, a, 0.38),
             strokeSide: lerpRgb(t.borderRgb, a, 0.25),
             accent: `rgb(${a[0]}, ${a[1]}, ${a[2]})`,
+            rgb: a,
             pad: lerpRgb(t.bgLightRgb, a, 0.06),
             padSide: lerpRgb(t.bgRgb, a, 0.05),
             padStroke: `rgba(${a[0]}, ${a[1]}, ${a[2]}, 0.42)`,
@@ -507,19 +606,18 @@ class IsoCityMode implements VizMode {
         let minY = Infinity;
         let maxY = -Infinity;
         let maxH = 1;
+        const P = CITY_PAD_TILES;
         for (const d of this.districts) {
-            const P = CITY_PAD_TILES;
-            const corners = [
-                [d.i0, d.j0], [d.i0 + P, d.j0], [d.i0 + P, d.j0 + P], [d.i0, d.j0 + P],
-            ];
-            for (const [ci, cj] of corners) {
-                const x = isoX(ci, cj);
-                const y = isoY(ci, cj, 0);
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
-            }
+            // Pad diamond extremes: left (i0, j0+P), right (i0+P, j0),
+            // top (i0, j0), bottom (i0+P, j0+P).
+            const l = isoX(d.i0, d.j0 + P);
+            const r = isoX(d.i0 + P, d.j0);
+            const t = isoY(d.i0, d.j0, 0);
+            const b = isoY(d.i0 + P, d.j0 + P, 0);
+            if (l < minX) minX = l;
+            if (r > maxX) maxX = r;
+            if (t < minY) minY = t;
+            if (b > maxY) maxY = b;
             for (const b of d.buildings) {
                 if (b.h > maxH) maxH = b.h;
             }
@@ -531,12 +629,16 @@ class IsoCityMode implements VizMode {
             minY = -CITY_PAD_TILES * ISO_H;
             maxY = CITY_PAD_TILES * ISO_H;
         }
-        minY -= maxH * ISO_Z + 20; // headroom for towers
-        // Margins cover the lissajous camera drift so pads never clip mid-pan.
-        const bw = maxX - minX + 160;
-        const bh = maxY - minY + 120;
-        const fit = Math.min(this.vw / bw, this.vh / bh);
-        this.camTargetScale = Math.min(1.4, Math.max(0.45, fit));
+        minY -= maxH * ISO_Z + ISO_Z; // headroom for towers
+        maxY += ISO_H; // room for the district labels under the front pads
+        // Screen margins cover the lissajous camera drift (±3% / ±2% of the
+        // short side) so pads never clip mid-pan.
+        const m = Math.min(this.vw, this.vh);
+        const fit = Math.min(
+            (this.vw - m * 0.16) / (maxX - minX + ISO_W),
+            (this.vh - m * 0.14) / (maxY - minY),
+        );
+        this.camTargetScale = Math.min(1.4 * this.u, Math.max(0.45 * this.u, fit));
         this.camTargetX = (minX + maxX) / 2;
         this.camTargetY = (minY + maxY) / 2;
         if (this.camScale === 0) {
@@ -547,63 +649,66 @@ class IsoCityMode implements VizMode {
     }
 
     private spawnTraffic(speedMul: number, kind: TrafficKind): void {
-        if (this.traffic.length >= 96) return;
+        if (this.trafficCount >= MAX_TRAFFIC) return;
+        const rng = this.rng;
         const R = this.rings;
         // Street center lines run between plot rows at m·stride + pad/2 + gap/2.
-        const m = Math.floor(Math.random() * (2 * R + 2)) - R - 1;
+        const m = Math.floor(rng.next() * (2 * R + 2)) - R - 1;
         const lane = m * CITY_PLOT_STRIDE + CITY_PAD_TILES / 2 + 0.75;
         const ext = this.extent + 2;
-        const alongI = Math.random() < 0.5;
-        const dir = Math.random() < 0.5 ? 1 : -1;
+        const alongI = rng.next() < 0.5;
+        const dir = rng.next() < 0.5 ? 1 : -1;
         const speed = 6 * speedMul;
-        const t = this.theme;
+        const car = this.traffic[this.trafficCount++];
+        car.i = alongI ? -dir * ext : lane;
+        car.j = alongI ? lane : -dir * ext;
+        car.di = alongI ? dir : 0;
+        car.dj = alongI ? 0 : dir;
+        car.speed = speed;
+        car.life = (2 * ext) / speed;
         // Traffic classes (cyberdesign lane separation): kicks are big
         // magenta ground-freight, hats small cyan couriers on the flyover
         // lane, ambient cars mix the palette at street level.
-        const pool = [t.neon, t.neonSecondary, t.active];
-        const color = kind === 'kick' ? t.neonSecondary
-            : kind === 'hat' ? t.neon
-            : pool[Math.floor(Math.random() * pool.length)];
-        this.traffic.push({
-            i: alongI ? -dir * ext : lane,
-            j: alongI ? lane : -dir * ext,
-            di: alongI ? dir : 0,
-            dj: alongI ? 0 : dir,
-            speed,
-            life: (2 * ext) / speed,
-            rgb: rgbOf(color, [255, 43, 214]),
-            lift: kind === 'hat' ? 0.55 : 0.12,
-            size: kind === 'kick' ? 3 : kind === 'hat' ? 1.8 : 2.2,
-            // ~1 in 7 cars has a broken-neon flicker.
-            flicker: Math.random() < 0.14 ? Math.random() * 3 : -1,
-        });
+        car.color = kind === 'kick' ? 1 : kind === 'hat' ? 0 : Math.min(2, Math.floor(rng.next() * 3));
+        car.lift = kind === 'hat' ? 0.55 : 0.12;
+        car.size = kind === 'kick' ? 3 : kind === 'hat' ? 1.8 : 2.2;
+        // ~1 in 7 cars has a broken-neon flicker.
+        car.flicker = rng.next() < 0.14 ? rng.next() * 3 : -1;
     }
 
     render(ctx: CanvasRenderingContext2D, s: VizServices): void {
-        const theme = s.theme;
-        const {width: w, height: h, low, mid, high} = s;
-        const energy = (low + mid + high) / 3;
+        const {width: w, height: h} = s;
+        if (w <= 0 || h <= 0 || !this.theme) return;
+        // Bands may exceed 1; clamp so nothing scales off the palette ramps.
+        const low = Math.min(1.5, s.low);
+        const mid = Math.min(1.5, s.mid);
+        const high = Math.min(1.5, s.high);
+        const energy = Math.min(1, (low + mid + high) / 3);
         const beat = beatEnv(s.cycle * 4);
         const downbeat = beatEnv(s.cycle);
         const playing = s.patternSource?.scheduler.pattern != null;
 
-        // Sky/horizon glow.
-        const sky = ctx.createLinearGradient(0, 0, 0, h * 0.7);
-        sky.addColorStop(0, `hsla(${theme.neonHue}, 70%, 40%, ${(0.05 + energy * 0.22).toFixed(3)})`);
-        sky.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = sky;
+        ctx.save();
+
+        // Sky/horizon wash — cached gradient, faded by the overall energy.
+        ctx.globalAlpha = 0.05 + energy * 0.22;
+        ctx.fillStyle = this.skyFor(ctx, h);
         ctx.fillRect(0, 0, w, h * 0.7);
+        ctx.globalAlpha = 1;
 
         const scale = this.camScale * (1 + low * 0.012);
-        if (scale <= 0) return;
+        if (!(scale > 0)) {
+            ctx.restore();
+            return;
+        }
         const driftX = Math.sin(this.driftT * TAU / 45) * Math.min(w, h) * 0.03;
         const driftY = Math.sin(this.driftT * TAU / 38 + 1.3) * Math.min(w, h) * 0.02;
 
-        ctx.save();
         ctx.translate(w / 2 + driftX, h * 0.55 + driftY);
         ctx.scale(scale, scale);
         ctx.translate(-this.camX, -this.camY);
-        const px = 1 / scale; // 1 CSS px in world units — keeps strokes crisp
+        // One (modestly canvas-scaled) CSS px in world units — crisp strokes.
+        const px = this.lineU / scale;
 
         // Floor grid — pulses on the beat, flashes on kicks.
         const ext = Math.ceil(this.extent);
@@ -611,7 +716,7 @@ class IsoCityMode implements VizMode {
         const minorA = 0.09 * gridPulse + low * 0.05 + this.floorFlash * 0.12;
         const majorA = 0.18 * gridPulse + low * 0.08 + this.floorFlash * 0.2 + downbeat * 0.06;
         ctx.lineWidth = 0.8 * px;
-        ctx.strokeStyle = `hsla(${theme.neonHue}, 90%, 62%, ${minorA.toFixed(3)})`;
+        ctx.strokeStyle = rampAt(this.gridRamp, minorA);
         ctx.beginPath();
         for (let g = -ext; g <= ext; g++) {
             if (g % 2 === 0) continue;
@@ -622,7 +727,7 @@ class IsoCityMode implements VizMode {
         }
         ctx.stroke();
         ctx.lineWidth = 1.1 * px;
-        ctx.strokeStyle = `hsla(${theme.neonHue}, 90%, 62%, ${majorA.toFixed(3)})`;
+        ctx.strokeStyle = rampAt(this.gridRamp, majorA);
         ctx.beginPath();
         for (let g = -ext; g <= ext; g++) {
             if (g % 2 !== 0) continue;
@@ -633,45 +738,29 @@ class IsoCityMode implements VizMode {
         }
         ctx.stroke();
 
-        // Street conduits — the cyberdesign glow-twin + marching-packet-train
-        // recipe. Each traffic lane is stroked twice: a fat translucent glow,
-        // then a thin dashed core whose dash offset scrolls with musical time,
-        // so the roads visibly carry energy even between cars. Alternate
-        // lanes run cyan/magenta in opposite directions.
+        // Street conduits — the cyberdesign twin-stroke + marching-packet-train
+        // recipe. Each lane class is one path stroked twice: a wide flat
+        // translucent band, then a thin dashed core whose dash offset scrolls
+        // with musical time, so the roads visibly carry energy between cars.
+        // Alternate lanes run cyan/magenta in opposite directions.
         if (this.districts.length > 0) {
-            const R = this.rings;
-            const [nr, ng, nb] = theme.accentPool[0];
-            const [mr2, mg2, mb2] = theme.accentPool[1];
-            const laneGlowA = 0.08 + low * 0.05 + this.floorFlash * 0.12;
-            for (let m = -R - 1; m <= R + 1; m++) {
-                const lane = m * CITY_PLOT_STRIDE + CITY_PAD_TILES / 2 + 0.75;
-                if (Math.abs(lane) > this.extent + 1) continue;
-                const magenta = ((m % 2) + 2) % 2 === 0;
-                const [cr, cg, cb] = magenta ? [mr2, mg2, mb2] : [nr, ng, nb];
-                for (const alongI of [true, false]) {
-                    ctx.beginPath();
-                    if (alongI) {
-                        ctx.moveTo(isoX(-ext, lane), isoY(-ext, lane, 0));
-                        ctx.lineTo(isoX(ext, lane), isoY(ext, lane, 0));
-                    } else {
-                        ctx.moveTo(isoX(lane, -ext), isoY(lane, -ext, 0));
-                        ctx.lineTo(isoX(lane, ext), isoY(lane, ext, 0));
-                    }
-                    // Glow twin.
-                    ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${laneGlowA.toFixed(3)})`;
-                    ctx.lineWidth = 5 * px;
-                    ctx.setLineDash([]);
-                    ctx.stroke();
-                    // Dashed core — packet train. Opposite scroll per color,
-                    // distinct dash rhythm per lane class.
-                    ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${(0.24 + this.floorFlash * 0.22).toFixed(3)})`;
-                    ctx.lineWidth = 1.4 * px;
-                    ctx.setLineDash(magenta ? [3, 17] : [8, 12]);
-                    ctx.lineDashOffset = magenta ? -this.dashT : this.dashT * 0.7;
-                    ctx.stroke();
-                }
+            const bandA = 0.08 + low * 0.05 + this.floorFlash * 0.12;
+            const coreA = 0.24 + this.floorFlash * 0.22;
+            for (let cls = 0; cls < 2; cls++) {
+                const magenta = cls === 1;
+                this.traceLanes(ctx, ext, magenta);
+                const ramp = this.laneRamps[cls];
+                ctx.strokeStyle = rampAt(ramp, bandA);
+                ctx.lineWidth = 4 * px;
+                ctx.setLineDash(NO_DASH);
+                ctx.stroke();
+                ctx.strokeStyle = rampAt(ramp, coreA);
+                ctx.lineWidth = 1.4 * px;
+                ctx.setLineDash(magenta ? DASH_MAGENTA : DASH_CYAN);
+                ctx.lineDashOffset = magenta ? -this.dashT : this.dashT * 0.7;
+                ctx.stroke();
             }
-            ctx.setLineDash([]);
+            ctx.setLineDash(NO_DASH);
             ctx.lineDashOffset = 0;
         }
 
@@ -686,78 +775,96 @@ class IsoCityMode implements VizMode {
             this.drawBuilding(ctx, item.b, item.d, px, high, beat, playing ? phase : -1);
         }
 
-        // Traffic — comet-streaked diamonds. Additive blending fuses streaks
-        // where cars cross; the head gets tight bloom (blur ≈ radius, the
-        // cyberdesign particle recipe), and a minority of cars flicker like
-        // broken neon.
-        ctx.globalCompositeOperation = 'lighter';
+        // Traffic — streaked diamonds, flat: a two-step tail (bright near the
+        // head, faint behind), a flat head with a fine lighter outline, and
+        // a minority of cars flickering like broken neon.
         ctx.lineCap = 'round';
-        for (const t of this.traffic) {
+        for (let n = 0; n < this.trafficCount; n++) {
+            const t = this.traffic[n];
             const tx = isoX(t.i, t.j);
             const ty = isoY(t.i, t.j, t.lift);
-            const [cr, cg, cb] = t.rgb;
+            const ramp = this.carRamps[t.color];
             let alpha = Math.min(1, t.life * 2) * 0.85;
             // Broken-neon dropout: brief dips on a 3s cycle.
             if (t.flicker >= 0 && ((this.driftT + t.flicker) % 3) < 0.07) alpha *= 0.15;
 
             // Flyover cars drop a faint pylon tick to the street below.
             if (t.lift > 0.3) {
-                ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${(alpha * 0.12).toFixed(3)})`;
-                ctx.lineWidth = 1 * px;
+                ctx.strokeStyle = rampAt(ramp, alpha * 0.14);
+                ctx.lineWidth = px;
                 ctx.beginPath();
                 ctx.moveTo(tx, isoY(t.i, t.j, 0));
                 ctx.lineTo(tx, ty);
                 ctx.stroke();
             }
 
-            // Velocity streak — gradient comet tail, length scales with speed.
-            const trailTiles = Math.min(2.4, 0.5 + t.speed * 0.11);
-            const bx = isoX(t.i - t.di * trailTiles, t.j - t.dj * trailTiles);
-            const by = isoY(t.i - t.di * trailTiles, t.j - t.dj * trailTiles, t.lift);
-            const grad = ctx.createLinearGradient(bx, by, tx, ty);
-            grad.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, 0)`);
-            grad.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, ${(alpha * 0.45).toFixed(3)})`);
-            ctx.strokeStyle = grad;
+            // Velocity streak, length scales with speed.
+            const trail = Math.min(2.4, 0.5 + t.speed * 0.11);
+            const mi = t.i - t.di * trail * 0.45;
+            const mj = t.j - t.dj * trail * 0.45;
+            const ei = t.i - t.di * trail;
+            const ej = t.j - t.dj * trail;
             ctx.lineWidth = t.size * 1.5 * px;
+            ctx.strokeStyle = rampAt(ramp, alpha * 0.14);
             ctx.beginPath();
-            ctx.moveTo(bx, by);
+            ctx.moveTo(isoX(ei, ej), isoY(ei, ej, t.lift));
+            ctx.lineTo(isoX(mi, mj), isoY(mi, mj, t.lift));
+            ctx.stroke();
+            ctx.strokeStyle = rampAt(ramp, alpha * 0.4);
+            ctx.beginPath();
+            ctx.moveTo(isoX(mi, mj), isoY(mi, mj, t.lift));
             ctx.lineTo(tx, ty);
             ctx.stroke();
 
-            // Diamond head with tight bloom.
+            // Diamond head.
             const r = (t.size + mid * 1.5) * px;
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = `rgb(${cr}, ${cg}, ${cb})`;
-            ctx.shadowBlur = 4;
-            ctx.shadowColor = `rgb(${cr}, ${cg}, ${cb})`;
             ctx.beginPath();
             ctx.moveTo(tx, ty - r);
             ctx.lineTo(tx + r, ty);
             ctx.lineTo(tx, ty + r);
             ctx.lineTo(tx - r, ty);
             ctx.closePath();
+            ctx.fillStyle = rampAt(ramp, alpha);
             ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.globalAlpha = 1;
+            ctx.strokeStyle = rampAt(this.carOutline[t.color], alpha);
+            ctx.lineWidth = px;
+            ctx.stroke();
         }
-        ctx.globalCompositeOperation = 'source-over';
 
         ctx.restore();
 
         // District labels — screen space so the mono text stays crisp.
-        ctx.font = '10px "JetBrains Mono", ui-monospace, monospace';
+        ctx.save();
+        ctx.font = this.labelFont;
         ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        const labelDy = this.labelPx * 0.6;
         for (const d of this.pads) {
             const ax = isoX(d.i0 + 0.15, d.j0 + CITY_PAD_TILES);
             const ay = isoY(d.i0 + 0.15, d.j0 + CITY_PAD_TILES, 0);
             const sx = w / 2 + driftX + (ax - this.camX) * scale;
-            const sy = h * 0.55 + driftY + (ay - this.camY) * scale + 14;
+            const sy = h * 0.55 + driftY + (ay - this.camY) * scale + labelDy;
             const life = d.dying > 0 ? d.dying / CITY_DEMOLISH_SECS : Math.min(1, d.age * 2);
             ctx.globalAlpha = (0.35 + d.activity * 0.5) * life;
             ctx.fillStyle = d.colors.accent;
             ctx.fillText(d.label, sx, sy);
         }
-        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    /** Both axes' street centre lines of one lane class, as a single path. */
+    private traceLanes(ctx: CanvasRenderingContext2D, ext: number, magenta: boolean): void {
+        const R = this.rings;
+        ctx.beginPath();
+        for (let m = -R - 1; m <= R + 1; m++) {
+            if ((((m % 2) + 2) % 2 === 0) !== magenta) continue;
+            const lane = m * CITY_PLOT_STRIDE + CITY_PAD_TILES / 2 + 0.75;
+            if (Math.abs(lane) > this.extent + 1) continue;
+            ctx.moveTo(isoX(-ext, lane), isoY(-ext, lane, 0));
+            ctx.lineTo(isoX(ext, lane), isoY(ext, lane, 0));
+            ctx.moveTo(isoX(lane, -ext), isoY(lane, -ext, 0));
+            ctx.lineTo(isoX(lane, ext), isoY(lane, ext, 0));
+        }
     }
 
     private drawPad(ctx: CanvasRenderingContext2D, d: CityDistrict, px: number): void {
@@ -824,12 +931,7 @@ class IsoCityMode implements VizMode {
 
         if (lit > 0.05) {
             ctx.globalAlpha = lit * life;
-            if (b.flash > 0.25) {
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = c.accent;
-            }
             this.drawBody(ctx, b, d.kind, k, bh, c.topLit, c.leftLit, c.rightLit, c.accent, c.accent, px);
-            ctx.shadowBlur = 0;
         }
 
         // Roof beacon — on schedule flashes, and antenna tips sparkle with the
@@ -841,8 +943,6 @@ class IsoCityMode implements VizMode {
             const r = (2.5 + beat * 1.5 + b.flash * 2.5) * px;
             ctx.globalAlpha = Math.min(1, beaconA) * life;
             ctx.fillStyle = c.accent;
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = c.accent;
             ctx.beginPath();
             ctx.moveTo(bx, by - r);
             ctx.lineTo(bx + r, by);
@@ -850,7 +950,6 @@ class IsoCityMode implements VizMode {
             ctx.lineTo(bx - r, by);
             ctx.closePath();
             ctx.fill();
-            ctx.shadowBlur = 0;
         }
         ctx.globalAlpha = 1;
     }
