@@ -266,25 +266,18 @@ class LensBenchMode implements VizMode {
         // pitched notes map C1..C7 across the fan, unpitched haps hash to a
         // stable ray.
         const sync = this.tracks.sync(s.patternSource, s.cycle, s.theme);
-        if (sync.pattern && sync.phase >= sync.prevPhase) {
-            const cps = Math.max(0.05, currentBpm() / 240);
-            for (const track of this.tracks.tracks) {
-                const field = track.slot % FIELDS;
-                for (let e = 0; e < track.count; e++) {
-                    const begin = track.begins[e];
-                    if (begin > sync.prevPhase && begin <= sync.phase) {
-                        track.activity = Math.min(1, track.activity + 0.45);
-                        const note = track.notes[e];
-                        const i = Number.isFinite(note)
-                            ? Math.round(((Math.min(96, Math.max(24, note)) - 24) / 72) * (RAYS - 1))
-                            : (track.slot * 5 + Math.floor(begin * 16) * 3) % RAYS;
-                        const durCycles = Math.min(1, Math.max(0.05, track.ends[e] - begin));
-                        const durSec = Math.min(1.2, Math.max(0.12, durCycles / cps));
-                        this.spawnPulse(field * RAYS + i, durSec, track.accentCss);
-                    }
-                }
-            }
-        }
+        const cps = Math.max(0.05, currentBpm() / 240);
+        this.tracks.forEachOnset(sync, (track, e) => {
+            const field = track.slot % FIELDS;
+            const begin = track.begins[e];
+            const note = track.notes[e];
+            const i = Number.isFinite(note)
+                ? Math.round(((Math.min(96, Math.max(24, note)) - 24) / 72) * (RAYS - 1))
+                : (track.slot * 5 + Math.floor(begin * 16) * 3) % RAYS;
+            const durCycles = Math.min(1, Math.max(0.05, track.ends[e] - begin));
+            const durSec = Math.min(1.2, Math.max(0.12, durCycles / cps));
+            this.spawnPulse(field * RAYS + i, durSec, track.accentCss);
+        }, 0.45);
         this.tracks.decay(dt);
 
         // FFT transients: kicks flood the on-axis marginal rays and chief;

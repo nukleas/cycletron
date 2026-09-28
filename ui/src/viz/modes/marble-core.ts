@@ -1,184 +1,319 @@
 /**
- * MARBLE CORE — concentric rings rotating at integer multiples of the cycle
- * ("clockwork" feel), with orbiting orbs and an FFT-driven core glow.
+ * MARBLE CORE — a clockwork of concentric rings, one per track.
+ *
+ * The playhead arm sweeps once per bar (12 o'clock = the downbeat). Up to five
+ * tracks each own a ring, assigned with hysteresis so rings don't swap while
+ * a track keeps playing; each ring carries a tick at every scheduled event
+ * position in the current bar, and a tick lights on its onset and fades, with
+ * sustained notes drawing their arc while they sound. Each ring's orb glides
+ * from event to event, arriving on the onset, and swells with its track's
+ * activity. The core disc breathes with kick onsets, with the smoothed FFT
+ * low band as a second opinion.
+ *
+ * With no pattern the rings become a calm subdivision clock (4 / 8 / 16) on
+ * a local clock, and the core follows the FFT gently.
+ *
+ * Flat fills and fine outlines; every radius is a fraction of min(w, h).
  */
 
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {TAU, beatEnv} from '../util.js';
+import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
+import {MAX_EVENTS_PER_TRACK, TrackModel, instrumentFamily, type VizTrack} from '../tracks.js';
+import {TAU, alphaRamp, beatEnv, clamp01, drawLabel, follow, rampAt, rgbOf} from '../util.js';
 
-interface Particle {
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
-    life: number;
-    size: number;
-    hue: number;
+const RINGS = 5;
+const TOP = -Math.PI / 2;
+/** Idle clock: bars per second when nothing is scheduled. */
+const IDLE_RATE = 0.25;
+const IDLE_DIVISIONS = [4, 8, 16] as const;
+
+function smoothstep(t: number): number {
+    return t * t * (3 - 2 * t);
 }
 
 class MarbleCoreMode implements VizMode {
-    private rings: Array<{ radius: number; cyclesPerRev: number; phaseOffset: number; hue: number }> = [];
-    private orbs: Array<{ baseAngle: number; cyclesPerRev: number; radius: number; size: number; hue: number }> = [];
-    private particles: Particle[] = [];
+    private readonly tracks = new TrackModel();
+
+    private u = 0;
+    private lw = 1;
+    private cx = 0;
+    private cy = 0;
+    private radius = 0;   // outer extent
+    private step = 0;     // ring spacing
+    private coreR = 0;
+
+    private readonly ringTrack: (VizTrack | null)[] = new Array<VizTrack | null>(RINGS).fill(null);
+    /** Per-ring, per-event onset envelopes. */
+    private readonly flash = new Float32Array(RINGS * MAX_EVENTS_PER_TRACK);
+    private readonly ringLevel = new Float32Array(RINGS);
+    private playing = false;
+    private phase = 0;
+    private idlePhase = 0;
+    private idleLevel = 1;
+    private kickEnv = 0;
+    private lowF = 0;
+    private midF = 0;
+
+    private theme: Theme | null = null;
+    private neonRamp: string[] = [];
+    private textRamp: string[] = [];
+    private idleCss: string[] = [];
 
     layout(s: VizServices): void {
-        this.rings.length = 0;
-        this.orbs.length = 0;
+        const m = Math.min(s.width, s.height);
+        this.u = m / 720;
+        this.lw = Math.min(2, Math.max(1, 0.9 + this.u * 0.35));
+        this.cx = s.width / 2;
+        this.cy = s.height / 2;
+        this.radius = m * 0.46;
+        this.step = this.radius * 0.14;
+        this.coreR = this.radius * 0.17;
+    }
 
-        // Integer-ratio rotation rates → "clockwork" feel
-        const ringSpec: Array<{ radius: number; cyclesPerRev: number; hueShift: number }> = [
-            { radius: 80, cyclesPerRev: 4, hueShift: 0 },
-            { radius: 132, cyclesPerRev: 2, hueShift: 28 },
-            { radius: 184, cyclesPerRev: 1, hueShift: 58 },
-            { radius: 236, cyclesPerRev: 0.5, hueShift: 92 },
-            { radius: 288, cyclesPerRev: 0.25, hueShift: 130 },
-        ];
-        for (let i = 0; i < ringSpec.length; i++) {
-            const spec = ringSpec[i];
-            this.rings.push({
-                radius: spec.radius,
-                cyclesPerRev: spec.cyclesPerRev,
-                phaseOffset: i * 0.4,
-                hue: s.theme.neonHue + spec.hueShift,
-            });
+    private ringRadius(k: number): number {
+        return this.radius * (0.34 + 0.14 * k);
+    }
+
+    private ensureTheme(theme: Theme): void {
+        if (theme === this.theme) return;
+        this.theme = theme;
+        this.neonRamp = alphaRamp(rgbOf(theme.neon, [71, 246, 255]));
+        this.textRamp = alphaRamp(theme.textRgb);
+        this.idleCss = [theme.neon, theme.neonSecondary, theme.violet];
+    }
+
+    private readonly onOnset = (track: VizTrack, e: number): void => {
+        if (instrumentFamily(track.name) === 'kick') this.kickEnv = 1;
+        for (let k = 0; k < RINGS; k++) {
+            if (this.ringTrack[k] === track) this.flash[k * MAX_EVENTS_PER_TRACK + e] = 1;
         }
+    };
 
-        const orbSpecs = [1, 2, 3, 4, 6, 8];
-        for (let i = 0; i < orbSpecs.length; i++) {
-            this.orbs.push({
-                baseAngle: (i / orbSpecs.length) * TAU,
-                cyclesPerRev: orbSpecs[i],
-                radius: 100 + (i % 3) * 44,
-                size: 4.5 + (i % 3),
-                hue: s.theme.neonHue + (i % 5) * 18,
-            });
+    /** Keep assigned tracks while they play; fill free rings with the busiest others. */
+    private assignRings(): void {
+        for (let k = 0; k < RINGS; k++) {
+            const t = this.ringTrack[k];
+            if (t && t.count === 0) {
+                this.ringTrack[k] = null;
+                this.flash.fill(0, k * MAX_EVENTS_PER_TRACK, (k + 1) * MAX_EVENTS_PER_TRACK);
+            }
+        }
+        for (let k = 0; k < RINGS; k++) {
+            if (this.ringTrack[k]) continue;
+            let best: VizTrack | null = null;
+            for (const t of this.tracks.tracks) {
+                if (t.count === 0 || this.ringTrack.includes(t)) continue;
+                if (!best || t.count > best.count) best = t;
+            }
+            if (!best) break;
+            this.ringTrack[k] = best;
+            this.ringLevel[k] = 0;
         }
     }
 
     update(dt: number, s: VizServices): void {
-        const low = s.low;
-        // Rings & orbs are positioned from the cycle directly in render —
-        // here we only spawn FFT-driven impact particles on strong low hits.
-        if (low > 0.55 && Math.random() < low * dt * 9) {
-            const angle = Math.random() * TAU;
-            const r = 70 + Math.random() * 160;
-            this.particles.push({
-                x: s.width / 2 + Math.cos(angle) * r,
-                y: s.height / 2 + Math.sin(angle) * r * 0.6,
-                vx: Math.cos(angle) * (22 + low * 35),
-                vy: Math.sin(angle) * (18 + low * 28),
-                life: 0.45 + low * 0.5,
-                size: 2.5 + low * 3,
-                hue: s.theme.activeHue + low * 30,
-            });
-        }
+        this.ensureTheme(s.theme);
+        const sync = this.tracks.sync(s.patternSource, s.cycle, s.theme);
+        this.playing = sync.pattern !== null;
+        this.phase = sync.phase;
+        // Tracks keep stale counts while stopped; only reassign while playing.
+        if (this.playing) this.assignRings();
+        this.tracks.forEachOnset(sync, this.onOnset);
+        this.tracks.decay(dt);
 
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles[i];
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            p.vx *= 0.96;
-            p.vy *= 0.96;
-            p.life -= dt * 1.4;
-            if (p.life <= 0) this.particles.splice(i, 1);
+        let rings = 0;
+        for (let k = 0; k < RINGS; k++) {
+            const on = this.playing && this.ringTrack[k] !== null;
+            if (on) rings++;
+            this.ringLevel[k] = follow(this.ringLevel[k], on ? 1 : 0, dt, 6, 4);
         }
+        const idle = rings === 0;
+        this.idleLevel = follow(this.idleLevel, idle ? 1 : 0, dt, 4, 6);
+        // The idle clock picks up from the bar position so stopping doesn't jump.
+        this.idlePhase = idle && !this.playing
+            ? (this.idlePhase + dt * IDLE_RATE) % 1
+            : this.phase;
+
+        const fk = Math.exp(-dt * 5);
+        for (let i = 0; i < this.flash.length; i++) this.flash[i] *= fk;
+        this.kickEnv *= Math.exp(-dt * 7);
+        const low = Number.isFinite(s.low) ? clamp01(s.low) : 0;
+        const mid = Number.isFinite(s.mid) ? clamp01(s.mid) : 0;
+        this.lowF = follow(this.lowF, low, dt, 30, 7);
+        this.midF = follow(this.midF, mid, dt, 25, 6);
     }
 
     render(ctx: CanvasRenderingContext2D, s: VizServices): void {
-        const {width: w, height: h, low, mid} = s;
-        const cx = w / 2;
-        const cy = h / 2;
-        const cyclePhase = s.cycle * TAU;
-        const beat = beatEnv(s.cycle * 4);
-        const downbeat = beatEnv(s.cycle);
+        if (s.width <= 0 || s.height <= 0) return;
+        if (this.u === 0) this.layout(s);
+        this.ensureTheme(s.theme);
+        const {cx, cy, lw, step} = this;
 
-        // Sweeping "playhead" arm — one revolution per bar, very obvious
-        // cycle-locked motion.
-        const armAngle = cyclePhase;
-        const armOuter = Math.min(w, h) * 0.45;
-        const armGrad = ctx.createLinearGradient(
-            cx, cy,
-            cx + Math.cos(armAngle) * armOuter,
-            cy + Math.sin(armAngle) * armOuter,
-        );
-        armGrad.addColorStop(0, `hsla(${s.theme.neonHue}, 92%, 70%, 0)`);
-        armGrad.addColorStop(1, `hsla(${s.theme.neonHue}, 92%, 72%, 0.28)`);
-        ctx.strokeStyle = armGrad;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + Math.cos(armAngle) * armOuter, cy + Math.sin(armAngle) * armOuter);
-        ctx.stroke();
+        ctx.save();
+        ctx.lineCap = 'round';
 
-        // Rings — rotation locked to integer ratios of the cycle. Brightness
-        // pumps with quarter-beat so the cycle lock reads at a glance.
-        for (const ring of this.rings) {
-            const ringPhase = cyclePhase * ring.cyclesPerRev + ring.phaseOffset;
-            const r = ring.radius + Math.sin(ringPhase) * (4 + low * 7) + downbeat * 6;
-            // Each ring brightens when its own phase wraps — those local accents
-            // are what make integer ratios visible.
-            const ringBeat = beatEnv(ringPhase / TAU);
-            const alpha = 0.22 + ringBeat * 0.4 + beat * 0.1;
+        if (this.idleLevel > 0.01) this.drawIdle(ctx, this.idleLevel);
 
-            ctx.strokeStyle = `hsla(${ring.hue}, 88%, 72%, ${alpha})`;
-            ctx.lineWidth = 1.6 + ringBeat * 1.8;
+        const labels = step >= 16 && s.width >= 360;
+        const fontSize = Math.round(Math.min(11, Math.max(9, 8 + this.u * 1.5)));
+        const tick = step * 0.28;
+        const litTick = step * 0.5;
+        for (let k = 0; k < RINGS; k++) {
+            const t = this.ringTrack[k];
+            const level = this.ringLevel[k];
+            if (!t || level < 0.01) continue;
+            const r = this.ringRadius(k);
+            const act = clamp01(t.activity);
+            const base = k * MAX_EVENTS_PER_TRACK;
+            ctx.strokeStyle = t.accentCss;
+
+            ctx.globalAlpha = level * (0.22 + act * 0.25 + this.midF * 0.1);
+            ctx.lineWidth = lw;
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, TAU);
             ctx.stroke();
 
-            // Longer, brighter tick marks — much more obvious rotation
-            const tickCount = 8;
-            const tickLen = 10 + ringBeat * 6;
-            ctx.strokeStyle = `hsla(${ring.hue}, 95%, 82%, ${alpha * 0.9})`;
-            ctx.lineWidth = 1.4;
-            for (let i = 0; i < tickCount; i++) {
-                const a = ringPhase + (i / tickCount) * TAU;
-                const x1 = cx + Math.cos(a) * (r - tickLen * 0.5);
-                const y1 = cy + Math.sin(a) * (r - tickLen * 0.5);
-                const x2 = cx + Math.cos(a) * (r + tickLen * 0.5);
-                const y2 = cy + Math.sin(a) * (r + tickLen * 0.5);
+            // Resting ticks, batched.
+            ctx.globalAlpha = level * 0.5;
+            ctx.beginPath();
+            for (let e = 0; e < t.count; e++) {
+                const a = TOP + t.begins[e] * TAU;
+                const c = Math.cos(a), sn = Math.sin(a);
+                ctx.moveTo(cx + c * (r - tick / 2), cy + sn * (r - tick / 2));
+                ctx.lineTo(cx + c * (r + tick / 2), cy + sn * (r + tick / 2));
+            }
+            ctx.stroke();
+
+            // Lit ticks in two buckets, plus arcs for notes still sounding.
+            for (let bucket = 0; bucket < 2; bucket++) {
+                const bright = bucket === 1;
+                ctx.globalAlpha = level * (bright ? 1 : 0.55);
+                ctx.lineWidth = lw * (bright ? 1.8 : 1.4);
                 ctx.beginPath();
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(x2, y2);
+                for (let e = 0; e < t.count; e++) {
+                    const f = this.flash[base + e];
+                    if (f < 0.08 || (f >= 0.5) !== bright) continue;
+                    const a = TOP + t.begins[e] * TAU;
+                    const c = Math.cos(a), sn = Math.sin(a);
+                    const len = tick + (litTick - tick) * f;
+                    ctx.moveTo(cx + c * (r - len / 2), cy + sn * (r - len / 2));
+                    ctx.lineTo(cx + c * (r + len / 2), cy + sn * (r + len / 2));
+                }
+                if (bright && this.playing) {
+                    for (let e = 0; e < t.count; e++) {
+                        const b0 = t.begins[e];
+                        if (b0 > this.phase || t.ends[e] <= this.phase || t.ends[e] - b0 < 0.1) continue;
+                        const a0 = TOP + b0 * TAU;
+                        ctx.moveTo(cx + Math.cos(a0) * r, cy + Math.sin(a0) * r);
+                        ctx.arc(cx, cy, r, a0, TOP + this.phase * TAU);
+                    }
+                }
                 ctx.stroke();
             }
-        }
 
-        // Orbs — orbit at integer rates with a beat-driven size pulse
-        for (const orb of this.orbs) {
-            const angle = orb.baseAngle + cyclePhase * orb.cyclesPerRev;
-            const orbBeat = beatEnv(angle / TAU);
-            const x = cx + Math.cos(angle) * orb.radius;
-            const y = cy + Math.sin(angle) * orb.radius * 0.58;
-            const sizeBoost = 1 + orbBeat * 1.4;
-
-            ctx.fillStyle = `hsla(${orb.hue}, 95%, 75%, ${0.10 + orbBeat * 0.28})`;
+            // Orb: glides from the last onset to the next, arriving on it.
+            const orbA = TOP + this.orbPhase(t) * TAU;
+            const orbR = Math.max(2.5, step * 0.13) * (1 + act * 0.7);
+            const ox = cx + Math.cos(orbA) * r, oy = cy + Math.sin(orbA) * r;
+            ctx.globalAlpha = level;
             ctx.beginPath();
-            ctx.arc(x, y, orb.size * 2.6 * sizeBoost, 0, TAU);
+            ctx.arc(ox, oy, orbR, 0, TAU);
+            ctx.fillStyle = s.theme.bg;
             ctx.fill();
-
-            ctx.fillStyle = `hsla(${orb.hue}, 92%, 82%, ${0.45 + orbBeat * 0.4})`;
-            ctx.beginPath();
-            ctx.arc(x, y, orb.size * sizeBoost, 0, TAU);
+            ctx.globalAlpha = level * (0.45 + act * 0.55);
+            ctx.fillStyle = t.accentCss;
             ctx.fill();
-        }
+            ctx.globalAlpha = level;
+            ctx.lineWidth = lw;
+            ctx.stroke();
 
-        // Impact particles
-        for (const p of this.particles) {
-            const a = Math.max(0.1, p.life / 1.1);
-            ctx.fillStyle = `hsla(${p.hue}, 90%, 78%, ${a})`;
-            ctx.fillRect(p.x - p.size * 0.5, p.y - p.size * 0.5, p.size, p.size);
+            if (labels) {
+                drawLabel(ctx, t.name, cx - 6 * this.u - 4, cy - r,
+                    rampAt(this.textRamp, level * (0.4 + act * 0.45)), fontSize, 'right');
+            }
         }
+        ctx.globalAlpha = 1;
 
-        // FFT-reactive core glow
-        const coreSize = 18 + (low + mid) * 11;
-        const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, coreSize * 1.8);
-        grad.addColorStop(0, `hsla(${s.theme.secondaryHue}, 90%, 60%, ${0.35 + (low + mid) * 0.25})`);
-        grad.addColorStop(1, `hsla(${s.theme.neonHue}, 92%, 60%, 0)`);
-        ctx.fillStyle = grad;
+        // Playhead arm: the bar position (or the idle clock).
+        const armPhase = this.playing ? this.phase : this.idlePhase;
+        const armA = TOP + armPhase * TAU;
+        const ac = Math.cos(armA), as = Math.sin(armA);
+        ctx.strokeStyle = rampAt(this.neonRamp, 0.5);
+        ctx.lineWidth = lw;
         ctx.beginPath();
-        ctx.arc(cx, cy, coreSize * 1.9, 0, TAU);
+        ctx.moveTo(cx + ac * this.coreR * 1.15, cy + as * this.coreR * 1.15);
+        ctx.lineTo(cx + ac * this.radius * 0.98, cy + as * this.radius * 0.98);
+        ctx.stroke();
+
+        // Core: flat disc breathing with kicks, FFT low as the second opinion.
+        const coreR = this.coreR * (1 + this.kickEnv * 0.16 + this.lowF * 0.08);
+        ctx.beginPath();
+        ctx.arc(cx, cy, coreR, 0, TAU);
+        ctx.fillStyle = s.theme.bg;
         ctx.fill();
+        ctx.fillStyle = rampAt(this.neonRamp, 0.08 + this.kickEnv * 0.3 + this.lowF * 0.12);
+        ctx.fill();
+        ctx.strokeStyle = s.theme.neon;
+        ctx.lineWidth = lw * 1.2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.max(1.5, 2.5 * this.u), 0, TAU);
+        ctx.fillStyle = s.theme.neonSecondary;
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    /** Bar phase of the orb: smoothstep between the surrounding onsets. */
+    private orbPhase(t: VizTrack): number {
+        if (t.count === 0) return this.phase;
+        const p = this.phase;
+        let prev = -Infinity, next = Infinity, first = Infinity, last = -Infinity;
+        for (let e = 0; e < t.count; e++) {
+            const b = t.begins[e];
+            if (b < first) first = b;
+            if (b > last) last = b;
+            if (b <= p && b > prev) prev = b;
+            if (b > p && b < next) next = b;
+        }
+        if (prev === -Infinity) prev = last - 1;
+        if (next === Infinity) next = first + 1;
+        const span = next - prev;
+        if (span <= 1e-6) return next;
+        return prev + span * smoothstep(clamp01((p - prev) / span));
+    }
+
+    /** Subdivision clock: rings of 4 / 8 / 16 ticks, the passing tick lit. */
+    private drawIdle(ctx: CanvasRenderingContext2D, level: number): void {
+        const {cx, cy, lw} = this;
+        const tick = this.step * 0.28;
+        for (let i = 0; i < IDLE_DIVISIONS.length; i++) {
+            const n = IDLE_DIVISIONS[i];
+            const r = this.ringRadius(i + 1);
+            ctx.strokeStyle = this.idleCss[i];
+            ctx.lineWidth = lw;
+            ctx.globalAlpha = level * (0.16 + this.midF * 0.1);
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, TAU);
+            ctx.stroke();
+            ctx.globalAlpha = level * 0.4;
+            ctx.beginPath();
+            for (let j = 0; j < n; j++) {
+                const a = TOP + (j / n) * TAU;
+                const len = j % (n / 4) === 0 ? tick * 1.4 : tick;
+                ctx.moveTo(cx + Math.cos(a) * (r - len / 2), cy + Math.sin(a) * (r - len / 2));
+                ctx.lineTo(cx + Math.cos(a) * (r + len / 2), cy + Math.sin(a) * (r + len / 2));
+            }
+            ctx.stroke();
+            const pos = this.idlePhase * n;
+            const a = TOP + (Math.floor(pos) / n) * TAU;
+            ctx.globalAlpha = level * beatEnv(pos);
+            ctx.lineWidth = lw * 1.8;
+            ctx.beginPath();
+            ctx.moveTo(cx + Math.cos(a) * (r - tick), cy + Math.sin(a) * (r - tick));
+            ctx.lineTo(cx + Math.cos(a) * (r + tick), cy + Math.sin(a) * (r + tick));
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
     }
 }
 

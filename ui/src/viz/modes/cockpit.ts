@@ -20,8 +20,8 @@
 
 import type {PatternHandle} from '../../../pkg';
 import type {PatternSource, Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {MAX_TRACKS, VIEW_CAPACITY} from '../tracks.js';
-import {TAU, TransientDetector, rgbOf} from '../util.js';
+import {MAX_TRACKS, VIEW_CAPACITY, instrumentFamily} from '../tracks.js';
+import {MONO_FONT, TAU, TransientDetector, clamp01, hash32, rand01, rgbOf} from '../util.js';
 import {currentBpm} from '../../bpm.js';
 
 /** World units per cycle. FOREST DRIVE uses 52 m of road; space is faster. */
@@ -76,7 +76,6 @@ const CYAN = '#80d9df';
 const WARN_RED = '#ef7e82';
 const CAPITAL_HULL = '#132637';
 
-const FONT = "'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, ui-monospace, monospace";
 
 /** 70% cool, 20% warm, 10% blue — the starfield's whole colour language. */
 const STAR_COLORS = ['#91b7c8', '#dac5a0', '#77b5cb'] as const;
@@ -145,23 +144,6 @@ interface Blip {
     css: string;
 }
 
-/** Deterministic 32-bit mix keeps event shapes stable across rebuilds. */
-function hash32(a: number, b: number): number {
-    let h = Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul(b | 0, 0x165667b1);
-    h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
-    h = Math.imul(h ^ (h >>> 13), 0x297a2d39);
-    return (h ^ (h >>> 16)) >>> 0;
-}
-
-/** 0..1 from a hash, taking the high bits. */
-function rand01(h: number): number {
-    return (h >>> 8) / 0x1000000;
-}
-
-function clamp01(v: number): number {
-    return v < 0 ? 0 : v > 1 ? 1 : v;
-}
-
 /**
  * Recognizable forms by instrument family, as in ISO CITY and FOREST DRIVE.
  * Pitch and duration separate small note markers from extended structures.
@@ -171,11 +153,7 @@ function heroKindFor(name: string, note: number, dur: number): HeroKind {
         if (dur < LONG_DUR) return 'buoy';
         return note < MASS_NOTE ? 'capital' : 'nebula';
     }
-    const n = name.toLowerCase();
-    if (/^(bd|kick|808)/.test(n)) return 'kick';
-    if (/^(sd|sn|cp|clap|rim|lt|mt|ht)/.test(n)) return 'snare';
-    if (/^(hh|oh|hat|shaker|cb|rd|cr)/.test(n)) return 'hat';
-    return 'perc';
+    return instrumentFamily(name);
 }
 
 /** Where a kind's blips sit on the radar face. */
@@ -368,7 +346,7 @@ class CockpitMode implements VizMode {
             const td = s.timeData;
             // Every 4th sample is plenty to catch a clip and a quarter the work.
             for (let i = 0; i < td.length; i += 4) {
-                const v = Math.abs(td[i] - 128) / 128;
+                const v = Math.abs(td[i]);
                 if (v > peak) peak = v;
             }
             this.clipPeak = Math.max(peak, this.clipPeak);
@@ -1220,7 +1198,7 @@ class CockpitMode implements VizMode {
     private label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number,
         color = MUTED, size = 10, align: CanvasTextAlign = 'left'): void {
         ctx.fillStyle = color;
-        ctx.font = `${size}px ${FONT}`;
+        ctx.font = `${size}px ${MONO_FONT}`;
         ctx.textAlign = align;
         ctx.textBaseline = 'middle';
         ctx.fillText(text, x, y);
