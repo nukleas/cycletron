@@ -6,15 +6,15 @@
  * round the outermost. Where blobs fuse, the inner bands split along a smooth
  * dominance curve, so every track keeps its own colour inside the liquid.
  *
- *   scheduled track → one ball (accent colour, slot-seeded home + orbit),
- *                     fading in/out as the track appears/leaves
+ *   scheduled track → up to eight owned balls (accent colour, seeded orbit),
+ *                     fading in/out as tracks appear/leave; overflow waits
  *   onset           → the ball swells (fast attack, slow release; kicks most)
  *   pitched note    → steers the ball's height (C4 at home, higher rises)
  *   no pattern      → three theme-coloured balls drifting slowly, breathing
  *                     with the smoothed low / mid / high bands
  */
 
-import {TrackModel, instrumentFamily} from '../tracks.js';
+import {TrackModel, instrumentFamily, type VizTrack} from '../tracks.js';
 import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
 import {
     TAU, drawLabel, follow, hash32, mixRgb, rampAt, alphaRamp, rand01, rgbOf,
@@ -51,7 +51,9 @@ class PlasmaMode implements VizMode {
     private m = 0; // min(w, h)
     private u = 1;
 
-    // Per-ball state (index = track slot % MAX_BALLS, or band index when idle).
+    // Explicit ownership: track slots are lifetime IDs, not reusable ball indices.
+    private readonly ballTrack: (VizTrack | null)[] = new Array<VizTrack | null>(MAX_BALLS).fill(null);
+    // Per-ball state, or band index when idle.
     private readonly presence = new Float32Array(MAX_BALLS);
     private readonly swell = new Float32Array(MAX_BALLS);
     private readonly swellTarget = new Float32Array(MAX_BALLS);
@@ -120,43 +122,76 @@ class PlasmaMode implements VizMode {
         this.coreCss[i] = `rgb(${core[0]}, ${core[1]}, ${core[2]})`;
     }
 
-    update(dt: number, s: VizServices): void {
-        this.syncTheme(s.theme);
-        this.t += dt;
-        const sync = this.tracks.sync(s.patternSource, s.cycle, s.theme);
-        this.tracks.forEachOnset(sync, (track, e) => {
-            const i = track.slot % MAX_BALLS;
-            const fam = instrumentFamily(track.name);
-            const hit = fam === 'kick' ? 1 : fam === 'snare' ? 0.7 : fam === 'hat' ? 0.3 : 0.55;
-            this.swellTarget[i] = Math.max(this.swellTarget[i], hit);
-            const note = track.notes[e];
-            if (Number.isFinite(note)) this.pitchTarget[i] = Math.max(-1, Math.min(1, (note - 60) / 30));
-        });
-        this.tracks.decay(dt);
+    private readonly onOnset = (track: VizTrack, e: number): void => {
+        const i = this.ballTrack.indexOf(track);
+        if (i < 0 || !this.wanted[i]) return;
+        const fam = instrumentFamily(track.name);
+        const hit = fam === 'kick' ? 1 : fam === 'snare' ? 0.7 : fam === 'hat' ? 0.3 : 0.55;
+        this.swellTarget[i] = Math.max(this.swellTarget[i], hit);
+        const note = track.notes[e];
+        if (Number.isFinite(note)) this.pitchTarget[i] = Math.max(-1, Math.min(1, (note - 60) / 30));
+    };
 
-        this.bands[0] = follow(this.bands[0], clampBand(s.low), dt, 8, 3);
-        this.bands[1] = follow(this.bands[1], clampBand(s.mid), dt, 8, 3);
-        this.bands[2] = follow(this.bands[2], clampBand(s.high), dt, 8, 3);
+    private resetBall(i: number): void {
+        this.presence[i] = 0;
+        this.swell[i] = this.swellTarget[i] = 0;
+        this.pitch[i] = this.pitchTarget[i] = 0;
+    }
 
+    /** Keep live owners; a departing ball finishes fading before reuse. */
+    private assignBalls(scheduled: boolean): void {
         this.wanted.fill(0);
         const theme = this.theme!;
-        if (sync.pattern && this.tracks.tracks.length > 0) {
+        const showTracks = scheduled && this.tracks.tracks.length > 0;
+        for (let i = 0; i < MAX_BALLS; i++) {
+            const track = this.ballTrack[i];
+            if (showTracks && track && (track.count > 0 || track.activity >= 0.02)) {
+                this.wanted[i] = 1;
+            } else if (this.presence[i] < 0.02) {
+                this.ballTrack[i] = null;
+            }
+        }
+        if (showTracks) {
             for (const track of this.tracks.tracks) {
                 if (track.count === 0 && track.activity < 0.02) continue;
-                const i = track.slot % MAX_BALLS;
+                if (this.ballTrack.includes(track)) continue;
+                const i = this.ballTrack.findIndex((owner, k) => owner === null
+                    && (this.presence[k] < 0.02 || this.ballName[k] === ''));
+                if (i < 0) break;
+                this.ballTrack[i] = track;
+                this.resetBall(i);
                 this.wanted[i] = 1;
+            }
+            for (let i = 0; i < MAX_BALLS; i++) {
+                const track = this.ballTrack[i];
+                if (!track || !this.wanted[i]) continue;
                 this.setBallColour(i, track.accentCss, track.accent);
                 this.ballName[i] = track.name;
             }
         } else {
             const pool = theme.accentPool;
             for (let i = 0; i < 3; i++) {
+                if (this.ballTrack[i]) this.resetBall(i);
+                this.ballTrack[i] = null;
                 const rgb = pool[(i * 2) % pool.length] ?? theme.textRgb;
                 this.wanted[i] = 1;
                 this.setBallColour(i, IDLE_KEYS[i], rgb);
                 this.ballName[i] = '';
             }
         }
+    }
+
+    update(dt: number, s: VizServices): void {
+        this.syncTheme(s.theme);
+        this.t += dt;
+        const sync = this.tracks.sync(s.patternSource, s.cycle, s.theme);
+        this.assignBalls(sync.pattern !== null);
+        this.tracks.forEachOnset(sync, this.onOnset);
+        this.tracks.decay(dt);
+
+        this.bands[0] = follow(this.bands[0], clampBand(s.low), dt, 8, 3);
+        this.bands[1] = follow(this.bands[1], clampBand(s.mid), dt, 8, 3);
+        this.bands[2] = follow(this.bands[2], clampBand(s.high), dt, 8, 3);
 
         const m = this.m;
         for (let i = 0; i < MAX_BALLS; i++) {

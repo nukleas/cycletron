@@ -374,7 +374,13 @@ class NeonCircuitMode implements VizMode {
 
     private partFor(key: string, label: string, kind: Kind): Part {
         let p = this.byKey.get(key);
-        if (p) return p;
+        if (p) {
+            if (p.kind !== kind) {
+                p.kind = kind;
+                p.faces.key = ''; // metal/epoxy lighting can change with the kind
+            }
+            return p;
+        }
         p = {
             key, label, kind, color: '', track: null, alive: true, presence: 0,
             rank: 0, y: NaN, lane: NaN, seqPin: NaN, jPin: NaN,
@@ -398,7 +404,11 @@ class NeonCircuitMode implements VizMode {
             for (const tr of this.tracks.tracks) {
                 if (n >= MAX_LIVE) break;
                 if (tr.count === 0 && tr.activity <= 0.02) continue;
-                const p = this.partFor(tr.name, tr.name.toUpperCase(), kindFor(tr));
+                // A track with nothing in the bars read (a rest) keeps its
+                // package; it only changes when the notes say otherwise.
+                const held = this.byKey.get(tr.name);
+                const kind = tr.count > 0 || !held ? kindFor(tr) : held.kind;
+                const p = this.partFor(tr.name, tr.name.toUpperCase(), kind);
                 p.track = tr;
                 p.color = tr.accentCss;
                 this.facesFor(p.faces, p.color, tr.accent, PACKAGES[p.kind].metal);
