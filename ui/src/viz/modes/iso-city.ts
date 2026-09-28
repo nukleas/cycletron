@@ -21,7 +21,7 @@
 
 import type {PatternHandle} from '../../../pkg';
 import type {PatternSource, Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {MAX_TRACKS, VIEW_CAPACITY, instrumentFamily} from '../tracks.js';
+import {MAX_TRACKS, VIEW_CAPACITY, PatternTimeline, instrumentFamily} from '../tracks.js';
 import {
     MONO_FONT, SeededRandom, TAU, TransientDetector, alphaRamp, beatEnv, lerpRgb, mixRgb, rampAt, rgbOf,
 } from '../util.js';
@@ -178,9 +178,7 @@ class IsoCityMode implements VizMode {
     private readonly plotByName = new Map<string, number>();
     private freePlots: number[] = [];
     private nextPlot = 0;
-    private lastBar = -1;
-    private lastPattern: PatternHandle | null = null;
-    private prevPhase = 0;
+    private readonly timeline = new PatternTimeline();
     private registryVersion = -1;
     private readonly trackNames: (string | undefined)[] = new Array(MAX_TRACKS).fill(undefined);
     /** Painter-sorted building draw list, rebuilt only on structural change. */
@@ -286,30 +284,22 @@ class IsoCityMode implements VizMode {
         const {low, mid, high} = s;
         const source = s.patternSource;
         const pattern = source?.scheduler.pattern ?? null;
-        const bar = Math.floor(s.cycle);
+        const sync = this.timeline.sync(pattern, s.cycle);
 
         // Rebuild on live edit (each evaluate creates a new handle) or on the
         // bar boundary (multi-cycle patterns change from bar to bar).
-        if (pattern && source && (pattern !== this.lastPattern || bar !== this.lastBar)) {
-            this.lastPattern = pattern;
-            this.lastBar = bar;
-            this.rebuild(pattern, source, bar, s.theme);
-            // Let begin=0 haps fire on the downbeat we just crossed.
-            this.prevPhase = -1e-6;
-        }
-        if (!pattern) this.lastPattern = null;
+        if (sync.rebuild && pattern && source) this.rebuild(pattern, source, sync.bar, s.theme);
 
         // Schedule-accurate onset flashes — latency-compensated cycle means
         // these land on the audible hits.
-        const phase = s.cycle - bar;
+        const {phase, prevPhase} = sync;
         let kickHit = false;
         let hatHits = 0;
-        if (pattern && phase >= this.prevPhase) {
-            const prev = this.prevPhase;
+        if (pattern && phase >= prevPhase) {
             for (const d of this.districts) {
                 if (d.dying > 0) continue;
                 for (const b of d.buildings) {
-                    if (b.begin > prev && b.begin <= phase) {
+                    if (b.begin > prevPhase && b.begin <= phase) {
                         b.flash = 1;
                         d.activity = Math.min(1, d.activity + 0.45);
                         if (d.kind === 'kick') kickHit = true;
@@ -318,7 +308,6 @@ class IsoCityMode implements VizMode {
                 }
             }
         }
-        this.prevPhase = phase;
 
         // Envelope decay, ages, demolition.
         const flashDecay = Math.exp(-dt * 6);

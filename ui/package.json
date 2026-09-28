@@ -11,6 +11,7 @@
     "dev": "vite --port 5173",
     "prebuild": "npm run gen:dsl && npm run gen:manifest",
     "build": "vite build",
+    "test:viz": "node --test scripts/viz.test.mjs",
     "preview": "vite preview --port 5173",
     "comment:build:wasm": "The prebuilt engine WASM is committed under ui/pkg. Only rerun build:wasm to bump the engine: it needs nightly + wasm-pack and a strudel-rs checkout (STRUDEL_RS, default ../../clean-strudel-rs) at the exact rev Cargo.toml pins — the script refuses anything else. Then commit ui/pkg with the pin bump.",
     "build:wasm": "node scripts/build-wasm.mjs"

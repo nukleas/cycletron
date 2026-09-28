@@ -16,8 +16,10 @@ import {rgbOf} from './util.js';
 
 /** Must match CYCLE_VIEW_CAPACITY in strudel-audio-wasm — bounds all reads. */
 export const VIEW_CAPACITY = 4096;
+/** Must match CYCLE_VIEW_EVENTS_CAPACITY, the engine's pre-packing scratch cap. */
+const VIEW_EVENT_CAPACITY = 1024;
 export const MAX_TRACKS = 128;
-/** Per-track hap cap — `note("c*2048")`-proofing. */
+/** Per-track, per-bar hap cap — `note("c*2048")`-proofing. */
 export const MAX_EVENTS_PER_TRACK = 64;
 
 export interface VizTrack {
@@ -58,27 +60,59 @@ export type OnsetHandler = (track: VizTrack, e: number) => void;
 
 export interface TrackSync {
     pattern: PatternHandle | null;
+    bar: number;
+    /** Query again on a new pattern handle or bar. */
+    rebuild: boolean;
     /** Bar phase pair for onset scanning: fire haps with begin ∈ (prev, phase]. */
     phase: number;
     prevPhase: number;
+}
+
+/** Shared onset window for flat tracks and modes with their own spatial model. */
+export class PatternTimeline {
+    // Handles are retained for identity only; never call methods on them here.
+    private lastPattern: PatternHandle | null = null;
+    private lastBar = -1;
+    private prevPhase = 0;
+
+    sync(pattern: PatternHandle | null, cycle: number): TrackSync {
+        const bar = Math.floor(cycle);
+        const phase = cycle - bar;
+        const rebuild = pattern !== null && (pattern !== this.lastPattern || bar !== this.lastBar);
+        let prevPhase = this.prevPhase;
+        if (rebuild) {
+            const nextBar = this.lastPattern !== null && bar === this.lastBar + 1;
+            const sameBar = this.lastPattern !== null && bar === this.lastBar;
+            // Keep the window on live edits. Entering mid-bar or seeking must
+            // not replay past haps, but a fresh start at zero includes its hit.
+            if (nextBar || (!sameBar && cycle === 0)) prevPhase = -1e-6;
+            else if (!sameBar) prevPhase = phase;
+        }
+        this.lastPattern = pattern;
+        this.lastBar = bar;
+        this.prevPhase = phase;
+        return {pattern, bar, rebuild, phase, prevPhase};
+    }
 }
 
 export class TrackModel {
     readonly tracks: VizTrack[] = [];
     private readonly byName = new Map<string, VizTrack>();
     private readonly names: (string | undefined)[] = new Array(MAX_TRACKS).fill(undefined);
-    private lastPattern: PatternHandle | null = null;
-    private lastBar = -1;
-    private prevPhase = 0;
+    private readonly timeline = new PatternTimeline();
     private nextSlot = 0;
     private registryVersion = -1;
+    /** Scratch counts: each queried bar gets its own per-track budget. */
+    private readonly barCounts: Uint16Array;
 
     /**
      * @param bars How many bars each rebuild reads, starting at the current
      *   one. Modes that draw notes approaching before they sound pass 2;
      *   onsets still fire only for the current bar.
      */
-    constructor(private readonly bars = 1) {}
+    constructor(private readonly bars = 1) {
+        this.barCounts = new Uint16Array(bars);
+    }
 
     /**
      * Query/reconcile for the current bar; rebuilds on live edit (each
@@ -87,27 +121,9 @@ export class TrackModel {
      */
     sync(source: PatternSource | null, cycle: number, theme: Theme): TrackSync {
         const pattern = source?.scheduler.pattern ?? null;
-        const bar = Math.floor(cycle);
-
-        const phase = cycle - bar;
-        if (pattern && source && (pattern !== this.lastPattern || bar !== this.lastBar)) {
-            const nextBar = this.lastPattern !== null && bar === this.lastBar + 1;
-            const sameBar = this.lastPattern !== null && bar === this.lastBar;
-            this.lastPattern = pattern;
-            this.lastBar = bar;
-            this.rebuild(pattern, source, bar, theme);
-            // Crossing into the next bar: let begin=0 haps fire on the downbeat.
-            // A live edit within the bar keeps scanning from the last frame.
-            // Entering mid-bar, starting, or seeking fires nothing already past,
-            // so earlier haps are never replayed as one burst.
-            if (nextBar) this.prevPhase = -1e-6;
-            else if (!sameBar) this.prevPhase = phase;
-        }
-        if (!pattern) this.lastPattern = null;
-
-        const prevPhase = this.prevPhase;
-        this.prevPhase = phase;
-        return { pattern, phase, prevPhase };
+        const sync = this.timeline.sync(pattern, cycle);
+        if (sync.rebuild && pattern && source) this.rebuild(pattern, source, sync.bar, theme);
+        return sync;
     }
 
     /**
@@ -134,11 +150,32 @@ export class TrackModel {
         for (const t of this.tracks) t.activity *= k;
     }
 
-    private rebuild(pattern: PatternHandle, source: PatternSource, bar: number, theme: Theme): void {
-        const span = this.bars;
+    private queryData(pattern: PatternHandle, source: PatternSource, bar: number, span: number): Float32Array {
         pattern.queryCycleViewData(bar, span);
         // Fresh view per query — WASM memory growth detaches cached views.
-        const data = new Float32Array(source.memory.buffer, source.cycleViewPtr, VIEW_CAPACITY);
+        return new Float32Array(source.memory.buffer, source.cycleViewPtr, VIEW_CAPACITY);
+    }
+
+    private rebuild(pattern: PatternHandle, source: PatternSource, bar: number, theme: Theme): void {
+        let span = this.bars;
+        let data = this.queryData(pattern, source, bar, span);
+        if (span > 1) {
+            let used = 3;
+            let events = 0;
+            for (let t = 0; t < data[0] && used + 2 <= VIEW_CAPACITY; t++) {
+                const count = data[used + 1];
+                events += count;
+                used += 2 + count * 3;
+            }
+            // A full shared buffer may have omitted current-bar haps behind
+            // future ones. Drop lookahead for this rebuild and query only the
+            // current bar. Normally keep a single multi-bar query: separate
+            // queries clip held notes and turn them into false future onsets.
+            if (events >= VIEW_EVENT_CAPACITY || used + 5 > VIEW_CAPACITY) {
+                span = 1;
+                data = this.queryData(pattern, source, bar, span);
+            }
+        }
 
         const trackCount = data[0];
         const registryVersion = data[2];
@@ -167,9 +204,9 @@ export class TrackModel {
                     slot: this.nextSlot++,
                     accent: [71, 246, 255],
                     accentCss: 'rgb(71, 246, 255)',
-                    begins: new Float32Array(MAX_EVENTS_PER_TRACK),
-                    ends: new Float32Array(MAX_EVENTS_PER_TRACK),
-                    notes: new Float32Array(MAX_EVENTS_PER_TRACK),
+                    begins: new Float32Array(MAX_EVENTS_PER_TRACK * this.bars),
+                    ends: new Float32Array(MAX_EVENTS_PER_TRACK * this.bars),
+                    notes: new Float32Array(MAX_EVENTS_PER_TRACK * this.bars),
                     count: 0,
                     activity: 0,
                     seen: true,
@@ -190,14 +227,18 @@ export class TrackModel {
             track.accentCss = `rgb(${accent[0]}, ${accent[1]}, ${accent[2]})`;
 
             let n = 0;
+            this.barCounts.fill(0);
             const nEvents = Math.min(eventCount, Math.floor((VIEW_CAPACITY - idx) / 3));
             for (let e = 0; e < nEvents; e++) {
                 const begin = data[idx++];
                 const end = data[idx++];
                 const note = data[idx++];
                 if (end <= 0 || begin >= span) continue;
-                if (n < MAX_EVENTS_PER_TRACK) {
-                    track.begins[n] = begin < 0 ? 0 : begin;
+                const onset = Math.max(0, begin);
+                const eventBar = Math.floor(onset);
+                if (this.barCounts[eventBar] < MAX_EVENTS_PER_TRACK) {
+                    this.barCounts[eventBar]++;
+                    track.begins[n] = onset;
                     track.ends[n] = Math.min(end, span);
                     track.notes[n] = note;
                     n++;
