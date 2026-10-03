@@ -304,6 +304,13 @@ jobs:
           done
           echo "--- bundled usr/lib after strip ---"
           ls squashfs-root/usr/lib/
+          # --appimage-extract creates every directory 0700 regardless of what
+          # the image stored, and appimagetool packs modes as found. A 0700
+          # root is invisible when the owner mounts it, but anything that
+          # mounts as another user (firejail, the AppImage catalog's test)
+          # gets "AppRun.wrapped: Permission denied". Normalize before packing:
+          # dirs 755, files 644 or 755, nothing group/other-writable.
+          chmod -R u=rwX,go=rX squashfs-root
           wget -qO appimagetool \
             "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x appimagetool
