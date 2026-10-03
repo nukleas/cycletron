@@ -9,6 +9,11 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # zip must stay on the major tauri-plugin-updater pulls in, so the two
+      # unify into one copy (src-tauri/Cargo.toml). Bump with the updater.
+      - dependency-name: zip
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /ui
     schedule:
