@@ -314,7 +314,18 @@ jobs:
           wget -qO appimagetool \
             "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x appimagetool
-          ./appimagetool --appimage-extract-and-run squashfs-root "$APPIMAGE"
+          # Embedded update info lets AppImageUpdate (and the AppImage catalog)
+          # find newer releases; appimagetool writes the matching .zsync beside
+          # the AppImage. "latest" resolves to the newest published
+          # non-prerelease — releases are published with --prerelease=false for
+          # the in-app updater already, so the same rule covers both.
+          ./appimagetool --appimage-extract-and-run \
+            -u "gh-releases-zsync|nukleas|cycletron|latest|Cycletron_*_amd64.AppImage.zsync" \
+            squashfs-root "$APPIMAGE"
+          [ -s "$APPIMAGE.zsync" ] || {
+            echo "::error::appimagetool did not write $APPIMAGE.zsync — AppImageUpdate would find nothing"
+            exit 1
+          }
           npx -y @tauri-apps/cli@2 signer sign \
             -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
             "$APPIMAGE"
@@ -322,7 +333,7 @@ jobs:
           # Upload the AppImage FIRST and read back its new id: --clobber does
           # not edit an asset in place, it deletes and re-creates it, so the id
           # changes every run and latest.json has to carry the new one.
-          gh release upload "$GITHUB_REF_NAME" "$APPIMAGE" "$APPIMAGE.sig" \
+          gh release upload "$GITHUB_REF_NAME" "$APPIMAGE" "$APPIMAGE.sig" "$APPIMAGE.zsync" \
             --clobber --repo "$GITHUB_REPOSITORY"
           NEW_ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
             --jq ".assets[] | select(.name == \"$NAME\") | .id")
