@@ -2,7 +2,6 @@
     // Get values from storage once
     const savedWidth = localStorage.getItem('sidebar-width');
     const savedFontSize = localStorage.getItem('editor-font-size') || '14';
-    const savedVizMode = parseInt(localStorage.getItem('visualizer-mode') || '0', 10);
     const savedBpm = localStorage.getItem('bpm') || '120';
     window.__savedEditorCode = localStorage.getItem('editor-code');
     const oldDefaultClaim = '// Strudel WASM — 100% Rust, compiled to WebAssembly';
@@ -17,17 +16,20 @@
     if (savedWidth) root.style.setProperty('--sidebar-width', savedWidth + 'px');
     root.style.setProperty('--editor-font-size', savedFontSize + 'px');
 
-    // Fast-path for UI text (ensures elements match variables on first frame)
+    // Fill the header readouts and the editor skeleton from storage once the
+    // document is parsed, before the app boots. Runs exactly once: the app
+    // owns these elements from then on (StrudelApp.applyBpm is the only tempo
+    // writer). It used to poll every frame until all of them existed — and
+    // since one was later removed, it kept stamping the load-time BPM over
+    // every setbpm() and slider drag for the whole session.
     function syncUI() {
         const zoomEl = document.getElementById('editorZoomValue');
-        const vizEl = document.getElementById('vizMode');
         const bpmSlider = document.getElementById('bpmSlider');
         const bpmValue = document.getElementById('bpmValue');
         const bpmDisplay = document.getElementById('bpmDisplay');
         const editorEl = document.getElementById('editor');
 
         if (zoomEl) zoomEl.textContent = savedFontSize + 'px';
-        if (vizEl) vizEl.selectedIndex = savedVizMode;
         if (bpmSlider) bpmSlider.value = savedBpm;
         if (bpmValue) bpmValue.value = savedBpm;
         if (bpmDisplay) bpmDisplay.textContent = savedBpm;
@@ -255,11 +257,11 @@ stack(
             <div class="es-content" style="font-size:${fontSize}px">${contentRows}</div>
         </div>`;
         }
-
-        if (!zoomEl || !vizEl || !bpmSlider || !bpmValue || !bpmDisplay) {
-            requestAnimationFrame(syncUI);
-        }
     }
 
-    syncUI();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', syncUI, {once: true});
+    } else {
+        syncUI();
+    }
 })();
