@@ -94,7 +94,10 @@
     },
     "linux": {
       "appimage": {
-        "bundleMediaFramework": true
+        "bundleMediaFramework": true,
+        "files": {
+          "/usr/share/metainfo/com.nukleas.cycletron.metainfo.xml": "linux/com.nukleas.cycletron.metainfo.xml"
+        }
       },
       "deb": {
         "depends": [

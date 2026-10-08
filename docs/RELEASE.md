@@ -41,7 +41,9 @@ Endpoint: `https://github.com/nukleas/cycletron/releases/latest/download/latest.
 ## Cutting a release
 
 `.github/workflows/release.yml` runs on a `v*` tag and produces a **draft**
-pre-release with signed bundles + `latest.json`, across three platforms:
+release with signed bundles + `latest.json`, across three platforms. It is
+deliberately not a prerelease: GitHub's `releases/latest` (the updater endpoint,
+and the AppImage's embedded zsync update info) skips prereleases.
 
 | Platform | Artifact | Signing |
 |----------|----------|---------|
@@ -62,8 +64,24 @@ git tag -a v0.1.0-alpha.6 -m "Cycletron alpha 6"
 git push origin v0.1.0-alpha.6
 ```
 
+Publish with `gh release edit <tag> --notes-file <notes> --draft=false --prerelease=false --latest`.
+
 Ship notes should mention: AGPL, API key / Ollama requirement for AI, Play-first
 audio arming, and dialect ≠ full web Strudel.
+
+### Linux AppImage extras
+
+The `fix-appimage` job repacks the Tauri AppImage (it strips bundled Wayland
+libs, normalizes file modes so other users can read it, and embeds
+`gh-releases-zsync` update info). It uploads the matching `.zsync`, so
+AppImageUpdate can update an installed AppImage.
+
+The AppImage ships AppStream metadata from
+`src-tauri/linux/com.nukleas.cycletron.metainfo.xml`. The
+[AppImage catalog](https://appimage.github.io/Cycletron/) page takes its
+description and screenshots from it. The screenshots are URLs into
+`docs/media/screenshots/` on `master`, so keep those files in place, and
+validate edits with `appstreamcli validate`.
 
 ## Privacy (user-facing copy)
 
