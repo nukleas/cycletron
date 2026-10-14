@@ -165,6 +165,10 @@ export class StrudelApp {
     private _activeNotesLit = false;
     private _wasmMemory: WebAssembly.Memory | null;
     private bpmView: Float64Array | null;
+    /** The BPM string applyBpm last wrote to the readouts. Not the slider's own
+     *  value: dragging the slider (or typing in the box) changes that control
+     *  before applyBpm runs, so comparing against it skipped the others. */
+    private _shownBpm = '';
     /** 128-bit set (4×u32) of GM instruments referenced but not yet loaded. */
     private gmBitsView: Uint32Array | null;
     /** Per-instrument 32-bit set of which soundfont variants are missing. */
@@ -1552,7 +1556,8 @@ export class StrudelApp {
         // Runs on every evaluate (each live-coding keystroke) — skip the DOM
         // and localStorage churn when the tempo didn't change. The scheduler
         // still gets the call; it no-ops internally on an unchanged BPM.
-        if (value !== this.elements.bpmSlider.value) {
+        if (value !== this._shownBpm) {
+            this._shownBpm = value;
             localStorage.setItem('bpm', value);
             this.elements.bpmSlider.value = value;
             this.elements.bpmValue.value = value;
