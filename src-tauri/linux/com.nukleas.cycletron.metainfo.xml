@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata: shipped in the AppImage (tauri.conf.json bundle.linux.appimage.files)
+     so software catalogs show these screenshots and this description. -->
+<component type="desktop-application">
+  <id>com.nukleas.cycletron</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-or-later</project_license>
+  <name>Cycletron</name>
+  <summary>Live coding for music, built on Rust</summary>
+  <developer id="io.github.nukleas">
+    <name>nukleas</name>
+  </developer>
+  <description>
+    <p>
+      Cycletron is a desktop live-coding instrument. Write patterns in a
+      Strudel-compatible mini-notation and hear every edit on the next cycle;
+      the pattern engine is strudel-rs, running in Rust.
+    </p>
+    <ul>
+      <li>Code highlighting that follows the notes as they play</li>
+      <li>Stage mode: full-window visualizers driven by the pattern itself</li>
+      <li>Built-in drum machines, General MIDI and downloadable sample sets</li>
+      <li>MIDI input, Ableton Link and OSC</li>
+      <li>Export to WAV, MP3, stems or MIDI</li>
+      <li>An optional AI assistant, with your own API key or a local model</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">Cycletron.desktop</launchable>
+  <url type="homepage">https://github.com/nukleas/cycletron</url>
+  <url type="bugtracker">https://github.com/nukleas/cycletron/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>The editor, highlighting a synthwave arrangement as it plays</caption>
+      <image>https://raw.githubusercontent.com/nukleas/cycletron/master/docs/media/screenshots/editor.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Stage mode with NEON CIRCUIT: one chip per track</caption>
+      <image>https://raw.githubusercontent.com/nukleas/cycletron/master/docs/media/screenshots/stage-neon-circuit.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Stage mode with FOREST DRIVE: every note plants a tree</caption>
+      <image>https://raw.githubusercontent.com/nukleas/cycletron/master/docs/media/screenshots/stage-forest-drive.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Stage mode with COCKPIT: fly through the schedule</caption>
+      <image>https://raw.githubusercontent.com/nukleas/cycletron/master/docs/media/screenshots/stage-cockpit.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1" />
+</component>
