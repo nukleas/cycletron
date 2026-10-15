@@ -9,7 +9,6 @@
  * so the way out has to be on screen when you arrive.
  */
 
-import {currentBpm} from '../../bpm.js';
 import {VIZ_MODES} from '../registry.js';
 import type {VizLayer, VizServices} from '../types.js';
 import {MONO_FONT} from '../util.js';
@@ -94,7 +93,7 @@ export class StageHudLayer implements VizLayer {
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.globalAlpha = 0.6;
         ctx.fillText(
-            `${currentBpm()} BPM   ·   CYCLE ${Math.floor(s.cycle)}`,
+            `${s.bpm} BPM   ·   CYCLE ${Math.floor(s.cycle)}`,
             x,
             y + this.fontPx * 1.7,
         );

@@ -211,22 +211,7 @@ fn render_pattern_to_wav(
             .map_err(|e| format!("Could not create directory {}: {e}", parent.display()))?;
     }
 
-    let spec = hound::WavSpec {
-        channels: 2,
-        sample_rate: pcm.sample_rate,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
-    let mut writer = hound::WavWriter::create(path, spec)
-        .map_err(|e| format!("Could not create WAV '{}': {e}", path.display()))?;
-    for (&l, &r) in pcm.left.iter().zip(&pcm.right) {
-        let _ = writer.write_sample(sample_to_i16(l));
-        let _ = writer.write_sample(sample_to_i16(r));
-    }
-    writer
-        .finalize()
-        .map_err(|e| format!("Could not finalize WAV '{}': {e}", path.display()))?;
-
+    pcm.write_wav(path)?;
     Ok(pcm.clipped)
 }
 
@@ -619,10 +604,6 @@ fn stem_dir_for(mix_wav: &Path) -> PathBuf {
         .parent()
         .unwrap_or_else(|| Path::new("."))
         .join(format!("{stem}-stems"))
-}
-
-fn sample_to_i16(s: f32) -> i16 {
-    (s.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16
 }
 
 // ---------------------------------------------------------------------------

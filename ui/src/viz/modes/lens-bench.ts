@@ -10,10 +10,9 @@
  * the off-axis bundles, and splits the trace chromatically.
  */
 
-import {currentBpm} from '../../bpm.js';
 import {TrackModel} from '../tracks.js';
 import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {TAU, TransientDetector, beatEnv, rgbOf} from '../util.js';
+import {TAU, TransientDetector, beatEnv, hash32, rand01, rgbOf} from '../util.js';
 import {
     AXIS, CHIEF, DESIGN_OPTICS, FIELDS, FIELD_FRAC, LANES, LENS_DESIGNS, MAX_PTS, RAYS,
     aimField, fieldFocus, rayIndex, sagZ, traceRay, yAtZ,
@@ -75,6 +74,8 @@ class LensBenchMode implements VizMode {
     private readonly impactY = new Float32Array(8);
     private nextImpact = 0;
     private titleFlash = 0;
+    /** Counts hat pulses, seeding which upper ray each takes. */
+    private hatSeq = 0;
     private readonly tracks = new TrackModel();
     private readonly transients = new TransientDetector(0.1, 0.08, 0.04);
     private vw = 0;
@@ -266,7 +267,7 @@ class LensBenchMode implements VizMode {
         // pitched notes map C1..C7 across the fan, unpitched haps hash to a
         // stable ray.
         const sync = this.tracks.sync(s.patternSource, s.cycle, s.theme);
-        const cps = Math.max(0.05, currentBpm() / 240);
+        const cps = Math.max(0.05, s.bpm / 240);
         this.tracks.forEachOnset(sync, (track, e) => {
             const field = track.slot % FIELDS;
             const begin = track.begins[e];
@@ -295,7 +296,7 @@ class LensBenchMode implements VizMode {
             this.spawnPulse((FIELDS - 1) * RAYS + CHIEF, 0.2, s.theme.active);
         }
         if (hits.hat) {
-            const upper = axis + CHIEF + 1 + Math.floor(Math.random() * CHIEF);
+            const upper = axis + CHIEF + 1 + Math.floor(rand01(hash32(0x4a7, this.hatSeq++)) * CHIEF);
             this.spawnPulse(Math.min(axis + RAYS - 1, upper), 0.15, '#ffffff');
         }
 

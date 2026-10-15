@@ -13,6 +13,7 @@ cycletron-analysis = { workspace = true }
 strudel-audio = { workspace = true }
 strudel-core = { workspace = true }
 strudel-dsl = { workspace = true }
+hound = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }

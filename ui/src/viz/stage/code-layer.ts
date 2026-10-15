@@ -146,6 +146,8 @@ export class StageCodeLayer implements VizLayer {
 
     private scrollPx = 0;
     private caretPhase = 0;
+    /** Off for a recording, where there is no performer to edit. */
+    private caretVisible = true;
     private clock = 0;
 
     private follow: StageFollow = 'off';
@@ -194,6 +196,10 @@ export class StageCodeLayer implements VizLayer {
         if (px === this.basePx) return;
         this.basePx = px;
         this.needsRelayout = true;
+    }
+
+    setCaretVisible(on: boolean): void {
+        this.caretVisible = on;
     }
 
     setFollow(mode: StageFollow): void {
@@ -763,7 +769,7 @@ export class StageCodeLayer implements VizLayer {
     }
 
     private drawCaret(ctx: CanvasRenderingContext2D, s: VizServices): void {
-        if (this.caretPhase % (CARET_BLINK * 2) > CARET_BLINK) return;
+        if (!this.caretVisible || this.caretPhase % (CARET_BLINK * 2) > CARET_BLINK) return;
 
         const row = this.rowIndexFor(this.snapshot.cursor);
         // Off screen (inside a hidden section) or on a folded row: no caret is

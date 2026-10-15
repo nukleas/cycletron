@@ -1,0 +1,18 @@
+[package]
+name = "performance-export"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "performance-export"
+path = "main.rs"
+
+[dependencies]
+cycletron-core = { workspace = true }
+cycletron-analysis = { workspace = true }
+cycletron-render = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

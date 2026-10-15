@@ -3,6 +3,8 @@
 //! arrangement-shape problems. Shares the [`Critique`]/[`Finding`] vocabulary
 //! with the mix critique.
 
+use serde::Serialize;
+
 use crate::arrangement::analyze;
 use crate::critique::{Critique, Finding};
 use crate::inspect::*;
@@ -78,6 +80,52 @@ pub(crate) fn parse_pickrestart_slow(code: &str) -> Option<u32> {
     let end = rest.find(')')?;
     let n = rest[..end].trim().parse::<f64>().ok()?;
     (n >= 1.0).then_some(n.round() as u32)
+}
+
+/// One named section of a `pickRestart` song form, in cycles.
+#[derive(Debug, Clone, Serialize)]
+pub struct LabeledSection {
+    pub label: String,
+    pub start_cycle: usize,
+    pub cycles: usize,
+}
+
+impl LabeledSection {
+    /// Inclusive last cycle.
+    pub fn end_cycle(&self) -> usize {
+        self.start_cycle + self.cycles - 1
+    }
+}
+
+/// The song form a `pickRestart` selector declares: each label run lasts
+/// `run × .slow(n)` cycles. `None` unless both the labels and the `.slow(n)`
+/// parse.
+pub fn pickrestart_sections(code: &str) -> Option<Vec<LabeledSection>> {
+    let labels = parse_pickrestart_labels(code)?;
+    let n = parse_pickrestart_slow(code)?;
+    Some(merge_labels(&labels, n))
+}
+
+/// Merge consecutive repeats: `<a a b>` = section a × 2n, b × n.
+fn merge_labels(labels: &[String], n: u32) -> Vec<LabeledSection> {
+    let mut sections = Vec::new();
+    let mut start = 0usize;
+    let mut i = 0usize;
+    while i < labels.len() {
+        let mut j = i + 1;
+        while j < labels.len() && labels[j] == labels[i] {
+            j += 1;
+        }
+        let cycles = (j - i) * n as usize;
+        sections.push(LabeledSection {
+            label: labels[i].clone(),
+            start_cycle: start,
+            cycles,
+        });
+        start += cycles;
+        i = j;
+    }
+    sections
 }
 
 /// One section of the song form, from either pickRestart labels (ground
@@ -166,25 +214,17 @@ pub fn critique_form(ev: &crate::Evaluated) -> Critique {
                         ),
                     ));
                 }
-                // Merge consecutive repeats: <a a b> = section a × 2n, b × n.
-                let mut start = 0usize;
-                let mut i = 0usize;
-                while i < labels.len() {
-                    let mut j = i + 1;
-                    while j < labels.len() && labels[j] == labels[i] {
-                        j += 1;
-                    }
-                    let cyc = (j - i) * n as usize;
-                    sections.push(FormSection {
-                        label: labels[i].clone(),
-                        start_cycle: start,
-                        end_cycle: start + cyc - 1,
-                        cycles: cyc,
-                        density: density_over(start, start + cyc - 1),
-                    });
-                    start += cyc;
-                    i = j;
-                }
+                sections = merge_labels(labels, n)
+                    .into_iter()
+                    .map(|s| FormSection {
+                        density: density_over(s.start_cycle, s.end_cycle()),
+                        end_cycle: s.end_cycle(),
+                        label: s.label,
+                        start_cycle: s.start_cycle,
+                        cycles: s.cycles,
+                    })
+                    .collect();
+                let start = sections.last().map_or(0, |s| s.end_cycle + 1);
                 if start > window {
                     findings.push(note(
                         "window-short",
