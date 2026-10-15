@@ -112,8 +112,25 @@ export class PatternScheduler {
     private _pendingBoundary: number = 0;
     /** Tempo carried by the armed pattern's source, applied when it lands. */
     private _pendingBpm: number | undefined = undefined;
+    /**
+     * True when the armed pattern is a new song ({@link setPatternAt}): where
+     * it lands becomes cycle 0, at its own tempo.
+     */
+    private _pendingSong = false;
+    /**
+     * The outgoing song's timeline after a song swap installs. The swap lands
+     * a lookahead before its downbeat is heard, so the UI keeps reporting the
+     * outgoing song until audio time `until`, then fires {@link onSongStarted}.
+     */
+    private _outgoing: {startTime: number; cps: number; until: number} | null = null;
 
     onCycleUpdate: ((cycle: number) => void) | null = null;
+
+    /**
+     * Every scheduling tick (~10 Hz) with the live cycle, hidden window or
+     * not — for work that must keep pace with the audio, not the screen.
+     */
+    onTick: ((cycle: number) => void) | null = null;
 
     /**
      * Fired after a quantized swap installs, with the BPM the incoming source
@@ -121,6 +138,9 @@ export class PatternScheduler {
      * tempo and visualizer cache — so they change with the audio, not ahead of it.
      */
     onPatternInstalled: ((bpm: number | undefined) => void) | null = null;
+
+    /** Fired when a song armed by {@link setPatternAt} is first heard — its cycle 0. */
+    onSongStarted: (() => void) | null = null;
 
     /** Fired when a swap is armed or lands, so the UI can show the countdown. */
     onLaunchArmed: ((boundary: number | null) => void) | null = null;
@@ -212,6 +232,18 @@ export class PatternScheduler {
      * the landing further away.
      */
     setPatternQuantized(pattern: PatternHandle, bpm?: number): boolean {
+        // An edit to the outgoing song while the next one is armed: apply it
+        // now, and leave the next song where it is.
+        if (this._pendingSong) {
+            this.setPattern(pattern, false);
+            return false;
+        }
+        // The next song is installed and the outgoing one is queued to its
+        // end: an edit to it has nowhere to land. Its side effects are dropped too.
+        if (this._outgoing) {
+            pattern.free();
+            return true;
+        }
         if (this.launchQuantum <= 0 || !this.running || !this.pattern) {
             this._cancelPending();
             this.setPattern(pattern, false);
@@ -228,6 +260,42 @@ export class PatternScheduler {
         this.onLaunchArmed?.(boundary);
         this.kickSchedule();
         return true;
+    }
+
+    /**
+     * Start a new song at cycle `boundary` of the current one: the clock
+     * rebases so that boundary is the new song's cycle 0, and the tempo changes
+     * exactly there. The outgoing song plays right up to the boundary.
+     *
+     * The host applies its side effects in {@link onPatternInstalled} as for any
+     * armed swap, and switches what it shows in {@link onSongStarted}. Not
+     * playing, the song simply becomes the pattern, from cycle 0.
+     */
+    setPatternAt(pattern: PatternHandle, boundary: number, bpm?: number): void {
+        // A quantized edit still waiting lands now rather than being lost;
+        // an armed song is replaced.
+        this._installPendingNow();
+        this._outgoing = null;
+        if (!this.running || !this.pattern) {
+            this.setPattern(pattern, false);
+            this.pausedCycle = 0;
+            if (bpm !== undefined) this.setBpm(bpm);
+            this.onPatternInstalled?.(bpm);
+            this.onSongStarted?.();
+            return;
+        }
+        const now = this._liveCurrentCycle();
+        const at = Math.max(boundary, Math.ceil(now + BOUNDARY_EPS));
+        if (this.scheduledTo > at) {
+            // The lookahead already queued the outgoing song past the boundary.
+            this.audioManager?.sendHush();
+            this.scheduledTo = now;
+        }
+        this._pending = pattern;
+        this._pendingBoundary = at;
+        this._pendingBpm = bpm;
+        this._pendingSong = true;
+        this.kickSchedule();
     }
 
     /**
@@ -256,6 +324,7 @@ export class PatternScheduler {
             this._pending.free();
             this._pending = null;
         }
+        this._pendingSong = false;
     }
 
     /**
@@ -265,7 +334,16 @@ export class PatternScheduler {
      */
     private _installPending(currentCycle: number, lookahead: number): void {
         if (!this._pending) return;
+        const song = this._pendingSong;
         this._swapInPending();
+        if (song) {
+            // The outgoing song is queued exactly to the boundary; its events
+            // keep their times. From here, cycles count from the boundary.
+            const downbeat = this.startTime + this._pendingBoundary / this.cps;
+            this._outgoing = {startTime: this.startTime, cps: this.cps, until: downbeat};
+            this._rebase(downbeat);
+            currentCycle = this._liveCurrentCycle();
+        }
 
         const end = currentCycle + lookahead;
         if (end > this.scheduledTo) {
@@ -286,14 +364,63 @@ export class PatternScheduler {
      * what resumes or what the new position plays, not the pattern it replaced.
      */
     private _installPendingNow(): void {
+        // An armed song is tied to the timeline being left: the playing song
+        // stays, and the host arms the next one again from wherever it lands.
+        if (this._pendingSong) {
+            this._cancelPending();
+            return;
+        }
         if (!this._pending) return;
         this._swapInPending();
         this._finishInstall();
     }
 
+    /**
+     * A song installed but not yet heard: the transport is leaving its
+     * timeline (pause, seek), so the song counts as started now.
+     */
+    private _commitOutgoing(): void {
+        if (!this._outgoing) return;
+        this._outgoing = null;
+        this.onSongStarted?.();
+    }
+
+    /** True from {@link setPatternAt} until the song is heard ({@link onSongStarted}). */
+    get songPending(): boolean {
+        return this._pendingSong || this._outgoing !== null;
+    }
+
+    /**
+     * Drop a song armed by {@link setPatternAt}. False once it has installed —
+     * it is then landing, and {@link onSongStarted} follows.
+     */
+    cancelSong(): boolean {
+        if (!this._pendingSong) return false;
+        this._cancelPending();
+        return true;
+    }
+
+    /** Make audio time `at` cycle 0, at the armed song's tempo. */
+    private _rebase(at: number): void {
+        if (this._pendingBpm !== undefined) this.bpm = Math.max(30, Math.min(300, this._pendingBpm));
+        this.cps = this.bpm * INV_240;
+        this.startTime = at;
+        this.processor!.setStartTime(at);
+        this.scheduledTo = 0;
+    }
+
+    /** Past the incoming song's downbeat (audio time `t`): stop reporting the outgoing one. */
+    private _passOutgoing(t: number): boolean {
+        if (!this._outgoing || t < this._outgoing.until) return false;
+        this._outgoing = null;
+        this.onSongStarted?.();
+        return true;
+    }
+
     private _swapInPending(): void {
         const pattern = this._pending!;
         this._pending = null;
+        this._pendingSong = false;
         if (this.pattern) this.pattern.free();
         this.pattern = pattern;
         this.processor!.setPattern(pattern);
@@ -371,6 +498,7 @@ export class PatternScheduler {
         if (!this.pattern) return;
         // The armed boundary refers to a timeline we are about to leave.
         this._installPendingNow();
+        this._commitOutgoing();
         const target = Math.max(0, cycle);
         if (this.running) {
             this.startTime = this.audioContext.currentTime - target / this.cps;
@@ -417,12 +545,14 @@ export class PatternScheduler {
 
         this.running = false;
         this._installPendingNow();
+        this._commitOutgoing();
         this._stopUiLoop();
         this._stopTimerDriver();
 
         // currentTime keeps advancing while paused (context stays running),
         // so we capture the cycle position now for startTime reconstruction.
-        this.pausedCycle = this._liveCurrentCycle();
+        // Clamped: just after a song installs, its downbeat is still ahead.
+        this.pausedCycle = Math.max(0, this._liveCurrentCycle());
 
         // Flush pre-scheduled future events from the worklet engine queue.
         // Active voices ring out naturally - hush() only removes pending events.
@@ -457,6 +587,7 @@ export class PatternScheduler {
     stop(): void {
         this.running = false;
         this._cancelPending();
+        this._outgoing = null;
         this.onLaunchArmed?.(null);
         this.pausedCycle = 0;
         this._stopUiLoop();
@@ -520,6 +651,9 @@ export class PatternScheduler {
         if (this._pending && this.scheduledTo >= boundary) {
             this._installPending(currentCycle, lookahead);
         }
+        // The UI loop reports the song switch; hidden, it doesn't run.
+        if (this.uiPaused) this._passOutgoing(this.audioContext.currentTime);
+        this.onTick?.(currentCycle);
 
         // Scan further ahead for sound banks not yet loaded (soundfonts/samples)
         // so the host can fetch them before their notes are due.
@@ -576,13 +710,14 @@ export class PatternScheduler {
             return;
         }
 
-        const visualElapsed = Math.max(
-            0,
-            this.audioContext.currentTime - this.startTime - this.visualLatency,
-        );
+        const heard = this.audioContext.currentTime - this.visualLatency;
+        // Until the incoming song is heard, the outgoing one is what's playing.
+        const outgoing = this._passOutgoing(heard) ? null : this._outgoing;
+        const cps = outgoing ? outgoing.cps : this.cps;
+        const visualElapsed = Math.max(0, heard - (outgoing ? outgoing.startTime : this.startTime));
 
         if (this.onCycleUpdate) {
-            this.onCycleUpdate(visualElapsed * this.cps);
+            this.onCycleUpdate(visualElapsed * cps);
         }
 
         // Continue loop
@@ -652,6 +787,8 @@ export class PatternScheduler {
         this.onMissingBanks = null;
         this.onPatternInstalled = null;
         this.onLaunchArmed = null;
+        this.onSongStarted = null;
+        this.onTick = null;
         this.processor = null;
         this.audioManager = null;
     }

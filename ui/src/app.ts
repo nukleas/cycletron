@@ -775,6 +775,8 @@ export class StrudelApp {
         this.scheduler.onCycleUpdate = this.handleCycleUpdate;
         this.scheduler.onPatternInstalled = this._onPatternInstalled;
         this.scheduler.onLaunchArmed = (b) => launchQuantum.setArmed(b);
+        this.scheduler.onSongStarted = () => this.onSongStarted?.();
+        this.scheduler.onTick = (cycle) => this.onTick?.(cycle);
         this.scheduler.launchQuantum = launchQuantum.cycles;
 
         const analyser = this.audioManager.getAnalyser()!;
@@ -1204,6 +1206,54 @@ export class StrudelApp {
                 btn.disabled = false;
             }
         }
+    }
+
+    /** Fired when a song started with {@link startSongAt} is first heard. */
+    onSongStarted: (() => void) | null = null;
+
+    /** Every scheduling tick with the live cycle, window hidden or not. */
+    onTick: ((cycle: number) => void) | null = null;
+
+    /**
+     * Parse a whole song, as written: the mixer's mutes belong to the buffer on
+     * screen, not to a song that hasn't started.
+     */
+    parseSong(code: string): {pattern: PatternHandle; bpm: number | undefined} {
+        const pattern = this.wasm!.parsePattern(code);
+        const raw = this.bpmView ? this.bpmView[0] : NaN;
+        return {pattern, bpm: isNaN(raw) ? undefined : raw};
+    }
+
+    /** Start loading the sounds a song's opening cycles use, before it plays. */
+    preloadSong(pattern: PatternHandle, cycles: number): void {
+        pattern.queryMissingBanks(0, cycles);
+        this._loadMissingBanks();
+    }
+
+    /** Start a song at cycle `boundary` of the playing one; see `PatternScheduler.setPatternAt`. */
+    startSongAt(pattern: PatternHandle, boundary: number, bpm: number | undefined): void {
+        this.scheduler!.setPatternAt(pattern, boundary, bpm);
+    }
+
+    /** True while a song started with {@link startSongAt} hasn't been heard yet. */
+    get songPending(): boolean {
+        return this.scheduler?.songPending ?? false;
+    }
+
+    /** Drop a song armed with {@link startSongAt}; false if none was, or it is already landing. */
+    cancelSong(): boolean {
+        return this.scheduler?.cancelSong() ?? false;
+    }
+
+    /** Show a song's code that is already playing, without evaluating it again. */
+    showPlayingCode(code: string): void {
+        if (!this.editor) return;
+        this.debouncedEvaluate.cancel();
+        this._suppressNextCodeChange = true;
+        mixer.reset();
+        this.editor.setCode(code);
+        // The installed pattern is this code: its note spans already match.
+        this.editor.replaced = false;
     }
 
     async replaceCodeAndPlay(code: string): Promise<void> {

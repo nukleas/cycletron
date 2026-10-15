@@ -45,6 +45,8 @@ export class AmbientViz {
     private latestCycle = 0;
     /** True while Stage Mode has borrowed the shared visualizer. */
     private borrowed = false;
+    /** While a show plays, the mode id for each song position; it outranks auto-cycle. */
+    private modeDriver: ((cycle: number) => string) | null = null;
 
     /** Fired after any enabled/mode/auto-cycle change so UI (menu) can refresh. */
     onStateChange: (() => void) | null = null;
@@ -105,6 +107,18 @@ export class AmbientViz {
         this.borrowed = on;
     }
 
+    /**
+     * Hand the mode to a show, which picks it from the song position; `null`
+     * hands it back to the user's persisted mode. The show's picks are never
+     * persisted.
+     */
+    setModeDriver(driver: ((cycle: number) => string) | null): void {
+        this.modeDriver = driver;
+        if (driver) this.viz?.setMode(modeIndexById(driver(this.latestCycle)));
+        else this.viz?.setMode(loadPersistedMode());
+        this.lastSwitchCycle = this.latestCycle;
+    }
+
     /** Whether the visualizer is currently painting somewhere the user can see. */
     private vizVisible(): boolean {
         return this.borrowed || (!!this.container && !this.container.hasAttribute('hidden'));
@@ -121,6 +135,11 @@ export class AmbientViz {
     updateCycle(cycle: number): void {
         this.viz?.updateCycle(cycle);
         this.latestCycle = cycle;
+
+        if (this.modeDriver) {
+            this.viz?.setMode(modeIndexById(this.modeDriver(cycle)));
+            return;
+        }
 
         // Stop/start resets cycle-space; re-anchor instead of switching early.
         if (cycle < this.lastSwitchCycle) this.lastSwitchCycle = cycle;

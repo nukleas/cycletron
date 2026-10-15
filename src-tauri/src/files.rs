@@ -39,12 +39,15 @@ pub fn read_file(path: &Path) -> std::io::Result<FileDoc> {
 }
 
 pub fn write_file(path: &Path, code: &str, bpm: Option<f64>) -> std::io::Result<()> {
-    let body = format_with_frontmatter(code, bpm);
-    // Atomic-ish write: write to sibling temp then rename.
+    write_text(path, &format_with_frontmatter(code, bpm))
+}
+
+/// Write `text` as is. Atomic-ish: write to a sibling temp, then rename.
+pub fn write_text(path: &Path, text: &str) -> std::io::Result<()> {
     let tmp = tmp_path(path);
     {
         let mut f = fs::File::create(&tmp)?;
-        f.write_all(body.as_bytes())?;
+        f.write_all(text.as_bytes())?;
         f.sync_all()?;
     }
     fs::rename(&tmp, path)

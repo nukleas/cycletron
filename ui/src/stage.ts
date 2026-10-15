@@ -273,6 +273,14 @@ export class Stage {
         this.onStateChange?.();
     }
 
+    /**
+     * A show's code follow for the playing section, applied without touching
+     * the saved preference; `null` restores the preference.
+     */
+    setShowFollow(id: StageFollow | null): void {
+        this.codeLayer.setFollow(id ?? this.follow().id);
+    }
+
     /** Off → fold → solo → off, for a single command to cycle through. */
     cycleFollow(): StageFollowOption {
         const at = STAGE_FOLLOW.indexOf(this.follow());
