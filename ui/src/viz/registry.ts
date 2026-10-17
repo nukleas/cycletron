@@ -24,6 +24,8 @@ import {spotFieldDef} from './modes/spot-field.js';
 import {vectorNexusDef} from './modes/vector-nexus.js';
 import {forestDriveDef} from './modes/forest-drive.js';
 import {cockpitDef} from './modes/cockpit.js';
+import {tankFieldDef} from './modes/tank-field.js';
+import {starRoadDef} from './modes/star-road.js';
 
 export const VIZ_MODES: readonly VizModeDef[] = [
     neonCircuitDef,
@@ -44,6 +46,8 @@ export const VIZ_MODES: readonly VizModeDef[] = [
     vectorNexusDef,
     forestDriveDef,
     cockpitDef,
+    tankFieldDef,
+    starRoadDef,
 ];
 
 /** Resolve a persisted mode id to its registry index; unknown ids → 0. */
