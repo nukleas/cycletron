@@ -10,9 +10,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  # strudel-rs is a Codeberg git dependency; libgit2's SSL flakes on some
-  # runners, so fetch git deps with the system git.
-  CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
 
 # Runner is selectable: set repo variable CI_RUNNER=cycletron-runners to use the
 # self-hosted k8s scale set; unset it (or set ubuntu-latest) to fall back to
@@ -35,15 +32,15 @@ jobs:
         run: npm ci
       - name: Typecheck
         # The real WASM types are committed under ui/pkg (built from the pinned
-        # strudel-rs main rev), so tsc checks against the actual engine surface.
+        # strudel-rs release), so tsc checks against the actual engine surface.
         run: npx tsc --noEmit
 
   rust:
     name: Rust test + corpus-check
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
-      # strudel-rs is a pinned git dependency (Codeberg, public), fetched by
-      # cargo — no sibling checkout needed.
+      # strudel-rs comes from crates.io at a pinned version, so no sibling
+      # checkout is needed.
       - uses: actions/checkout@v7
 
       # The self-hosted runner image is bare; the cargo workspace includes the

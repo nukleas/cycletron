@@ -21,14 +21,14 @@ Cycletron is built on, and derived from, the Strudel live-coding ecosystem:
   with or endorsed by strudel.cc.
 
 - strudel-rs — the Rust port of the Strudel engine that powers Cycletron's
-  audio (embedded as a pinned git dependency and as the prebuilt WASM in
+  audio (embedded as pinned crates.io dependencies and as the prebuilt WASM in
   `ui/pkg/`). Copyright (C) strudel-rs contributors. Licensed under
   AGPL-3.0-or-later.
   https://codeberg.org/nukleas/strudel-rs
 
 Corresponding source (AGPL §6) for the prebuilt engine binary in `ui/pkg/`
-is the strudel-rs tree at the exact revision pinned in the workspace
-`Cargo.toml` (`strudel-*` / `midi-to-strudel` git `rev`).
+is the strudel-rs tree at the release tag (`vX.Y.Z`) of the version pinned
+in the workspace `Cargo.toml` (`strudel-*` / `midi-to-strudel`).
 
 Bundled third-party audio assets (samples, drum machines, soundfonts) and
 their licenses are credited in ATTRIBUTION.md.

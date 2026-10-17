@@ -60,16 +60,16 @@ cycletron-gen = { path = "crates/cycletron-gen" }
 cycletron-midi = { path = "crates/cycletron-midi" }
 cycletron-analysis = { path = "crates/cycletron-analysis" }
 cycletron-render = { path = "crates/cycletron-render" }
-# strudel-rs engine crates — pinned to public Codeberg main so the app builds
-# from a clean clone (no sibling checkout needed). Bump `rev` to move the engine.
-strudel-core = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
-strudel-mini = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2", default-features = false }
-strudel-dsl = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
-strudel-audio = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
-strudel-sounds = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
-strudel-soundfont = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2", default-features = false, features = ["gm"] }
-strudel-music-theory = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
-midi-to-strudel = { git = "https://codeberg.org/nukleas/strudel-rs.git", rev = "07b45508dbe237ac5a510e7469d48c5ef5e4e0e2" }
+# strudel-rs engine crates, from crates.io. Bump the version (all together) to
+# move the engine; ui/pkg is built from the matching `v<version>` tag.
+strudel-core = { version = "=0.2.0" }
+strudel-mini = { version = "=0.2.0", default-features = false }
+strudel-dsl = { version = "=0.2.0" }
+strudel-audio = { version = "=0.2.0" }
+strudel-sounds = { version = "=0.2.0" }
+strudel-soundfont = { version = "=0.2.0", default-features = false, features = ["gm"] }
+strudel-music-theory = { version = "=0.2.0" }
+midi-to-strudel = { version = "=0.2.0" }
 
 # Shared external deps
 serde = { version = "1.0", features = ["derive"] }
