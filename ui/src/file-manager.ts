@@ -7,6 +7,8 @@
  */
 
 import {invoke, isTauri} from './tauri.js';
+import {liveShow} from './show/live.js';
+import {showPane} from './show/show-pane.js';
 import {notify} from './notifications.js';
 import {addTask, removeTask} from './dock-badge.js';
 import {confirmDialog, errorDialog, infoDialog, openPathDialog, saveFileDialog} from './dialog.js';
@@ -25,6 +27,17 @@ const STRUDEL_FILTER = {
     name: 'Strudel Pattern',
     extensions: ['strudel', 'js'],
 };
+
+/** Opening also takes show files (`*.show.toml`); the dialog filters by the last extension only. */
+const OPEN_FILTER = {
+    name: 'Songs and Shows',
+    extensions: ['strudel', 'js', 'toml'],
+};
+
+/** A show file plays its song rather than opening as a document. */
+export function isShowPath(path: string): boolean {
+    return /\.show\.toml$/i.test(path);
+}
 
 const MIDI_FILTER = {
     name: 'MIDI File',
@@ -109,7 +122,7 @@ export class FileManager {
         if (!isTauri) return;
         const path = await openPathDialog({
             directory: false,
-            filters: [STRUDEL_FILTER],
+            filters: [OPEN_FILTER],
         });
         if (!path) return;
         await this.openPath(path);
@@ -120,17 +133,31 @@ export class FileManager {
      * every entry point (dialog, tree, drag-drop, recents, Finder) funnels
      * through here, so none can silently discard work. `force` skips the
      * guard for flows that already confirmed (external-change reload).
+     * `playing` opens a song the scheduler is already playing (a setlist's
+     * next song): its code is shown, not evaluated again.
      */
-    async openPath(path: string, opts?: {force?: boolean}): Promise<void> {
+    async openPath(path: string, opts?: {force?: boolean; playing?: boolean}): Promise<void> {
+        if (isShowPath(path)) {
+            await liveShow.open(path);
+            return;
+        }
+        if (/\.toml$/i.test(path)) {
+            await errorDialog(`Only show files (.show.toml) open here:\n${path}`);
+            return;
+        }
         if (!opts?.force && !(await this.confirmDiscardIfDirty())) return;
         try {
             const doc = await invoke<FileDoc>('open_file', {path});
-            this.setEditorCode(doc.code);
+            // The new file first: replacing the text must read as this file,
+            // clean — not as unsaved edits to the one it replaces.
             this.currentPath = doc.path;
             this.currentName = basename(doc.path);
             this.lastSavedCode = doc.code;
             this.dirty = false;
-            if (doc.frontmatter?.bpm) {
+            if (opts?.playing) window.strudelApp?.showPlayingCode(doc.code);
+            else this.setEditorCode(doc.code);
+            // A playing song already has its tempo.
+            if (doc.frontmatter?.bpm && !opts?.playing) {
                 window.strudelApp?.applyBpm?.(doc.frontmatter.bpm);
             }
             this.emitChanged();
@@ -142,6 +169,15 @@ export class FileManager {
 
     async saveCurrent(): Promise<boolean> {
         if (!isTauri) return false;
+        // Save saves the editor last worked in; the show pane holds a show file.
+        if (showPane.isActiveEditor()) {
+            try {
+                return await showPane.save();
+            } catch (e) {
+                await errorDialog(`Could not save show:\n${e}`);
+                return false;
+            }
+        }
         if (!this.currentPath) {
             return this.saveAs();
         }

@@ -13,7 +13,7 @@
  * flag (same pattern as the metronome) and attach() honors it.
  */
 
-import {FullscreenVisualizer} from './fullscreen-viz.js';
+import {FullscreenVisualizer, type Shot} from './fullscreen-viz.js';
 import {VIZ_MODES, modeIndexById} from './viz/registry.js';
 import type {PatternSource} from './viz/types.js';
 import {currentBpm} from './bpm.js';
@@ -45,6 +45,8 @@ export class AmbientViz {
     private latestCycle = 0;
     /** True while Stage Mode has borrowed the shared visualizer. */
     private borrowed = false;
+    /** While a show plays, what each song position shows; it outranks the user's mode and auto-cycle. */
+    private director: ((cycle: number) => Shot) | null = null;
 
     /** Fired after any enabled/mode/auto-cycle change so UI (menu) can refresh. */
     onStateChange: (() => void) | null = null;
@@ -105,6 +107,26 @@ export class AmbientViz {
         this.borrowed = on;
     }
 
+    /**
+     * Hand the visuals to a show, which picks the mode, camera and overlay
+     * from the song position; `null` hands them back to the user's persisted
+     * mode. The show's picks are never persisted.
+     */
+    setDirector(director: ((cycle: number) => Shot) | null): void {
+        this.director = director;
+        if (director) this.direct(director(this.latestCycle));
+        else {
+            this.viz?.setShot(null);
+            this.viz?.setMode(loadPersistedMode());
+        }
+        this.lastSwitchCycle = this.latestCycle;
+    }
+
+    private direct(shot: Shot): void {
+        this.viz?.setMode(modeIndexById(shot.mode));
+        this.viz?.setShot(shot);
+    }
+
     /** Whether the visualizer is currently painting somewhere the user can see. */
     private vizVisible(): boolean {
         return this.borrowed || (!!this.container && !this.container.hasAttribute('hidden'));
@@ -121,6 +143,11 @@ export class AmbientViz {
     updateCycle(cycle: number): void {
         this.viz?.updateCycle(cycle);
         this.latestCycle = cycle;
+
+        if (this.director) {
+            this.direct(this.director(cycle));
+            return;
+        }
 
         // Stop/start resets cycle-space; re-anchor instead of switching early.
         if (cycle < this.lastSwitchCycle) this.lastSwitchCycle = cycle;

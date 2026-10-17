@@ -20,6 +20,7 @@ members = [
     "tools/gen-pattern",
     "tools/gen-recipes",
     "tools/song-check",
+    "tools/performance-export",
 ]
 resolver = "2"
 

@@ -261,3 +261,38 @@ export class TrackModel {
         }
     }
 }
+
+/**
+ * Onsets of the `family` drum's haps (kicks, which the camera bumps on;
+ * snares) over bars [0, `bars`), in cycles, ascending. Queries bar by bar, so
+ * a long form never fills the shared buffer.
+ */
+export function drumOnsets(pattern: PatternHandle, source: PatternSource, bars: number, family: InstrumentFamily): number[] {
+    const view = () => new Float32Array(source.memory.buffer, source.cycleViewPtr, VIEW_CAPACITY);
+    const onsets = new Set<number>();
+    const isFamily = new Map<number, boolean>();
+    for (let bar = 0; bar < bars; bar++) {
+        pattern.queryCycleViewData(bar, 1);
+        let data = view();
+        const trackCount = data[0];
+        let idx = 3;
+        for (let t = 0; t < trackCount && idx + 2 <= VIEW_CAPACITY; t++) {
+            const id = data[idx++];
+            const count = data[idx++];
+            let hit = isFamily.get(id);
+            if (hit === undefined) {
+                hit = instrumentFamily(String(pattern.getTrackName(id) ?? '')) === family;
+                isFamily.set(id, hit);
+                // The lookup may have grown WASM memory, detaching the view.
+                data = view();
+            }
+            const n = hit ? Math.min(count, Math.floor((VIEW_CAPACITY - idx) / 3)) : 0;
+            for (let e = 0; e < n; e++) {
+                const begin = data[idx + e * 3];
+                if (begin >= 0 && begin < 1) onsets.add(bar + begin);
+            }
+            idx += count * 3;
+        }
+    }
+    return [...onsets].sort((a, b) => a - b);
+}

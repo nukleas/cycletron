@@ -55,6 +55,14 @@ export async function confirmDialog(message: string, opts: ConfirmOptions = {}):
     return ask(message, {title: TITLE, ...opts});
 }
 
+/** Save / Discard / Cancel before closing an edited document. Resolves `'cancel'` outside Tauri. */
+export async function saveChangesDialog(message: string): Promise<'save' | 'discard' | 'cancel'> {
+    if (!isTauri) { console.warn('[dialog] save prompt suppressed (no Tauri shell):', message); return 'cancel'; }
+    const {message: show} = await plugin();
+    const picked = await show(message, {title: TITLE, kind: 'warning', buttons: {yes: 'Save', no: 'Discard', cancel: 'Cancel'}});
+    return picked === 'Save' ? 'save' : picked === 'Discard' ? 'discard' : 'cancel';
+}
+
 /** Native save-file picker. Resolves `null` when cancelled or outside Tauri. */
 export async function saveFileDialog(opts: SaveDialogOptions): Promise<string | null> {
     if (!isTauri) return null;

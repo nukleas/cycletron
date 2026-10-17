@@ -1266,6 +1266,116 @@ select option {
 }
 
 /* =========================================================
+   Show pane — a show file beside the song while it plays
+   ========================================================= */
+
+.editor-split {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    position: relative;
+}
+
+.editor-split > #editor {
+    min-width: 0;
+}
+
+.show-divider {
+    flex: 0 0 5px;
+    cursor: col-resize;
+    background: var(--accent-subtle);
+    transition: background 0.15s;
+}
+
+.show-divider:hover,
+.show-divider.dragging {
+    background: var(--neon-glow);
+}
+
+.show-pane {
+    flex: 0 0 var(--show-pane-width, 38%);
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+}
+
+.show-divider[hidden],
+.show-pane[hidden] {
+    display: none;
+}
+
+.show-pane-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 6px 0 10px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--neon);
+    border-bottom: var(--edge-neon);
+    flex-shrink: 0;
+}
+
+.show-pane-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.show-pane-dirty {
+    color: var(--orange-bright);
+    font-size: 10px;
+}
+
+.show-pane-close {
+    background: none;
+    border: none;
+    color: inherit;
+    opacity: 0.6;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 0 4px;
+}
+
+.show-pane-close:hover {
+    opacity: 1;
+}
+
+.show-pane-editor {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+.show-pane-editor .cm-editor {
+    height: 100%;
+}
+
+.show-pane-playing {
+    color: var(--neon);
+    padding: 0 2px;
+}
+
+/* Narrow windows: the show stacks under the song. */
+@container editor (max-width: 650px) {
+    .editor-split {
+        flex-direction: column;
+    }
+    .show-divider {
+        display: none;
+    }
+    .show-pane {
+        flex: 0 0 40%;
+        min-width: 0;
+        border-top: 1px solid var(--accent-subtle);
+    }
+}
+
+/* =========================================================
    Editor Skeleton
    ========================================================= */
 
@@ -4425,14 +4535,18 @@ body.is-drop-target::after {
    gutters keep their own foreground colors and the active-line accent stays. */
 body.immersive-viz-active #editor,
 body.immersive-viz-active #editor .cm-editor,
-body.immersive-viz-active #editor .cm-scroller {
+body.immersive-viz-active #editor .cm-scroller,
+body.immersive-viz-active .show-pane,
+body.immersive-viz-active .show-pane .cm-editor,
+body.immersive-viz-active .show-pane .cm-scroller {
     background: transparent !important;
     background-color: transparent !important;
 }
 
 /* Keep gutters legible with a slight dark wash, but translucent so the
    viz still suggests motion under the line numbers. */
-body.immersive-viz-active #editor .cm-gutters {
+body.immersive-viz-active #editor .cm-gutters,
+body.immersive-viz-active .show-pane .cm-gutters {
     background-color: rgba(11, 15, 24, 0.55) !important;
     backdrop-filter: blur(6px);
 }

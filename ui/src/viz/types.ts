@@ -64,6 +64,8 @@ export interface VizServices {
     readonly theme: Theme;
     /** Latency-compensated fractional cycle position (1 cycle = 1 bar). */
     readonly cycle: number;
+    /** Current tempo, BPM. */
+    readonly bpm: number;
     /** Normalized FFT band energies, already scaled by sensitivity. */
     readonly low: number;
     readonly mid: number;

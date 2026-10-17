@@ -82,13 +82,14 @@ pub fn list_dir(path: &Path) -> std::io::Result<Vec<DirEntry>> {
         };
         let is_dir = meta.is_dir();
         if !is_dir {
-            // Only surface strudel-ish text files.
+            // Only surface strudel-ish text files, and show files.
             let ext = entry
                 .path()
                 .extension()
                 .and_then(|s| s.to_str())
                 .map(str::to_ascii_lowercase);
-            if !matches!(ext.as_deref(), Some("strudel") | Some("js") | Some("txt")) {
+            let show = name.to_ascii_lowercase().ends_with(".show.toml");
+            if !show && !matches!(ext.as_deref(), Some("strudel") | Some("js") | Some("txt")) {
                 continue;
             }
         }
@@ -226,13 +227,17 @@ mod tests {
         fs::write(dir.join(".hidden.strudel"), "").unwrap();
         fs::write(dir.join("song.strudel"), "").unwrap();
         fs::write(dir.join("pattern.js"), "").unwrap();
+        fs::write(dir.join("set.show.toml"), "").unwrap();
         fs::write(dir.join("ignore.png"), "").unwrap();
+        fs::write(dir.join("config.toml"), "").unwrap();
         fs::create_dir_all(dir.join("subfolder")).unwrap();
 
         let entries = list_dir(&dir).unwrap();
         let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
         assert!(names.contains(&"song.strudel"));
         assert!(names.contains(&"pattern.js"));
+        assert!(names.contains(&"set.show.toml"));
+        assert!(!names.contains(&"config.toml"));
         assert!(names.contains(&"subfolder"));
         assert!(!names.contains(&".hidden.strudel"));
         assert!(!names.contains(&"ignore.png"));

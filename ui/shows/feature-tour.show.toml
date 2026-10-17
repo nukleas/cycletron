@@ -1,0 +1,140 @@
+# FEATURE TOUR — every show-file setting, on two Agency tracks. The comment
+# above each section says what it shows. Edit a value while it plays and the
+# change takes effect as you type. Open in Cycletron; ⌘⇧F for Stage. The
+# format is documented in docs/SHOW_FILES.md.
+
+[show]
+title = "Feature Tour"
+out = "renders/feature-tour.mp4"   # render target, relative to this file
+size = "1920x1080"
+fps = 60
+
+# Settings every song and section start from.
+[defaults]
+code = "hide"        # visuals only; sections below turn the code on
+camera = "drift"
+grain = 0.15
+
+# ---- 04 · First Incident (110 BPM, 64 bars) ------------------------------
+
+[[song]]
+source = "../Songs/agency/04-first-incident.strudel"
+mode = "matrix-rain"          # for any section not listed
+titles = true                 # a // LABEL card on every section's downbeat
+passes = 1                    # times through the form before the next song
+fade = { in = 2, out = 2 }    # bars up from black, and down at the end
+
+# A custom title card, a locked-off camera, a palette, and a caption line.
+[song.sections.intro]
+title = "04 · FIRST INCIDENT"
+palette = "blood"
+camera = { move = "still", punch = 0 }
+text = [{ say = "the pager goes off", at = 3, hold = 3 }]
+
+# The song's code types itself in over 2 bars, then lights up as it plays.
+[song.sections.verse]
+mode = "neon-circuit"
+camera = "push"
+code = { follow = "solo", type = 2 }
+
+# Shots: a cut every bar, entered with a glitch.
+[song.sections.lift]
+shots = ["spot-field", "kaleidoscope"]
+every = 1
+transition = "glitch"
+palette = "toxic"
+
+# Each shot its own palette; one holds 4 bars with its own camera.
+# A kick strobe, a camera slam on each cut, and a bump on each kick.
+[song.sections.drop]
+shots = [
+  { mode = "vector-nexus", palette = "vapor" },
+  { mode = "tunnel", palette = "ice" },
+  { mode = "iso-city", bars = 4, palette = "sunset", camera = "orbit" },
+]
+every = 2
+transition = "flash"
+strobe = { on = "kick", strength = 0.2 }
+camera = { move = "drift", punch = 2, kick = 2 }
+text = [{ say = "ALL HANDS.", at = 8, hold = 1.5, style = "card" }]
+
+# Up from black into a slowed, letterboxed scene, with the whole song
+# faint behind it: no scanlines, heavy grain.
+[song.sections.break]
+mode = "ascii-scope"
+transition = "black"
+palette = "amber"
+speed = 0.5
+letterbox = 2.39
+grain = 0.5
+scanlines = false
+code = { follow = "off", opacity = 0.35, scrim = false }
+
+# Fast cuts with a short glitch, a snare strobe, a handheld camera.
+[song.sections.drop2]
+shots = ["kaleidoscope", "tunnel", "plasma", "cockpit"]
+every = 1
+transition = { kind = "glitch", bars = 0.15 }
+strobe = { on = "snare", strength = 0.4 }
+camera = { move = "shake", punch = 1.5, kick = 3 }
+
+# No title card here, a slow pull back, then the song's fade out.
+[song.sections.outro]
+mode = "lissajous"
+titles = false
+camera = "pull"
+
+# ---- 09 · Night Drive (104 BPM, 64 bars) ---------------------------------
+# The next song starts on the downbeat, at its own tempo.
+
+[[song]]
+source = "../Songs/agency/09-night-drive.strudel"
+mode = "cockpit"
+palette = "ice"
+transition = "fade"    # every section dissolves in; the first comes up from black
+
+# Only this section has a card: `title` turns its card on.
+[song.sections.ignition]
+title = "09 · NIGHT DRIVE"
+text = [{ say = "called back in at 11 PM", at = 3, hold = 3, place = "top" }]
+
+# Two modes, a dissolve every 4 bars.
+[song.sections.highway]
+shots = ["forest-drive", "cockpit"]
+every = 4
+palette = "sunset"
+
+# An ultra-wide frame, an orbiting camera, the playing code in a sheer
+# column on the right, and a line at the top.
+[song.sections.skyline]
+mode = "iso-city"
+palette = "vapor"
+letterbox = 2.76
+camera = { move = "orbit", punch = 0 }
+code = { follow = "solo", place = "right", size = 22, opacity = 0.6, scrim = false }
+text = [{ say = "C# minor · 104 BPM", at = 1, hold = 4, place = "top" }]
+
+# Double speed, a flash in, a strobe on every beat, the code folded to the
+# playing section.
+[song.sections.tunnel]
+mode = "tunnel"
+palette = "neon"
+transition = "flash"
+speed = 2
+strobe = { on = "beat", strength = 0.3 }
+code = "fold"
+
+# Per-shot palettes and cameras.
+[song.sections.highway2]
+shots = [
+  { mode = "forest-drive", palette = "sunset" },
+  { mode = "cockpit", palette = "ice", camera = "shake" },
+  { mode = "neon-circuit", palette = "neon" },
+]
+every = 4
+transition = "glitch"
+
+# A calm close.
+[song.sections.exit]
+mode = "lissajous"
+camera = "pull"

@@ -64,7 +64,7 @@ ${cacheResets}
     };
 }
 
-export default defineConfig({
+export default defineConfig(({mode}) => ({
     // No base path — served from Tauri webview root
     clearScreen: false,
     build: {
@@ -116,8 +116,10 @@ export default defineConfig({
         exclude: ['./pkg/strudel_audio_wasm.js']
     },
     plugins: [
-        tsc(),
+        // The headless renderer (scripts/render-viz.mjs) serves in mode
+        // 'render' and needs no type-check watcher.
+        ...(mode === 'render' ? [] : [tsc()]),
         InlineEnum.vite(),
         wasmMemoryLeakFixPlugin()
     ]
-});
+}));
