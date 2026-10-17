@@ -6,9 +6,11 @@
 //! one section, `song`.
 //!
 //! Usage:
-//!     performance-export song.strudel <out-dir> [--seconds N] [--samples strudel.json]
+//!     performance-export song.strudel <out-dir> [--passes N] [--seconds N] [--samples strudel.json]
 //!
-//! --seconds N   window to render and digest (default: the whole pickRestart
+//! --passes N    times through the pickRestart form (default 1); the sections
+//!               list the first pass
+//! --seconds N   window to render and digest (default: `--passes` times the
 //!               form, else 32 cycles)
 //! --samples P   sample manifest (default: the repo's bundled Cycletron set)
 
@@ -71,6 +73,7 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let mut seconds: Option<f64> = None;
+    let mut passes: usize = 1;
     let mut samples: Option<PathBuf> = None;
     let mut positional: Vec<PathBuf> = Vec::new();
     let mut args = std::env::args().skip(1);
@@ -84,6 +87,13 @@ fn run() -> Result<(), String> {
                         .ok_or("--seconds needs a positive number")?,
                 );
             }
+            "--passes" => {
+                passes = args
+                    .next()
+                    .and_then(|v| v.parse().ok())
+                    .filter(|n: &usize| *n > 0)
+                    .ok_or("--passes needs a positive whole number")?;
+            }
             "--samples" => samples = Some(args.next().ok_or("--samples needs a path")?.into()),
             _ if arg.starts_with("--") => return Err(format!("unknown flag {arg}")),
             _ => positional.push(arg.into()),
@@ -91,7 +101,8 @@ fn run() -> Result<(), String> {
     }
     let [song, out_dir] = positional.as_slice() else {
         return Err(
-            "usage: performance-export <song.strudel> <out-dir> [--seconds N] [--samples P]".into(),
+            "usage: performance-export <song.strudel> <out-dir> [--passes N] [--seconds N] [--samples P]"
+                .into(),
         );
     };
 
@@ -122,7 +133,7 @@ fn run() -> Result<(), String> {
         let cycles = form
             .as_ref()
             .and_then(|f| f.last())
-            .map_or(DEFAULT_CYCLES, |s| s.end_cycle() + 1);
+            .map_or(DEFAULT_CYCLES, |s| (s.end_cycle() + 1) * passes);
         cycles as f64 * cycle_secs
     });
     let cycles = (seconds / cycle_secs).ceil() as usize;

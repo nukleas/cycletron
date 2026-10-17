@@ -78,6 +78,11 @@ export class PatternScheduler {
         return {bpm: this.bpm, cps: this.cps};
     }
 
+    /** Cycles per second of the song being heard: the outgoing song's until the next one's downbeat. */
+    get heardCps(): number {
+        return this._outgoing?.cps ?? this.cps;
+    }
+
     /** Cycle position off the audio clock. Deliberately not the visualizer's
      *  cycle: that one rides requestAnimationFrame, which the OS throttles to
      *  a standstill whenever the window is hidden — precisely when something

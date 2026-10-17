@@ -16,6 +16,7 @@ import {PlaybackState} from "./types/app.js";
 import {StrudelEditor} from './editor.js';
 import {PatternVisualizer, ScopeVisualizer, VizMode} from './visualizer.js';
 import {ambientViz} from './ambient-viz.js';
+import type {PatternSource} from './viz/types.js';
 import {stage} from './stage.js';
 import {audioRecorder} from './audio-recorder.js';
 import {visualsMenu} from './visuals-menu.js';
@@ -113,6 +114,8 @@ export class StrudelApp {
     scheduler: PatternScheduler | null;
     sampleLoader: SampleLoader | null;
     processor: MainThreadProcessor | null;
+    /** The scheduled pattern's data, for anything reading the song's structure; set on audio init. */
+    patternSource: PatternSource | null = null;
 
     private _playbackState: PlaybackState = PlaybackState.Stopped;
     private playbackListeners: Array<(state: PlaybackState) => void> = [];
@@ -805,6 +808,7 @@ export class StrudelApp {
             memory: this.audioManager.getWasmMemory()!,
             cycleViewPtr: wasmModule.getCycleViewBufPtr(),
         };
+        this.patternSource = patternSource;
         ambientViz.attach(analyser, patternSource);
         oscOut.attach(patternSource);
 

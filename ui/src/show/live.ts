@@ -18,14 +18,17 @@
 import {ambientViz} from '../ambient-viz.js';
 import {confirmDialog, errorDialog, saveChangesDialog} from '../dialog.js';
 import {fileManager} from '../file-manager.js';
+import type {Shot} from '../fullscreen-viz.js';
 import {basename} from '../paths.js';
 import {stage} from '../stage.js';
 import {invoke} from '../tauri.js';
 import {VIZ_MODES} from '../viz/registry.js';
+import type {PatternHandle} from '../../pkg';
+import {direct, type Director} from './director.js';
 import {locate} from './locate.js';
 import {showPane} from './show-pane.js';
 import {
-    cue, cueAt, formLength, parseShow, ShowError, type Cue, type FormSection, type ShowContext, type ShowSong,
+    cue, formLength, parseShow, ShowError, type Cue, type FormSection, type ShowContext, type ShowSong,
 } from './show.js';
 
 /** How often the playing song's form and the show file on disk are checked for changes. */
@@ -54,6 +57,14 @@ interface Planned {
     cues: Cue[];
 }
 
+/** The playing song's director, and what it was made from. */
+interface Edit {
+    cues: Cue[];
+    cps: number;
+    pattern: PatternHandle | null;
+    director: Director;
+}
+
 /** The song to play next, loaded; armed in the scheduler when `songPending`. */
 interface Next {
     index: number;
@@ -79,6 +90,7 @@ class LiveShow {
     /** The song code the playing song's cues were made from. */
     private cuedCode = '';
     private playing: Cue | null = null;
+    private edit: Edit | null = null;
     private timer: ReturnType<typeof setInterval> | null = null;
     /** True while a reload prompt is up, so the poll doesn't stack them. */
     private asking = false;
@@ -127,7 +139,7 @@ class LiveShow {
         });
         app.onSongStarted = () => void this.promote();
         app.onTick = (cycle) => this.advance(cycle);
-        ambientViz.setModeDriver((cycle) => this.direct(cycle));
+        ambientViz.setDirector((cycle) => this.direct(cycle));
         this.timer = setInterval(() => void this.poll(), POLL_MS);
         // Song and show stay in view, to edit while it plays; ⌘⇧F is the stage.
         await app.play();
@@ -168,9 +180,10 @@ class LiveShow {
         this.stalled = false;
         this.holding = false;
         this.playing = null;
+        this.edit = null;
         showPane.close();
-        ambientViz.setModeDriver(null);
-        stage.setShowFollow(null);
+        ambientViz.setDirector(null);
+        stage.setShowCode(null);
         return true;
     }
 
@@ -196,15 +209,39 @@ class LiveShow {
         await this.prepare(target, 'now');
     }
 
-    /** The section playing at `cycle` sets the code follow and names the mode. */
-    private direct(cycle: number): string {
-        const playing = cueAt(this.plan[this.current].cues, cycle);
-        if (playing !== this.playing) {
-            this.playing = playing;
+    /** The section playing at `cycle` sets the code, and picks the mode, camera and title cards. */
+    private direct(cycle: number): Shot {
+        const director = this.cut(this.plan[this.current]);
+        const frame = director.at(cycle);
+        if (frame.cue !== this.playing) {
+            this.playing = frame.cue;
             showPane.setPlaying(this.playingLine(showPane.text));
         }
-        stage.setShowFollow(playing.look.code);
-        return playing.look.mode;
+        stage.setShowCode(frame);
+        return {
+            mode: frame.mode, view: frame.view, overlay: director.overlay,
+            entering: frame.entering, fades: director.fades,
+            palette: frame.palette, finish: frame.finish, scanlines: frame.scanlines, time: frame.time,
+            strobe: frame.strobe, dim: frame.dim, speed: frame.speed,
+        };
+    }
+
+    /**
+     * The director for `cues` at the tempo being heard, made again when the
+     * cues, the tempo or the song's pattern (each evaluate) changes. While the
+     * next song lands, the scheduler already holds its pattern: it waits.
+     */
+    private cut({cues, song}: Planned): Director {
+        const app = window.strudelApp;
+        const scheduler = app?.scheduler;
+        const cps = scheduler?.heardCps ?? 0.5;
+        const pattern = scheduler?.pattern ?? null;
+        const edit = this.edit;
+        if (edit && edit.cues === cues && edit.cps === cps && (edit.pattern === pattern || scheduler?.songPending)) {
+            return edit.director;
+        }
+        this.edit = {cues, cps, pattern, director: direct(cues, cps, song, pattern, app?.patternSource ?? null)};
+        return this.edit.director;
     }
 
     /**

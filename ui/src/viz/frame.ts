@@ -36,15 +36,25 @@ export function advanceScanlines(offset: number, dt: number): number {
     return (offset + dt * SCANLINE_SPEED) % 4;
 }
 
-/** Paint background, scanlines, the mode (framed by `view` when given), vignette, then overlay layers. */
+export interface Paint {
+    /** Scanline phase (see {@link advanceScanlines}), or null for none. */
+    scanlines: number | null;
+    /** How the mode is framed; none, as is. */
+    view?: View;
+    /** Painted over the visuals, under the layers: a show's transition and finish. */
+    over?: (ctx: CanvasRenderingContext2D) => void;
+    /** Painted over everything: a show's fade to black. */
+    after?: (ctx: CanvasRenderingContext2D) => void;
+}
+
+/** Paint background, scanlines, the mode, vignette, then what goes `over` the visuals, then overlay layers. */
 export function paintFrame(
     ctx: CanvasRenderingContext2D,
     def: VizModeDef,
     mode: VizMode,
     layers: readonly VizLayer[],
     s: VizServices,
-    scanlineOffset: number,
-    view?: View,
+    {scanlines, view, over, after}: Paint,
 ): void {
     const w = s.width;
     const h = s.height;
@@ -59,10 +69,10 @@ export function paintFrame(
     }
     ctx.fillRect(0, 0, w, h);
 
-    drawScanlines(ctx, w, h, s.theme.neonHue, scanlineOffset);
+    if (scanlines !== null) drawScanlines(ctx, w, h, s.theme.neonHue, scanlines);
     if (view) {
         ctx.save();
-        ctx.translate(w / 2 + view.x, h / 2 + view.y);
+        ctx.translate(w / 2 + view.x * w, h / 2 + view.y * w);
         ctx.rotate(view.rotate);
         ctx.scale(view.scale, view.scale);
         ctx.translate(-w / 2, -h / 2);
@@ -72,9 +82,11 @@ export function paintFrame(
         mode.render(ctx, s);
     }
     drawVignette(ctx, w, h);
+    over?.(ctx);
     // Layers last: the vignette is a frame around the *visuals*, and
     // dimming Stage Mode's code at the edges would hurt legibility.
     for (const layer of layers) layer.render(ctx, s);
+    after?.(ctx);
 }
 
 function drawScanlines(ctx: CanvasRenderingContext2D, w: number, h: number, hue: number, offset: number): void {
