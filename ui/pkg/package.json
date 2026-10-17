@@ -2,10 +2,12 @@
   "name": "strudel-audio-wasm",
   "type": "module",
   "collaborators": [
-    "Strudel Contributors"
+    "nukleas",
+    "OverwrittenCode",
+    "Other Strudel Contributors"
   ],
   "description": "WASM audio bindings for Strudel DSP engine",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
@@ -17,8 +19,16 @@
     "strudel_audio_wasm.d.ts"
   ],
   "main": "strudel_audio_wasm.js",
+  "homepage": "https://nukleas.codeberg.page/strudel-rs",
   "types": "strudel_audio_wasm.d.ts",
   "sideEffects": [
     "./snippets/*"
+  ],
+  "keywords": [
+    "strudel",
+    "audio",
+    "wasm",
+    "audio-worklet",
+    "synthesis"
   ]
 }

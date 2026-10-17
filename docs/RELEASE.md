@@ -4,10 +4,10 @@ How releases are built, signed, and published.
 
 ## Prerequisites
 
-- The **strudel-rs** engine is a pinned git dependency (Codeberg) and the prebuilt
+- The **strudel-rs** engine is a pinned crates.io dependency and the prebuilt
   audio WASM is committed under `ui/pkg` — a fresh clone builds with no sibling
   checkout and no nightly toolchain.
-- Rust (workspace edition 2024), Node 22+. `wasm-pack` + nightly are needed only to
+- Rust stable 1.98.1+ (workspace edition 2024), Node 22+. `wasm-pack` + nightly are needed only to
   rebuild the audio WASM (see README).
 
 ## Build (unsigned local)
