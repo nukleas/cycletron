@@ -1,6 +1,7 @@
 /** Show files: layering, strict validation, and cueing a song's form. */
 import assert from 'node:assert/strict';
 import {after, test} from 'node:test';
+import {readFileSync, readdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {createServer} from 'vite';
 
@@ -16,6 +17,7 @@ after(() => server.close());
 const {parseShow, cue, cueAt, formLength, ShowError} = await server.ssrLoadModule('/src/show/show.ts');
 const {locate} = await server.ssrLoadModule('/src/show/locate.ts');
 const {Director} = await server.ssrLoadModule('/src/show/director.ts');
+const {VIZ_MODES} = await server.ssrLoadModule('/src/viz/registry.ts');
 const NO_DRUMS = {kick: [], snare: []};
 
 const CTX = {dir: '/shows', home: '/home/me', modes: ['tunnel', 'plasma', 'cockpit']};
@@ -240,4 +242,32 @@ test('dotted and quoted keys are found on their line', () => {
     const text = '[[song]]\nsource = "a"\nmode = "tunnel"\nsections.drop = "plasma"\n"sections".\'outro\' = "cockpit"\n';
     assert.deepEqual(locate(text, 'song[0].sections.drop'), {line: 4, exact: true});
     assert.deepEqual(locate(text, 'song[0].sections.outro'), {line: 5, exact: true});
+});
+
+test('the bundled shows parse and cue against their songs', () => {
+    // The shows are seeded to the library's Demos/Shows, beside Demos/Songs (ui/songs here).
+    const shows = fileURLToPath(new URL('../shows/', import.meta.url));
+    const songs = fileURLToPath(new URL('../songs/', import.meta.url));
+    const ctx = {dir: '/demos/Shows', home: '/home/me', modes: VIZ_MODES.map((m) => m.id)};
+    const song = (source) => {
+        assert.ok(source.startsWith('/demos/Songs/'), source);
+        return readFileSync(songs + source.slice('/demos/Songs/'.length), 'utf8');
+    };
+    // The form as song-check reads it: `"<a@2 b …>".slow(n)`, a section's bars its weight × n.
+    const form = (code) => {
+        const [, labels, slow] = code.match(/"<([^>]+)>"\.slow\((\d+)\)\.pickRestart/);
+        let startCycle = 0;
+        return labels.trim().split(/\s+/).map((entry) => {
+            const [label, weight = '1'] = entry.split('@');
+            const section = {label, startCycle, cycles: Number(weight) * Number(slow)};
+            startCycle += section.cycles;
+            return section;
+        });
+    };
+    const files = readdirSync(shows).sort();
+    assert.deepEqual(files, ['agency-ost.show.toml', 'cycletron-trailer.show.toml', 'feature-tour.show.toml']);
+    for (const file of files) {
+        const show = parseShow(readFileSync(shows + file, 'utf8'), ctx);
+        for (const s of show.songs) cue(s, form(song(s.source)));
+    }
 });

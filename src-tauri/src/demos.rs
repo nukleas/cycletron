@@ -6,6 +6,7 @@
 //!
 //! Content is embedded at compile time from:
 //! - `ui/songs/**` — full tracks + Agency OST
+//! - `ui/shows/*.show.toml` — show files playing those songs
 //! - `corpus/{rhythm,melody,harmony,form,timbre,motion}/**` — curated techniques
 //! - `corpus/genres/**/*.strudel` — generated skeletons + curated genre examples
 //!
@@ -22,6 +23,10 @@ const DEMOS_DIR: &str = "Demos";
 #[derive(Embed)]
 #[folder = "$CARGO_MANIFEST_DIR/../ui/songs"]
 struct SongAssets;
+
+#[derive(Embed)]
+#[folder = "$CARGO_MANIFEST_DIR/../ui/shows"]
+struct ShowAssets;
 
 #[derive(Embed)]
 #[folder = "$CARGO_MANIFEST_DIR/../corpus"]
@@ -43,12 +48,25 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
         if !rel.ends_with(".strudel") {
             continue;
         }
-        // Skip nested README etc. already filtered by extension.
         let dest = demos.join("Songs").join(rel);
         if write_if_missing(
             &dest,
             SongAssets::get(rel).as_ref().map(|f| f.data.as_ref()),
         )? {
+            report.written += 1;
+        } else {
+            report.skipped += 1;
+        }
+    }
+
+    // Shows → Demos/Shows/…; their `source` paths point into ../Songs.
+    for path in ShowAssets::iter() {
+        let rel = path.as_ref();
+        if !rel.ends_with(".show.toml") {
+            continue;
+        }
+        let dest = demos.join("Shows").join(rel);
+        if write_if_missing(&dest, ShowAssets::get(rel).as_ref().map(|f| f.data.as_ref()))? {
             report.written += 1;
         } else {
             report.skipped += 1;
@@ -137,6 +155,9 @@ Cycletron demo library
 ======================
 
 Songs/       Full tracks and covers (plus the Agency OST album).
+Shows/       Show files: songs played as music videos. agency-ost plays the
+             album, feature-tour uses every setting, cycletron-trailer is
+             the trailer.
 Techniques/  Short curated patterns by musical idea (rhythm, melody, …).
 Genres/      Generated skeletons plus concise, curated genre examples.
 
@@ -273,6 +294,7 @@ mod tests {
             report.written
         );
         assert!(dir.join("Demos/Songs").is_dir());
+        assert!(dir.join("Demos/Shows/agency-ost.show.toml").is_file());
         assert!(dir.join("Demos/Techniques").is_dir());
         assert!(dir.join("Demos/Genres").is_dir());
         assert!(
