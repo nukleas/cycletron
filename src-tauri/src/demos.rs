@@ -66,7 +66,10 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
             continue;
         }
         let dest = demos.join("Shows").join(rel);
-        if write_if_missing(&dest, ShowAssets::get(rel).as_ref().map(|f| f.data.as_ref()))? {
+        if write_if_missing(
+            &dest,
+            ShowAssets::get(rel).as_ref().map(|f| f.data.as_ref()),
+        )? {
             report.written += 1;
         } else {
             report.skipped += 1;
