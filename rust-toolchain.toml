@@ -1,0 +1,5 @@
+# Cycletron builds on stable Rust; the strudel-rs engine crates need 1.98.1+.
+# (Only `npm run build:wasm` needs nightly, and it uses the strudel-rs
+# checkout's own pinned toolchain.)
+[toolchain]
+channel = "stable"

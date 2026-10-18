@@ -84,14 +84,14 @@ now-playing widgets need.
 
 ## Requirements (dev)
 
-- Rust (edition 2024 toolchain as in workspace)
+- Rust stable, 1.98.1 or newer (`rust-toolchain.toml` selects stable)
 - Node.js 22+ and npm (UI)
 - Tauri CLI: `cargo install tauri-cli --version "^2"`
 - Linux only: the system packages CI installs (webkit2gtk, gtk3, soup3,
   appindicator, librsvg, alsa, udev — see `.github/workflows/ci.yml`)
 - Optional: AI provider — Preferences → AI (SuperGrok OAuth, Codex/ChatGPT OAuth, or API keys / env: `ANTHROPIC_API_KEY` / `XAI_API_KEY` / `OPENAI_API_KEY`)
 
-The **strudel-rs** engine is a pinned git dependency (Codeberg), and the prebuilt
+The **strudel-rs** engine comes from crates.io at a pinned version, and the prebuilt
 audio WASM is committed under `ui/pkg`, so a fresh clone builds with no sibling
 checkout and no nightly toolchain:
 
@@ -109,12 +109,12 @@ cargo tauri build             # production bundle (npm install + vite build firs
 
 ### Bumping the engine
 
-Only needed when moving to a newer strudel-rs. Update the pinned `rev` for the
-`strudel-*` / `midi-to-strudel` git deps in the workspace `Cargo.toml`, then
-rebuild and re-commit the audio WASM (needs nightly + `wasm-pack`). The
-`build:wasm` script expects a strudel-rs checkout at that rev as a sibling dir
-(`../strudel-rs/` relative to this repo) — adjust the path in `ui/package.json`
-if yours differs:
+Only needed when moving to a newer strudel-rs. Bump the `=X.Y.Z` version of
+every `strudel-*` / `midi-to-strudel` dependency in the workspace `Cargo.toml`,
+then rebuild and re-commit the audio WASM (needs `wasm-pack`; the strudel-rs
+checkout's own toolchain file supplies nightly). The `build:wasm` script expects
+a strudel-rs checkout at that release's `vX.Y.Z` tag, by default the sibling
+`../clean-strudel-rs/`; set `STRUDEL_RS` to use another:
 
 ```bash
 cd ui && npm run build:wasm   # rebuild strudel-audio-wasm → ui/pkg, then commit ui/pkg
@@ -129,8 +129,8 @@ cd ui && npm run build:wasm   # rebuild strudel-audio-wasm → ui/pkg, then comm
 Cycletron builds on and adapts **Strudel** ([codeberg.org/uzu/strudel](https://codeberg.org/uzu/strudel))
 and **strudel-rs** ([codeberg.org/nukleas/strudel-rs](https://codeberg.org/nukleas/strudel-rs)),
 both AGPL-3.0-or-later — see [`NOTICE`](NOTICE). The prebuilt engine WASM in `ui/pkg/`
-is an AGPL binary; its corresponding source (AGPL §6) is strudel-rs at the `rev`
-pinned in the workspace `Cargo.toml`. Bundled third-party audio (samples,
+is an AGPL binary; its corresponding source (AGPL §6) is strudel-rs at the release tag
+of the version pinned in the workspace `Cargo.toml`. Bundled third-party audio (samples,
 drum machines, soundfonts) is credited in [`ATTRIBUTION.md`](ATTRIBUTION.md).
 
 ## Privacy
@@ -156,4 +156,4 @@ See [`docs/RELEASE.md`](docs/RELEASE.md) (updater keys, signing, CI, tags).
 |--|--|
 | Studio | [naderlabs.io](https://www.naderlabs.io/) |
 | GitHub | [github.com/nukleas/cycletron](https://github.com/nukleas/cycletron) |
-| Engine | [strudel-rs](https://codeberg.org/nukleas/strudel-rs) (pinned git dependency) |
+| Engine | [strudel-rs](https://codeberg.org/nukleas/strudel-rs) (pinned crates.io version) |
