@@ -585,37 +585,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "cargo-platform"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd0061da739915fae12ea00e16397555ed4371a6bb285431aab930f61b0aa4ba"
-dependencies = [
- "serde",
- "serde_core",
-]
-
-[[package]]
 name = "cargo_metadata"
 version = "0.19.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd5eb614ed4c27c5d706420e4320fbe3216ab31fa1c33cd8246ac36dae4479ba"
 dependencies = [
  "camino",
- "cargo-platform 0.1.9",
- "semver",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "cargo_metadata"
-version = "0.23.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef987d17b0a113becdd19d3d0022d04d7ef41f9efe4f3fb63ac44ba61df3ade9"
-dependencies = [
- "camino",
- "cargo-platform 0.3.3",
+ "cargo-platform",
  "semver",
  "serde",
  "serde_json",
@@ -3256,8 +3232,9 @@ dependencies = [
 
 [[package]]
 name = "midi-to-strudel"
-version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32568447e11361e4e6fdadce8a6d2e9036c493ad6e39f813f33f795e7a263a70"
 dependencies = [
  "anyhow",
  "clap",
@@ -4578,6 +4555,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "reassoc"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0abc6568f77e3d526aafbdbd7e1a6ba1d05fc9ed79f6bc8246b4db65cadec63"
+dependencies = [
+ "reassoc-macros",
+]
+
+[[package]]
+name = "reassoc-macros"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05b612094bd2aadc418ed56919d2ffcce505116da529b2ca778027fcc6e3cc68"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5477,8 +5474,9 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strudel-audio"
-version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac24c98142b2abc62c52068c5dab3df614aceda0531914c672ef6fddff6ffcc5"
 dependencies = [
  "cpal",
  "parking_lot",
@@ -5495,8 +5493,9 @@ dependencies = [
 
 [[package]]
 name = "strudel-core"
-version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4342dce96eca0fd46b644ad99d326440640d4c6ab13819937f702eb9b856358"
 dependencies = [
  "hashbrown 0.17.1",
  "rustc-hash",
@@ -5508,8 +5507,9 @@ dependencies = [
 
 [[package]]
 name = "strudel-dsl"
-version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f75d594f4b6eed5e8c3ea533d77a88657a4d4a5f0be40c103bdfed70da0f0da8"
 dependencies = [
  "anyhow",
  "clap",
@@ -5529,24 +5529,29 @@ dependencies = [
 
 [[package]]
 name = "strudel-dsp"
-version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec372575a18ed26c01e8595399009350c8dd3f8c57869e4accb92b068002c25e"
 dependencies = [
+ "getrandom 0.4.3",
  "rand 0.10.2",
+ "reassoc",
  "strudel-internal",
+ "strudel-pcm",
 ]
 
 [[package]]
 name = "strudel-internal"
-version = "0.0.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42ff7768b7a6d71dfc1a8bc21dad4ad5704e83664b9421ba12ca7f07f8954c51"
 
 [[package]]
 name = "strudel-macros"
-version = "0.0.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76c3e99f00efc39e351c575985f751c3a9e765a5afbed96805aae39ca79f0ee7"
 dependencies = [
- "cargo_metadata 0.23.1",
  "convert_case",
  "proc-macro2",
  "quote",
@@ -5556,8 +5561,9 @@ dependencies = [
 
 [[package]]
 name = "strudel-mini"
-version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1baf44a9c6f4055cc2c778efd85eeaf8c09504a98b209456228f5cca6a6318e0"
 dependencies = [
  "anyhow",
  "clap",
@@ -5573,11 +5579,24 @@ dependencies = [
 
 [[package]]
 name = "strudel-music-theory"
-version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9519cc0f8adbc1a60e29a45fe98757728c559fc2e0ff602e8599332a2fbbecb1"
 dependencies = [
  "serde",
  "strudel-internal",
+]
+
+[[package]]
+name = "strudel-pcm"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03b97db7328f974f3bd8ba408a2c95a0503d75493ebb9902cbb2e816ddddd1a8"
+dependencies = [
+ "log",
+ "strudel-internal",
+ "symphonia",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -5592,8 +5611,9 @@ dependencies = [
 
 [[package]]
 name = "strudel-soundfont"
-version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71ea69d41cb671d777b8c4ef0db2f667d5fb585c52eeb9edcfa7cfa80ab835e2"
 dependencies = [
  "base64-turbo",
  "log",
@@ -5604,17 +5624,17 @@ dependencies = [
  "strudel-internal",
  "strudel-macros",
  "strudel-music-theory",
- "symphonia",
+ "strudel-pcm",
  "thiserror 2.0.21",
  "ureq",
 ]
 
 [[package]]
 name = "strudel-sounds"
-version = "0.1.0"
-source = "git+https://codeberg.org/nukleas/strudel-rs.git?rev=07b45508dbe237ac5a510e7469d48c5ef5e4e0e2#07b45508dbe237ac5a510e7469d48c5ef5e4e0e2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aefb1233521e4a266b1a51ab90ce9fdc7574c024a07164ab68b4946ca654de5f"
 dependencies = [
- "anyhow",
  "dirs 6.0.0",
  "log",
  "rayon",
@@ -5625,7 +5645,7 @@ dependencies = [
  "strudel-dsp",
  "strudel-internal",
  "strudel-music-theory",
- "symphonia",
+ "strudel-pcm",
  "thiserror 2.0.21",
 ]
 
@@ -6325,7 +6345,7 @@ checksum = "2ff55a614843b9a3f010f211df637c94df2607175b8d0f6e0f4a7c19e18621ee"
 dependencies = [
  "anyhow",
  "brotli",
- "cargo_metadata 0.19.2",
+ "cargo_metadata",
  "ctor",
  "dom_query",
  "dunce",

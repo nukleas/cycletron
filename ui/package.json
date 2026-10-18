@@ -16,7 +16,7 @@
     "test:show": "node --test scripts/show.test.mjs",
     "test:scheduler": "node --test scripts/scheduler.test.mjs",
     "preview": "vite preview --port 5173",
-    "comment:build:wasm": "The prebuilt engine WASM is committed under ui/pkg. Only rerun build:wasm to bump the engine: it needs nightly + wasm-pack and a strudel-rs checkout (STRUDEL_RS, default ../../clean-strudel-rs) at the exact rev Cargo.toml pins — the script refuses anything else. Then commit ui/pkg with the pin bump.",
+    "comment:build:wasm": "The prebuilt engine WASM is committed under ui/pkg. Only rerun build:wasm to bump the engine: it needs nightly + wasm-pack and a strudel-rs checkout (STRUDEL_RS, default ../../clean-strudel-rs) at the v<version> tag of the release Cargo.toml pins — the script refuses anything else. Then commit ui/pkg with the version bump.",
     "build:wasm": "node scripts/build-wasm.mjs"
   },
   "dependencies": {

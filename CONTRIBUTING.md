@@ -13,7 +13,7 @@ cargo tauri build   # production bundle
 You need Rust (workspace edition 2024), Node 22+, and the Tauri CLI
 (`cargo install tauri-cli --version "^2"`); on Linux also the system packages
 CI installs (see `.github/workflows/ci.yml`). The strudel-rs engine is a
-pinned git dependency and the audio WASM is prebuilt under `ui/pkg`, so no
+pinned crates.io dependency and the audio WASM is prebuilt under `ui/pkg`, so no
 nightly toolchain or sibling checkout is needed.
 
 ## Before you open a PR
