@@ -48,7 +48,7 @@ and the AppImage's embedded zsync update info) skips prereleases.
 | Platform | Artifact | Signing |
 |----------|----------|---------|
 | macOS | universal `.dmg` + `.app` | Developer ID + notarized (app **and** dmg) |
-| Linux | `.AppImage`, `.deb`, `.rpm` | unsigned (n/a) |
+| Linux | `.AppImage`, `.deb` | unsigned (n/a) |
 | Windows | NSIS `.exe` | intentionally unsigned for alpha — SmartScreen "More info → Run anyway" |
 
 macOS signing/notarization runs only for the maintainer: the signing

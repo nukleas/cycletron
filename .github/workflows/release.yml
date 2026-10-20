@@ -4,7 +4,7 @@ name: Release
 #   git tag v0.1.0-alpha.1 && git push origin v0.1.0-alpha.1
 #
 # Builds macOS (universal, signed + notarized — .app AND .dmg), Linux
-# (AppImage/deb/rpm, the Tauri default target set), and Windows (NSIS only —
+# (AppImage and deb), and Windows (NSIS only —
 # MSI/WiX rejects pre-release versions; intentionally UNSIGNED — SmartScreen
 # "More info → Run anyway"; see docs/RELEASE.md). Signs the Tauri updater
 # artifacts and publishes latest.json so auto-update works.
@@ -69,7 +69,9 @@ jobs:
             args: '--target universal-apple-darwin'
             rust-targets: 'aarch64-apple-darwin,x86_64-apple-darwin'
           - platform: ubuntu-22.04
-            args: ''
+            # No rpm: the bundler rejects pre-release versions (0.1.0-alpha.N)
+            # in rpm, which allows no '-'. Fedora users take the AppImage.
+            args: '--bundles appimage,deb'
             rust-targets: ''
           - platform: windows-latest
             # NSIS only: the MSI/WiX target rejects pre-release versions

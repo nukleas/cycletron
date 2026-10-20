@@ -53,7 +53,7 @@ Grab the latest build from [**Releases**](https://github.com/nukleas/cycletron/r
 | Platform | Artifact | Notes |
 |----------|----------|-------|
 | macOS (Intel + Apple Silicon) | `.dmg` | signed + notarized universal build |
-| Linux | `.AppImage` / `.deb` / `.rpm` | |
+| Linux | `.AppImage` / `.deb` | |
 | Windows | `.exe` (NSIS) | unsigned for now — SmartScreen: *More info → Run anyway* |
 
 Or build from source (below).
