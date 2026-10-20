@@ -1,7 +1,6 @@
-# CYCLETRON — the trailer, cut from the app's own visuals by this file. The
-# music is Songs/cycletron-trailer.strudel; its section labels are the
-# sections below. 140 BPM, so 1 bar = 1.714 s. Open in Cycletron and press
-# ⌘⇧F to watch it in Stage. The format is documented in docs/SHOW_FILES.md.
+# The Cycletron trailer. Music: Songs/cycletron-trailer.strudel, whose section
+# labels match the sections below. 140 BPM, so 1 bar = 1.714 s.
+# Open it and press ⌘⇧F to watch in Stage. Format: docs/SHOW_FILES.md.
 
 [show]
 title = "Cycletron Trailer"
@@ -9,8 +8,7 @@ out = "renders/cycletron-trailer.mp4"
 size = "1920x1080"
 fps = 60
 
-# Visuals only unless a section shows the code; cards only where a section
-# asks for one.
+# Code hidden and section titles off unless a section turns them on.
 [defaults]
 code = { follow = "hide", scrim = false }
 titles = false
@@ -22,14 +20,14 @@ source = "../Songs/cycletron-trailer.strudel"
 mode = "lissajous"
 fade = { in = 1, out = 0.5 }
 
-# 1–4 · the pattern types itself in.
+# Bars 1–4: code types in at the center.
 [song.sections.open]
 camera = "still"
 palette = "ice"
 code = { follow = "solo", place = "center", size = 30, type = 1.5, opacity = 0.9 }
 text = [{ say = "MUSIC IS CODE.", at = 2.5, hold = 1.4, style = "card", place = "bottom" }]
 
-# 5–8 · typed in, then lit note by note as it plays.
+# 5–8: code types in, then highlights notes as they play.
 [song.sections.build]
 mode = "neon-circuit"
 camera = { move = "push", punch = 0 }
@@ -40,7 +38,7 @@ text = [
   { say = "HEAR IT.", at = 1.7, hold = 2.2, style = "card", place = "bottom" },
 ]
 
-# 9–12 · ISO CITY: a district for each sound, a building for each hit.
+# 9–12: iso-city, code at the right.
 [song.sections.build2]
 mode = "iso-city"
 transition = "glitch"
@@ -50,15 +48,14 @@ text = [
   { say = "SEE IT.", at = 0, hold = 1.8, style = "card" }
 ]
 
-# 13–16 · the same notes, on a phosphor scope.
+# 13–16: ascii-scope.
 [song.sections.listen]
 mode = "ascii-scope"
 palette = "vapor"
 camera = { move = "orbit", punch = 0 }
 text = [{ say = "DRAWN FROM YOUR CODE.", at = 1, hold = 2.6, style = "card" }]
 
-# 17–24 · a cut every bar, each shot its own palette, the form folded on the
-# right throughout.
+# 17–24: a new shot and palette every bar, folded code at the right.
 [song.sections.drop]
 shots = [
   { mode = "wave-terrain", palette = "neon" },
@@ -80,7 +77,7 @@ text = [
   { say = "VISUALIZERS", at = 4, hold = 1.5, style = "card" },
 ]
 
-# 25–28 · the lineage, framed like cinema; every tree on the verge is a note.
+# 25–28: forest-drive, letterboxed, credits to TidalCycles and Strudel.
 [song.sections.break]
 mode = "forest-drive"
 palette = "sunset"
@@ -94,7 +91,7 @@ text = [
   { say = "based on strudel-rs", at = 1.5, hold = 2.4 },
 ]
 
-# 29–32 · the strobe rides the snare roll as it speeds up.
+# 29–32: kaleidoscope, one card per beat, then four per beat.
 [song.sections.riser]
 mode = "kaleidoscope"
 palette = "toxic"
@@ -110,8 +107,7 @@ text = [
   { say = "GO.", at = 3.75, hold = 0.2, style = "card" },
 ]
 
-# 33–40 · half-bar cuts between the modes the pattern drives, and the lines
-# of this file that cut them.
+# 33–40: a new shot every half bar, glitch transitions, camera shake on kicks.
 [song.sections.drop2]
 shots = [
   "iso-city", "cockpit", "tunnel", "forest-drive", "lens-bench", "spot-field", "iso-city", "tunnel",
@@ -128,7 +124,7 @@ text = [
   { say = "JUST MAKE THINGS.", at = 6, hold = 1.4, style = "card" },
 ]
 
-# 41–44 · the logo, in ASCII, ringing out with the last hit; credits around it.
+# 41–44: the logo, with links and credits.
 [song.sections.logo]
 mode = "logo"
 camera = { move = "still", punch = 0 }

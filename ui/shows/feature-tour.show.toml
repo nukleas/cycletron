@@ -1,7 +1,6 @@
-# FEATURE TOUR — every show-file setting, on two Agency tracks. The comment
-# above each section says what it shows. Edit a value while it plays and the
-# change takes effect as you type. Open in Cycletron; ⌘⇧F for Stage. The
-# format is documented in docs/SHOW_FILES.md.
+# Feature tour: every show-file setting, on two Agency tracks. The comment
+# above each section says what it uses. Edit a value while it plays and the
+# change applies after a short pause. ⌘⇧F for Stage. Format: docs/SHOW_FILES.md.
 
 [show]
 title = "Feature Tour"
