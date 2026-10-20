@@ -722,7 +722,8 @@ export class StageCodeLayer implements VizLayer {
      */
     private typedChars(last: number): number[] | null {
         const {typed} = this.style;
-        if (typed === null) return null;
+        // Fully typed in is the whole code, so its notes light.
+        if (typed === null || typed >= 1) return null;
         const lengths = this.rows.slice(0, last + 1).map((row) => row.segments.reduce((n, seg) => n + seg.text.length, 0));
         const total = this.rows.reduce((n, row) => n + row.segments.reduce((m, seg) => m + seg.text.length, 0), 0);
         let left = Math.floor(total * Math.min(1, Math.max(0, typed)));

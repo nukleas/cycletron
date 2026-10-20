@@ -1,8 +1,9 @@
 /**
  * Words on screen at set song times: each line types in, holds, and fades, at
  * the bottom (a lower third), the center, or the top — as a caption, or as a
- * big glitching card like a section's title. A pure function of song time,
- * like the title cards.
+ * big glitching card like a section's title. The next line of the same style
+ * in the same place cuts the one before it, so a quick run of cards reads one
+ * word at a time. A pure function of song time, like the title cards.
  */
 
 import {drawCard, outline} from './edit.js';
@@ -29,8 +30,19 @@ const CARD_ROW = {bottom: 0.76, center: 0.5, top: 0.24};
 const CARD_FADE = 0.35;
 
 export class Captions implements VizLayer {
+    /** Song seconds each line is gone by: its fade's end, or the next line's start in its place. */
+    private readonly gone: number[];
+
     /** `now` is the song time being drawn, in seconds. */
-    constructor(private readonly lines: readonly CaptionLine[], private readonly now: () => number) {}
+    constructor(private readonly lines: readonly CaptionLine[], private readonly now: () => number) {
+        this.gone = lines.map((line) => {
+            const end = line.until + (line.style === 'card' ? CARD_FADE : FADE);
+            const next = lines
+                .filter((other) => other.style === line.style && other.place === line.place && other.at > line.at)
+                .reduce((at, other) => Math.min(at, other.at), Infinity);
+            return Math.min(end, next);
+        });
+    }
 
     layout(): void {}
 
@@ -38,16 +50,16 @@ export class Captions implements VizLayer {
 
     render(ctx: CanvasRenderingContext2D, s: VizServices): void {
         const t = this.now();
-        for (const line of this.lines) {
+        this.lines.forEach((line, i) => {
             const fade = line.style === 'card' ? CARD_FADE : FADE;
-            if (t < line.at || t >= line.until + fade) continue;
+            if (t < line.at || t >= this.gone[i]) return;
             const alpha = t < line.until ? 1 : 1 - (t - line.until) / fade;
             if (line.style === 'card') {
                 drawCard(ctx, s, {text: line.say, since: t - line.at, t, alpha, y: CARD_ROW[line.place], kicker: null});
             } else {
                 this.draw(ctx, s, line, t - line.at, alpha);
             }
-        }
+        });
     }
 
     private draw(ctx: CanvasRenderingContext2D, s: VizServices, line: CaptionLine, since: number, alpha: number): void {
