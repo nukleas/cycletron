@@ -62,6 +62,28 @@ impl Pcm {
             .map(|(l, r)| (l + r) * 0.5)
             .collect()
     }
+
+    /// Write as a 16-bit stereo WAV.
+    pub fn write_wav(&self, path: &std::path::Path) -> Result<(), String> {
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: self.sample_rate,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(path, spec)
+            .map_err(|e| format!("Could not create WAV '{}': {e}", path.display()))?;
+        for (&l, &r) in self.left.iter().zip(&self.right) {
+            for s in [l, r] {
+                writer
+                    .write_sample((s.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16)
+                    .map_err(|e| format!("Could not write WAV '{}': {e}", path.display()))?;
+            }
+        }
+        writer
+            .finalize()
+            .map_err(|e| format!("Could not finalize WAV '{}': {e}", path.display()))
+    }
 }
 
 /// Render `duration_secs` of `pattern` at `bpm`. One `OfflineRenderer` per

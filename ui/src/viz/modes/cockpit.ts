@@ -22,7 +22,6 @@ import type {PatternHandle} from '../../../pkg';
 import type {PatternSource, Theme, VizMode, VizModeDef, VizServices} from '../types.js';
 import {MAX_TRACKS, VIEW_CAPACITY, instrumentFamily} from '../tracks.js';
 import {MONO_FONT, TAU, TransientDetector, clamp01, hash32, rand01, rgbOf} from '../util.js';
-import {currentBpm} from '../../bpm.js';
 
 /** World units per cycle. FOREST DRIVE uses 52 m of road; space is faster. */
 const Z_PER_CYCLE = 80;
@@ -718,7 +717,7 @@ class CockpitMode implements VizMode {
         this.buildDrawList();
         for (const h of this.drawList) this.drawHero(ctx, h);
         this.drawWeapons(ctx);
-        this.drawLasers(ctx);
+        this.drawLasers(ctx, s.bpm);
         this.drawBursts(ctx);
         this.drawNavigation(ctx, s);
         this.drawReticle(ctx);
@@ -1025,10 +1024,10 @@ class CockpitMode implements VizMode {
     }
 
     /** Cycle-based travel catches the note even if BPM changes mid-shot. */
-    private laserProgress(h: Hero): number {
+    private laserProgress(h: Hero, bpm: number): number {
         if (!this.camLocked || !h.seen || h.destroyed) return -1;
         const remaining = (h.z - this.camZ) / Z_PER_CYCLE;
-        const lead = LASER_FLIGHT_SECONDS * currentBpm() / 240;
+        const lead = LASER_FLIGHT_SECONDS * bpm / 240;
         return remaining >= 0 && remaining <= lead ? 1 - remaining / lead : -1;
     }
 
@@ -1057,12 +1056,12 @@ class CockpitMode implements VizMode {
         ctx.restore();
     }
 
-    private drawLasers(ctx: CanvasRenderingContext2D): void {
+    private drawLasers(ctx: CanvasRenderingContext2D, bpm: number): void {
         let count = 0;
         // Nearest targets first, with a hard ceiling for pathological patterns.
         for (let i = this.drawList.length - 1; i >= 0 && count < MAX_LASERS; i--) {
             const h = this.drawList[i];
-            const progress = this.laserProgress(h);
+            const progress = this.laserProgress(h, bpm);
             if (progress < 0) continue;
             const {x, y} = this.projectTarget(h.wx, h.wy, INTERCEPT_Z + h.z - this.camZ);
             // Draw acquisition marks after every target: the destination stays
@@ -1351,7 +1350,7 @@ class CockpitMode implements VizMode {
             }
             ctx.stroke();
         }
-        this.label(ctx, String(Math.round(currentBpm())), cx, y + h * 0.43, INK, Math.min(34, h * 0.35, w * 0.23), 'center');
+        this.label(ctx, String(Math.round(s.bpm)), cx, y + h * 0.43, INK, Math.min(34, h * 0.35, w * 0.23), 'center');
         this.label(ctx, 'BPM', cx, y + h * 0.43 + Math.min(26, h * 0.26), AMBER, 9, 'center');
         if (!compact) this.label(ctx, `DRIVE ${Math.round(this.warp * 100).toString().padStart(2, '0')}`, cx, y + h - 25, MUTED, 8, 'center');
         if (h > 82) {

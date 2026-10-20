@@ -96,6 +96,22 @@ const CRUMB_SEP = ' · ';
  */
 export type StageFollow = 'off' | 'fold' | 'solo';
 
+/** Where the code column sits across the frame. */
+export type CodePlace = 'left' | 'center' | 'right';
+
+/** A show's styling of the code, over Stage Mode's own. */
+export interface CodeStyle {
+    place: CodePlace;
+    /** Multiplies the code's opacity. */
+    opacity: number;
+    /** The dark backing behind each row. */
+    scrim: boolean;
+    /** How much of the shown code has typed in, 0 to 1; null for all of it. */
+    typed: number | null;
+}
+
+export const PLAIN_CODE: CodeStyle = {place: 'left', opacity: 1, scrim: true, typed: null};
+
 interface Segment {
     text: string;
     color: string;
@@ -146,6 +162,8 @@ export class StageCodeLayer implements VizLayer {
 
     private scrollPx = 0;
     private caretPhase = 0;
+    /** Off for a recording, where there is no performer to edit. */
+    private caretVisible = true;
     private clock = 0;
 
     private follow: StageFollow = 'off';
@@ -176,6 +194,9 @@ export class StageCodeLayer implements VizLayer {
 
     private needsRewrap = true;
     private needsRelayout = false;
+    /** A show's visuals-only section. */
+    private hidden = false;
+    private style: CodeStyle = PLAIN_CODE;
 
     constructor() {
         const canvas = document.createElement('canvas');
@@ -194,6 +215,21 @@ export class StageCodeLayer implements VizLayer {
         if (px === this.basePx) return;
         this.basePx = px;
         this.needsRelayout = true;
+    }
+
+    setCaretVisible(on: boolean): void {
+        this.caretVisible = on;
+    }
+
+    /** Style the code as a show's section asks. */
+    setStyle(style: CodeStyle): void {
+        if (style.place !== this.style.place) this.needsRelayout = true;
+        this.style = style;
+    }
+
+    /** Hide the code entirely (a show's visuals-only section); it keeps following while hidden. */
+    setHidden(on: boolean): void {
+        this.hidden = on;
     }
 
     setFollow(mode: StageFollow): void {
@@ -262,12 +298,10 @@ export class StageCodeLayer implements VizLayer {
         // fallback's advance width differs — always measure, never assume.
         this.charW = this.measure.measureText('M').width || this.fontPx * 0.6;
 
-        this.box = {
-            x: Math.round(s.width * MARGIN_X),
-            y: Math.round(s.height * MARGIN_Y),
-            w: Math.round(Math.min(CODE_COLUMNS * this.charW, s.width * MAX_COLUMN_WIDTH)),
-            h: Math.round(s.height * (1 - MARGIN_Y * 2)),
-        };
+        const w = Math.round(Math.min(CODE_COLUMNS * this.charW, s.width * MAX_COLUMN_WIDTH));
+        const margin = Math.round(s.width * MARGIN_X);
+        const x = {left: margin, center: Math.round((s.width - w) / 2), right: s.width - margin - w}[this.style.place];
+        this.box = {x, y: Math.round(s.height * MARGIN_Y), w, h: Math.round(s.height * (1 - MARGIN_Y * 2))};
         this.cols = Math.max(8, Math.floor(this.box.w / this.charW));
 
         this.rewrap();
@@ -306,7 +340,7 @@ export class StageCodeLayer implements VizLayer {
     render(ctx: CanvasRenderingContext2D, s: VizServices): void {
         if (this.needsRelayout) this.layout(s);
         if (this.needsRewrap) this.rewrap();
-        if (!this.rows.length) return;
+        if (this.hidden || !this.rows.length) return;
 
         ctx.save();
         ctx.beginPath();
@@ -321,11 +355,15 @@ export class StageCodeLayer implements VizLayer {
             Math.ceil((this.scrollPx + this.box.h) / this.lineH) + 1,
         );
 
-        this.drawScrim(ctx, s, first, last);
+        const shown = this.typedChars(last);
+        if (this.style.scrim) this.drawScrim(ctx, s, first, last, shown);
         this.drawSelection(ctx, s, first, last);
-        this.drawFlash(ctx, s, first, last);
-        this.drawActive(ctx, s, first, last);
-        this.drawText(ctx, first, last);
+        // Notes light only once the code has typed in: not on text not there yet.
+        if (!shown) {
+            this.drawFlash(ctx, s, first, last);
+            this.drawActive(ctx, s, first, last);
+        }
+        this.drawText(ctx, first, last, shown);
         this.drawCaret(ctx, s);
 
         ctx.restore();
@@ -678,8 +716,26 @@ export class StageCodeLayer implements VizLayer {
      * palette — the underlying visuals range from near-black to white flashes —
      * hence a backing at all rather than none.
      */
+    /**
+     * Characters each row shows while the code types in (in row order, top to
+     * bottom), or null when all of it shows.
+     */
+    private typedChars(last: number): number[] | null {
+        const {typed} = this.style;
+        // Fully typed in is the whole code, so its notes light.
+        if (typed === null || typed >= 1) return null;
+        const lengths = this.rows.slice(0, last + 1).map((row) => row.segments.reduce((n, seg) => n + seg.text.length, 0));
+        const total = this.rows.reduce((n, row) => n + row.segments.reduce((m, seg) => m + seg.text.length, 0), 0);
+        let left = Math.floor(total * Math.min(1, Math.max(0, typed)));
+        return lengths.map((n) => {
+            const shown = Math.min(n, left);
+            left -= shown;
+            return shown;
+        });
+    }
+
     private drawScrim(
-        ctx: CanvasRenderingContext2D, s: VizServices, first: number, last: number,
+        ctx: CanvasRenderingContext2D, s: VizServices, first: number, last: number, shown: number[] | null,
     ): void {
         const [r, g, b] = s.theme.bgRgb;
         const pad = this.charW * SCRIM_PAD;
@@ -688,23 +744,24 @@ export class StageCodeLayer implements VizLayer {
 
         for (let i = first; i <= last; i++) {
             const row = this.rows[i];
-            if (!row.segments.length) continue;
+            if (!row.segments.length || shown?.[i] === 0) continue;
 
             const solid = row.cols * this.charW + pad;
             const y = this.box.y + i * this.lineH - this.scrollPx;
 
-            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${SCRIM_ALPHA})`;
+            const alpha = SCRIM_ALPHA * this.style.opacity;
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
             ctx.fillRect(x, y, solid, this.lineH);
 
             const grad = ctx.createLinearGradient(x + solid, 0, x + solid + fade, 0);
-            grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${SCRIM_ALPHA})`);
+            grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha})`);
             grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
             ctx.fillStyle = grad;
             ctx.fillRect(x + solid, y, fade, this.lineH);
         }
     }
 
-    private drawText(ctx: CanvasRenderingContext2D, first: number, last: number): void {
+    private drawText(ctx: CanvasRenderingContext2D, first: number, last: number, shown: number[] | null): void {
         ctx.font = `${this.fontPx}px ${FONT_STACK}`;
         ctx.textBaseline = 'top';
 
@@ -712,10 +769,15 @@ export class StageCodeLayer implements VizLayer {
             const row = this.rows[i];
             const y = this.box.y + i * this.lineH - this.scrollPx;
             const rowAlpha = row.dim ? DIM_ALPHA : CODE_ALPHA;
+            // While typing in, a row shows its first `left` characters.
+            let left = shown ? shown[i] : Infinity;
             for (const seg of row.segments) {
-                ctx.globalAlpha = seg.alpha ?? rowAlpha;
+                if (left <= 0) break;
+                const text = left < seg.text.length ? seg.text.slice(0, left) : seg.text;
+                left -= text.length;
+                ctx.globalAlpha = (seg.alpha ?? rowAlpha) * this.style.opacity;
                 ctx.fillStyle = seg.color;
-                ctx.fillText(seg.text, this.box.x + seg.col * this.charW, y);
+                ctx.fillText(text, this.box.x + seg.col * this.charW, y);
             }
         }
 
@@ -763,7 +825,7 @@ export class StageCodeLayer implements VizLayer {
     }
 
     private drawCaret(ctx: CanvasRenderingContext2D, s: VizServices): void {
-        if (this.caretPhase % (CARET_BLINK * 2) > CARET_BLINK) return;
+        if (!this.caretVisible || this.caretPhase % (CARET_BLINK * 2) > CARET_BLINK) return;
 
         const row = this.rowIndexFor(this.snapshot.cursor);
         // Off screen (inside a hidden section) or on a folded row: no caret is

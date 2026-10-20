@@ -1,0 +1,174 @@
+# The Agency album, all 13 tracks back to back. Open it to play the album;
+# ⌘⇧F for Stage. Format: docs/SHOW_FILES.md.
+#
+# Each track below names a mode for the sections not listed, then picks
+# modes for the sections that change. Section names come from the track's
+# pickRestart form.
+
+[show]
+title = "Agency OST"
+out = "renders/agency-ost.mp4"
+
+# Applies to every track: the playing section's code, a slow camera drift.
+[defaults]
+code = "solo"
+camera = "drift"
+
+# ---- Act I --------------------------------------------------
+
+# 01 · Legacy System
+[[song]]
+source = "../Songs/agency/01-legacy-system.strudel"
+mode = "ascii-scope"
+fade = { in = 2 }
+
+[song.sections]
+boot  = { mode = "lissajous", title = "01 · LEGACY SYSTEM", camera = "push" }
+wake  = "wave-terrain"
+drift = "neon-circuit"
+surge = "tunnel"
+fade  = { mode = "lissajous", code = "fold", camera = "pull" }
+
+# 02 · Ticket Queue
+[[song]]
+source = "../Songs/agency/02-ticket-queue.strudel"
+mode = "iso-city"
+
+[song.sections]
+intro = { title = "02 · TICKET QUEUE" }
+lift  = "tunnel"
+break = "neon-circuit"
+
+# 03 · Red Tape
+[[song]]
+source = "../Songs/agency/03-red-tape.strudel"
+mode = "flame-graph"
+
+[song.sections]
+intro  = { title = "03 · RED TAPE" }
+stomp  = "iso-city"
+stabs  = "kaleidoscope"
+choke  = { mode = "ascii-scope", code = "fold" }
+stomp2 = "iso-city"
+
+# 04 · First Incident
+[[song]]
+source = "../Songs/agency/04-first-incident.strudel"
+mode = "matrix-rain"
+
+[song.sections]
+intro = { title = "04 · FIRST INCIDENT", camera = "still" }
+lift  = { mode = "spot-field", camera = "push" }
+drop  = { mode = "vector-nexus", camera = { move = "orbit", kick = 2 } }
+break = { mode = "ascii-scope", camera = "still" }
+drop2 = { mode = "tunnel", camera = { move = "shake", kick = 2 } }
+outro = { camera = "pull" }
+
+# 05 · Zero Day
+[[song]]
+source = "../Songs/agency/05-zero-day.strudel"
+mode = "neon-circuit"
+
+[song.sections]
+intro    = { title = "05 · ZERO DAY" }
+duel     = "iso-city"
+vent     = "wave-terrain"
+overload = "tunnel"
+collapse = { mode = "ascii-scope", code = "fold" }
+
+# 06 · Cascade Failure
+[[song]]
+source = "../Songs/agency/06-cascade-failure.strudel"
+mode = "marble-drop"
+
+[song.sections]
+intro  = { mode = "matrix-rain", title = "06 · CASCADE FAILURE" }
+drop   = "tunnel"
+glitch = "ascii-scope"
+break  = "attractor"
+drop2  = "kaleidoscope"
+
+# 07 · The All-Nighter
+[[song]]
+source = "../Songs/agency/07-the-all-nighter.strudel"
+mode = "wave-terrain"
+
+[song.sections]
+intro = { mode = "lissajous", title = "07 · THE ALL-NIGHTER" }
+deep  = "attractor"
+drift = "plasma"
+dawn  = "lens-bench"
+
+# 08 · Green Build
+[[song]]
+source = "../Songs/agency/08-green-build.strudel"
+mode = "neon-circuit"
+
+[song.sections]
+intro   = { mode = "iso-city", title = "08 · GREEN BUILD" }
+lift    = "tunnel"
+chorus  = "kaleidoscope"
+break   = "lens-bench"
+chorus2 = "vector-nexus"
+outro   = "iso-city"
+
+# ---- Act II ------------------------------------------
+
+# 09 · Night Drive
+[[song]]
+source = "../Songs/agency/09-night-drive.strudel"
+mode = "cockpit"
+
+[song.sections]
+ignition = { title = "09 · NIGHT DRIVE" }
+skyline  = "iso-city"
+tunnel   = "tunnel"
+exit     = "forest-drive"
+
+# 10 · Black ICE
+[[song]]
+source = "../Songs/agency/10-black-ice.strudel"
+mode = "vector-nexus"
+
+[song.sections]
+intro = { mode = "matrix-rain", title = "10 · BLACK ICE" }
+surge = "plasma"
+stall = { mode = "ascii-scope", code = "fold" }
+riff2 = "kaleidoscope"
+outro = "matrix-rain"
+
+# 11 · War Room
+[[song]]
+source = "../Songs/agency/11-war-room.strudel"
+mode = "attractor"
+
+[song.sections]
+intro   = { mode = "iso-city", title = "11 · WAR ROOM" }
+assault = "spot-field"
+hold    = "lens-bench"
+outro   = "ascii-scope"
+
+# 12 · Rogue Process
+[[song]]
+source = "../Songs/agency/12-rogue-process.strudel"
+mode = "marble-drop"
+
+[song.sections]
+intro = { mode = "neon-circuit", title = "12 · ROGUE PROCESS" }
+swarm = "marble-core"
+kill  = { mode = "ascii-scope", code = "fold" }
+fork2 = "kaleidoscope"
+outro = "flame-graph"
+
+# 13 · Kill Switch
+[[song]]
+source = "../Songs/agency/13-kill-switch.strudel"
+mode = "tunnel"
+
+[song.sections]
+intro   = { mode = "ascii-scope", title = "13 · KILL SWITCH" }
+arm     = "neon-circuit"
+doubt   = "lissajous"
+strike2 = "plasma"
+flip    = "kaleidoscope"
+outro   = { mode = "lissajous", code = "fold", camera = "pull" }

@@ -12,12 +12,16 @@
     "prebuild": "npm run gen:dsl && npm run gen:manifest",
     "build": "vite build",
     "test:viz": "node --test scripts/viz.test.mjs",
+    "test:render": "node --test scripts/render-viz.test.mjs",
+    "test:show": "node --test scripts/show.test.mjs",
+    "test:scheduler": "node --test scripts/scheduler.test.mjs",
     "preview": "vite preview --port 5173",
     "comment:build:wasm": "The prebuilt engine WASM is committed under ui/pkg. Only rerun build:wasm to bump the engine: it needs nightly + wasm-pack and a strudel-rs checkout (STRUDEL_RS, default ../../clean-strudel-rs) at the v<version> tag of the release Cargo.toml pins — the script refuses anything else. Then commit ui/pkg with the version bump.",
     "build:wasm": "node scripts/build-wasm.mjs"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.1",
+    "@codemirror/legacy-modes": "^6.5.5",
     "@codemirror/lint": "^6.0.0",
     "@lezer/common": "^1.5.3",
     "@lezer/highlight": "^1.2.5",
@@ -31,9 +35,11 @@
     "@tauri-apps/plugin-updater": "^2.13.2",
     "codemirror": "^6.0.1",
     "coi-serviceworker": "^0.1.7",
-    "marked": "^18.1.0"
+    "marked": "^18.1.0",
+    "smol-toml": "^1.9.1"
   },
   "devDependencies": {
+    "playwright": "^1.62.0",
     "typescript": "^7.0.2",
     "unplugin-inline-enum": "^0.8.3",
     "vite": "^8.3.4",

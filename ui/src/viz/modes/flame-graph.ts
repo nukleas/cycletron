@@ -58,7 +58,6 @@ class FlameGraphMode implements VizMode {
     private gradH = -1;
     private flameFill: CanvasGradient | string = '';
     private outlineCss = '';
-    private emberCss = '';
 
     layout(s: VizServices): void {
         this.w = s.width;
@@ -125,7 +124,7 @@ class FlameGraphMode implements VizMode {
         for (let i = 0; i < BANDS; i++) {
             const v = this.shape[i];
             if (v <= 0.45 || this.rng.next() >= v * dt * 4) continue;
-            this.spawnEmber(((i + 0.5) / BANDS) * this.w, this.baseY - v * this.maxH, this.emberCss, 1);
+            this.spawnEmber(((i + 0.5) / BANDS) * this.w, this.baseY - v * this.maxH, s.theme.active, 1);
         }
         const drag = Math.exp(-dt * 2.5);
         for (let k = 0; k < MAX_EMBERS; k++) {
@@ -153,7 +152,6 @@ class FlameGraphMode implements VizMode {
         g.addColorStop(1, `rgba(${secondary[0]}, ${secondary[1]}, ${secondary[2]}, 0.6)`);
         this.flameFill = g;
         this.outlineCss = `rgba(${active[0]}, ${active[1]}, ${active[2]}, 0.7)`;
-        this.emberCss = t.active;
     }
 
     private flameY(i: number): number {

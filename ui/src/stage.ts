@@ -21,7 +21,8 @@ import {ambientViz} from './ambient-viz.js';
 import {diag} from './diagnostics.js';
 import {isTauri} from './tauri.js';
 import type {FixedResolution, FullscreenVisualizer} from './fullscreen-viz.js';
-import {DEFAULT_FONT_PX, StageCodeLayer, type StageFollow} from './viz/stage/code-layer.js';
+import {type Frame, showCode} from './show/director.js';
+import {DEFAULT_FONT_PX, PLAIN_CODE, StageCodeLayer, type StageFollow} from './viz/stage/code-layer.js';
 import {StageHudLayer} from './viz/stage/hud-layer.js';
 
 export interface StagePreset extends FixedResolution {
@@ -271,6 +272,22 @@ export class Stage {
         localStorage.setItem(FOLLOW_KEY, option.id);
         this.codeLayer.setFollow(option.id);
         this.onStateChange?.();
+    }
+
+    /**
+     * A show's code for the playing frame — hidden, or following, sized and
+     * placed its way — applied without touching the saved preferences; `null`
+     * restores them.
+     */
+    setShowCode(frame: Pick<Frame, 'code' | 'typed'> | null): void {
+        if (frame) {
+            showCode(this.codeLayer, frame, this.textSize().px);
+            return;
+        }
+        this.codeLayer.setHidden(false);
+        this.codeLayer.setFollow(this.follow().id);
+        this.codeLayer.setBaseFontPx(this.textSize().px);
+        this.codeLayer.setStyle(PLAIN_CODE);
     }
 
     /** Off → fold → solo → off, for a single command to cycle through. */

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-song-form"
+description = "Enables the song_form command without any pre-configured scope."
+commands.allow = ["song_form"]
+
+[[permission]]
+identifier = "deny-song-form"
+description = "Denies the song_form command without any pre-configured scope."
+commands.deny = ["song_form"]

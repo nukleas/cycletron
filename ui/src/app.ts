@@ -10,11 +10,13 @@ import type {StrudelAudioManager} from '../audio-manager.js';
 import type {PatternScheduler} from '../scheduler.js';
 import type {SampleLoader} from '../sample-loader.js';
 import {GM_FONT_FILES, GM_BANK_NAMES} from '../soundfont-tables.js';
+import {ActiveLocations} from './active-locations.js';
 import {measure, setWasmMemory} from '../query-profiler.js';
 import {PlaybackState} from "./types/app.js";
 import {StrudelEditor} from './editor.js';
 import {PatternVisualizer, ScopeVisualizer, VizMode} from './visualizer.js';
 import {ambientViz} from './ambient-viz.js';
+import type {PatternSource} from './viz/types.js';
 import {stage} from './stage.js';
 import {audioRecorder} from './audio-recorder.js';
 import {visualsMenu} from './visuals-menu.js';
@@ -112,6 +114,8 @@ export class StrudelApp {
     scheduler: PatternScheduler | null;
     sampleLoader: SampleLoader | null;
     processor: MainThreadProcessor | null;
+    /** The scheduled pattern's data, for anything reading the song's structure; set on audio init. */
+    patternSource: PatternSource | null = null;
 
     private _playbackState: PlaybackState = PlaybackState.Stopped;
     private playbackListeners: Array<(state: PlaybackState) => void> = [];
@@ -160,7 +164,7 @@ export class StrudelApp {
      * dispose+init and race the first one to nulled state. */
     private _recoveringFromCrash: boolean;
     private _resizeMoveRafId: number | null;
-    private _activeLocsBufPtr: number;
+    private _activeLocations: ActiveLocations | null;
     /** Whether any active-note highlight is currently lit. See applyActiveNotes. */
     private _activeNotesLit = false;
     private _wasmMemory: WebAssembly.Memory | null;
@@ -184,9 +188,6 @@ export class StrudelApp {
     /** Manifest banks loaded or in flight (name is the de-dupe key). */
     private _loadedManifestBanks: Set<string>;
     private _suppressNextCodeChange: boolean;
-    /** Cached byte→char offset map for the current code. */
-    private _byteToChar: Uint32Array | null;
-    private _byteToCharCode: string;
 
     constructor() {
         this.editor = null;
@@ -212,7 +213,7 @@ export class StrudelApp {
         this._audioCrashed = false;
         this._recoveringFromCrash = false;
         this._resizeMoveRafId = null;
-        this._activeLocsBufPtr = 0;
+        this._activeLocations = null;
         this._wasmMemory = null;
         this.bpmView = null;
         this.gmBitsView = null;
@@ -223,8 +224,6 @@ export class StrudelApp {
         this._bankToSetSource = new Map();
         this._loadedManifestBanks = new Set();
         this._suppressNextCodeChange = false;
-        this._byteToChar = null;
-        this._byteToCharCode = '';
     }
 
     renderFrame = (): void => {
@@ -240,36 +239,6 @@ export class StrudelApp {
         if (!this.audioManager || !this.isInitialized || !this.wasm) return;
         this.elements.voiceCount.textContent = String(this.audioManager.getActiveVoices());
     };
-
-    /**
-     * Build a byte-offset → char-offset lookup table for the given code.
-     * Cached and only rebuilt when the code changes.
-     */
-    private getByteToCharMap(code: string): Uint32Array {
-        if (this._byteToChar && this._byteToCharCode === code) return this._byteToChar;
-
-        const encoder = new TextEncoder();
-        const bytes = encoder.encode(code);
-        // Map: for each byte index, what is the char index?
-        const map = new Uint32Array(bytes.length + 1);
-        let charIdx = 0;
-        let byteIdx = 0;
-        while (charIdx < code.length) {
-            map[byteIdx] = charIdx;
-            const cp = code.codePointAt(charIdx)!;
-            const byteLen = cp <= 0x7f ? 1 : cp <= 0x7ff ? 2 : cp <= 0xffff ? 3 : 4;
-            const charLen = cp > 0xffff ? 2 : 1;
-            for (let j = 1; j < byteLen; j++) {
-                map[byteIdx + j] = charIdx; // mid-codepoint bytes map to same char
-            }
-            byteIdx += byteLen;
-            charIdx += charLen;
-        }
-        map[byteIdx] = charIdx; // sentinel at end
-        this._byteToChar = map;
-        this._byteToCharCode = code;
-        return map;
-    }
 
     /**
      * Route highlight ranges to every renderer that draws the document: the
@@ -292,7 +261,7 @@ export class StrudelApp {
     }
 
     private updateActiveNotes(cycle: number): void {
-        if (!this.scheduler?.pattern || !this.editor || !this._wasmMemory) return;
+        if (!this.scheduler?.pattern || !this.editor || !this._activeLocations) return;
         // Full-buffer replace (file open / examples) until the new code
         // actually evaluates — otherwise old-pattern byte spans light up
         // the wrong tokens in the new document.
@@ -315,36 +284,7 @@ export class StrudelApp {
             return;
         }
 
-        const locsBuf = new Uint32Array(
-            this._wasmMemory.buffer,
-            this._activeLocsBufPtr,
-            count
-        );
-
-        const code = this.editor.getCode();
-        const b2c = this.getByteToCharMap(code);
-        const docLen = this.editor.view.state.doc.length;
-        const ranges: { from: number; to: number }[] = [];
-        const seen = new Set<string>();
-
-        // The engine packs each active location as a 3-tuple: (startByte,
-        // endByte, colorRGB). We highlight the source span and ignore the colour.
-        // The stride must be 3 — reading 2-tuples misaligns every entry.
-        for (let i = 0; i + 2 < count; i += 3) {
-            const fromByte = locsBuf[i];
-            const toByte = locsBuf[i + 1];
-            const from = fromByte < b2c.length ? b2c[fromByte] : fromByte;
-            const to = toByte < b2c.length ? b2c[toByte] : toByte;
-            if (from < docLen && to <= docLen && from < to) {
-                const key = `${from}-${to}`;
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    ranges.push({from, to});
-                }
-            }
-        }
-
-        this.applyActiveNotes(ranges);
+        this.applyActiveNotes(this._activeLocations.ranges(count, this.editor.getCode()));
     }
 
     handleCycleUpdate = (cycle: number): void => {
@@ -838,6 +778,8 @@ export class StrudelApp {
         this.scheduler.onCycleUpdate = this.handleCycleUpdate;
         this.scheduler.onPatternInstalled = this._onPatternInstalled;
         this.scheduler.onLaunchArmed = (b) => launchQuantum.setArmed(b);
+        this.scheduler.onSongStarted = () => this.onSongStarted?.();
+        this.scheduler.onTick = (cycle) => this.onTick?.(cycle);
         this.scheduler.launchQuantum = launchQuantum.cycles;
 
         const analyser = this.audioManager.getAnalyser()!;
@@ -866,12 +808,13 @@ export class StrudelApp {
             memory: this.audioManager.getWasmMemory()!,
             cycleViewPtr: wasmModule.getCycleViewBufPtr(),
         };
+        this.patternSource = patternSource;
         ambientViz.attach(analyser, patternSource);
         oscOut.attach(patternSource);
 
         // Capture pointers for active-note highlighting
-        this._activeLocsBufPtr = wasmModule.getActiveLocsBufPtr();
         this._wasmMemory = this.audioManager.getWasmMemory()!;
+        this._activeLocations = new ActiveLocations(this._wasmMemory, wasmModule.getActiveLocsBufPtr());
         setWasmMemory(this._wasmMemory);
 
         // BPM is published by parsePattern into a single-f64 cell; we just keep
@@ -1267,6 +1210,54 @@ export class StrudelApp {
                 btn.disabled = false;
             }
         }
+    }
+
+    /** Fired when a song started with {@link startSongAt} is first heard. */
+    onSongStarted: (() => void) | null = null;
+
+    /** Every scheduling tick with the live cycle, window hidden or not. */
+    onTick: ((cycle: number) => void) | null = null;
+
+    /**
+     * Parse a whole song, as written: the mixer's mutes belong to the buffer on
+     * screen, not to a song that hasn't started.
+     */
+    parseSong(code: string): {pattern: PatternHandle; bpm: number | undefined} {
+        const pattern = this.wasm!.parsePattern(code);
+        const raw = this.bpmView ? this.bpmView[0] : NaN;
+        return {pattern, bpm: isNaN(raw) ? undefined : raw};
+    }
+
+    /** Start loading the sounds a song's opening cycles use, before it plays. */
+    preloadSong(pattern: PatternHandle, cycles: number): void {
+        pattern.queryMissingBanks(0, cycles);
+        this._loadMissingBanks();
+    }
+
+    /** Start a song at cycle `boundary` of the playing one; see `PatternScheduler.setPatternAt`. */
+    startSongAt(pattern: PatternHandle, boundary: number, bpm: number | undefined): void {
+        this.scheduler!.setPatternAt(pattern, boundary, bpm);
+    }
+
+    /** True while a song started with {@link startSongAt} hasn't been heard yet. */
+    get songPending(): boolean {
+        return this.scheduler?.songPending ?? false;
+    }
+
+    /** Drop a song armed with {@link startSongAt}; false if none was, or it is already landing. */
+    cancelSong(): boolean {
+        return this.scheduler?.cancelSong() ?? false;
+    }
+
+    /** Show a song's code that is already playing, without evaluating it again. */
+    showPlayingCode(code: string): void {
+        if (!this.editor) return;
+        this.debouncedEvaluate.cancel();
+        this._suppressNextCodeChange = true;
+        mixer.reset();
+        this.editor.setCode(code);
+        // The installed pattern is this code: its note spans already match.
+        this.editor.replaced = false;
     }
 
     async replaceCodeAndPlay(code: string): Promise<void> {

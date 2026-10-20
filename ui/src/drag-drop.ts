@@ -8,7 +8,7 @@
  */
 
 import {isTauri} from './tauri.js';
-import {fileManager} from './file-manager.js';
+import {fileManager, isShowPath} from './file-manager.js';
 import {packImport} from './pack-import.js';
 import {midiLab} from './midi-lab.js';
 import {diag} from './diagnostics.js';
@@ -79,7 +79,7 @@ function handleDrop(paths: string[]): void {
         }
         return;
     }
-    const strudel = paths.find(p => STRUDEL_EXT.test(p));
+    const strudel = paths.find(p => STRUDEL_EXT.test(p) || isShowPath(p));
     if (strudel) {
         void fileManager.openPath(strudel);
         return;
@@ -93,7 +93,7 @@ function handleDrop(paths: string[]): void {
         void packImport.openFromPath(pack);
         return;
     }
-    flash(`Unsupported file. Drop .strudel, .js, .mid, a .zip sample pack, or a folder.`);
+    flash(`Unsupported file. Drop .strudel, .js, .show.toml, .mid, a .zip sample pack, or a folder.`);
 }
 
 

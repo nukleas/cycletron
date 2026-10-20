@@ -222,6 +222,43 @@ pub fn open_file(
     Ok(doc)
 }
 
+/// Read a song without opening it: a setlist loads the next song ahead of
+/// playing it, while the session's file is still the one on screen.
+#[tauri::command]
+pub fn read_song(path: String) -> Result<FileDoc, String> {
+    files::read_file(&PathBuf::from(&path)).map_err(|e| format!("read {path}: {e}"))
+}
+
+/// Read a show file as is.
+#[tauri::command]
+pub fn read_text(path: String) -> Result<String, String> {
+    show_file(&path)?;
+    std::fs::read_to_string(&path).map_err(|e| format!("read {path}: {e}"))
+}
+
+/// Write a show file as is: no frontmatter, unlike a song.
+#[tauri::command]
+pub fn write_text(path: String, text: String) -> Result<(), String> {
+    show_file(&path)?;
+    files::write_text(&PathBuf::from(&path), &text).map_err(|e| format!("write {path}: {e}"))
+}
+
+/// The raw read and write commands serve show files only.
+fn show_file(path: &str) -> Result<(), String> {
+    if path.to_ascii_lowercase().ends_with(".show.toml") {
+        Ok(())
+    } else {
+        Err(format!("{path}: not a show file (*.show.toml)"))
+    }
+}
+
+/// The song form a `pickRestart` selector declares, in cycles — the same
+/// sections a performance export times, so live playback agrees with it.
+#[tauri::command]
+pub fn song_form(code: String) -> Option<Vec<strudel::LabeledSection>> {
+    strudel::pickrestart_sections(&code)
+}
+
 /// Save the current buffer to the session's existing file path. Errors if
 /// there is no current file — the UI should fall back to `save_as` in that case.
 #[tauri::command]

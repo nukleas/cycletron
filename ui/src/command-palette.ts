@@ -27,6 +27,7 @@ import {soundBrowser} from './sound-browser.js';
 import {packImport} from './pack-import.js';
 import {adjustBpm} from './bpm.js';
 import {basename} from './paths.js';
+import {liveShow} from './show/live.js';
 import {clearSession, toggleAiPanel} from './ai-bridge.js';
 import {fileExplorer} from './file-explorer.js';
 import {helpModal} from './help-modal.js';
@@ -225,6 +226,9 @@ const COMMANDS: Item[] = [
     {id: 'cmd.updates',     title: 'Check for Updates',     section: 'Commands',                 run: () => checkForUpdates(true)},
     {id: 'cmd.logs',        title: 'Show Logs…',            section: 'Commands',                 run: () => logsModal.open()},
     {id: 'cmd.stage',       title: 'Stage Mode',            section: 'Commands', hint: '⌘⇧F',   run: () => { void stage.toggle(); }},
+    {id: 'cmd.stop_show',   title: 'Stop Show',             section: 'Commands',                 run: () => liveShow.stop()},
+    {id: 'cmd.next_song',   title: 'Show: Next Song',       section: 'Commands',                 run: () => liveShow.skip(1)},
+    {id: 'cmd.prev_song',   title: 'Show: Previous Song',   section: 'Commands',                 run: () => liveShow.skip(-1)},
     {id: 'cmd.stage_follow',title: 'Stage: Follow the Music', section: 'Commands', hint: 'cycle',  run: () => { stage.cycleFollow(); }},
     {id: 'cmd.toggle_ai',   title: 'Toggle AI Panel',       section: 'Commands',                 run: () => { toggleAiPanel(); }},
     {id: 'cmd.toggle_files',title: 'Toggle Files Panel',    section: 'Commands',                 run: () => { fileExplorer.toggleCollapsed(); }},

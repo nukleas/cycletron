@@ -1313,6 +1313,7 @@ name = "cycletron-render"
 version = "0.1.0"
 dependencies = [
  "cycletron-analysis",
+ "hound",
  "rustc-hash",
  "serde",
  "strudel-audio",
@@ -4023,6 +4024,17 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+
+[[package]]
+name = "performance-export"
+version = "0.1.0"
+dependencies = [
+ "cycletron-analysis",
+ "cycletron-core",
+ "cycletron-render",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "phf"

@@ -1,0 +1,137 @@
+# The Cycletron trailer. Music: Songs/cycletron-trailer.strudel, whose section
+# labels match the sections below. 140 BPM, so 1 bar = 1.714 s.
+# Open it and press ⌘⇧F to watch in Stage. Format: docs/SHOW_FILES.md.
+
+[show]
+title = "Cycletron Trailer"
+out = "renders/cycletron-trailer.mp4"
+size = "1920x1080"
+fps = 60
+
+# Code hidden and section titles off unless a section turns them on.
+[defaults]
+code = { follow = "hide", scrim = false }
+titles = false
+camera = "drift"
+grain = 0.2
+
+[[song]]
+source = "../Songs/cycletron-trailer.strudel"
+mode = "lissajous"
+fade = { in = 1, out = 0.5 }
+
+# Bars 1–4: code types in at the center.
+[song.sections.open]
+camera = "still"
+palette = "ice"
+code = { follow = "solo", place = "center", size = 30, type = 1.5, opacity = 0.9 }
+text = [{ say = "MUSIC IS CODE.", at = 2.5, hold = 1.4, style = "card", place = "bottom" }]
+
+# 5–8: code types in, then highlights notes as they play.
+[song.sections.build]
+mode = "neon-circuit"
+camera = { move = "push", punch = 0 }
+transition = "flash"
+code = { follow = "solo", size = 34, type = 1.6 }
+text = [
+  { say = "WRITE IT.", at = 0, hold = 1.6, style = "card", place = "bottom" },
+  { say = "HEAR IT.", at = 1.7, hold = 2.2, style = "card", place = "bottom" },
+]
+
+# 9–12: iso-city, code at the right.
+[song.sections.build2]
+mode = "iso-city"
+transition = "glitch"
+camera = { move = "push", punch = 0, kick = 0.5 }
+code = { follow = "solo", place = "right", size = 22, opacity = 0.5 }
+text = [
+  { say = "SEE IT.", at = 0, hold = 1.8, style = "card" }
+]
+
+# 13–16: ascii-scope.
+[song.sections.listen]
+mode = "ascii-scope"
+palette = "vapor"
+camera = { move = "orbit", punch = 0 }
+text = [{ say = "DRAWN FROM YOUR CODE.", at = 1, hold = 2.6, style = "card" }]
+
+# 17–24: a new shot and palette every bar, folded code at the right.
+[song.sections.drop]
+shots = [
+  { mode = "wave-terrain", palette = "neon" },
+  { mode = "tunnel", palette = "vapor" },
+  { mode = "iso-city", palette = "sunset" },
+  { mode = "matrix-rain", palette = "toxic" },
+  { mode = "neon-circuit", palette = "ice" },
+  { mode = "flame-graph", palette = "amber" },
+  { mode = "kaleidoscope", palette = "blood" },
+  { mode = "tunnel", palette = "neon" },
+]
+every = 1
+transition = "flash"
+strobe = { on = "kick", strength = 0.12 }
+camera = { move = "drift", punch = 1.5 }
+code = { follow = "fold", place = "right", size = 18, opacity = 0.45 }
+text = [
+  { say = "RUST ENGINE", at = 0, hold = 1.5, style = "card" },
+  { say = "VISUALIZERS", at = 4, hold = 1.5, style = "card" },
+]
+
+# 25–28: forest-drive, letterboxed, credits to TidalCycles and Strudel.
+[song.sections.break]
+mode = "forest-drive"
+palette = "sunset"
+letterbox = 2.39
+grain = 0.45
+transition = "black"
+camera = { move = "drift", punch = 0 }
+text = [
+  { say = "BORN FROM TIDALCYCLES", at = 0.5, hold = 1.6, style = "card" },
+  { say = "& STRUDEL.", at = 2.25, hold = 1.6, style = "card" },
+  { say = "based on strudel-rs", at = 1.5, hold = 2.4 },
+]
+
+# 29–32: kaleidoscope, one card per beat, then four per beat.
+[song.sections.riser]
+mode = "kaleidoscope"
+palette = "toxic"
+camera = "push"
+transition = "glitch"
+text = [
+  { say = "MIDI IMPORT.", at = 0, hold = 0.9, style = "card" },
+  { say = "DRUM MACHINES.", at = 1, hold = 0.9, style = "card" },
+  { say = "EXPORT ANYTHING.", at = 2, hold = 0.9, style = "card" },
+  { say = "LIVE CHANGES.", at = 3, hold = 0.2, style = "card" },
+  { say = "SAMPLE PACKS.", at = 3.25, hold = 0.2, style = "card" },
+  { say = "OPEN SOURCE.", at = 3.5, hold = 0.2, style = "card" },
+  { say = "GO.", at = 3.75, hold = 0.2, style = "card" },
+]
+
+# 33–40: a new shot every half bar, glitch transitions, camera shake on kicks.
+[song.sections.drop2]
+shots = [
+  "iso-city", "cockpit", "tunnel", "forest-drive", "lens-bench", "spot-field", "iso-city", "tunnel",
+  "tank-field", "cockpit", "iso-city", "forest-drive", "star-road", "kaleidoscope", "tunnel", "cockpit",
+]
+every = 0.5
+transition = "glitch"
+strobe = { on = "kick", strength = 0.15 }
+camera = { move = "shake", punch = 1.5, kick = 2 }
+text = [
+  { say = "STAGE MODE.", at = 0, hold = 1.4, style = "card" },
+  { say = "THIS VIDEO IS CODE.", at = 2, hold = 2.4, style = "card" },
+  { say = "shots = [\"iso-city\", \"cockpit\", …] · every = 0.5 · transition = \"glitch\"", at = 2.2, hold = 2.2, place = "top" },
+  { say = "JUST MAKE THINGS.", at = 6, hold = 1.4, style = "card" },
+]
+
+# 41–44: the logo, with links and credits.
+[song.sections.logo]
+mode = "logo"
+camera = { move = "still", punch = 0 }
+transition = { kind = "flash", bars = 0.4 }
+text = [
+  { say = "Live coding studio, built on Rust.", at = 0.9, hold = 1.1 },
+  { say = "with gratitude to TidalCycles, Strudel & the uzu community", at = 2.1, hold = 1.3 },
+  { say = "github.com/nukleas/cycletron · naderlabs.io", at = 0.9, hold = 1.1, place = "top" },
+  { say = "FREE & OPEN SOURCE (AGPL) · NOT AFFILIATED WITH STRUDEL.CC", at = 2.1, hold = 1.3, place = "top" },
+]

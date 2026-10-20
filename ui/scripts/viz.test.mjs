@@ -40,7 +40,7 @@ function fixture(t, code) {
     edit(code);
     t.after(() => source.scheduler.pattern?.free());
     const services = {
-        width: 1280, height: 720, dpr: 1, theme, cycle: 0,
+        width: 1280, height: 720, dpr: 1, theme, cycle: 0, bpm: 120,
         low: 0, mid: 0, high: 0, freqData: null, timeData: null,
         sampleRate: 48000, sensitivity: 1, patternSource: source,
     };

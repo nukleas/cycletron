@@ -15,12 +15,42 @@
  * - Canvas 2D only — no extra runtime deps.
  */
 
+import {currentBpm} from './bpm.js';
 import {pauseWhileHidden} from './viz-visibility.js';
+import {advanceScanlines, bandEnergies, paintFrame} from './viz/frame.js';
 import {VIZ_MODES} from './viz/registry.js';
 import {defaultTheme, readTheme} from './viz/theme.js';
+import type {View} from './viz/edit.js';
+import {applyFinish, type Finish, wash} from './viz/finish.js';
+import {paletteTheme} from './viz/palettes.js';
+import {type Entering, Transitions} from './viz/transitions.js';
 import type {PatternSource, VizLayer, VizMode, VizServices} from './viz/types.js';
 
 type MutableServices = { -readonly [K in keyof VizServices]: VizServices[K] };
+
+/** What a show's playing section shows. */
+export interface Shot {
+    /** Registry mode id. */
+    mode: string;
+    /** The camera's framing of the mode, or null to show it as is. */
+    view: View | null;
+    /** Drawn over the mode and the stage's layers (title cards), or null. */
+    overlay: VizLayer | null;
+    /** The transition into this shot while it lasts, else null. */
+    entering: Entering | null;
+    /** Whether the show fades anywhere: keep each frame to fade from. */
+    fades: boolean;
+    palette: string;
+    finish: Finish;
+    scanlines: boolean;
+    /** Song seconds, for the grain. */
+    time: number;
+    /** White over the visuals (the strobe), and black over everything (a fade), 0 to 1. */
+    strobe: number;
+    dim: number;
+    /** How fast the mode moves, against the music's pace. */
+    speed: number;
+}
 
 /** A locked output size for Stage Mode. See {@link FullscreenVisualizer.setFixedResolution}. */
 export interface FixedResolution {
@@ -45,6 +75,7 @@ export class FullscreenVisualizer {
         dpr: 1,
         theme: defaultTheme(),
         cycle: 0,
+        bpm: 120,
         low: 0,
         mid: 0,
         high: 0,
@@ -63,6 +94,22 @@ export class FullscreenVisualizer {
     /** Non-null in Stage Mode: bitmap is locked to this size and letterboxed. */
     private fixed: FixedResolution | null = null;
     private layers: readonly VizLayer[] = [];
+    /** A show's framing and overlay, kept apart from the stage's layers. */
+    private shot: Shot | null = null;
+    /** {@link layers}, then the shot's overlay. */
+    private painted: readonly VizLayer[] = [];
+    private readonly transitions = new Transitions();
+    private readonly overShot = (ctx: CanvasRenderingContext2D): void => {
+        if (!this.shot) return;
+        this.transitions.apply(ctx, this.services, this.shot.entering, this.shot.fades);
+        wash(ctx, '#ffffff', this.shot.strobe);
+        applyFinish(ctx, this.shot.finish, this.shot.time);
+    };
+    private readonly afterShot = (ctx: CanvasRenderingContext2D): void => {
+        if (this.shot) wash(ctx, '#000000', this.shot.dim);
+    };
+    /** The app's own palette; a show's shot may draw in another. */
+    private baseTheme = defaultTheme();
 
     private resizeObserver: ResizeObserver | null = null;
     private resizeRaf: number | null = null;
@@ -156,6 +203,22 @@ export class FullscreenVisualizer {
         if (this.services.width > 0) {
             for (const layer of layers) layer.layout(this.services);
         }
+        this.compose();
+    }
+
+    /** Frame the mode and overlay it as a show's playing section asks; `null` for neither. */
+    setShot(shot: Shot | null): void {
+        const overlay = shot?.overlay ?? null;
+        const changed = overlay !== (this.shot?.overlay ?? null);
+        this.shot = shot;
+        if (!changed) return;
+        if (overlay && this.services.width > 0) overlay.layout(this.services);
+        this.compose();
+    }
+
+    private compose(): void {
+        const overlay = this.shot?.overlay;
+        this.painted = overlay ? [...this.layers, overlay] : this.layers;
     }
 
 
@@ -190,7 +253,8 @@ export class FullscreenVisualizer {
 
     start(): void {
         if (this.running) return;
-        this.services.theme = readTheme();
+        this.baseTheme = readTheme();
+        this.services.theme = this.baseTheme;
         // Container is now visible — safe to measure and seed geometry.
         this.handleResize();
         this.running = true;
@@ -242,7 +306,7 @@ export class FullscreenVisualizer {
         }
 
         this.modeImpl.layout(this.services);
-        for (const layer of this.layers) layer.layout(this.services);
+        for (const layer of this.painted) layer.layout(this.services);
     };
 
     private readonly draw = (now: number): void => {
@@ -251,11 +315,23 @@ export class FullscreenVisualizer {
         const dt = Math.min((now - this.lastFrame) / 1000, 0.1);
         this.lastFrame = now;
 
+        this.services.bpm = currentBpm();
+        const theme = this.shot ? paletteTheme(this.shot.palette, this.baseTheme) : this.baseTheme;
+        if (theme !== this.services.theme) {
+            // Modes bake their colors at layout.
+            this.services.theme = theme;
+            this.modeImpl.layout(this.services);
+        }
         this.updateAudioFeatures();
-        this.modeImpl.update(dt, this.services);
-        for (const layer of this.layers) layer.update(dt, this.services);
-        this.scanlineOffset = (this.scanlineOffset + dt * 18) % 4;
-        this.render();
+        this.modeImpl.update(dt * (this.shot?.speed ?? 1), this.services);
+        for (const layer of this.painted) layer.update(dt, this.services);
+        this.scanlineOffset = advanceScanlines(this.scanlineOffset, dt);
+        paintFrame(this.ctx, VIZ_MODES[this.modeIndex], this.modeImpl, this.painted, this.services, {
+            scanlines: this.shot?.scanlines === false ? null : this.scanlineOffset,
+            view: this.shot?.view ?? undefined,
+            over: this.overShot,
+            after: this.afterShot,
+        });
 
         this.animationId = requestAnimationFrame(this.draw);
     };
@@ -268,71 +344,10 @@ export class FullscreenVisualizer {
         this.analyser.getByteFrequencyData(s.freqData as Uint8Array<ArrayBuffer>);
         this.analyser.getFloatTimeDomainData(s.timeData as Float32Array<ArrayBuffer>);
 
-        const len = s.freqData.length;
-        const lowEnd = Math.floor(len * 0.08);
-        const midEnd = Math.floor(len * 0.35);
-
-        let low = 0, mid = 0, high = 0;
-        for (let i = 0; i < lowEnd; i++) low += s.freqData[i];
-        for (let i = lowEnd; i < midEnd; i++) mid += s.freqData[i];
-        for (let i = midEnd; i < len; i++) high += s.freqData[i];
-
-        const inv255 = 1 / 255;
-        s.low = (low / (lowEnd || 1)) * inv255 * this.sensitivity;
-        s.mid = (mid / ((midEnd - lowEnd) || 1)) * inv255 * this.sensitivity;
-        s.high = (high / ((len - midEnd) || 1)) * inv255 * this.sensitivity;
-    }
-
-    private render(): void {
-        const {ctx} = this;
-        const s = this.services;
-        const w = s.width;
-        const h = s.height;
-
-        // Trail modes get a translucent clear so strokes smear across frames;
-        // everyone else gets an opaque background.
-        const fade = VIZ_MODES[this.modeIndex].trailFade;
-        if (fade !== undefined) {
-            const [br, bg, bb] = s.theme.bgRgb;
-            ctx.fillStyle = `rgba(${br}, ${bg}, ${bb}, ${fade})`;
-        } else {
-            ctx.fillStyle = s.theme.bg;
-        }
-        ctx.fillRect(0, 0, w, h);
-
-        this.drawScanlines(ctx, w, h);
-        this.modeImpl.render(ctx, s);
-        this.drawVignette(ctx, w, h);
-        // Layers last: the vignette is a frame around the *visuals*, and
-        // dimming Stage Mode's code at the edges would hurt legibility.
-        for (const layer of this.layers) layer.render(ctx, s);
-    }
-
-    private drawScanlines(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-        ctx.strokeStyle = `hsla(${this.services.theme.neonHue}, 92%, 70%, 0.035)`;
-        ctx.lineWidth = 1;
-
-        const step = 3.6;
-        let y = (this.scanlineOffset % step) - step;
-
-        ctx.beginPath();
-        while (y < h) {
-            ctx.moveTo(0, y);
-            ctx.lineTo(w, y);
-            y += step;
-        }
-        ctx.stroke();
-    }
-
-    private drawVignette(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-        const grad = ctx.createRadialGradient(
-            w * 0.5, h * 0.5, Math.min(w, h) * 0.35,
-            w * 0.5, h * 0.5, Math.max(w, h) * 0.72,
-        );
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,0.65)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, w, h);
+        const {low, mid, high} = bandEnergies(s.freqData, this.sensitivity);
+        s.low = low;
+        s.mid = mid;
+        s.high = high;
     }
 
     destroy(): void {

@@ -1,0 +1,129 @@
+// Cycletron Trailer — dark acid techno · F minor · 140 BPM · 44 bars
+// The music for Shows/cycletron-trailer.show.toml, which cuts its picture on
+// these section labels. Every section is 4-bar aligned (1 bar = 1.714 s).
+//
+// FORM (1 cycle = 1 bar):
+//   open    4   sub drone, a lone ticking hat, crackle
+//   build   4   kick in, the acid line, its filter opening bar by bar
+//   build2  4   sixteenth hats and rimshots, the acid brighter
+//   listen  4   the floor drops out from under the kick, noise riser
+//   drop    8   full kit, distorted acid, clap
+//   break   4   kick out: pad, acid in the delay
+//   riser   4   snare roll, noise sweep, pitch climb
+//   drop2   8   everything, a second acid layer, stabs
+//   logo    4   one hit on the downbeat, then the room rings out
+
+setbpm(140);
+
+"<open build build2 listen drop@2 break riser drop2@2 logo>".slow(4).pickRestart({
+  // OPEN
+  open: stack(
+    note("f1").s("sine").attack(1.2).release(2).lpf(160).gain(0.7),
+    s("~ ~ ~ hh").gain(0.3).hpf(7000).room(0.4).pan(0.62),
+    s("crackle*4").gain(0.12).hpf(3000).pan(0.35),
+    note("<~ ~ [~ ~ ~ f5] [~ ~ c6 ~]>").s("wt_bell").decay(0.2).sustain(0)
+      .delay(0.4).delaytime(0.3214).delayfeedback(0.5).room(0.6).gain(0.22).pan(0.7)
+  ),
+
+  // BUILD A
+  build: stack(
+    s("bd*4").gain(0.9).dist(0.4).lpf(2600),
+    note("f1*4").s("sine").attack(0.001).decay(0.3).sustain(0).release(0.35)
+      .lpf(200).dist(0.45).gain(0.55),
+    s("<[~ hh ~ hh] [~ hh ~ hh] [hh*8] [hh*8]>").gain(0.3).hpf(7000).pan(0.4),
+    note("f2 f2 f3 f2 ab2 f2 c3 f2 f2 eb3 f2 f3 gb2 f2 c3 f2")
+      .s("sawtooth").hpf(120).lpf("<500 700 900 1200>").resonance(14)
+      .decay(0.14).sustain(0.05).dist(0.35).gain(0.5).pan(0.45)
+  ),
+
+  // BUILD B
+  build2: stack(
+    s("bd*4").gain(0.95).dist(0.45).lpf(3000),
+    note("f1*4").s("sine").attack(0.001).decay(0.3).sustain(0).release(0.35)
+      .lpf(210).dist(0.5).gain(0.55),
+    s("hh*16").gain("0.22 0.35 0.26 0.4").hpf(7000).pan(0.35),
+    s("~ rim ~ ~ rim ~ ~ rim").gain(0.3).hpf(1800).room(0.15).pan(0.65),
+    note("f2 f2 f3 f2 ab2 f2 c3 f2 f2 eb3 f2 f3 gb2 f2 c3 f2")
+      .s("sawtooth").hpf(120).lpf("<1500 1900 2400 3000>").resonance(16)
+      .decay(0.14).sustain(0.05).dist(0.4).gain(0.52).pan(0.45)
+  ),
+
+  // LISTEN — the floor drops out from under the kick
+  listen: stack(
+    s("bd*4").gain(0.85).lpf("<900 700 500 300>"),
+    s("hh*16").gain(0.2).hpf(8000).pan(0.4),
+    note("f2 f2 f3 f2 ab2 f2 c3 f2 f2 eb3 f2 f3 gb2 f2 c3 f2")
+      .s("sawtooth").hpf(200).lpf(sine.range(400, 3500).fast(2)).resonance(20)
+      .decay(0.14).sustain(0.05).dist(0.3).gain(0.45)
+      .delay(0.3).delaytime(0.3214).delayfeedback(0.35).pan(0.5),
+    s("white*16").hpf(saw.range(400, 9000).slow(4)).gain(saw.range(0.02, 0.22).slow(4)).pan(0.5)
+  ),
+
+  // DROP 1
+  drop: stack(
+    s("bd*4").gain(1.0).dist(0.6).lpf(3500),
+    note("f1*4").s("sine").attack(0.001).decay(0.32).sustain(0).release(0.4)
+      .lpf(230).dist(0.6).room(0.4).roomsize(0.8).gain(0.6),
+    s("~ cp ~ cp").gain(0.7).hpf(1000).dist(0.2).room(0.2),
+    s("~ oh ~ oh").gain(0.4).hpf(4500).pan(0.62),
+    s("hh*16").gain("0.25 0.42 0.3 0.46").hpf(7000).pan(0.32),
+    s("~ rim ~ ~ rim ~ ~ rim").gain(0.34).hpf(1800).dist(0.25).room(0.12).pan(0.68),
+    s("<[~ ~ ~ ~] [~ ~ ~ [ht mt]]>").gain(0.35).crush(6).hpf(700).pan(0.6),
+    note("<[f2 f2 f3 f2 ab2 f2 c3 f2 f2 eb3 f2 f3 gb2 f2 c3 f2] [f2 f2 f3 f2 ab2 f2 c3 f2 db3 c3 ab2 f2 gb2 f2 eb3 c3]>")
+      .s("superzow").hpf(160).lpf(sine.range(700, 5200).slow(4)).resonance(19)
+      .decay(0.16).sustain(0.08).dist(0.55).gain(0.62).pan(0.45)
+  ),
+
+  // BREAK
+  break: stack(
+    note("<[f3, ab3, c4, eb4] [f3, ab3, c4, eb4] [db3, f3, ab3, c4] [eb3, gb3, bb3, db4]>")
+      .s("supersaw").attack(0.6).release(2.5).lpf(1000).gain(0.2).room(0.8).roomsize(0.9),
+    note("f1").s("sine").attack(0.5).release(2).lpf(150).gain(0.35),
+    note("f2 ~ f3 ~ ab2 ~ c3 ~ ~ ~ ~ ~ ~ ~ ~ ~")
+      .s("sawtooth").lpf(1400).resonance(18).decay(0.15).sustain(0)
+      .delay(0.55).delaytime(0.3214).delayfeedback(0.6).room(0.5).gain(0.25).pan(0.55),
+    note("<f5 ~ c6 ~>").s("wt_bell").room(0.8).gain(0.18).pan(0.3)
+  ),
+
+  // RISER
+  riser: stack(
+    s("<sd*4 sd*8 sd*16 [sd*16, sd*32]>").gain(saw.range(0.3, 1.0).slow(4)).hpf(900).dist(0.2).pan(0.5),
+    s("bd*4").gain(saw.range(0.6, 1.0).slow(4)).lpf(saw.range(300, 3000).slow(4)),
+    s("white*16").hpf(saw.range(300, 10000).slow(4)).gain(saw.range(0.05, 0.5).slow(4)),
+    note("<f2*16 ab2*16 bb2*16 c3*16>").s("sawtooth")
+      .lpf(saw.range(500, 6000).slow(4)).resonance(20).decay(0.12).sustain(0.05)
+      .dist(0.45).gain(0.6)
+  ),
+
+  // DROP 2
+  drop2: stack(
+    s("bd*4").gain(1.0).dist(0.65).lpf(3800),
+    note("f1*4").s("sine").attack(0.001).decay(0.32).sustain(0).release(0.4)
+      .lpf(240).dist(0.6).room(0.4).roomsize(0.8).gain(0.6),
+    s("~ cp ~ cp").gain(0.75).hpf(1000).dist(0.25).room(0.25),
+    s("~ ~ sd ~").gain(0.5).hpf(1400).dist(0.3),
+    s("~ oh ~ oh").gain(0.45).hpf(4500).pan(0.62),
+    s("hh*16").gain("0.28 0.45 0.32 0.5").hpf(7000).pan(0.32),
+    s("rd*4").gain(0.22).hpf(5000).pan(0.75),
+    s("~ rim ~ ~ rim ~ ~ rim").gain(0.36).hpf(1800).dist(0.3).room(0.12).pan(0.68),
+    s("<[~ ~ ~ [~ mt]] [~ ~ ~ [ht mt]]>").gain(0.38).crush(6).hpf(700).pan(0.6),
+    note("<[f2 f2 f3 f2 ab2 f2 c3 f2 f2 eb3 f2 f3 gb2 f2 c3 f2] [f2 f2 f3 f2 ab2 f2 c3 f2 db3 c3 ab2 f2 gb2 f2 eb3 c3]>")
+      .s("superzow").hpf(160).lpf(sine.range(900, 6000).slow(2)).resonance(20)
+      .decay(0.16).sustain(0.08).dist(0.6).gain(0.62).pan(0.4),
+    note("<[f4 ~ f4 ab4 ~ c5 ~ eb5] [f4 ~ f4 ab4 ~ db5 c5 ~]>")
+      .s("supersquare").decay(0.1).sustain(0).release(0.06)
+      .lpf(3200).resonance(8).dist(0.35)
+      .delay(0.25).delaytime(0.1607).delayfeedback(0.3).gain(0.36).pan(0.68)
+  ),
+
+  // LOGO — one hit, then the room rings out
+  logo: stack(
+    s("<[bd, cr] ~ ~ ~>").gain(1.0).dist(0.5).room(0.6).roomsize(0.95),
+    note("<f1 ~ ~ ~>").s("sine").attack(0.001).decay(2.5).sustain(0).release(2)
+      .lpf(200).dist(0.5).gain(0.8),
+    note("<[f3, ab3, c4, f4] ~ ~ ~>").s("superzow").attack(0.001).decay(1.8).sustain(0)
+      .lpf(2400).resonance(6).dist(0.4).room(0.8).roomsize(0.95).gain(0.4),
+    note("<~ ~ ~ [~ ~ ~ [f5 c6]]>").s("wt_bell").delay(0.5).delaytime(0.3214)
+      .delayfeedback(0.5).room(0.7).gain(0.22).pan(0.6)
+  )
+})

@@ -37,7 +37,6 @@ import {TrackModel, instrumentFamily, type TrackSync, type VizTrack} from '../tr
 import {
     TransientDetector, alphaRamp, clamp01, drawLabel, follow, lerpRgb, mixRgb, rampAt, rgbOf,
 } from '../util.js';
-import {currentBpm} from '../../bpm.js';
 
 const MAX_LIVE = 8;
 /** Live parts plus ones still fading out. */
@@ -522,7 +521,7 @@ class NeonCircuitMode implements VizMode {
         this.playing = sync.pattern !== null;
         this.phase = sync.phase;
         this.bar = Math.floor(s.cycle);
-        this.travel = Math.max(0.01, IN_SECONDS * currentBpm() / 240);
+        this.travel = Math.max(0.01, IN_SECONDS * s.bpm / 240);
         this.syncParts(dt);
         this.tracks.forEachOnset(sync, this.onOnset);
         this.tracks.decay(dt);
