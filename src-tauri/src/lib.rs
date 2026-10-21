@@ -341,6 +341,7 @@ pub fn run() {
             commands::list_library,
             commands::create_library_folder,
             commands::create_library_file,
+            commands::list_library_songs,
             commands::delete_library_path,
             commands::rename_library_path,
             commands::reveal_in_os,

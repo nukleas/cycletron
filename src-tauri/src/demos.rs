@@ -10,14 +10,16 @@
 //! - `corpus/{rhythm,melody,harmony,form,timbre,motion}/**` — curated techniques
 //! - `corpus/genres/**/*.strudel` — generated skeletons + curated genre examples
 //!
-//! Seeding is idempotent (marker file) and never overwrites files the user
-//! already has, so re-running after an app upgrade only fills gaps.
+//! Each demo is written once (see [`Seeder`]) and never over a file the
+//! user has, so an app upgrade only adds new demos.
 
 use rust_embed::Embed;
+use std::collections::BTreeSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-const SEED_MARKER: &str = ".cycletron-demos-v1";
+/// At the library root, beside `Demos/`, so it outlives that folder.
+const SEED_LIST: &str = ".cycletron-demos";
 const DEMOS_DIR: &str = "Demos";
 
 #[derive(Embed)]
@@ -35,12 +37,7 @@ struct CorpusAssets;
 /// Ensure `library_root/Demos/` is populated. Safe to call on every launch.
 pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
     let demos = library_root.join(DEMOS_DIR);
-    fs::create_dir_all(&demos).map_err(|e| format!("create Demos: {e}"))?;
-
-    let marker = demos.join(SEED_MARKER);
-    let first_seed = !marker.exists();
-
-    let mut report = SeedReport::default();
+    let mut seeder = Seeder::new(library_root);
 
     // Songs → Demos/Songs/… (preserve agency/ subfolder)
     for path in SongAssets::iter() {
@@ -49,14 +46,10 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
             continue;
         }
         let dest = demos.join("Songs").join(rel);
-        if write_if_missing(
+        seeder.put(
             &dest,
             SongAssets::get(rel).as_ref().map(|f| f.data.as_ref()),
-        )? {
-            report.written += 1;
-        } else {
-            report.skipped += 1;
-        }
+        )?;
     }
 
     // Shows → Demos/Shows/…; their `source` paths point into ../Songs.
@@ -66,14 +59,10 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
             continue;
         }
         let dest = demos.join("Shows").join(rel);
-        if write_if_missing(
+        seeder.put(
             &dest,
             ShowAssets::get(rel).as_ref().map(|f| f.data.as_ref()),
-        )? {
-            report.written += 1;
-        } else {
-            report.skipped += 1;
-        }
+        )?;
     }
 
     // Curated techniques → Demos/Techniques/{Category}/file.strudel
@@ -98,16 +87,12 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
                 .join("Techniques")
                 .join(title_case_words(cat))
                 .join(rest);
-            if write_if_missing(
+            seeder.put(
                 &dest,
                 CorpusAssets::get(path.as_ref())
                     .as_ref()
                     .map(|f| f.data.as_ref()),
-            )? {
-                report.written += 1;
-            } else {
-                report.skipped += 1;
-            }
+            )?;
             continue;
         }
 
@@ -136,24 +121,18 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
                         .join(title_case_kebab(slug))
                         .join(format!("{}.strudel", title_case_kebab(example)))
                 };
-                if write_if_missing(
+                seeder.put(
                     &dest,
                     CorpusAssets::get(path.as_ref())
                         .as_ref()
                         .map(|f| f.data.as_ref()),
-                )? {
-                    report.written += 1;
-                } else {
-                    report.skipped += 1;
-                }
+                )?;
             }
         }
     }
 
     // Friendly README once.
-    let readme = demos.join("README.txt");
-    if !readme.exists() {
-        let text = "\
+    let text = "\
 Cycletron demo library
 ======================
 
@@ -165,16 +144,12 @@ Techniques/  Short curated patterns by musical idea (rhythm, melody, …).
 Genres/      Generated skeletons plus concise, curated genre examples.
 
 Open any file in the File Explorer, press Play (⌘↩), and remix.
-These files were seeded for you — edit freely; Cycletron will not overwrite
-existing files on upgrade (only fill missing ones).
+Edit them freely. Cycletron never overwrites your files, and a demo you
+delete stays deleted; upgrades only add new demos.
 ";
-        fs::write(&readme, text).map_err(|e| e.to_string())?;
-        report.written += 1;
-    }
+    seeder.put(&demos.join("README.txt"), Some(text.as_bytes()))?;
 
-    if first_seed || report.written > 0 {
-        fs::write(&marker, b"v1\n").map_err(|e| e.to_string())?;
-    }
+    let report = seeder.finish()?;
 
     if report.written > 0 {
         tracing::info!(
@@ -228,18 +203,65 @@ pub fn export_corpus_assets(dest: &Path) -> Result<(), String> {
     fs::write(&marker, VERSION).map_err(|e| format!("write {}: {e}", marker.display()))
 }
 
-fn write_if_missing(dest: &Path, data: Option<&[u8]>) -> Result<bool, String> {
-    let Some(bytes) = data else {
-        return Ok(false);
-    };
-    if dest.exists() {
-        return Ok(false);
+/// Writes each demo once. The library root's seed list records what was
+/// seeded, so a demo the user deletes, or the whole `Demos/` folder, stays
+/// deleted; only demos new in a later version are added.
+struct Seeder {
+    root: PathBuf,
+    list: PathBuf,
+    seeded: BTreeSet<String>,
+    added: bool,
+    report: SeedReport,
+}
+
+impl Seeder {
+    fn new(root: &Path) -> Self {
+        let list = root.join(SEED_LIST);
+        let seeded = fs::read_to_string(&list)
+            .map(|text| text.lines().map(str::to_string).collect())
+            .unwrap_or_default();
+        Self {
+            root: root.to_path_buf(),
+            list,
+            seeded,
+            added: false,
+            report: SeedReport::default(),
+        }
     }
-    if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
+
+    /// Write `data` to `dest`, unless it was seeded before or a file is already there.
+    fn put(&mut self, dest: &Path, data: Option<&[u8]>) -> Result<(), String> {
+        let Some(bytes) = data else {
+            return Ok(());
+        };
+        let key = dest
+            .strip_prefix(&self.root)
+            .unwrap_or(dest)
+            .to_string_lossy()
+            .replace('\\', "/");
+        if self.seeded.contains(&key) || dest.exists() {
+            self.report.skipped += 1;
+        } else {
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
+            }
+            fs::write(dest, bytes).map_err(|e| format!("write {}: {e}", dest.display()))?;
+            self.report.written += 1;
+        }
+        self.added |= self.seeded.insert(key);
+        Ok(())
     }
-    fs::write(dest, bytes).map_err(|e| format!("write {}: {e}", dest.display()))?;
-    Ok(true)
+
+    fn finish(self) -> Result<SeedReport, String> {
+        if self.added {
+            let mut text = self.seeded.into_iter().collect::<Vec<_>>().join("\n");
+            text.push('\n');
+            fs::write(&self.list, text)
+                .map_err(|e| format!("write {}: {e}", self.list.display()))?;
+        }
+        Ok(self.report)
+    }
 }
 
 fn title_case_kebab(s: &str) -> String {
@@ -304,10 +326,15 @@ mod tests {
             dir.join("Demos/Genres/Acid House/Warehouse Squelch.strudel")
                 .is_file()
         );
-        assert!(dir.join("Demos").join(SEED_MARKER).is_file());
+        assert!(dir.join(SEED_LIST).is_file());
         // Second seed should not rewrite.
         let report2 = seed_into_library(&dir).expect("re-seed");
         assert_eq!(report2.written, 0);
+        // Deleted demos stay deleted.
+        fs::remove_dir_all(dir.join("Demos")).unwrap();
+        let report3 = seed_into_library(&dir).expect("seed after delete");
+        assert_eq!(report3.written, 0);
+        assert!(!dir.join("Demos").exists());
         let _ = fs::remove_dir_all(&dir);
     }
 }

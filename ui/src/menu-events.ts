@@ -63,6 +63,7 @@ export async function initMenuEvents(): Promise<void> {
         'menu:user_guide': () => { helpModal.open('guide'); },
         'menu:shortcuts': () => { helpModal.open('shortcuts'); },
         'menu:dialect': () => { helpModal.open('dialect'); },
+        'menu:shows': () => { helpModal.open('shows'); },
         'menu:about': () => { void aboutModal.open(); },
         'menu:preferences': () => { void preferencesModal.open(); },
         'menu:check_updates': () => { void checkForUpdates(true); },

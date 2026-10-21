@@ -11,9 +11,10 @@
 
 import {invoke, isTauri} from './tauri.js';
 import {escapeHtml} from './html.js';
-import {fileManager} from './file-manager.js';
+import {fileManager, isShowPath} from './file-manager.js';
 import {confirmDialog, errorDialog, openPathDialog} from './dialog.js';
-import {basename} from './paths.js';
+import {basename, relativePath} from './paths.js';
+import {newShowText} from './show/show.js';
 import {currentBpm} from './bpm.js';
 
 interface DirEntry {
@@ -335,10 +336,13 @@ export class FileExplorer {
     private async newFile(parentDir: string): Promise<void> {
         const name = await this.promptInline(parentDir, 'untitled.strudel');
         if (!name) return;
-        const path = join(parentDir, ensureStrudelExt(name));
+        const path = join(parentDir, withFileExt(name));
         const bpm = currentBpm();
+        // A new show plays the open song.
+        const song = fileManager.filePath;
+        const text = isShowPath(path) ? newShowText(song ? relativePath(parentDir, song) : 'my-song.strudel') : null;
         try {
-            await invoke('create_library_file', {path, bpm});
+            await invoke('create_library_file', {path, bpm, text});
             this.expanded.add(parentDir);
             await this.refresh();
             await fileManager.openPath(path);
@@ -365,7 +369,7 @@ export class FileExplorer {
         const newName = await this.promptInline(parentDirOf(entry.path), entry.name, entry.name);
         if (!newName || newName === entry.name) return;
         const parent = parentDirOf(entry.path);
-        const target = join(parent, entry.is_dir ? newName : ensureStrudelExt(newName));
+        const target = join(parent, entry.is_dir || extOf(newName) === extOf(entry.name) ? newName : withFileExt(newName));
         try {
             await invoke('rename_library_path', {from: entry.path, to: target});
             // Migrate expanded paths.
@@ -672,8 +676,14 @@ function parentDirOf(path: string): string {
     return idx >= 0 ? path.slice(0, idx) : path;
 }
 
-function ensureStrudelExt(name: string): string {
-    return /\.(strudel|js)$/i.test(name) ? name : `${name}.strudel`;
+/** The extension, lowercased: `toml` for `a.show.toml`, '' for none. */
+function extOf(name: string): string {
+    return /\.([^.\\/]+)$/.exec(name)?.[1].toLowerCase() ?? '';
+}
+
+/** Songs (`.strudel`, `.js`) and shows (`.show.toml`) keep their name; anything else becomes a song. */
+function withFileExt(name: string): string {
+    return /\.(strudel|js)$/i.test(name) || isShowPath(name) ? name : `${name}.strudel`;
 }
 
 function depthFromRoot(path: string, root: string): number {

@@ -1,10 +1,13 @@
 /**
- * In-app Help: Keyboard Shortcuts, Dialect, and User Guide summary.
+ * In-app Help: Keyboard Shortcuts, Dialect, User Guide summary, and the
+ * show-file guide (docs/SHOW_FILES.md, rendered as is).
  * Opened from Help menu, command palette, and About links.
  */
 
 import {dismissibleModal} from './modal-utils.js';
 import {escapeHtml} from './html.js';
+import {renderDocToHtml} from './markdown.js';
+import showGuide from '../../docs/SHOW_FILES.md?raw';
 import {
     SHORTCUTS,
     DIALECT_RULES,
@@ -12,7 +15,7 @@ import {
     PRIVACY_BLURB,
 } from './help-content.js';
 
-export type HelpSection = 'shortcuts' | 'dialect' | 'guide';
+export type HelpSection = 'shortcuts' | 'dialect' | 'guide' | 'shows';
 
 class HelpModal {
     private root: HTMLElement | null = null;
@@ -36,6 +39,13 @@ class HelpModal {
             if (!btn?.dataset.helpSection) return;
             this.section = btn.dataset.helpSection as HelpSection;
             this.render();
+        });
+        // A guide's own contents links jump within the page.
+        this.bodyEl?.addEventListener('click', (e) => {
+            const link = (e.target as Element).closest<HTMLElement>('[data-doc-anchor]');
+            if (!link) return;
+            e.preventDefault();
+            this.bodyEl?.querySelector(`#${CSS.escape(link.dataset.docAnchor!)}`)?.scrollIntoView({block: 'start'});
         });
 
         this.inited = true;
@@ -64,6 +74,7 @@ class HelpModal {
             shortcuts: 'Keyboard Shortcuts',
             dialect: 'Cycletron Dialect',
             guide: 'User Guide',
+            shows: 'Show Files',
         };
         this.titleEl.textContent = titles[this.section];
 
@@ -71,7 +82,11 @@ class HelpModal {
             btn.classList.toggle('help-tab--active', btn.dataset.helpSection === this.section);
         }
 
-        if (this.section === 'shortcuts') {
+        this.bodyEl.classList.toggle('help-body--doc', this.section === 'shows');
+        this.bodyEl.scrollTop = 0;
+        if (this.section === 'shows') {
+            this.bodyEl.innerHTML = renderDocToHtml(showGuide);
+        } else if (this.section === 'shortcuts') {
             this.bodyEl.innerHTML = this.renderShortcuts();
         } else if (this.section === 'dialect') {
             this.bodyEl.innerHTML = this.renderDialect();

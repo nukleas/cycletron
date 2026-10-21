@@ -145,6 +145,8 @@ async function wireAiChat() {
         isProcessing = busy;
         input.disabled = busy;
         form.querySelector('button')!.disabled = busy;
+        // Clearing mid-request would drop the reply into a cleared session.
+        (clearBtn as HTMLButtonElement).disabled = busy;
         if (busy) {
             input.placeholder = 'Thinking...';
         } else {

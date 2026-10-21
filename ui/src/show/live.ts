@@ -94,56 +94,92 @@ class LiveShow {
     private timer: ReturnType<typeof setInterval> | null = null;
     /** True while a reload prompt is up, so the poll doesn't stack them. */
     private asking = false;
+    /** True while start() plans the show and opens its first song. */
+    private starting = false;
 
     constructor() {
         // Opening another file ends the show; the song stays open as a plain song.
         document.addEventListener('file:changed', (e) => {
             const path = (e as CustomEvent<{path: string | null}>).detail.path;
             const playing = this.plan[this.current]?.song.source;
-            if (this.path && path !== playing) void this.stop({cancellable: false});
+            // A show still being fixed has no song yet.
+            if (this.path && this.plan.length && path !== playing) void this.stop({cancellable: false});
         });
     }
 
     async open(path: string): Promise<void> {
         let text: string;
         let ctx: ShowContext;
-        let plan: Planned[];
         try {
             text = await invoke<string>('read_text', {path});
             ctx = await context(path);
-            plan = await planSongs(parseShow(text, ctx).songs);
         } catch (e) {
             await errorDialog(`Could not open show:\n${message(e)}`);
             return;
         }
         // Reopening a show (or opening another) first settles the one open.
         if (!(await this.stop())) return;
-        // A set starts from its first song's cycle 0, not wherever the transport is.
-        window.strudelApp?.stop();
-
-        const first = plan[0].song.source;
-        await fileManager.openPath(first);
-        // Declined the unsaved-changes prompt, or the song failed to open.
-        if (fileManager.filePath !== first) return;
-        const app = window.strudelApp;
-        if (!app?.editor) return;
-
         this.path = path;
         this.ctx = ctx;
-        this.plan = plan;
-        this.current = 0;
-        this.cuedCode = app.editor.getCode();
         showPane.open(path, text, {
-            onEdit: (edited) => void this.apply(edited),
+            // A show that can't play yet starts once an edit fixes it.
+            onEdit: (edited) => void (this.plan.length ? this.apply(edited) : this.start(edited)),
             onClose: () => void this.stop(),
+            sections: (index) => [...new Set(this.plan[index]?.cues.map((c) => c.label) ?? [])],
         });
-        app.onSongStarted = () => void this.promote();
-        app.onTick = (cycle) => this.advance(cycle);
-        ambientViz.setDirector((cycle) => this.direct(cycle));
-        this.timer = setInterval(() => void this.poll(), POLL_MS);
-        // Song and show stay in view, to edit while it plays; ⌘⇧F is the stage.
-        await app.play();
-        this.announce();
+        await this.start(text);
+    }
+
+    /** Plan the show and play it. A problem is marked in the pane, to fix there. */
+    private async start(text: string): Promise<void> {
+        const ctx = this.ctx;
+        const app = window.strudelApp;
+        if (!ctx || !app?.editor || this.starting) return;
+        this.starting = true;
+        try {
+            let plan: Planned[];
+            try {
+                const songs = parseShow(text, ctx).songs;
+                // The first song may be open already, with edits to keep.
+                const open = songs[0].source === fileManager.filePath;
+                plan = await planSongs(songs, open ? 0 : -1, open ? app.editor.getCode() : '');
+            } catch (e) {
+                if (ctx === this.ctx) showPane.setProblem(problem(e, text));
+                return;
+            }
+            if (ctx !== this.ctx) return;
+            showPane.setProblem(null);
+
+            const first = plan[0].song.source;
+            if (fileManager.filePath !== first) {
+                // Asked before anything stops; declining ends the show.
+                if (!(await fileManager.confirmDiscardIfDirty())) {
+                    await this.stop();
+                    return;
+                }
+                // Set first: opening the song must read as this show's song.
+                this.plan = plan;
+                await fileManager.openPath(first, {force: true});
+                if (fileManager.filePath !== first) {
+                    await this.stop();
+                    return;
+                }
+            }
+            this.plan = plan;
+            this.current = 0;
+            // A set starts from its first song's cycle 0, not wherever the transport is.
+            app.stop();
+            this.cuedCode = app.editor.getCode();
+            app.onSongStarted = () => void this.promote();
+            app.onTick = (cycle) => this.advance(cycle);
+            ambientViz.setDirector((cycle) => this.direct(cycle));
+            this.timer = setInterval(() => void this.poll(), POLL_MS);
+            // Song and show stay in view, to edit while it plays; ⌘⇧F is the stage.
+            await app.play();
+            this.announce();
+        } finally {
+            this.starting = false;
+        }
     }
 
     /** End the show, offering to save an edited show file first. False if cancelled or the save failed. */
@@ -327,6 +363,8 @@ class LiveShow {
         this.current = index >= 0 ? index : next.index;
         this.cuedCode = next.code;
         this.playing = null;
+        // Edits made to the song during the show are kept, not discarded.
+        await fileManager.saveSong();
         await fileManager.openPath(next.source, {force: true, playing: true});
         this.announce();
     }

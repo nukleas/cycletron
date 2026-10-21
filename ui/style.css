@@ -4243,6 +4243,43 @@ body.is-drop-target::after {
     color: var(--text);
 }
 .help-code--bad { border-color: rgba(255, 110, 199, 0.35); }
+/* A guide rendered from the repo's docs (Help → Shows). */
+.help-body--doc { max-height: min(640px, 70vh); }
+.help-body--doc h1 { display: none; }
+.help-body--doc .doc-h2 {
+    margin: 18px 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--neon);
+}
+.help-body--doc .doc-h3 {
+    margin: 12px 0 4px;
+    font-size: 11px;
+    color: var(--text);
+}
+.help-body--doc p, .help-body--doc ul { margin: 0 0 8px; }
+.help-body--doc ul { padding-left: 1.1em; }
+.help-body--doc hr { border: none; border-top: 1px solid rgba(125, 249, 255, 0.08); margin: 14px 0; }
+.help-body--doc code { font-size: 11px; color: var(--neon); }
+.help-body--doc pre code { color: var(--text); }
+.help-body--doc .help-code { margin: 0 0 8px; }
+.help-body--doc table { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
+.help-body--doc th {
+    text-align: left;
+    font-size: 10px;
+    color: var(--text-muted);
+    padding: 4px 8px 4px 0;
+    border-bottom: 1px solid var(--neon-subtle);
+}
+.help-body--doc td {
+    padding: 4px 8px 4px 0;
+    vertical-align: top;
+    border-bottom: 1px solid rgba(125, 249, 255, 0.06);
+}
+.help-body--doc a { color: var(--neon); }
+
 .help-foot {
     margin: 16px 0 4px;
     font-size: 11px;
@@ -5231,11 +5268,14 @@ body.stage-active #fullscreenVizHUD { display: none; }
     min-width: 0;
 }
 
+/* Too small for the global button's corner mark and left-aligned, spaced label. */
 .mixer-btn {
     flex: none;
-    width: 20px;
-    height: 18px;
+    width: 22px;
+    height: 20px;
     padding: 0;
+    justify-content: center;
+    letter-spacing: 0;
     font-size: 10px;
     font-family: inherit;
     font-weight: 600;
@@ -5246,6 +5286,10 @@ body.stage-active #fullscreenVizHUD { display: none; }
     border-radius: 3px;
     cursor: pointer;
     transition: color 0.12s, border-color 0.12s, background 0.12s, box-shadow 0.12s;
+}
+
+.mixer-btn::before {
+    content: none;
 }
 
 .mixer-btn:hover {

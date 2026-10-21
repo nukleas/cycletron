@@ -184,6 +184,12 @@ export class FileManager {
         return this.writeTo(this.currentPath);
     }
 
+    /** Save the song in the editor to its file, if it has one and has changes. */
+    async saveSong(): Promise<boolean> {
+        if (!isTauri || !this.dirty || !this.currentPath) return true;
+        return this.writeTo(this.currentPath);
+    }
+
     async saveAs(): Promise<boolean> {
         if (!isTauri) return false;
         const picked = await saveFileDialog({
@@ -225,6 +231,8 @@ export class FileManager {
         if (!(await this.confirmDiscardIfDirty())) return;
         try {
             const result = await invoke<MidiImport>('import_midi', {path, options});
+            // The backend must forget the previous song too, or Save writes over it.
+            await invoke('new_file');
             const app = window.strudelApp;
             if (app?.isInitialized) {
                 await app.replaceCodeAndPlay(result.code);
@@ -398,7 +406,7 @@ export class FileManager {
     // Internals
     // ------------------------------------------------------------------
 
-    private async confirmDiscardIfDirty(): Promise<boolean> {
+    async confirmDiscardIfDirty(): Promise<boolean> {
         if (!this.dirty) return true;
         if (!isTauri) return true;
         return confirmDialog(

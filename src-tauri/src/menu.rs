@@ -164,6 +164,7 @@ pub fn build_app_menu<R: Runtime>(
         .item(&MenuItemBuilder::with_id("help.user_guide", "User Guide…").build(app)?)
         .item(&MenuItemBuilder::with_id("help.shortcuts", "Keyboard Shortcuts…").build(app)?)
         .item(&MenuItemBuilder::with_id("help.dialect", "Cycletron Dialect…").build(app)?)
+        .item(&MenuItemBuilder::with_id("help.shows", "Show Files…").build(app)?)
         .item(&MenuItemBuilder::with_id("help.docs", "Open Strudel Docs (web)").build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("help.show_logs", "Show Logs…").build(app)?)
@@ -249,6 +250,7 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "help.user_guide" => "menu:user_guide",
         "help.shortcuts" => "menu:shortcuts",
         "help.dialect" => "menu:dialect",
+        "help.shows" => "menu:shows",
         "help.docs" => "menu:docs",
         "help.show_logs" => "menu:show_logs",
         "help.welcome" => "menu:welcome",

@@ -18,8 +18,8 @@ pub struct FileDoc {
     pub frontmatter: Option<Frontmatter>,
 }
 
-/// A minimal subset of frontmatter fields we recognize. Unknown keys are
-/// preserved verbatim when round-tripping.
+/// A minimal subset of frontmatter fields we recognize. Saving keeps the
+/// whole block on disk, unknown keys included (see `write_file`).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Frontmatter {
     pub name: Option<String>,
@@ -38,8 +38,25 @@ pub fn read_file(path: &Path) -> std::io::Result<FileDoc> {
     })
 }
 
+/// Write a song. A `.js` file is code only. A `.strudel` file keeps the
+/// frontmatter already on disk, with `bpm` updated; a new one gets the
+/// standard header.
 pub fn write_file(path: &Path, code: &str, bpm: Option<f64>) -> std::io::Result<()> {
-    write_text(path, &format_with_frontmatter(code, bpm))
+    let is_js = path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("js"));
+    if is_js {
+        return write_text(path, code);
+    }
+    let on_disk = fs::read_to_string(path).ok();
+    let header = match on_disk
+        .as_deref()
+        .map(cycletron_core::text::frontmatter::split)
+    {
+        Some((Some(yaml), _)) => with_bpm(yaml, bpm),
+        _ => new_header(bpm),
+    };
+    write_text(path, &format!("---\n{header}\n---\n{code}"))
 }
 
 /// Write `text` as is. Atomic-ish: write to a sibling temp, then rename.
@@ -63,12 +80,30 @@ fn tmp_path(path: &Path) -> PathBuf {
     p
 }
 
-fn format_with_frontmatter(code: &str, bpm: Option<f64>) -> String {
+fn new_header(bpm: Option<f64>) -> String {
     let bpm_line = bpm.map(|v| format!("bpm: {v}\n")).unwrap_or_default();
     format!(
-        "---\nname: \"Cycletron Session\"\n{bpm_line}created: {}\ntags: [cycletron]\n---\n{code}",
+        "name: \"Cycletron Session\"\n{bpm_line}created: {}\ntags: [cycletron]",
         Utc::now().format("%Y-%m-%d"),
     )
+}
+
+/// `yaml` with its `bpm:` line set to `bpm` (added if missing); unchanged without one.
+fn with_bpm(yaml: &str, bpm: Option<f64>) -> String {
+    let Some(bpm) = bpm else {
+        return yaml.to_string();
+    };
+    let mut lines: Vec<String> = yaml
+        .lines()
+        .filter(|l| !l.trim_start().starts_with("bpm:"))
+        .map(str::to_string)
+        .collect();
+    let at = lines
+        .iter()
+        .position(|l| l.trim_start().starts_with("name:"))
+        .map_or(0, |i| i + 1);
+    lines.insert(at, format!("bpm: {bpm}"));
+    lines.join("\n")
 }
 
 /// Splits a file body into optional frontmatter + code.
@@ -161,6 +196,7 @@ mod tests {
     #[test]
     fn roundtrip_with_frontmatter() {
         let tmp = std::env::temp_dir().join("cycletron_test.strudel");
+        let _ = fs::remove_file(&tmp);
         let code = "note(\"c4 e4 g4\").s(\"sine\")\n";
         write_file(&tmp, code, Some(120.0)).unwrap();
         let doc = read_file(&tmp).unwrap();
@@ -168,6 +204,31 @@ mod tests {
         let fm = doc.frontmatter.unwrap();
         assert_eq!(fm.bpm, Some(120.0));
         assert!(fm.tags.contains(&"cycletron".to_string()));
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn save_keeps_the_header_and_updates_bpm() {
+        let tmp = std::env::temp_dir().join("cycletron_keep_header.strudel");
+        fs::write(
+            &tmp,
+            "---\nname: \"Night Drive\"\nbpm: 90\ncreated: 2026-01-02\ntags: [synthwave]\nkey: Am\n---\ns(\"bd\")\n",
+        )
+        .unwrap();
+        write_file(&tmp, "s(\"hh\")\n", Some(128.0)).unwrap();
+        let raw = fs::read_to_string(&tmp).unwrap();
+        assert_eq!(
+            raw,
+            "---\nname: \"Night Drive\"\nbpm: 128\ncreated: 2026-01-02\ntags: [synthwave]\nkey: Am\n---\ns(\"hh\")\n"
+        );
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn js_saves_without_a_header() {
+        let tmp = std::env::temp_dir().join("cycletron_no_header.js");
+        write_file(&tmp, "s(\"bd\")\n", Some(120.0)).unwrap();
+        assert_eq!(fs::read_to_string(&tmp).unwrap(), "s(\"bd\")\n");
         let _ = fs::remove_file(&tmp);
     }
 

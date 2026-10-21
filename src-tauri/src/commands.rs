@@ -10,6 +10,7 @@ use cycletron_midi as midi;
 use midi_to_strudel::{InstrumentMode, SectionNamingStrategy, drums::DrumBank};
 use serde::Deserialize;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager, State};
 
 /// Send a user message to the AI composer.
@@ -40,7 +41,11 @@ pub async fn send_message(
     }
 
     let Some(client) = state.agent_client.lock().clone() else {
-        let msg = "AI is off. Turn it on with “Enable AI” in the AI panel, then pick a provider in Preferences → AI (or sign in with SuperGrok / add an API key).";
+        let msg = if state.user_settings.lock().ai_consent {
+            "AI is on, but the provider has no API key or server address. Add one in Preferences → AI (or sign in with SuperGrok)."
+        } else {
+            "AI is off. Turn it on with “Enable AI” in the AI panel, then pick a provider in Preferences → AI (or sign in with SuperGrok / add an API key)."
+        };
         let mut session = state.session.lock();
         session.add_assistant_message(msg.to_string());
         return Ok(msg.to_string());
@@ -268,24 +273,24 @@ pub fn save_current(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let path = {
-        let session = state.session.lock();
-        session
+        // Written under the lock, so the change watcher never sees this save
+        // on disk before it is recorded as saved.
+        let mut session = state.session.lock();
+        let path = session
             .file_path
             .clone()
-            .ok_or_else(|| "no current file — use save_as".to_string())?
-    };
-    files::write_file(&path, &code, bpm).map_err(|e| format!("write {}: {e}", path.display()))?;
-
-    if let Some(dir) = state.app_data_dir() {
-        snapshots::record(&dir, &path, &code);
-    }
-
-    {
-        let mut session = state.session.lock();
-        session.mark_saved(path.clone(), code);
+            .ok_or_else(|| "no current file — use save_as".to_string())?;
+        files::write_file(&path, &code, bpm)
+            .map_err(|e| format!("write {}: {e}", path.display()))?;
+        session.mark_saved(path.clone(), code.clone());
         if let Some(b) = bpm {
             session.tempo = b;
         }
+        path
+    };
+
+    if let Some(dir) = state.app_data_dir() {
+        snapshots::record(&dir, &path, &code);
     }
 
     Ok(path.to_string_lossy().into_owned())
@@ -301,18 +306,18 @@ pub fn save_as(
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let pb = PathBuf::from(&path);
-    files::write_file(&pb, &code, bpm).map_err(|e| format!("write {}: {e}", pb.display()))?;
-
-    if let Some(dir) = state.app_data_dir() {
-        snapshots::record(&dir, &pb, &code);
-    }
-
     {
+        // Under the lock, as in `save_current`.
         let mut session = state.session.lock();
-        session.mark_saved(pb.clone(), code);
+        files::write_file(&pb, &code, bpm).map_err(|e| format!("write {}: {e}", pb.display()))?;
+        session.mark_saved(pb.clone(), code.clone());
         if let Some(b) = bpm {
             session.tempo = b;
         }
+    }
+
+    if let Some(dir) = state.app_data_dir() {
+        snapshots::record(&dir, &pb, &code);
     }
     push_recent(&state, pb.clone());
     rebuild_menu_after_recents_change(&app_handle);
@@ -683,12 +688,29 @@ pub fn create_library_folder(
     Ok(())
 }
 
-/// Create a new (empty-ish) strudel file. Writes the standard frontmatter
-/// so the new file is round-trip compatible with `files::read_file`.
+/// Every song in the library, as absolute paths: what a show's `source` can name.
+#[tauri::command]
+pub async fn list_library_songs(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let root = state.library_root();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::library_index::LibraryIndex::build(&root)
+            .songs
+            .into_iter()
+            .map(|s| root.join(s.rel_path).to_string_lossy().into_owned())
+            .collect()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Create a new file. With `text` (a show file), writes it as is; otherwise
+/// an empty song with the standard frontmatter, so it round-trips through
+/// `files::read_file`.
 #[tauri::command]
 pub fn create_library_file(
     path: String,
     bpm: Option<f64>,
+    text: Option<String>,
     state: State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
@@ -696,7 +718,11 @@ pub fn create_library_file(
     if target.exists() {
         return Err(format!("{} already exists", target.display()));
     }
-    files::write_file(&target, "", bpm).map_err(|e| format!("write {}: {e}", target.display()))?;
+    match text {
+        Some(text) => files::write_text(&target, &text),
+        None => files::write_file(&target, "", bpm),
+    }
+    .map_err(|e| format!("write {}: {e}", target.display()))?;
     let _ = app_handle.emit("library-changed", &path);
     Ok(())
 }
@@ -1102,12 +1128,20 @@ pub async fn export_audio(
              Samples manager"
                 .to_string()
         })?;
-    tauri::async_runtime::spawn_blocking(move || {
+    // One export at a time: a second would compete for the CPU and could
+    // write the same files.
+    if EXPORT_RUNNING.swap(true, Ordering::SeqCst) {
+        return Err("an export is already running".into());
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || {
         crate::export::export_audio(&code, &path, duration_secs, bpm, gain, fmt, stems, &samples)
     })
-    .await
-    .map_err(|e| format!("export task failed: {e}"))?
+    .await;
+    EXPORT_RUNNING.store(false, Ordering::SeqCst);
+    result.map_err(|e| format!("export task failed: {e}"))?
 }
+
+static EXPORT_RUNNING: AtomicBool = AtomicBool::new(false);
 
 /// Convert the current pattern to a Standard MIDI File (`strudio to-midi`).
 #[tauri::command]
@@ -1130,8 +1164,9 @@ pub async fn export_midi(
 
 /// Spawn a background thread that polls the current session file's mtime
 /// and emits `file-externally-changed` when something else modifies it on
-/// disk. Polling is cheap (one stat call every ~1.5s) and is correct
-/// enough for editor-style "reload?" prompts without dragging in `notify`.
+/// disk; a change that leaves it holding the last-saved code is our own
+/// save. Polling is cheap (one stat call every ~1.5s) and is correct enough
+/// for editor-style "reload?" prompts without dragging in `notify`.
 ///
 /// Uses a plain `std::thread` rather than `tokio::spawn` so it works
 /// regardless of whether a tokio runtime is currently entered — Tauri's
@@ -1170,6 +1205,13 @@ pub fn spawn_external_change_watcher(app_handle: tauri::AppHandle) {
             };
             if modified != prev {
                 last_mtime = Some(modified);
+                // Our own save: the file holds what was last saved.
+                let ours = files::read_file(&path).is_ok_and(|doc| {
+                    state.session.lock().last_saved_snapshot.as_deref() == Some(doc.code.as_str())
+                });
+                if ours {
+                    continue;
+                }
                 let _ = app_handle.emit(
                     "file-externally-changed",
                     path.to_string_lossy().into_owned(),
