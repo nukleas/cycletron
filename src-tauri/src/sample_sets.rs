@@ -491,6 +491,16 @@ pub fn remove_sample_set(set_id: String, app_handle: tauri::AppHandle) -> Result
     if set_id == BUNDLED_SET_ID {
         return Err("the bundled set cannot be removed".into());
     }
+    let active = app_handle
+        .state::<crate::state::AppState>()
+        .user_settings
+        .lock()
+        .samples
+        .active
+        .clone();
+    if active == set_id {
+        return Err("this set is in use; switch to another set before removing it".into());
+    }
     // Sources are shared: only delete the ones no other set lists.
     let defs = definitions(&app_handle);
     let def = defs
