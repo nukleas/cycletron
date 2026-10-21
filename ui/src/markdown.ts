@@ -46,6 +46,37 @@ const md = new Marked({
     },
 });
 
+/** `Key reference` → `doc-key-reference`, as GitHub makes heading anchors. */
+function anchor(text: string): string {
+    return `doc-${text.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^\w\- ]/g, '').trim().replace(/ /g, '-')}`;
+}
+
+// A doc shipped with the app (Help pages): trusted, so headings get anchors
+// and its `#` links jump to them. Other links follow the chat's rules.
+const docs = new Marked({
+    renderer: {
+        heading({tokens, depth}) {
+            const html = this.parser.parseInline(tokens);
+            return `<h${depth} id="${anchor(html)}" class="doc-h${depth}">${html}</h${depth}>`;
+        },
+        link({href, title, tokens}) {
+            const label = this.parser.parseInline(tokens);
+            if (href.startsWith('#')) return `<a href="#" data-doc-anchor="doc-${escapeHtml(href.slice(1))}">${label}</a>`;
+            const safeHref = sanitizeHref(href);
+            if (!safeHref) return label;
+            const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+            return `<a href="${escapeHtml(safeHref)}"${titleAttr} rel="noopener" target="_blank">${label}</a>`;
+        },
+        code({text}) {
+            return `<pre class="help-code"><code>${escapeHtml(text)}</code></pre>`;
+        },
+    },
+});
+
+export function renderDocToHtml(text: string): string {
+    return docs.parse(text, {async: false});
+}
+
 export function renderMarkdownToHtml(text: string): string {
     try {
         return md.parse(text, {async: false});

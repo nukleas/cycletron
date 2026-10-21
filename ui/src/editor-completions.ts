@@ -192,7 +192,7 @@ function strudelHover(view: EditorView, pos: number): Tooltip | null {
     };
 }
 
-const hoverTheme = EditorView.baseTheme({
+export const hoverTheme = EditorView.baseTheme({
     '.cm-strudel-hover': {
         padding: '5px 8px',
         maxWidth: '340px',

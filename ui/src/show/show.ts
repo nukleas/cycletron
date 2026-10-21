@@ -8,7 +8,7 @@
  * Settings layer `[defaults]` → `[[song]]` → `[song.sections].<label>`. A
  * section entry is a mode id, or a table with an optional `mode` plus any
  * look key. Every unknown key or bad value fails with its path; a typo is
- * never ignored.
+ * never ignored. The keys and values allowed are in `schema.ts`.
  */
 
 import {parse, TomlError} from 'smol-toml';
@@ -16,9 +16,10 @@ import {CAMERA_MOVES, type CameraMove, type CameraStyle, DEFAULT_CAMERA} from '.
 import {PALETTES} from '../viz/palettes.js';
 import type {CodePlace} from '../viz/stage/code-layer.js';
 import {type Transition, TRANSITION_BARS, TRANSITION_KINDS, type TransitionKind} from '../viz/transitions.js';
+import {CAPTION_PLACES, CAPTION_STYLES, closest, CODE_FOLLOW, CODE_PLACES, keysOf, STROBE_ON} from './schema.js';
 
 /** How the code shows over the visuals: hidden, or following the music (`off` shows it all, still). */
-export type CodeFollow = 'hide' | 'off' | 'fold' | 'solo';
+export type CodeFollow = typeof CODE_FOLLOW[number];
 
 /** How a section shows the song's code. */
 export interface CodeLook {
@@ -34,7 +35,6 @@ export interface CodeLook {
     type: number | null;
 }
 
-const CODE_PLACES: readonly CodePlace[] = ['left', 'center', 'right'];
 const PLAIN_CODE: CodeLook = {follow: 'off', size: null, place: 'left', opacity: 1, scrim: true, type: null};
 
 /** What one section shows. */
@@ -67,15 +67,12 @@ export interface Look {
     text: Caption[];
 }
 
-export const STROBE_ON = ['kick', 'snare', 'beat'] as const;
 export interface Strobe {
     on: typeof STROBE_ON[number];
     /** 0 to 1; 1 is a full white flash. */
     strength: number;
 }
 
-export const CAPTION_PLACES = ['bottom', 'center', 'top'] as const;
-export const CAPTION_STYLES = ['line', 'card'] as const;
 /** A line of words on screen. */
 export interface Caption {
     /** Bars into the section it appears. */
@@ -156,12 +153,7 @@ export class ShowError extends Error {
     }
 }
 
-const CODE_FOLLOW: readonly CodeFollow[] = ['hide', 'off', 'fold', 'solo'];
-const LOOK_KEYS = [
-    'code', 'camera', 'titles', 'every', 'transition', 'palette', 'letterbox', 'grain', 'scanlines', 'strobe', 'speed',
-] as const;
 const NO_TRANSITION: Transition = {kind: 'cut', bars: 0};
-const AUDIO_KEYS = ['gain_db', 'sensitivity'] as const;
 
 type Table = Record<string, unknown>;
 
@@ -176,9 +168,9 @@ export function parseShow(text: string, ctx: ShowContext): Show {
     only(doc, '', ['show', 'defaults', 'song']);
 
     const show = table(doc.show ?? {}, 'show');
-    only(show, 'show', ['title', 'out', 'size', 'fps']);
+    only(show, 'show', keysOf('show'));
     const defaults = table(doc.defaults ?? {}, 'defaults');
-    only(defaults, 'defaults', [...LOOK_KEYS, ...AUDIO_KEYS]);
+    only(defaults, 'defaults', keysOf('defaults'));
     // Checked once, here, whether or not a song overrides them.
     const base: SongDefaults = {
         look: overlay({
@@ -210,7 +202,7 @@ interface SongDefaults {
 function parseSong(entry: unknown, index: number, defaults: SongDefaults, ctx: ShowContext): ShowSong {
     const at = `song[${index}]`;
     const song = table(entry, at);
-    only(song, at, ['source', 'performance', 'mode', 'shots', 'passes', 'fade', 'sections', ...LOOK_KEYS, ...AUDIO_KEYS]);
+    only(song, at, keysOf('song'));
 
     // A song cutting between shots needs no mode of its own: its first shot's stands in.
     const songLook = overlay({...defaults.look}, song, at);
@@ -225,7 +217,7 @@ function parseSong(entry: unknown, index: number, defaults: SongDefaults, ctx: S
             continue;
         }
         const t = table(value, entryAt);
-        only(t, entryAt, ['mode', 'shots', 'title', 'text', ...LOOK_KEYS]);
+        only(t, entryAt, keysOf('section'));
         if (t.mode !== undefined && t.shots !== undefined) throw new ShowError(`${entryAt}.shots`, 'give a mode or shots, not both');
         const look = overlay(songLook, t, entryAt);
         // A section's own mode holds through it, over any shots the song cuts between.
@@ -256,7 +248,7 @@ function parseSong(entry: unknown, index: number, defaults: SongDefaults, ctx: S
 
 /** A new show file playing `source` (a path relative to the show). */
 export function newShowText(source: string): string {
-    return `# Format: docs/SHOW_FILES.md
+    return `# Help → Shows has the format. ⌃Space suggests keys and values here.
 
 [[song]]
 source = ${JSON.stringify(source)}
@@ -323,7 +315,7 @@ function parseCamera(v: unknown, below: CameraStyle | null, at: string): CameraS
         throw new ShowError(at, `expected true, false, a move (${CAMERA_MOVES.join(', ')}), or a table of move, punch, kick`);
     }
     const t = v as Table;
-    only(t, at, ['move', 'punch', 'kick']);
+    only(t, at, keysOf('camera'));
     return {
         move: t.move === undefined ? base.move : cameraMove(t.move, `${at}.move`),
         punch: t.punch === undefined ? base.punch : strength(t.punch, `${at}.punch`),
@@ -338,7 +330,7 @@ function shots(v: unknown, camera: CameraStyle | null, at: string, ctx: ShowCont
         const shotAt = `${at}[${i}]`;
         if (typeof entry === 'string') return {mode: modeId(entry, shotAt, ctx), bars: null};
         const t = table(entry, shotAt);
-        only(t, shotAt, ['mode', 'bars', 'camera', 'palette']);
+        only(t, shotAt, keysOf('shot'));
         const shot: Shot = {mode: modeId(t.mode, `${shotAt}.mode`, ctx), bars: t.bars === undefined ? null : bars(t.bars, `${shotAt}.bars`)};
         if (t.camera !== undefined) shot.camera = parseCamera(t.camera, camera, `${shotAt}.camera`);
         if (t.palette !== undefined) shot.palette = palette(t.palette, `${shotAt}.palette`);
@@ -350,13 +342,13 @@ function shots(v: unknown, camera: CameraStyle | null, at: string, ctx: ShowCont
 function transition(v: unknown, at: string): Transition {
     if (typeof v === 'string') return {kind: transitionKind(v, at), bars: TRANSITION_BARS[transitionKind(v, at)]};
     const t = table(v, at);
-    only(t, at, ['kind', 'bars']);
+    only(t, at, keysOf('transition'));
     const kind = transitionKind(t.kind, `${at}.kind`);
     return {kind, bars: t.bars === undefined ? TRANSITION_BARS[kind] : bars(t.bars, `${at}.bars`)};
 }
 
 function transitionKind(v: unknown, at: string): TransitionKind {
-    if (!TRANSITION_KINDS.includes(v as TransitionKind)) throw new ShowError(at, `${TRANSITION_KINDS.join(', ')} — not ${JSON.stringify(v)}`);
+    if (!TRANSITION_KINDS.includes(v as TransitionKind)) throw new ShowError(at, notOneOf(TRANSITION_KINDS, v));
     return v as TransitionKind;
 }
 
@@ -370,12 +362,12 @@ function bars(v: unknown, at: string): number {
 /** A follow (`"solo"`), or a table of `follow`, `size`, `place`, `opacity`, `scrim` and `type` over the layer below. */
 function code(v: unknown, below: CodeLook, at: string): CodeLook {
     const follow = (w: unknown, wAt: string): CodeFollow => {
-        if (!CODE_FOLLOW.includes(w as CodeFollow)) throw new ShowError(wAt, `${CODE_FOLLOW.join(', ')} — not ${JSON.stringify(w)}`);
+        if (!CODE_FOLLOW.includes(w as CodeFollow)) throw new ShowError(wAt, notOneOf(CODE_FOLLOW, w));
         return w as CodeFollow;
     };
     if (typeof v === 'string') return {...below, follow: follow(v, at)};
     const t = table(v, at);
-    only(t, at, ['follow', 'size', 'place', 'opacity', 'scrim', 'type']);
+    only(t, at, keysOf('code'));
     const next = {...below};
     if (t.follow !== undefined) next.follow = follow(t.follow, `${at}.follow`);
     if (t.size !== undefined) {
@@ -384,7 +376,7 @@ function code(v: unknown, below: CodeLook, at: string): CodeLook {
     }
     if (t.place !== undefined) {
         if (!CODE_PLACES.includes(t.place as CodePlace)) {
-            throw new ShowError(`${at}.place`, `${CODE_PLACES.join(', ')} — not ${JSON.stringify(t.place)}`);
+            throw new ShowError(`${at}.place`, notOneOf(CODE_PLACES, t.place));
         }
         next.place = t.place as CodePlace;
     }
@@ -398,12 +390,12 @@ function code(v: unknown, below: CodeLook, at: string): CodeLook {
 function strobe(v: unknown, at: string): Strobe | null {
     if (v === false) return null;
     const on = (w: unknown, wAt: string) => {
-        if (!STROBE_ON.includes(w as Strobe['on'])) throw new ShowError(wAt, `${STROBE_ON.join(', ')} — not ${JSON.stringify(w)}`);
+        if (!STROBE_ON.includes(w as Strobe['on'])) throw new ShowError(wAt, notOneOf(STROBE_ON, w));
         return w as Strobe['on'];
     };
     if (typeof v === 'string') return {on: on(v, at), strength: 0.6};
     const t = table(v, at);
-    only(t, at, ['on', 'strength']);
+    only(t, at, keysOf('strobe'));
     return {on: on(t.on, `${at}.on`), strength: t.strength === undefined ? 0.6 : fraction(t.strength, `${at}.strength`)};
 }
 
@@ -413,15 +405,15 @@ function captions(v: unknown, at: string): Caption[] {
     return v.map((entry, i) => {
         const lineAt = `${at}[${i}]`;
         const t = table(entry, lineAt);
-        only(t, lineAt, ['say', 'at', 'hold', 'place', 'style']);
+        only(t, lineAt, keysOf('caption'));
         const style = t.style ?? 'line';
         if (!CAPTION_STYLES.includes(style as Caption['style'])) {
-            throw new ShowError(`${lineAt}.style`, `${CAPTION_STYLES.join(', ')} — not ${JSON.stringify(style)}`);
+            throw new ShowError(`${lineAt}.style`, notOneOf(CAPTION_STYLES, style));
         }
         // A card sits in the middle unless placed; a line, at the bottom.
         const place = t.place ?? (style === 'card' ? 'center' : 'bottom');
         if (!CAPTION_PLACES.includes(place as Caption['place'])) {
-            throw new ShowError(`${lineAt}.place`, `${CAPTION_PLACES.join(', ')} — not ${JSON.stringify(place)}`);
+            throw new ShowError(`${lineAt}.place`, notOneOf(CAPTION_PLACES, place));
         }
         const start = t.at === undefined ? 0 : num(t.at, `${lineAt}.at`);
         if (start < 0) throw new ShowError(`${lineAt}.at`, `expected bars into the section, not ${start}`);
@@ -434,12 +426,12 @@ function captions(v: unknown, at: string): Caption[] {
 function fade(v: unknown, at: string): {in: number; out: number} {
     if (v === undefined) return {in: 0, out: 0};
     const t = table(v, at);
-    only(t, at, ['in', 'out']);
+    only(t, at, keysOf('fade'));
     return {in: t.in === undefined ? 0 : bars(t.in, `${at}.in`), out: t.out === undefined ? 0 : bars(t.out, `${at}.out`)};
 }
 
 function palette(v: unknown, at: string): string {
-    if (!PALETTES.includes(v as string)) throw new ShowError(at, `${PALETTES.join(', ')} — not ${JSON.stringify(v)}`);
+    if (!PALETTES.includes(v as string)) throw new ShowError(at, notOneOf(PALETTES, v));
     return v as string;
 }
 
@@ -458,7 +450,7 @@ function fraction(v: unknown, at: string): number {
 }
 
 function cameraMove(v: unknown, at: string): CameraMove {
-    if (!CAMERA_MOVES.includes(v as CameraMove)) throw new ShowError(at, `${CAMERA_MOVES.join(', ')} — not ${JSON.stringify(v)}`);
+    if (!CAMERA_MOVES.includes(v as CameraMove)) throw new ShowError(at, notOneOf(CAMERA_MOVES, v));
     return v as CameraMove;
 }
 
@@ -472,9 +464,17 @@ function strength(v: unknown, at: string): number {
 function only(t: Table, at: string, keys: readonly string[]): void {
     for (const key of Object.keys(t)) {
         if (!keys.includes(key)) {
-            throw new ShowError(at ? `${at}.${key}` : key, `unknown key (expected one of: ${keys.join(', ')})`);
+            const near = closest(key, keys);
+            const guess = near ? `did you mean '${near}'? ` : '';
+            throw new ShowError(at ? `${at}.${key}` : key, `unknown key; ${guess}(expected one of: ${keys.join(', ')})`);
         }
     }
+}
+
+/** The message for `v` not being one of `options`, with the nearest as a guess. */
+function notOneOf(options: readonly string[], v: unknown): string {
+    const near = typeof v === 'string' ? closest(v, options) : null;
+    return `${near ? `did you mean "${near}"? ` : ''}${options.join(', ')} — not ${JSON.stringify(v)}`;
 }
 
 function table(v: unknown, at: string): Table {
@@ -514,7 +514,10 @@ function size(v: unknown, at: string): {width: number; height: number} {
 
 function modeId(v: unknown, at: string, ctx: ShowContext): string {
     const id = str(v, at);
-    if (!ctx.modes.includes(id)) throw new ShowError(at, `no mode '${id}' (have: ${ctx.modes.join(', ')})`);
+    if (!ctx.modes.includes(id)) {
+        const near = closest(id, ctx.modes);
+        throw new ShowError(at, `no mode '${id}'${near ? `; did you mean '${near}'?` : ''} (have: ${ctx.modes.join(', ')})`);
+    }
     return id;
 }
 

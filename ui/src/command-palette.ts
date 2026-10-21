@@ -222,6 +222,7 @@ const COMMANDS: Item[] = [
     {id: 'cmd.help_guide',  title: 'User Guide…',           section: 'Commands',                 run: () => helpModal.open('guide')},
     {id: 'cmd.help_keys',   title: 'Keyboard Shortcuts…',   section: 'Commands',                 run: () => helpModal.open('shortcuts')},
     {id: 'cmd.help_dialect',title: 'Cycletron Dialect…',    section: 'Commands',                 run: () => helpModal.open('dialect')},
+    {id: 'cmd.help_shows',  title: 'Show Files Guide…',     section: 'Commands',                 run: () => helpModal.open('shows')},
     {id: 'cmd.about',       title: 'About Cycletron',       section: 'Commands',                 run: () => aboutModal.open()},
     {id: 'cmd.updates',     title: 'Check for Updates',     section: 'Commands',                 run: () => checkForUpdates(true)},
     {id: 'cmd.logs',        title: 'Show Logs…',            section: 'Commands',                 run: () => logsModal.open()},

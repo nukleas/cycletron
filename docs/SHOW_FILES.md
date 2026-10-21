@@ -278,6 +278,8 @@ transition = "fade"
 transition = { kind = "glitch", bars = 0.15 }
 ```
 
+A kind alone takes its default bars; `{ kind, bars }` sets them.
+
 ---
 
 ## Text
@@ -336,13 +338,20 @@ code = { follow = "solo", place = "right", size = 22, opacity = 0.6, scrim = fal
 
 ## Playing live
 
+- **New:** in the file tree, New File and a name ending `.show.toml`. It
+  starts out playing the song that's open.
 - **Open:** ⌘O, click a `.show.toml` in the file tree, or drag it onto the
   window. The first song opens in the editor and plays from its start, and
-  the show opens in a pane beside it.
+  the show opens in a pane beside it. A show with a mistake opens with the
+  mistake marked, and starts playing once it's fixed.
 - **Edit:** changes in the show pane take effect about 0.3 s after you stop
   typing. An error is marked on its line, and the last good version keeps
   playing. ▶ marks the line setting the playing section. Edits to the song
   itself apply as usual and re-cue the show.
+- **Suggestions:** the pane suggests the keys that fit where you're typing,
+  and their values: modes, palettes, moves, the song's section names, and
+  songs in your library for `source`. They open as you type; ⌃Space opens
+  them anywhere. Hover a key to see what it does and what it takes.
 - **Save:** ⌘S saves whichever editor you last typed in, the show pane or the
   song.
 - **Stage:** ⌘⇧F shows the visuals full-frame with the code layer. ⌘⇧V
@@ -353,7 +362,8 @@ code = { follow = "solo", place = "right", size = 22, opacity = 0.6, scrim = fal
 - **The set:** each song plays its form `passes` times, then the next starts
   on the downbeat at its own tempo. The last song loops. If the playing song
   has unsaved edits, the set waits, then moves on at the next section once
-  you save.
+  you save. Edits made in the last bars before the next song starts are
+  saved when it does.
 - **Closing:** closing the pane or opening another file ends the show. An
   unsaved show asks Save / Discard / Cancel.
 
