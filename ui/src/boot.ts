@@ -41,7 +41,7 @@ import {editorEmptyState} from './editor-empty-state.js';
 import {basename} from './paths.js';
 import {currentBpm} from './bpm.js';
 import {toolRowFromTrace} from './ai-tool-row.js';
-import type {SessionSnapshot, UserSettings} from './types/tauri-commands.js';
+import type {CurrentFile, SessionSnapshot, UserSettings} from './types/tauri-commands.js';
 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -356,18 +356,10 @@ async function restoreIfAny(): Promise<void> {
         if (snap.bpm) window.strudelApp?.applyBpm?.(snap.bpm);
         if (snap.code) window.strudelApp?.editor?.setCode?.(snap.code);
 
-        // File metadata
+        // File metadata: dirty when the restored code differs from the file on disk.
         if (snap.file_path) {
-            const name = basename(snap.file_path);
-            document.dispatchEvent(new CustomEvent('file:changed', {
-                detail: {path: snap.file_path, name, dirty: false},
-            }));
-            // Treat restored file as clean: sync the file-manager cache.
-            fileManager.applyCurrentFile({
-                path: snap.file_path,
-                name,
-                dirty: false,
-            });
+            const code = window.strudelApp?.editor?.getCode?.() ?? snap.code;
+            fileManager.applyCurrentFile(await invoke<CurrentFile>('get_current_file', {code}));
         }
     } catch (e) {
         console.warn('[boot] restore failed:', e);

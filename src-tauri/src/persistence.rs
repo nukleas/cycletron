@@ -87,21 +87,26 @@ pub fn autosave_session(
 #[tauri::command]
 pub fn restore_session(state: State<'_, AppState>) -> Option<SessionSnapshot> {
     let dir = state.app_data_dir()?;
-    let snap = read_snapshot(&dir)?;
+    let mut snap = read_snapshot(&dir)?;
 
     {
         let mut session = state.session.lock();
         session.messages = snap.messages.clone();
         session.tempo = snap.bpm;
-        if let Some(path) = &snap.file_path {
-            // If the file no longer exists, drop the reference so Save doesn't
-            // try to overwrite a stale path.
-            if path.exists() {
-                session.file_path = Some(path.clone());
-                session.last_saved_snapshot = Some(snap.code.clone());
-                session.current_pattern = Some(snap.code.clone());
+        // The file on disk is what was saved; the snapshot may hold unsaved
+        // edits on top. A file that's gone is dropped, so Save asks where.
+        let saved = snap
+            .file_path
+            .as_deref()
+            .and_then(|p| crate::files::read_file(p).ok());
+        match saved {
+            Some(doc) => {
+                session.file_path = Some(doc.path);
+                session.last_saved_snapshot = Some(doc.code);
             }
-        } else if !snap.code.is_empty() {
+            None => snap.file_path = None,
+        }
+        if !snap.code.is_empty() {
             session.current_pattern = Some(snap.code.clone());
         }
     }

@@ -134,7 +134,12 @@ pub fn delete_path(path: &Path) -> std::io::Result<()> {
 }
 
 pub fn rename_path(from: &Path, to: &Path) -> std::io::Result<()> {
-    if to.exists() {
+    // On a case-insensitive disk, `Foo` → `foo` finds `to` as `from` itself.
+    let same_file = to.exists()
+        && fs::canonicalize(from)
+            .ok()
+            .is_some_and(|f| fs::canonicalize(to).ok() == Some(f));
+    if to.exists() && !same_file {
         return Err(std::io::Error::new(
             std::io::ErrorKind::AlreadyExists,
             format!("{} already exists", to.display()),
@@ -244,6 +249,21 @@ mod tests {
         // Folders first.
         assert_eq!(entries[0].name, "subfolder");
 
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rename_changes_only_case() {
+        let dir = std::env::temp_dir().join(format!("cycletron-case-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("Foo.strudel"), "").unwrap();
+        rename_path(&dir.join("Foo.strudel"), &dir.join("foo.strudel")).unwrap();
+        let names: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert_eq!(names, ["foo.strudel"]);
         let _ = fs::remove_dir_all(&dir);
     }
 }

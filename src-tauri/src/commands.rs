@@ -268,24 +268,24 @@ pub fn save_current(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let path = {
-        let session = state.session.lock();
-        session
+        // Written under the lock, so the change watcher never sees this save
+        // on disk before it is recorded as saved.
+        let mut session = state.session.lock();
+        let path = session
             .file_path
             .clone()
-            .ok_or_else(|| "no current file — use save_as".to_string())?
-    };
-    files::write_file(&path, &code, bpm).map_err(|e| format!("write {}: {e}", path.display()))?;
-
-    if let Some(dir) = state.app_data_dir() {
-        snapshots::record(&dir, &path, &code);
-    }
-
-    {
-        let mut session = state.session.lock();
-        session.mark_saved(path.clone(), code);
+            .ok_or_else(|| "no current file — use save_as".to_string())?;
+        files::write_file(&path, &code, bpm)
+            .map_err(|e| format!("write {}: {e}", path.display()))?;
+        session.mark_saved(path.clone(), code.clone());
         if let Some(b) = bpm {
             session.tempo = b;
         }
+        path
+    };
+
+    if let Some(dir) = state.app_data_dir() {
+        snapshots::record(&dir, &path, &code);
     }
 
     Ok(path.to_string_lossy().into_owned())
@@ -301,18 +301,18 @@ pub fn save_as(
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let pb = PathBuf::from(&path);
-    files::write_file(&pb, &code, bpm).map_err(|e| format!("write {}: {e}", pb.display()))?;
-
-    if let Some(dir) = state.app_data_dir() {
-        snapshots::record(&dir, &pb, &code);
-    }
-
     {
+        // Under the lock, as in `save_current`.
         let mut session = state.session.lock();
-        session.mark_saved(pb.clone(), code);
+        files::write_file(&pb, &code, bpm).map_err(|e| format!("write {}: {e}", pb.display()))?;
+        session.mark_saved(pb.clone(), code.clone());
         if let Some(b) = bpm {
             session.tempo = b;
         }
+    }
+
+    if let Some(dir) = state.app_data_dir() {
+        snapshots::record(&dir, &pb, &code);
     }
     push_recent(&state, pb.clone());
     rebuild_menu_after_recents_change(&app_handle);
@@ -1136,8 +1136,9 @@ pub async fn export_midi(
 
 /// Spawn a background thread that polls the current session file's mtime
 /// and emits `file-externally-changed` when something else modifies it on
-/// disk. Polling is cheap (one stat call every ~1.5s) and is correct
-/// enough for editor-style "reload?" prompts without dragging in `notify`.
+/// disk; a change that leaves it holding the last-saved code is our own
+/// save. Polling is cheap (one stat call every ~1.5s) and is correct enough
+/// for editor-style "reload?" prompts without dragging in `notify`.
 ///
 /// Uses a plain `std::thread` rather than `tokio::spawn` so it works
 /// regardless of whether a tokio runtime is currently entered — Tauri's
@@ -1176,6 +1177,13 @@ pub fn spawn_external_change_watcher(app_handle: tauri::AppHandle) {
             };
             if modified != prev {
                 last_mtime = Some(modified);
+                // Our own save: the file holds what was last saved.
+                let ours = files::read_file(&path).is_ok_and(|doc| {
+                    state.session.lock().last_saved_snapshot.as_deref() == Some(doc.code.as_str())
+                });
+                if ours {
+                    continue;
+                }
                 let _ = app_handle.emit(
                     "file-externally-changed",
                     path.to_string_lossy().into_owned(),

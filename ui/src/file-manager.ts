@@ -225,6 +225,8 @@ export class FileManager {
         if (!(await this.confirmDiscardIfDirty())) return;
         try {
             const result = await invoke<MidiImport>('import_midi', {path, options});
+            // The backend must forget the previous song too, or Save writes over it.
+            await invoke('new_file');
             const app = window.strudelApp;
             if (app?.isInitialized) {
                 await app.replaceCodeAndPlay(result.code);
