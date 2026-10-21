@@ -184,6 +184,12 @@ export class FileManager {
         return this.writeTo(this.currentPath);
     }
 
+    /** Save the song in the editor to its file, if it has one and has changes. */
+    async saveSong(): Promise<boolean> {
+        if (!isTauri || !this.dirty || !this.currentPath) return true;
+        return this.writeTo(this.currentPath);
+    }
+
     async saveAs(): Promise<boolean> {
         if (!isTauri) return false;
         const picked = await saveFileDialog({
@@ -400,7 +406,7 @@ export class FileManager {
     // Internals
     // ------------------------------------------------------------------
 
-    private async confirmDiscardIfDirty(): Promise<boolean> {
+    async confirmDiscardIfDirty(): Promise<boolean> {
         if (!this.dirty) return true;
         if (!isTauri) return true;
         return confirmDialog(
