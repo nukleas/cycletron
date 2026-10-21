@@ -7,6 +7,7 @@
  * playing section, which the pane marks.
  */
 
+import {autocompletion} from '@codemirror/autocomplete';
 import {defaultKeymap, history, historyKeymap, indentWithTab} from '@codemirror/commands';
 import {StreamLanguage} from '@codemirror/language';
 import {toml} from '@codemirror/legacy-modes/mode/toml';
@@ -17,9 +18,11 @@ import {
     EditorView, GutterMarker, drawSelection, gutter, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers,
 } from '@codemirror/view';
 import {tags} from '@lezer/highlight';
-import {basename} from '../paths.js';
+import {basename, relativePath} from '../paths.js';
 import {invoke} from '../tauri.js';
 import {strudelThemeExtension} from '../theme.js';
+import {VIZ_MODES} from '../viz/registry.js';
+import {type AssistSources, completions, hover} from './assist.js';
 
 /** Quiet time after a keystroke before the show is re-read. */
 const EDIT_PAUSE_MS = 300;
@@ -29,6 +32,8 @@ export interface ShowPaneHandlers {
     /** The buffer after an edit pause. */
     onEdit(text: string): void;
     onClose(): void;
+    /** Section labels of the `index`th song, once it's loaded. */
+    sections(index: number): readonly string[];
 }
 
 /** The problem in the buffer, at a 1-based line. */
@@ -72,6 +77,8 @@ class ShowPane {
     private wired = false;
     /** Kept across focus moving to the palette, menus or dialogs. */
     private lastEditor: 'song' | 'show' = 'song';
+    /** The library's songs, listed once per open. */
+    private songs: Promise<string[]> | null = null;
 
     get isOpen(): boolean {
         return this.view !== null;
@@ -97,6 +104,7 @@ class ShowPane {
         this.handlers = handlers;
         this.savedText = text;
         this.lastEditor = 'song';
+        this.songs = null;
         this.view = new EditorView({
             state: EditorState.create({doc: text, extensions: this.extensions()}),
             parent: element('showPaneEditor'),
@@ -172,7 +180,21 @@ class ShowPane {
         view.dispatch({effects: setPlaying.of(line)});
     }
 
+    /** What suggestions draw on beyond the file. */
+    private sources(): AssistSources {
+        return {
+            modes: VIZ_MODES.map((m) => ({id: m.id, name: m.name})),
+            sections: (index) => this.handlers?.sections(index) ?? [],
+            songs: async () => {
+                this.songs ??= invoke<string[]>('list_library_songs').catch(() => []);
+                const dir = (this.path ?? '').replace(/[\\/][^\\/]*$/, '');
+                return (await this.songs).map((song) => relativePath(dir, song));
+            },
+        };
+    }
+
     private extensions() {
+        const sources = this.sources();
         return [
             lineNumbers(),
             gutter({
@@ -202,6 +224,9 @@ class ShowPane {
             EditorView.theme({'&': {fontSize: 'var(--editor-font-size)'}}),
             EditorView.lineWrapping,
             lintGutter(),
+            // ⌃Space for suggestions anywhere; they also open as you type.
+            autocompletion({override: [completions(sources)]}),
+            hover(sources),
             EditorView.updateListener.of((update) => {
                 if (!update.docChanged) return;
                 this.renderDirty();

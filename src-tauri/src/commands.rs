@@ -688,6 +688,21 @@ pub fn create_library_folder(
     Ok(())
 }
 
+/// Every song in the library, as absolute paths: what a show's `source` can name.
+#[tauri::command]
+pub async fn list_library_songs(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let root = state.library_root();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::library_index::LibraryIndex::build(&root)
+            .songs
+            .into_iter()
+            .map(|s| root.join(s.rel_path).to_string_lossy().into_owned())
+            .collect()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// Create a new file. With `text` (a show file), writes it as is; otherwise
 /// an empty song with the standard frontmatter, so it round-trips through
 /// `files::read_file`.

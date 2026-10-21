@@ -125,6 +125,7 @@ class LiveShow {
             // A show that can't play yet starts once an edit fixes it.
             onEdit: (edited) => void (this.plan.length ? this.apply(edited) : this.start(edited)),
             onClose: () => void this.stop(),
+            sections: (index) => [...new Set(this.plan[index]?.cues.map((c) => c.label) ?? [])],
         });
         await this.start(text);
     }
