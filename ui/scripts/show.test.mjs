@@ -280,3 +280,44 @@ test('a new show file plays the open song', () => {
     assert.equal(show.songs[0].source, '/lib/Songs/my song.strudel');
     assert.equal(relativePath('C:\\lib', 'C:\\lib\\a.strudel'), 'a.strudel');
 });
+
+test('the show pane knows where the cursor is', async () => {
+    const {spotAt} = await server.ssrLoadModule('/src/show/assist.ts');
+    const at = (text) => spotAt(text.replace('|', ''), text.indexOf('|'));
+    const pick = ({kind, table, key, inList, quoted}) => ({kind, table, key, inList, quoted});
+
+    assert.deepEqual(pick(at('[[song]]\nsource = "a.strudel"\nmo|')), {kind: 'key', table: 'song', key: null, inList: false, quoted: false});
+    assert.deepEqual(pick(at('[[song]]\nmode = |')), {kind: 'value', table: 'song', key: 'mode', inList: false, quoted: false});
+    assert.deepEqual(pick(at('[[song]]\nmode = "tu|')), {kind: 'value', table: 'song', key: 'mode', inList: false, quoted: true});
+    assert.deepEqual(pick(at('[defaults]\ncamera = { move = "orbit", pu|')), {kind: 'key', table: 'camera', key: null, inList: false, quoted: false});
+    assert.deepEqual(pick(at('[defaults]\ncamera = { move = |')), {kind: 'value', table: 'camera', key: 'move', inList: false, quoted: false});
+    assert.deepEqual(pick(at('[[song]]\nshots = ["tunnel", |')), {kind: 'value', table: 'song', key: 'shots', inList: true, quoted: false});
+    assert.deepEqual(pick(at('[[song]]\nshots = [\n  { mode = "tunnel", ba|')), {kind: 'key', table: 'shot', key: null, inList: false, quoted: false});
+    assert.deepEqual(pick(at('[song.sections.drop]\ntext = [{ say = "hi", st|')), {kind: 'key', table: 'caption', key: null, inList: false, quoted: false});
+    assert.deepEqual(pick(at('[song.sections]\nintro = |')), {kind: 'value', table: 'sections', key: 'intro', inList: false, quoted: false});
+    assert.deepEqual(pick(at('[song.sections]\nintro = { code = { fo|')), {kind: 'key', table: 'code', key: null, inList: false, quoted: false});
+    assert.deepEqual(pick(at('[song.sections.intro]\nc|')), {kind: 'key', table: 'section', key: null, inList: false, quoted: false});
+    assert.deepEqual(pick(at('[[song]]\nmode = "x" # a comment = "|')).kind, 'none');
+    assert.equal(at('[[song]]\n[so|').kind, 'header');
+
+    // Keys set already, and which song.
+    const spot = at('[[song]]\nsource = "a"\n[[song]]\nsource = "b"\nmode = "x"\n|');
+    assert.equal(spot.song, 1);
+    assert.deepEqual([...spot.seen], ['source', 'mode']);
+});
+
+test('a misspelled key or value suggests the nearest', () => {
+    assert.throws(() => parseShow('[[song]]\nsource = "a.strudel"\nmode = "tunnel"\npallete = "ice"\n', CTX), /did you mean 'palette'/);
+    assert.throws(() => parseShow('[[song]]\nsource = "a.strudel"\nmode = "tunel"\n', CTX), /did you mean 'tunnel'/);
+    assert.throws(() => parseShow('[[song]]\nsource = "a.strudel"\nmode = "tunnel"\ncamera = "orbt"\n', CTX), /did you mean "orbit"/);
+});
+
+test('the guide covers every key a show takes', async () => {
+    const {SCHEMA} = await server.ssrLoadModule('/src/show/schema.ts');
+    const guide = readFileSync(fileURLToPath(new URL('../../docs/SHOW_FILES.md', import.meta.url)), 'utf8');
+    const missing = Object.entries(SCHEMA).flatMap(([table, keys]) => Object.keys(keys)
+        // Named in inline code, alone or in an example like `{ move, punch, kick }`.
+        .filter((key) => !new RegExp(`\`[^\`\n]*\\b${key}\\b[^\`\n]*\``).test(guide))
+        .map((key) => `${table}.${key}`));
+    assert.deepEqual(missing, []);
+});
