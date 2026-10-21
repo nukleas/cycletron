@@ -683,12 +683,14 @@ pub fn create_library_folder(
     Ok(())
 }
 
-/// Create a new (empty-ish) strudel file. Writes the standard frontmatter
-/// so the new file is round-trip compatible with `files::read_file`.
+/// Create a new file. With `text` (a show file), writes it as is; otherwise
+/// an empty song with the standard frontmatter, so it round-trips through
+/// `files::read_file`.
 #[tauri::command]
 pub fn create_library_file(
     path: String,
     bpm: Option<f64>,
+    text: Option<String>,
     state: State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
@@ -696,7 +698,11 @@ pub fn create_library_file(
     if target.exists() {
         return Err(format!("{} already exists", target.display()));
     }
-    files::write_file(&target, "", bpm).map_err(|e| format!("write {}: {e}", target.display()))?;
+    match text {
+        Some(text) => files::write_text(&target, &text),
+        None => files::write_file(&target, "", bpm),
+    }
+    .map_err(|e| format!("write {}: {e}", target.display()))?;
     let _ = app_handle.emit("library-changed", &path);
     Ok(())
 }

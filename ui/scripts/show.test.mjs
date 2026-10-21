@@ -14,7 +14,8 @@ const server = await createServer({
     optimizeDeps: {noDiscovery: true, include: []},
 });
 after(() => server.close());
-const {parseShow, cue, cueAt, formLength, ShowError} = await server.ssrLoadModule('/src/show/show.ts');
+const {parseShow, newShowText, cue, cueAt, formLength, ShowError} = await server.ssrLoadModule('/src/show/show.ts');
+const {relativePath} = await server.ssrLoadModule('/src/paths.ts');
 const {locate} = await server.ssrLoadModule('/src/show/locate.ts');
 const {Director} = await server.ssrLoadModule('/src/show/director.ts');
 const {VIZ_MODES} = await server.ssrLoadModule('/src/viz/registry.ts');
@@ -270,4 +271,12 @@ test('the bundled shows parse and cue against their songs', () => {
         const show = parseShow(readFileSync(shows + file, 'utf8'), ctx);
         for (const s of show.songs) cue(s, form(song(s.source)));
     }
+});
+
+test('a new show file plays the open song', () => {
+    const source = relativePath('/lib/Shows', '/lib/Songs/my song.strudel');
+    assert.equal(source, '../Songs/my song.strudel');
+    const show = parseShow(newShowText(source), {...CTX, dir: '/lib/Shows'});
+    assert.equal(show.songs[0].source, '/lib/Songs/my song.strudel');
+    assert.equal(relativePath('C:\\lib', 'C:\\lib\\a.strudel'), 'a.strudel');
 });

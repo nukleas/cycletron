@@ -254,6 +254,16 @@ function parseSong(entry: unknown, index: number, defaults: SongDefaults, ctx: S
     };
 }
 
+/** A new show file playing `source` (a path relative to the show). */
+export function newShowText(source: string): string {
+    return `# Format: docs/SHOW_FILES.md
+
+[[song]]
+source = ${JSON.stringify(source)}
+mode = "tunnel"
+`;
+}
+
 /** Cue the song's form: each section with its look. Every listed label must be in the form. */
 export function cue(song: ShowSong, form: readonly FormSection[]): Cue[] {
     for (const label of song.sections.keys()) {
