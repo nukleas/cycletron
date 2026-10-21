@@ -5231,11 +5231,14 @@ body.stage-active #fullscreenVizHUD { display: none; }
     min-width: 0;
 }
 
+/* Too small for the global button's corner mark and left-aligned, spaced label. */
 .mixer-btn {
     flex: none;
-    width: 20px;
-    height: 18px;
+    width: 22px;
+    height: 20px;
     padding: 0;
+    justify-content: center;
+    letter-spacing: 0;
     font-size: 10px;
     font-family: inherit;
     font-weight: 600;
@@ -5246,6 +5249,10 @@ body.stage-active #fullscreenVizHUD { display: none; }
     border-radius: 3px;
     cursor: pointer;
     transition: color 0.12s, border-color 0.12s, background 0.12s, box-shadow 0.12s;
+}
+
+.mixer-btn::before {
+    content: none;
 }
 
 .mixer-btn:hover {

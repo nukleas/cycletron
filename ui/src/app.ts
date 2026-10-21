@@ -118,6 +118,8 @@ export class StrudelApp {
     patternSource: PatternSource | null = null;
 
     private _playbackState: PlaybackState = PlaybackState.Stopped;
+    /** Counts calls to stop(), so a start waiting on the Link bar can tell it was cancelled. */
+    private _stopPresses = 0;
     private playbackListeners: Array<(state: PlaybackState) => void> = [];
 
     get playbackState(): PlaybackState {
@@ -755,6 +757,8 @@ export class StrudelApp {
         }
 
         this.processor = this.audioManager.getProcessor();
+        // A new graph starts at unity; the slider may say otherwise.
+        this.audioManager.setMonitorGain(Number(this.elements.gainSlider.value) / 100);
 
         const audioContext = this.audioManager.getAudioContext()!;
 
@@ -1110,11 +1114,12 @@ export class StrudelApp {
      * Re-apply the pattern after a mute/solo change. Routed through the same
      * quantized swap as an evaluate, so mutes land on the bar line too. Never
      * arms audio or starts the transport — toggling a mute while stopped
-     * should stay stopped.
+     * should stay stopped. While paused the swap is immediate, so Resume
+     * plays the new mix.
      */
     private _reapplyMix = (): void => {
         if (!this.isInitialized || !this.editor) return;
-        if (this.playbackState !== PlaybackState.Playing) return;
+        if (this.playbackState === PlaybackState.Stopped) return;
         try {
             const {pattern, bpm} = this.parsePatternWithTempo(this.editor.getCode());
             this._swapPattern(pattern, bpm);
@@ -1147,6 +1152,8 @@ export class StrudelApp {
     }
 
     async evaluate(code: string): Promise<void> {
+        // This evaluate supersedes a pending keystroke one for the same text.
+        this.debouncedEvaluate.cancel();
         if (!this.isInitialized) {
             if (this._initInProgress) return;
             await this._initAndPlay();
@@ -1168,7 +1175,11 @@ export class StrudelApp {
             return;
         }
 
-        if (this.playbackState !== PlaybackState.Playing) {
+        // From pause, carry on from where it paused.
+        if (this.playbackState === PlaybackState.Paused) {
+            this.scheduler!.resume();
+            this._enterPlayingState();
+        } else if (this.playbackState !== PlaybackState.Playing) {
             this.scheduler!.start();
             this._enterPlayingState();
         }
@@ -1292,7 +1303,10 @@ export class StrudelApp {
     }
 
     async play(): Promise<void> {
+        const stops = this._stopPresses;
         await this._awaitLinkBar();
+        // Stop pressed while waiting for the bar cancels this start.
+        if (this._stopPresses !== stops) return;
         const code = this.editor!.getCode();
         this.evaluate(code);
     }
@@ -1503,6 +1517,7 @@ export class StrudelApp {
     }
 
     stop(): void {
+        this._stopPresses++;
         if (this.playbackState === PlaybackState.Stopped) return;
 
         this.scheduler?.stop();
