@@ -107,8 +107,20 @@ pub fn export_audio(
         "starting offline audio export"
     );
 
-    // Always bake the full mix first.
-    let mix_wav = ensure_wav_path(path);
+    // Before rendering, which can take minutes.
+    if format != AudioFormat::Wav {
+        find_ffmpeg().ok_or_else(ffmpeg_missing)?;
+    }
+
+    // Always bake the full mix first. For MP3 only, into a hidden temp file,
+    // so a WAV of the same name beside it is left alone.
+    let out_wav = ensure_wav_path(path);
+    let mix_wav = if format == AudioFormat::Mp3 {
+        let name = out_wav.file_name().unwrap_or_default().to_string_lossy();
+        out_wav.with_file_name(format!(".{name}.tmp"))
+    } else {
+        out_wav.clone()
+    };
     let mut notes = Vec::new();
     let mut clipped = 0_u64;
 
@@ -124,10 +136,10 @@ pub fn export_audio(
             paths.push(mix_wav.to_string_lossy().into_owned());
         }
         AudioFormat::Mp3 => {
-            let mp3 = mix_wav.with_extension("mp3");
-            encode_mp3(&mix_wav, &mp3)?;
-            // Drop intermediate WAV when user asked for MP3 only.
+            let mp3 = out_wav.with_extension("mp3");
+            let encoded = encode_mp3(&mix_wav, &mp3);
             let _ = std::fs::remove_file(&mix_wav);
+            encoded?;
             paths.push(mp3.to_string_lossy().into_owned());
             notes.push("MP3 encoded with ffmpeg (libmp3lame 320k)".into());
         }
@@ -147,7 +159,7 @@ pub fn export_audio(
                     .into(),
             );
         } else {
-            let stem_dir = stem_dir_for(&mix_wav);
+            let stem_dir = stem_dir_for(&out_wav);
             std::fs::create_dir_all(&stem_dir)
                 .map_err(|e| format!("Could not create stems dir {}: {e}", stem_dir.display()))?;
             notes.push(format!(
@@ -490,11 +502,13 @@ fn value_to_midi_note(value: &str) -> Option<u8> {
 // MP3 via ffmpeg
 // ---------------------------------------------------------------------------
 
+fn ffmpeg_missing() -> String {
+    "MP3 export requires `ffmpeg` on PATH (with libmp3lame). Install via brew: `brew install ffmpeg`."
+        .to_string()
+}
+
 fn encode_mp3(wav: &Path, mp3: &Path) -> Result<(), String> {
-    let ffmpeg = find_ffmpeg().ok_or_else(|| {
-        "MP3 export requires `ffmpeg` on PATH (with libmp3lame). Install via brew: `brew install ffmpeg`."
-            .to_string()
-    })?;
+    let ffmpeg = find_ffmpeg().ok_or_else(ffmpeg_missing)?;
 
     let output = Command::new(&ffmpeg)
         .args([

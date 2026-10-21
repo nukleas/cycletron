@@ -10,6 +10,7 @@ use cycletron_midi as midi;
 use midi_to_strudel::{InstrumentMode, SectionNamingStrategy, drums::DrumBank};
 use serde::Deserialize;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager, State};
 
 /// Send a user message to the AI composer.
@@ -1108,12 +1109,20 @@ pub async fn export_audio(
              Samples manager"
                 .to_string()
         })?;
-    tauri::async_runtime::spawn_blocking(move || {
+    // One export at a time: a second would compete for the CPU and could
+    // write the same files.
+    if EXPORT_RUNNING.swap(true, Ordering::SeqCst) {
+        return Err("an export is already running".into());
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || {
         crate::export::export_audio(&code, &path, duration_secs, bpm, gain, fmt, stems, &samples)
     })
-    .await
-    .map_err(|e| format!("export task failed: {e}"))?
+    .await;
+    EXPORT_RUNNING.store(false, Ordering::SeqCst);
+    result.map_err(|e| format!("export task failed: {e}"))?
 }
+
+static EXPORT_RUNNING: AtomicBool = AtomicBool::new(false);
 
 /// Convert the current pattern to a Standard MIDI File (`strudio to-midi`).
 #[tauri::command]
