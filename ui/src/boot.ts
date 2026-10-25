@@ -189,11 +189,13 @@ async function boot(): Promise<void> {
     // when no endpoint is configured.
     void maybeAutoCheckUpdates();
 
+    // After an update, show the releases since the version last launched.
+    // Awaited so the welcome flow, which saves the whole settings object,
+    // reads settings that already record this version.
+    await maybeShowWhatsNew();
+
     // Onboarding: opens itself only if first_run_done is false.
     void welcomeModal.maybeOpen();
-
-    // After an update, show the releases since the version last launched.
-    void maybeShowWhatsNew();
 
     // Autosave on significant events — the backend throttles internally.
     setupAutosave();

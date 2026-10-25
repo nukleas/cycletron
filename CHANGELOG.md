@@ -9,7 +9,7 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; rename 
 - **Help → What's New** has the notes for every release. It's also in the command palette and About.
 
 ### Fixed
-- Linux: animated labels in NEON CIRCUIT, MARBLE, PLASMA and TUNNEL held the frame rate to about 35 fps, because WebKitGTK loaded a new font size every frame. They now run at full speed.
+- Linux: animated labels in NEON CIRCUIT, MARBLE CORE, MARBLE DROP, PLASMA and TUNNEL held the frame rate to about 35 fps, because WebKitGTK loaded a new font size every frame. They now run at full speed.
 - tokio 1.54.1, which fixes a race in its interval timer, plus routine dependency updates.
 
 ## 0.1.0-alpha.25 (2026-10-21)
