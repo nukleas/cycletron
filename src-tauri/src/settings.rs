@@ -48,6 +48,10 @@ pub struct UserSettings {
     /// fresh install sees the onboarding flow.
     #[serde(default)]
     pub first_run_done: bool,
+    /// App version the user last launched. Drives the What's New popup after
+    /// an update; see [`UserSettings::take_whats_new`].
+    #[serde(default)]
+    pub last_seen_version: Option<String>,
     /// The user has explicitly turned the AI assistant on. Defaults to false:
     /// AI stays fully inert (no client built, no request sent) until the user
     /// opts in via the AI panel's consent dialog. See `build_agent_client`.
@@ -338,6 +342,14 @@ fn default_true() -> bool {
     true
 }
 
+/// What's New after an update: show every release after `since`, up to
+/// `current`, the running version.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct WhatsNew {
+    pub since: Option<String>,
+    pub current: String,
+}
+
 impl UserSettings {
     pub fn load(app_data_dir: &Path) -> Self {
         let path = app_data_dir.join(SETTINGS_FILE);
@@ -347,6 +359,26 @@ impl UserSettings {
             return parsed;
         }
         Self::default()
+    }
+
+    /// Record `current` as the last version seen, and say whether to show
+    /// What's New. `None` when nothing changed, or on a fresh install (the
+    /// welcome flow covers that). An existing user with no recorded version
+    /// gets `since: None`: show only `current`'s notes.
+    pub fn take_whats_new(&mut self, current: &str) -> Option<WhatsNew> {
+        let previous = self.last_seen_version.replace(current.to_string());
+        match previous {
+            Some(prev) if prev == current => None,
+            Some(prev) => Some(WhatsNew {
+                since: Some(prev),
+                current: current.to_string(),
+            }),
+            None if self.first_run_done => Some(WhatsNew {
+                since: None,
+                current: current.to_string(),
+            }),
+            None => None,
+        }
     }
 
     pub fn save(&self, app_data_dir: &Path) -> std::io::Result<()> {
@@ -438,5 +470,43 @@ mod tests {
 
         // Idempotent: a second run finds nothing to migrate.
         assert!(s.migrate_legacy_anthropic().is_none());
+    }
+
+    #[test]
+    fn whats_new_after_an_update_names_the_previous_version() {
+        let mut s = UserSettings {
+            first_run_done: true,
+            last_seen_version: Some("0.1.0-alpha.24".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            s.take_whats_new("0.1.0-alpha.26"),
+            Some(WhatsNew {
+                since: Some("0.1.0-alpha.24".into()),
+                current: "0.1.0-alpha.26".into(),
+            })
+        );
+        assert_eq!(s.last_seen_version.as_deref(), Some("0.1.0-alpha.26"));
+        // Shown once.
+        assert_eq!(s.take_whats_new("0.1.0-alpha.26"), None);
+    }
+
+    #[test]
+    fn whats_new_skips_fresh_installs_but_not_existing_users() {
+        let mut fresh = UserSettings::default();
+        assert_eq!(fresh.take_whats_new("0.1.0-alpha.26"), None);
+        assert_eq!(fresh.last_seen_version.as_deref(), Some("0.1.0-alpha.26"));
+
+        let mut existing = UserSettings {
+            first_run_done: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            existing.take_whats_new("0.1.0-alpha.26"),
+            Some(WhatsNew {
+                since: None,
+                current: "0.1.0-alpha.26".into()
+            })
+        );
     }
 }

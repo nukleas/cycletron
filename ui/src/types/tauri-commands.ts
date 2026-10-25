@@ -135,6 +135,12 @@ export interface MidiMetadata {
     programs: number[];
 }
 
+/// Mirror of `settings::WhatsNew`: show releases after `since` up to `current`.
+export interface WhatsNew {
+    since: string | null;
+    current: string;
+}
+
 export interface AppInfo {
     name: string;
     version: string;
@@ -303,6 +309,8 @@ export interface UserSettings {
     samples: SampleSetSettings;
     follow_desktop_theme: boolean;
     first_run_done: boolean;
+    /** App version last launched; drives What's New after an update. */
+    last_seen_version: string | null;
     /** User has explicitly turned the AI assistant on. Off by default. */
     ai_consent: boolean;
 }

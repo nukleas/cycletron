@@ -35,6 +35,10 @@ export class AboutModal {
             this.close();
             helpModal.open('dialect');
         });
+        document.getElementById('aboutWhatsNewBtn')?.addEventListener('click', () => {
+            this.close();
+            helpModal.open('changes');
+        });
         document.getElementById('aboutDocsBtn')?.addEventListener('click', () => {
             void openExternal('https://strudel.cc/learn/');
         });
