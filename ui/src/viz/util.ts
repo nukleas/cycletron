@@ -222,14 +222,34 @@ export function mixRgb(
     ];
 }
 
+/** Font size a fractional-size label is resolved at before it is scaled. */
+const LABEL_BASE_PX = 16;
+const LABEL_BASE_FONT = `${LABEL_BASE_PX}px ${MONO_FONT}`;
+
 /** Small instrument label, as on the drafting modes' rails. */
 export function drawLabel(
     ctx: CanvasRenderingContext2D, text: string, x: number, y: number,
     color: string, size = 10, align: CanvasTextAlign = 'left',
 ): void {
     ctx.fillStyle = color;
-    ctx.font = `${size}px ${MONO_FONT}`;
     ctx.textAlign = align;
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, x, y);
+    if (Number.isInteger(size)) {
+        ctx.font = `${size}px ${MONO_FONT}`;
+        ctx.fillText(text, x, y);
+        return;
+    }
+    // Animated labels pass a continuously changing size, and every size
+    // WebKitGTK hasn't seen costs it ~3 ms to resolve (fontconfig fallback,
+    // FreeType face, HarfBuzz font) — hundreds per second was most of the
+    // Linux frame budget. Resolve one fixed size and scale it instead: the
+    // glyphs still rasterize at the scaled device size, so nothing blurs.
+    if (!(size > 0)) return;
+    const s = size / LABEL_BASE_PX;
+    ctx.font = LABEL_BASE_FONT;
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    ctx.fillText(text, 0, 0);
+    ctx.scale(1 / s, 1 / s);
+    ctx.translate(-x, -y);
 }
