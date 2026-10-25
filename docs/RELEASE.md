@@ -59,8 +59,10 @@ still produce unsigned builds.
 Nothing is public until the draft is reviewed on GitHub and **published**.
 
 Release notes live in `CHANGELOG.md`, which the app bundles for What's New.
-Before tagging, rename `## Unreleased` to `## <version> (<date>)`, matching the
-version in `tauri.conf.json` exactly, and start a new empty `Unreleased`.
+Before tagging, rename `## Unreleased` to `## <version> (<date>)`, where
+`<version>` is the tag without the `v` (`0.1.0-alpha.26`): the workflow stamps
+that into the build, and What's New looks it up by that exact string. Start a
+new empty `Unreleased`.
 
 ```bash
 # clean tree, green CI
