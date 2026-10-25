@@ -7,6 +7,7 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; rename 
 ### What's New
 - **After an update, Cycletron shows what changed** in every release since the version you last ran. It's shown once, and not on a fresh install.
 - **Help → What's New** has the notes for every release. It's also in the command palette and About.
+- **The update prompt shows the new release's notes** before you install. On deb and AUR installs it shows them with a link to the releases page.
 
 ### Fixed
 - Linux: animated labels in NEON CIRCUIT, MARBLE CORE, MARBLE DROP, PLASMA and TUNNEL held the frame rate to about 35 fps, because WebKitGTK loaded a new font size every frame. They now run at full speed.

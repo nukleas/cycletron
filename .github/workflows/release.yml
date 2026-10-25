@@ -9,8 +9,8 @@ name: Release
 # "More info → Run anyway"; see docs/RELEASE.md). Signs the Tauri updater
 # artifacts and publishes latest.json so auto-update works.
 #
-# Everything lands in a single DRAFT pre-release — nothing is public until you
-# review it and hit Publish.
+# Everything lands in a single DRAFT release, with the tag's CHANGELOG.md
+# section as its notes — nothing is public until you review it and hit Publish.
 
 on:
   push:
@@ -40,15 +40,21 @@ jobs:
     outputs:
       release-id: ${{ steps.create.outputs.release-id }}
     steps:
+      - uses: actions/checkout@v7
       - name: Create the draft release
         id: create
         run: |
+          set -euo pipefail
+          # The notes are the tag's CHANGELOG.md section. No section fails the
+          # release here, before anything builds.
+          python3 .github/scripts/release-notes.py "$GITHUB_REF_NAME" \
+            --footer .github/release-footer.md > notes.md
           # Reuse the existing release on a workflow re-run.
           if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
               --draft \
               --title "Cycletron $GITHUB_REF_NAME" \
-              --notes "Automated build. Draft pre-release — review before publishing."
+              --notes-file notes.md
           fi
           ID=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --json databaseId --jq .databaseId)
@@ -264,6 +270,7 @@ jobs:
       # this job failed on its first run, alpha.18). Address it by id.
       RELEASE_ID: ${{ needs.create-release.outputs.release-id }}
     steps:
+      - uses: actions/checkout@v7
       - name: Strip bundled wayland libs, re-sign, patch latest.json
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -334,10 +341,13 @@ jobs:
           NEW_ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
             --jq ".assets[] | select(.name == \"$NAME\") | .id")
           echo "AppImage asset id: $OLD_ID -> $NEW_ID"
+          # The update prompt shows latest.json's notes; no footer there.
+          python3 .github/scripts/release-notes.py "$GITHUB_REF_NAME" > update-notes.md
           python3 - "$SIG" "$OLD_ID" "$NEW_ID" "$NAME" <<'EOF'
           import json, sys
           sig, old_id, new_id, name = sys.argv[1:5]
           j = json.load(open('latest.json'))
+          j['notes'] = open('update-notes.md').read().strip()
           patched = []
           for key, entry in j['platforms'].items():
               url = entry.get('url', '')
@@ -354,7 +364,7 @@ jobs:
               sys.exit("::error::latest.json has no entry pointing at %s "
                        "(asset id %s) — Linux auto-update would 404" % (name, old_id))
           json.dump(j, open('latest.json', 'w'), indent=2)
-          print("patched url + signature for: %s" % ", ".join(patched))
+          print("patched url + signature for: %s, and notes" % ", ".join(patched))
           EOF
           gh release upload "$GITHUB_REF_NAME" latest.json \
             --clobber --repo "$GITHUB_REPOSITORY"

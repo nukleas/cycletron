@@ -9,8 +9,11 @@
  *     is configured (manual: false — silent if nothing's available)
  */
 
-import {confirmDialog, infoDialog} from './dialog.js';
+import {infoDialog} from './dialog.js';
 import {openExternal} from './external-link.js';
+import {escapeHtml} from './html.js';
+import {renderDocToHtml} from './markdown.js';
+import {dismissibleModal} from './modal-utils.js';
 import {notify} from './notifications.js';
 import {invoke, isTauri} from './tauri.js';
 
@@ -64,6 +67,35 @@ function hideToast(): void {
     toastEl = toastBarEl = toastTextEl = null;
 }
 
+/**
+ * The update prompt: the new release's notes (latest.json `notes`, which the
+ * plugin hands over as `update.body`) under a one-line lead. Resolves true
+ * when the user picks the confirm button, false for Later or a dismiss.
+ */
+function askToUpdate(version: string, notes: string | undefined, lead: string, confirmLabel: string): Promise<boolean> {
+    const root = document.getElementById('updateModal');
+    const body = document.getElementById('updateBody');
+    const confirm = document.getElementById('updateConfirm');
+    if (!root || !body || !confirm) return Promise.resolve(false);
+    body.innerHTML =
+        `<p class="help-lead">Cycletron ${escapeHtml(version)} is available. ${escapeHtml(lead)}</p>` +
+        (notes?.trim() ? renderDocToHtml(notes) : '');
+    body.scrollTop = 0;
+    confirm.textContent = confirmLabel;
+    return new Promise(resolve => {
+        const finish = (ok: boolean) => {
+            root.hidden = true;
+            cleanup();
+            confirm.removeEventListener('click', onConfirm);
+            resolve(ok);
+        };
+        const onConfirm = () => finish(true);
+        confirm.addEventListener('click', onConfirm);
+        root.hidden = false;
+        const cleanup = dismissibleModal(root, () => finish(false));
+    });
+}
+
 export async function checkForUpdates(manual: boolean): Promise<void> {
     if (!isTauri) {
         if (manual) console.warn('[updater] only available in desktop build');
@@ -112,11 +144,10 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
         }
         if (installKind === 'package') {
             if (manual) {
-                const open = await confirmDialog(
-                    `Cycletron ${update.version} is available.\n\n` +
-                    'This install is managed by your system package manager, ' +
-                    "so the app can't update itself. Open the releases page?",
-                    {title: 'Update available', kind: 'info'},
+                const open = await askToUpdate(
+                    update.version, update.body,
+                    "Your system package manager owns this install, so update it there; the app can't update itself.",
+                    'Open releases page',
                 );
                 if (open) await openExternal(RELEASES_URL);
             } else {
@@ -127,9 +158,8 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
             }
             return;
         }
-        const accept = await confirmDialog(
-            `Cycletron ${update.version} is available.\n\nDownload and install now?`,
-            {title: 'Update available', kind: 'info'},
+        const accept = await askToUpdate(
+            update.version, update.body, "Here's what's in it.", 'Install and restart',
         );
         if (!accept) return;
         let total = 0;

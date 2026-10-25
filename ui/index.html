@@ -465,6 +465,23 @@
         </div>
     </div>
 
+    <!-- Update available: the new release's notes before installing -->
+    <div id="updateModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="updateTitle">
+        <div class="app-modal-backdrop" data-dismiss></div>
+        <div class="app-modal-window app-modal-window--wide" role="document">
+            <div class="app-modal-header">
+                <span id="updateTitle">Update available</span>
+                <button class="app-modal-close" data-dismiss aria-label="Close"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></button>
+            </div>
+            <div id="updateBody" class="help-body help-body--doc"></div>
+            <div class="app-modal-actions">
+                <span class="app-modal-spacer"></span>
+                <button data-dismiss>Later</button>
+                <button id="updateConfirm" class="app-modal-primary">Install</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Samples manager: sample sets (base sound world) + packs (additive banks) -->
     <div id="samplesModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="samplesTitle">
         <div class="app-modal-backdrop" data-dismiss></div>
