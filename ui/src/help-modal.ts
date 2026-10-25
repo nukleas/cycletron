@@ -1,6 +1,7 @@
 /**
- * In-app Help: Keyboard Shortcuts, Dialect, User Guide summary, and the
- * show-file guide (docs/SHOW_FILES.md, rendered as is).
+ * In-app Help: Keyboard Shortcuts, Dialect, User Guide summary, the
+ * show-file guide (docs/SHOW_FILES.md, rendered as is), and What's New
+ * (CHANGELOG.md).
  * Opened from Help menu, command palette, and About links.
  */
 
@@ -8,6 +9,7 @@ import {dismissibleModal} from './modal-utils.js';
 import {escapeHtml} from './html.js';
 import {renderDocToHtml} from './markdown.js';
 import showGuide from '../../docs/SHOW_FILES.md?raw';
+import {releasesToMarkdown, shippedReleases, type Release} from './changelog.js';
 import {
     SHORTCUTS,
     DIALECT_RULES,
@@ -15,7 +17,7 @@ import {
     PRIVACY_BLURB,
 } from './help-content.js';
 
-export type HelpSection = 'shortcuts' | 'dialect' | 'guide' | 'shows';
+export type HelpSection = 'shortcuts' | 'dialect' | 'guide' | 'shows' | 'changes';
 
 class HelpModal {
     private root: HTMLElement | null = null;
@@ -24,6 +26,8 @@ class HelpModal {
     private tabs: HTMLElement | null = null;
     private cleanup: (() => void) | null = null;
     private section: HelpSection = 'guide';
+    /** Set when What's New opens after an update: just the new releases. */
+    private newReleases: Release[] | null = null;
     private inited = false;
 
     init(): void {
@@ -38,6 +42,7 @@ class HelpModal {
             const btn = (e.target as Element).closest<HTMLElement>('[data-help-section]');
             if (!btn?.dataset.helpSection) return;
             this.section = btn.dataset.helpSection as HelpSection;
+            this.newReleases = null;
             this.render();
         });
         // A guide's own contents links jump within the page.
@@ -55,7 +60,23 @@ class HelpModal {
         this.init();
         if (!this.root) return;
         this.section = section;
+        this.newReleases = null;
         this.render();
+        this.show();
+    }
+
+    /** What's New after an update, limited to `releases`. */
+    openWhatsNew(releases: Release[]): void {
+        this.init();
+        if (!this.root) return;
+        this.section = 'changes';
+        this.newReleases = releases;
+        this.render();
+        this.show();
+    }
+
+    private show(): void {
+        if (!this.root || this.cleanup) return;
         this.root.hidden = false;
         this.cleanup = dismissibleModal(this.root, () => this.close());
     }
@@ -75,6 +96,7 @@ class HelpModal {
             dialect: 'Cycletron Dialect',
             guide: 'User Guide',
             shows: 'Show Files',
+            changes: "What's New",
         };
         this.titleEl.textContent = titles[this.section];
 
@@ -82,10 +104,12 @@ class HelpModal {
             btn.classList.toggle('help-tab--active', btn.dataset.helpSection === this.section);
         }
 
-        this.bodyEl.classList.toggle('help-body--doc', this.section === 'shows');
+        this.bodyEl.classList.toggle('help-body--doc', this.section === 'shows' || this.section === 'changes');
         this.bodyEl.scrollTop = 0;
         if (this.section === 'shows') {
             this.bodyEl.innerHTML = renderDocToHtml(showGuide);
+        } else if (this.section === 'changes') {
+            this.bodyEl.innerHTML = this.renderChanges();
         } else if (this.section === 'shortcuts') {
             this.bodyEl.innerHTML = this.renderShortcuts();
         } else if (this.section === 'dialect') {
@@ -93,6 +117,17 @@ class HelpModal {
         } else {
             this.bodyEl.innerHTML = this.renderGuide();
         }
+    }
+
+    private renderChanges(): string {
+        if (this.newReleases) {
+            const count = this.newReleases.length;
+            const lead = count === 1
+                ? `<p class="help-lead">Updated to ${escapeHtml(this.newReleases[0].version)}. Here's what changed.</p>`
+                : `<p class="help-lead">Updated to ${escapeHtml(this.newReleases[0].version)}. Here's what changed in the last ${count} releases.</p>`;
+            return lead + renderDocToHtml(releasesToMarkdown(this.newReleases));
+        }
+        return renderDocToHtml(releasesToMarkdown(shippedReleases()));
     }
 
     private renderShortcuts(): string {

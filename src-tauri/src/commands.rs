@@ -995,6 +995,22 @@ pub fn get_app_info(app_handle: tauri::AppHandle) -> AppInfo {
     }
 }
 
+/// Record the running version as seen and return what What's New should
+/// show, if anything. Called once at startup.
+#[tauri::command]
+pub fn take_whats_new(
+    state: State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<Option<crate::settings::WhatsNew>, String> {
+    let current = app_handle.package_info().version.to_string();
+    let mut settings = state.user_settings.lock();
+    let whats_new = settings.take_whats_new(&current);
+    if let Some(dir) = state.app_data_dir() {
+        settings.save(&dir).map_err(|e| e.to_string())?;
+    }
+    Ok(whats_new)
+}
+
 /// List snapshots for a given file path (most recent first).
 #[tauri::command]
 pub fn list_snapshots(path: String, state: State<'_, AppState>) -> Result<Vec<Snapshot>, String> {

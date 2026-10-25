@@ -352,6 +352,7 @@ pub fn run() {
             commands::inspect_midi,
             commands::save_midi_to_library,
             commands::get_user_settings,
+            commands::take_whats_new,
             commands::set_user_settings,
             commands::set_provider_key,
             commands::has_provider_key,

@@ -99,6 +99,7 @@ jobs:
           test -f docs/DIALECT.md
           test -f docs/RELEASE.md
           test -f Cargo.lock
+          test -f CHANGELOG.md
           test -f src-tauri/tauri.conf.json
           # CSP must not be null
           ! grep -q '"csp": null' src-tauri/tauri.conf.json

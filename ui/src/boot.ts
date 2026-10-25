@@ -22,6 +22,7 @@ import {aboutModal} from './about-modal.js';
 import {samplesModal} from './samples-modal.js';
 import {packImport} from './pack-import.js';
 import {helpModal} from './help-modal.js';
+import {releasesSince} from './changelog.js';
 import {preferencesModal} from './preferences.js';
 import {audioRecorder} from './audio-recorder.js';
 import {commandPalette} from './command-palette.js';
@@ -41,7 +42,7 @@ import {editorEmptyState} from './editor-empty-state.js';
 import {basename} from './paths.js';
 import {currentBpm} from './bpm.js';
 import {toolRowFromTrace} from './ai-tool-row.js';
-import type {CurrentFile, SessionSnapshot, UserSettings} from './types/tauri-commands.js';
+import type {CurrentFile, SessionSnapshot, UserSettings, WhatsNew} from './types/tauri-commands.js';
 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -188,6 +189,11 @@ async function boot(): Promise<void> {
     // when no endpoint is configured.
     void maybeAutoCheckUpdates();
 
+    // After an update, show the releases since the version last launched.
+    // Awaited so the welcome flow, which saves the whole settings object,
+    // reads settings that already record this version.
+    await maybeShowWhatsNew();
+
     // Onboarding: opens itself only if first_run_done is false.
     void welcomeModal.maybeOpen();
 
@@ -262,6 +268,18 @@ function setupExternalChangeListener(): void {
         );
         if (reload) await fileManager.openPath(path, {force: true});
     });
+}
+
+async function maybeShowWhatsNew(): Promise<void> {
+    if (!isTauri) return;
+    try {
+        const whatsNew = await invoke<WhatsNew | null>('take_whats_new');
+        if (!whatsNew) return;
+        const releases = releasesSince(whatsNew.since, whatsNew.current);
+        if (releases.length > 0) helpModal.openWhatsNew(releases);
+    } catch (e) {
+        console.warn('[boot] what\'s new check failed:', e);
+    }
 }
 
 async function maybeAutoCheckUpdates(): Promise<void> {

@@ -547,6 +547,7 @@ export class PreferencesModal {
             },
             follow_desktop_theme: !!this.followDesktopTheme?.checked,
             first_run_done: firstRunDone,
+            last_seen_version: this.loaded?.last_seen_version ?? null,
             ai_consent: this.aiConsent ? !!this.aiConsent.checked : (this.loaded?.ai_consent ?? false),
         };
     }
