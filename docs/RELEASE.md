@@ -64,16 +64,20 @@ Before tagging, rename `## Unreleased` to `## <version> (<date>)`, where
 that into the build, and What's New looks it up by that exact string. Start a
 new empty `Unreleased`.
 
+The workflow fails before building if that section is missing. Otherwise it
+becomes the draft's notes, with `.github/release-footer.md` (AGPL, AI key,
+Play first, dialect) appended, and the `notes` in `latest.json`, which the
+update prompt shows before installing.
+
 ```bash
 # clean tree, green CI
 git tag -a v0.1.0-alpha.6 -m "Cycletron alpha 6"
 git push origin v0.1.0-alpha.6
 ```
 
-Publish with `gh release edit <tag> --notes-file <notes> --draft=false --prerelease=false --latest`.
-
-Ship notes should mention: AGPL, API key / Ollama requirement for AI, Play-first
-audio arming, and dialect ≠ full web Strudel.
+Publish with `gh release edit <tag> --draft=false --prerelease=false --latest`.
+To fix the notes, edit `CHANGELOG.md` and retag: editing the draft changes
+GitHub only, not the app's What's New or `latest.json`.
 
 ### Linux AppImage extras
 
