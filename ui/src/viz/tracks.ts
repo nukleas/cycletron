@@ -48,7 +48,13 @@ export interface VizTrack {
 export type InstrumentFamily = 'kick' | 'snare' | 'hat' | 'perc';
 
 export function instrumentFamily(name: string): InstrumentFamily {
-    const n = name.toLowerCase();
+    const family = familyOf(name.toLowerCase());
+    // A machine voice spelled out, `RolandTR909_bd`, is classed by its voice.
+    const voice = name.indexOf('_');
+    return family === 'perc' && voice > 0 ? familyOf(name.slice(voice + 1).toLowerCase()) : family;
+}
+
+function familyOf(n: string): InstrumentFamily {
     if (/^(bd|kick|808)/.test(n)) return 'kick';
     if (/^(sd|sn|cp|clap|rim|lt|mt|ht)/.test(n)) return 'snare';
     if (/^(hh|oh|hat|shaker|cb|rd|cr)/.test(n)) return 'hat';
