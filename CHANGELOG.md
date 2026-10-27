@@ -4,6 +4,10 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+## 0.1.0-alpha.26 (2026-10-26)
+
+Bundled 909, 606 and 727 kits, Ableton Link and OSC output that work, and What's New after updates.
+
 ### What's New
 - **After an update, Cycletron shows what changed** in every release since the version you last ran. It's shown once, and not on a fresh install.
 - **Help → What's New** has the notes for every release. It's also in the command palette and About.
@@ -27,7 +31,7 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 ### Fixed
 - Linux: animated labels in NEON CIRCUIT, MARBLE CORE, MARBLE DROP, PLASMA and TUNNEL held the frame rate to about 35 fps, because WebKitGTK loaded a new font size every frame. They now run at full speed.
 - tokio 1.54.1, which fixes a race in its interval timer, plus routine dependency updates.
-- The after-update What's New, Reload Corpus and the show pane's song suggestions did nothing, because the app's command permissions blocked them. They work now. The same bug blocked Ableton Link and OSC output; they now connect, with more fixes to come.
+- The after-update What's New, Reload Corpus and the show pane's song suggestions did nothing, because the app's command permissions blocked them. They work now, as do Ableton Link and OSC output, which the same bug blocked (see above).
 - Failed calls to the app's backend now show up in Help → Show Logs instead of failing silently.
 - The show pane's song suggestions pick up songs added to the library while the pane is open, and try again after a failed listing.
 - If Cycletron can't tell how it was installed, the update prompt links to the releases page instead of trying to update itself.
