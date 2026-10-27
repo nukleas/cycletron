@@ -25,10 +25,10 @@ setbpm(106);
     note("c#1").s("sine").slow(2).attack(1.5).release(3).gain(0.4)
   ),
   riff: stack(
-    s("<[bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ bd ~ bd ~ bd ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ bd ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+    s("<[bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ bd ~ bd ~ bd ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ bd ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909").velocity(0.85)
       .gain(0.95).dist(0.25),
-    s("~ ~ sd ~").room(0.6).roomsize(0.8).gain(0.7),
-    s("hh*8").gain(0.2).pan(sine.range(0.4, 0.6)),
+    s("~ ~ sd ~").bank("RolandTR909").velocity(0.9).room(0.6).roomsize(0.8).gain(0.7),
+    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.2).pan(sine.range(0.4, 0.6)),
     note("<[c#1 c#1 ~ ~ c#1 ~ c#1 ~ ~ c#1 c#1 ~ ~ ~ ~ ~] [c#1 c#1 ~ ~ c#1 ~ c#1 ~ e1 ~ e1 ~ d1 ~ ~ ~] [c#1 c#1 ~ ~ c#1 ~ c#1 ~ ~ c#1 c#1 ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ f#1 ~ ~ ~ ~ ~ ~ ~ ~ ~] [c#1 c#1 ~ ~ c#1 ~ c#1 ~ ~ c#1 c#1 ~ ~ ~ ~ ~] [c#1 c#1 ~ ~ c#1 ~ c#1 ~ e1 ~ e1 ~ d1 ~ ~ ~] [a1 ~ ~ a1 ~ ~ g#1 ~ ~ f#1 ~ ~ e1 ~ ~ ~] [c#1 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ c#1 c#2 c#1 ~]>")
       .s("sawtooth").lpf(900).resonance(8)
       .decay(0.09).sustain(0).dist(0.35).gain(0.58),
@@ -39,10 +39,10 @@ setbpm(106);
       .gain(saw.range(0.1, 0.26).fast(4))
   ),
   surge: stack(
-    s("<[bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ bd ~ bd ~ bd ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ bd ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+    s("<[bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ bd ~ bd ~ bd ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ bd ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909").velocity(0.85)
       .gain(0.95).dist(0.28),
-    s("~ ~ sd ~").room(0.6).roomsize(0.8).gain(0.72),
-    s("hh*8").gain(0.22).pan(sine.range(0.4, 0.6)),
+    s("~ ~ sd ~").bank("RolandTR909").velocity(0.9).room(0.6).roomsize(0.8).gain(0.72),
+    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.22).pan(sine.range(0.4, 0.6)),
     note("<[c#1 c#1 ~ ~ c#1 ~ c#1 ~ ~ c#1 c#1 ~ ~ ~ ~ ~] [c#1 c#1 ~ ~ c#1 ~ c#1 ~ e1 ~ e1 ~ d1 ~ ~ ~] [c#1 c#1 ~ ~ c#1 ~ c#1 ~ ~ c#1 c#1 ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ f#1 ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
       .s("sawtooth").lpf(950).resonance(8)
       .decay(0.09).sustain(0).dist(0.35).gain(0.56),
@@ -54,7 +54,7 @@ setbpm(106);
       .dist(0.15).delay(0.25).delaytime(0.1875).room(0.3).gain(0.38)
   ),
   stall: stack(
-    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").lpf(500).gain(0.7),
+    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").bank("RolandTR909").velocity(0.85).lpf(500).gain(0.7),
     chord("<C#m G#m A A>").voicing().s("supersaw")
       .attack(1.0).release(2.0).lpf(900).chorus(0.5).room(0.75).gain(0.28),
     note("<[7 ~ ~ ~ ~ ~ 6 ~] [4 ~ ~ ~ ~ ~ ~ ~] [~ ~ 7 ~ ~ ~ 9 ~] [7 ~ ~ ~ ~ ~ ~ ~]>")
@@ -63,11 +63,11 @@ setbpm(106);
     note("c#1").s("sine").slow(2).attack(1.0).release(2.5).gain(0.42)
   ),
   riff2: stack(
-    s("<[bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ bd ~ bd ~ bd ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ bd ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+    s("<[bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ bd ~ bd ~ bd ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ bd ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909").velocity(0.85)
       .gain(0.95).dist(0.28),
-    s("~ ~ sd ~").room(0.6).roomsize(0.8).gain(0.72),
-    s("hh*8").gain(0.22).pan(sine.range(0.4, 0.6)),
-    s("~ ~ ~ oh").gain(0.26),
+    s("~ ~ sd ~").bank("RolandTR909").velocity(0.9).room(0.6).roomsize(0.8).gain(0.72),
+    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.22).pan(sine.range(0.4, 0.6)),
+    s("~ ~ ~ oh").bank("RolandTR909").velocity(0.85).gain(0.26),
     note("<[c#1 c#1 ~ ~ c#1 ~ c#1 ~ ~ c#1 c#1 ~ ~ ~ ~ ~] [c#1 c#1 ~ ~ c#1 ~ c#1 ~ e1 ~ e1 ~ d1 ~ ~ ~] [c#1 c#1 ~ ~ c#1 ~ c#1 ~ ~ c#1 c#1 ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ f#1 ~ ~ ~ ~ ~ ~ ~ ~ ~] [c#1 c#1 ~ ~ c#1 ~ c#1 ~ ~ c#1 c#1 ~ ~ ~ ~ ~] [c#1 c#1 ~ ~ c#1 ~ c#1 ~ e1 ~ e1 ~ d1 ~ ~ ~] [a1 ~ ~ a1 ~ ~ g#1 ~ ~ f#1 ~ ~ e1 ~ ~ ~] [c#1 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ c#1 c#2 c#1 ~]>")
       .s("sawtooth").lpf(1000).resonance(8)
       .decay(0.09).sustain(0).dist(0.35).gain(0.58),

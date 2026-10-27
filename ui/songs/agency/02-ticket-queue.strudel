@@ -16,14 +16,14 @@ setbpm(100);
 "<intro verse@2 lift chorus@2 break chorus2@2 outro>".slow(4).pickRestart({
   intro: stack(
     note("f#1").s("sine").attack(1.5).release(2.5).slow(2).gain(0.4),
-    s("rs*4").gain(0.25).pan(0.45),
+    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.25).pan(0.45),
     chord("<F#m F#m D Bm>").voicing().s("supersaw")
       .attack(0.6).release(1.2).lpf(900).chorus(0.4).room(0.5).gain(0.26)
   ),
   verse: stack(
     note("f#1").s("sine").attack(1.5).release(2.5).slow(2).gain(0.35),
-    s("bd*4").gain(0.8),
-    s("rs*4").gain(0.2).pan(0.45),
+    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.8),
+    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.2).pan(0.45),
     note("<[f#1 f#1 f#1 f#1] [f#1 f#1 f#1 f#1] [d1 d1 d1 d1] [b0 b0 c#1 c#1]>")
       .s("sawtooth").lpf(650).decay(0.2).sustain(0.3).dist(0.1).gain(0.55),
     note("<[7 7 ~ 7 ~ 7 7 ~] [7 9 ~ 7 ~ ~ 9 ~] [7 7 ~ 7 ~ 4 ~ 4] [5 ~ 5 ~ 2 ~ ~ ~]>")
@@ -33,8 +33,8 @@ setbpm(100);
       .attack(0.6).release(1.2).lpf(1100).chorus(0.4).room(0.5).gain(0.24)
   ),
   lift: stack(
-    s("bd*4").gain(0.85),
-    s("~ sd ~ sd").room(0.5).roomsize(0.7).gain(0.55),
+    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.85),
+    s("~ sd ~ sd").bank("RolandTR909").velocity(0.9).room(0.5).roomsize(0.7).gain(0.55),
     note("f#1*8").s("sawtooth").lpf(700).decay(0.15).sustain(0.3).dist(0.12).gain(0.55),
     note("<[0 2 4 6 7 9 11 12] [2 4 6 7 9 11 12 14] [4 6 7 9 11 12 14 16] [7 9 11 12 14 16 18 19]>")
       .scale("F#4:minor").s("pulse")
@@ -44,10 +44,10 @@ setbpm(100);
       .attack(0.4).release(1.0).lpf(1400).chorus(0.4).room(0.5).gain(0.26)
   ),
   chorus: stack(
-    s("bd*4").gain(0.9),
-    s("~ sd ~ sd").room(0.55).roomsize(0.7).gain(0.65),
-    s("hh*8").gain(0.2).pan(sine.range(0.35, 0.65)),
-    s("rs*4").gain(0.16).pan(0.45),
+    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.9),
+    s("~ sd ~ sd").bank("RolandTR909").velocity(0.9).room(0.55).roomsize(0.7).gain(0.65),
+    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.2).pan(sine.range(0.35, 0.65)),
+    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.16).pan(0.45),
     note("<[f#1 f#2]*4 [f#1 f#2]*4 [d1 d2]*4 [c#1 c#2]*4>")
       .s("sawtooth").lpf(750).decay(0.18).sustain(0.25).dist(0.12).gain(0.55),
     note("<[7 ~ 6 ~ 4 ~ 2 ~] [4 ~ 2 ~ 0 ~ ~ ~] [6 ~ 4 ~ 2 ~ 1 ~] [2 ~ 0 ~ ~ ~ ~ ~]>")
@@ -58,7 +58,7 @@ setbpm(100);
   ),
   break: stack(
     note("f#1").s("sine").attack(1.5).release(2.5).slow(2).gain(0.4),
-    s("rs*4").gain(0.22).pan(0.45),
+    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.22).pan(0.45),
     note("<[7 7 ~ 7 ~ 7 7 ~] [~ 9 ~ 7 ~ ~ 9 ~] [7 ~ ~ 7 ~ 4 ~ 4] [5 ~ 5 ~ 2 ~ ~ ~]>")
       .scale("F#5:minor").s("pulse").decay(0.1).sustain(0)
       .delay(0.35).delaytime(0.375).room(0.4).gain(0.3).pan(0.6),
@@ -66,10 +66,10 @@ setbpm(100);
       .attack(0.8).release(1.4).lpf(1000).chorus(0.5).room(0.6).gain(0.26)
   ),
   chorus2: stack(
-    s("bd*4").gain(0.9),
-    s("~ sd ~ sd").room(0.55).roomsize(0.7).gain(0.65),
-    s("hh*8").gain(0.2).pan(sine.range(0.35, 0.65)),
-    s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.14).pan(0.3),
+    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.9),
+    s("~ sd ~ sd").bank("RolandTR909").velocity(0.9).room(0.55).roomsize(0.7).gain(0.65),
+    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.2).pan(sine.range(0.35, 0.65)),
+    s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").bank("RolandTR909").velocity(0.4).gain(0.14).pan(0.3),
     note("<[f#1 f#2]*4 [f#1 f#2]*4 [d1 d2]*4 [c#1 c#2]*4>")
       .s("sawtooth").lpf(800).decay(0.18).sustain(0.25).dist(0.12).gain(0.5),
     note("<[7 ~ 6 ~ 4 ~ 2 ~] [4 ~ 2 ~ 0 ~ ~ ~] [6 ~ 4 ~ 2 ~ 1 ~] [2 ~ 0 ~ ~ ~ ~ ~] [9 ~ 7 ~ 6 ~ 4 ~] [6 ~ 4 ~ 2 ~ ~ ~] [4 ~ 6 ~ 7 ~ 9 ~] [7 ~ ~ ~ ~ ~ ~ ~]>")
@@ -81,7 +81,7 @@ setbpm(100);
   ),
   outro: stack(
     note("f#1").s("sine").attack(1.5).release(2.5).slow(2).gain(0.38),
-    s("rs*4").gain(0.22).pan(0.45),
+    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.22).pan(0.45),
     chord("<F#m F#m F#m F#m>").voicing().s("supersaw")
       .attack(0.8).release(1.6).lpf(isaw.range(300, 1400).slow(4))
       .chorus(0.5).room(0.6).gain(0.26)

@@ -23,11 +23,11 @@ setbpm(110);
     note("<[[c#6 c#6] ~ ~ ~] [~ ~ [c#6 c#6] ~] [[c#6 c#6] ~ ~ ~] [~ ~ ~ ~]>")
       .s("square").decay(0.05).sustain(0)
       .room(0.4).gain(0.24).pan(0.62),
-    s("bd ~ ~ ~").gain(0.8).dist(0.2)
+    s("bd ~ ~ ~").bank("RolandTR909").velocity(0.85).gain(0.8).dist(0.2)
   ),
   verse: stack(
-    s("bd*4").gain(0.92).dist(0.25),
-    s("hh*8").gain(0.24).pan(sine.range(0.4, 0.6)),
+    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.92).dist(0.25),
+    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.24).pan(sine.range(0.4, 0.6)),
     note("<[c#1 c#2 c#1 c#2 c#1 c#2 c#1 c#2] [c#1 c#2 c#1 c#2 c#1 c#2 c#1 c#2] [a0 a1 a0 a1 a0 a1 a0 a1] [b0 b1 b0 b1 g#0 g#1 b0 b1]>")
       .s("sawtooth").lpf(760).resonance(9).decay(0.18).sustain(0.25)
       .dist(0.2).gain(0.52),
@@ -37,8 +37,8 @@ setbpm(110);
       .lpf(1400).attack(0.5).release(1.2).chorus(0.4).room(0.6).gain(0.24)
   ),
   lift: stack(
-    s("bd*4").gain(0.93).dist(0.25),
-    s("~ sd ~ sd").room(0.55).roomsize(0.75).gain(0.66),
+    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.93).dist(0.25),
+    s("~ sd ~ sd").bank("RolandTR909").velocity(0.9).room(0.55).roomsize(0.75).gain(0.66),
     note("c#1*16").s("supersaw")
       .lpf(sine.range(250, 700).fast(4)).resonance(11)
       .decay(0.08).sustain(0).dist(0.3).gain("0.5 0.35 0.42 0.35"),
@@ -48,10 +48,10 @@ setbpm(110);
       .dist(0.12).gain(0.34)
   ),
   drop: stack(
-    s("bd*4").gain(0.95).dist(0.28),
-    s("~ sd ~ sd").room(0.55).roomsize(0.75).gain(0.7),
-    s("hh*8").gain(0.26).pan(sine.range(0.4, 0.6)),
-    s("~ ~ ~ oh").gain(0.3),
+    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.95).dist(0.28),
+    s("~ sd ~ sd").bank("RolandTR909").velocity(0.9).room(0.55).roomsize(0.75).gain(0.7),
+    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.26).pan(sine.range(0.4, 0.6)),
+    s("~ ~ ~ oh").bank("RolandTR909").velocity(0.85).gain(0.3),
     note("c#1*16").s("supersaw")
       .lpf(sine.range(400, 1400).fast(4)).resonance(11)
       .decay(0.08).sustain(0).dist(0.35).gain("0.6 0.4 0.5 0.4"),
@@ -66,14 +66,14 @@ setbpm(110);
     note("<[[c#6 c#6] ~ ~ ~] [~ ~ ~ ~] [~ [c#6 c#6] ~ ~] [~ ~ ~ ~]>")
       .s("square").decay(0.05).sustain(0)
       .room(0.5).delay(0.3).delaytime(0.2045).gain(0.2).pan(0.62),
-    s("bd ~ ~ ~").gain(0.75).dist(0.2),
+    s("bd ~ ~ ~").bank("RolandTR909").velocity(0.85).gain(0.75).dist(0.2),
     note("<c#1 ~ a0 b0>").s("sine").attack(0.1).release(1.0).gain(0.45)
   ),
   drop2: stack(
-    s("bd*4").gain(0.95).dist(0.28),
-    s("~ sd ~ sd").room(0.55).roomsize(0.75).gain(0.7),
-    s("hh*8").gain(0.26).pan(sine.range(0.4, 0.6)),
-    s("~ ~ ~ oh").gain(0.3),
+    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.95).dist(0.28),
+    s("~ sd ~ sd").bank("RolandTR909").velocity(0.9).room(0.55).roomsize(0.75).gain(0.7),
+    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.26).pan(sine.range(0.4, 0.6)),
+    s("~ ~ ~ oh").bank("RolandTR909").velocity(0.85).gain(0.3),
     note("c#1*16").s("supersaw")
       .lpf(sine.range(400, 1500).fast(4)).resonance(11)
       .decay(0.08).sustain(0).dist(0.35).gain("0.6 0.4 0.5 0.4"),
