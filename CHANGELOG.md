@@ -9,6 +9,9 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; rename 
 - **Help → What's New** has the notes for every release. It's also in the command palette and About.
 - **The update prompt shows the new release's notes** before you install. On deb and AUR installs it shows them with a link to the releases page.
 
+### Sounds
+- **TR-909, TR-606 and TR-727 kits are bundled** and work offline: `s("bd*4").bank("RolandTR909")`. The 909 gains crash and toms, and most voices have several takes (`bd:3` is the 909's attack kick). The 727 is Latin percussion: `perc:0`–`perc:13` and `sh`. They're CC0 recordings of a Roland TR-8.
+
 ### Fixed
 - Linux: animated labels in NEON CIRCUIT, MARBLE CORE, MARBLE DROP, PLASMA and TUNNEL held the frame rate to about 35 fps, because WebKitGTK loaded a new font size every frame. They now run at full speed.
 - tokio 1.54.1, which fixes a race in its interval timer, plus routine dependency updates.
