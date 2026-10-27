@@ -4,6 +4,9 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+### Demos
+- **The Agency album plays on the TR-909**, with the TR-606 on Green Build. Ticket Queue has new drums on the LinnDrum, with fills, and a stronger lead. Other tracks get small fixes: gains that applied to the wrong layer, and a gallop with 15 steps instead of 16. New libraries get these; demos already in your library are left as they are.
+
 ## 0.1.0-alpha.26 (2026-10-26)
 
 Bundled 909, 606 and 727 kits, Ableton Link and OSC output that work, and What's New after updates.

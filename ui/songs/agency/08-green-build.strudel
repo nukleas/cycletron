@@ -1,4 +1,5 @@
-// AGENCY OST — 08 · Green Build
+// AGENCY OST — 08 · Green Build (v2)
+// v2 of Demos/Songs/agency/08-green-build.strudel — original arrangement plus bug fixes only; see REVIEW.md
 // It ships. Dawn through the blinds. Synthwave in E major — the relative major
 // of home. The mainframe drone from "Legacy System" returns and resolves up a
 // major third; the Agency motif (0 2 4 6 · 7 4 2 0) finally lands in major.
@@ -9,7 +10,7 @@
 //   lift    4  e3  + snare, line climbs into the light
 //   chorus  16 e4  full: gated snare, wide pad, the motif sung in major
 //   break   8  e2  drums out — choir and pad, deep breath, sunrise
-//   chorus2 16 e5  everything, octave double, all the hats
+//   chorus2 16 e5  everything, an octave-up echo a beat late, all the hats
 //   outro   8  e1  drone on E alone. The build is green.
 // hook: the Agency motif, major-voiced — both choruses.
 
@@ -24,7 +25,7 @@ setbpm(102);
   ),
   verse: stack(
     note("e1").s("sine").attack(1.0).release(2.0).slow(2).gain(0.35),
-    s("bd*4").gain(0.8),
+    s("bd*4").bank("RolandTR606").velocity(1.3).gain(0.8),
     s("rs*4").gain(0.16).pan(0.45),
     note("<[e1 e1 e1 e1] [e1 e1 e1 e1] [a1 a1 a1 a1] [b1 b1 b1 b1]>")
       .s("sawtooth").lpf(650).decay(0.2).sustain(0.3).gain(0.55),
@@ -35,8 +36,8 @@ setbpm(102);
       .attack(0.5).release(1.1).lpf(1200).chorus(0.4).room(0.5).gain(0.24)
   ),
   lift: stack(
-    s("bd*4").gain(0.85),
-    s("~ sd ~ sd").room(0.5).roomsize(0.7).gain(0.55),
+    s("bd*4").bank("RolandTR606").velocity(1.3).gain(0.85),
+    s("~ sd ~ sd").bank("RolandTR606").velocity(0.66).room(0.5).roomsize(0.7).gain(0.55),
     note("e1*8").s("sawtooth").lpf(700).decay(0.15).sustain(0.3).gain(0.55),
     note("<[0 2 4 6 7 9 11 12] [2 4 6 7 9 11 12 14] [4 6 7 9 11 12 14 16] [7 9 11 12 14 16 18 19]>")
       .scale("E4:major").s("pulse")
@@ -46,9 +47,9 @@ setbpm(102);
       .attack(0.3).release(1.0).lpf(1500).chorus(0.4).room(0.5).gain(0.26)
   ),
   chorus: stack(
-    s("bd*4").gain(0.9),
-    s("~ sd ~ sd").room(0.55).roomsize(0.7).gain(0.65),
-    s("hh*8").gain(0.2).pan(sine.range(0.35, 0.65)),
+    s("bd*4").bank("RolandTR606").velocity(1.3).gain(0.9),
+    s("~ sd ~ sd").bank("RolandTR606").velocity(0.66).room(0.55).roomsize(0.7).gain(0.65),
+    s("hh*8").bank("RolandTR606").velocity(0.52).gain(0.2).pan(sine.range(0.35, 0.65)),
     note("<[e1 e2]*4 [b0 b1]*4 [c#1 c#2]*4 [a0 a1]*4>")
       .s("sawtooth").lpf(750).decay(0.18).sustain(0.25).gain(0.52),
     note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 9 ~ 7 ~ 4 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [4 ~ 6 ~ 7 ~ 9 ~] [7 ~ ~ ~ ~ ~ ~ ~]>")
@@ -69,17 +70,17 @@ setbpm(102);
       .attack(1.0).release(1.6).lpf(1200).chorus(0.5).room(0.7).gain(0.26)
   ),
   chorus2: stack(
-    s("bd*4").gain(0.9),
-    s("~ sd ~ sd").room(0.55).roomsize(0.7).gain(0.65),
-    s("hh*8").gain(0.18).pan(sine.range(0.35, 0.65)),
-    s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").gain(0.12).pan(0.3),
-    s("~ ~ oh ~").gain(0.14).pan(0.55),
+    s("bd*4").bank("RolandTR606").velocity(1.3).gain(0.9),
+    s("~ sd ~ sd").bank("RolandTR606").velocity(0.66).room(0.55).roomsize(0.7).gain(0.65),
+    s("hh*8").bank("RolandTR606").velocity(0.52).gain(0.18).pan(sine.range(0.35, 0.65)),
+    s("~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh").bank("RolandTR606").velocity(0.52).gain(0.12).pan(0.3),
+    s("~ ~ oh ~").bank("RolandTR606").velocity(0.55).gain(0.14).pan(0.55),
     note("<[e1 e2]*4 [b0 b1]*4 [c#1 c#2]*4 [a0 a1]*4>")
       .s("sawtooth").lpf(820).decay(0.18).sustain(0.25).gain(0.5),
     note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 9 ~ 7 ~ 4 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [4 ~ 6 ~ 7 ~ 9 ~] [7 ~ ~ ~ ~ ~ ~ ~]>")
       .scale("E4:major").s("supersaw").release(0.3).lpf(2600)
-      .off(0.25, x => x.add(12).gain(0.4))
-      .delay(0.22).delaytime(0.368).room(0.3).gain(0.4),
+      .delay(0.22).delaytime(0.368).room(0.3).gain(0.4)
+      .off(0.25, x => x.add(12).gain(0.4)),
     chord("<E B C#m A>").voicing().s("supersaw")
       .attack(0.3).release(0.9).lpf(2000).chorus(0.45).room(0.5).gain(0.24)
   ),

@@ -1,4 +1,5 @@
-// AGENCY OST — 13 · Kill Switch
+// AGENCY OST — 13 · Kill Switch (v2)
+// v2 of Demos/Songs/agency/13-kill-switch.strudel — original arrangement plus bug fixes only; see REVIEW.md
 // ACT II finale. One command ends the rogue process — and the legacy system
 // with it. The Agency motif (0 2 4 6 · 7 4 2 0) is no longer a melody:
 // it IS the bass riff, distorted, full of stops, doubled by sub. Harmonic
@@ -27,7 +28,7 @@ setbpm(100);
       .attack(1.2).release(2.4).lpf(900).chorus(0.4).room(0.7).gain(0.24)
   ),
   arm: stack(
-    s("<[bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+    s("<[bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909")
       .gain(0.9).dist(0.22),
     note("<[c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ b#1 ~ g#1 ~ c#1 ~ ~ ~ ~ ~ ~ ~]>")
       .s("sawtooth").lpf(saw.range(500, 900).slow(8)).resonance(8)
@@ -36,13 +37,13 @@ setbpm(100);
       .s("sine").lpf(190).decay(0.13).sustain(0).dist(0.15).gain(0.4),
     chord("<C#m C#m A B>").voicing().s("supersaw")
       .attack(0.05).release(1.0).lpf(950).chorus(0.4).room(0.6)
-      .gain(saw.range(0.1, 0.26).fast(4))
+      .gain(0.1)
   ),
   strike: stack(
-    s("<[bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+    s("<[bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909")
       .gain(0.95).dist(0.25),
-    s("~ ~ sd ~").room(0.65).roomsize(0.85).gain(0.74),
-    s("hh*8").gain(0.2).pan(sine.range(0.4, 0.6)),
+    s("~ ~ sd ~").bank("RolandTR909").velocity(0.7).room(0.65).roomsize(0.85).gain(0.74),
+    s("hh*8").bank("RolandTR909").velocity(0.43).gain(0.2).pan(sine.range(0.4, 0.6)),
     note("<[c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ b#1 ~ g#1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [a1 ~ ~ a1 ~ ~ g#1 ~ f#1 ~ ~ f#1 e1 ~ ~ ~] [d1 ~ ~ ~ b#1 ~ ~ ~ c#1 ~ ~ ~ ~ ~ ~ ~]>")
       .s("sawtooth").lpf(950).resonance(8)
       .decay(0.1).sustain(0).dist(0.35).gain(0.56),
@@ -62,14 +63,14 @@ setbpm(100);
       .delay(0.5).delaytime(0.1875).delayfeedback(0.55)
       .room(0.8).gain(0.26).pan(0.6),
     note("c#1").s("sine").slow(4).attack(2).release(6).gain(0.44),
-    s("<[~ ~ ~ ~] [~ ~ sd ~] [~ ~ ~ ~] [~ ~ ~ ~]>").room(0.75).roomsize(0.9).gain(0.36)
+    s("<[~ ~ ~ ~] [~ ~ sd ~] [~ ~ ~ ~] [~ ~ ~ ~]>").bank("RolandTR909").velocity(0.7).room(0.75).roomsize(0.9).gain(0.36)
   ),
   strike2: stack(
-    s("<[bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
+    s("<[bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909")
       .gain(0.95).dist(0.28),
-    s("~ ~ sd ~").room(0.65).roomsize(0.85).gain(0.76),
-    s("hh*8").gain(0.22).pan(sine.range(0.4, 0.6)),
-    s("~ ~ ~ oh").gain(0.24),
+    s("~ ~ sd ~").bank("RolandTR909").velocity(0.7).room(0.65).roomsize(0.85).gain(0.76),
+    s("hh*8").bank("RolandTR909").velocity(0.43).gain(0.22).pan(sine.range(0.4, 0.6)),
+    s("~ ~ ~ oh").bank("RolandTR909").velocity(0.9).gain(0.24),
     note("<[c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ b#1 ~ g#1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [c#1 ~ c#1 ~ e1 ~ ~ ~ g#1 ~ ~ g#1 b1 ~ ~ ~] [c#2 ~ ~ ~ g#1 ~ e1 ~ c#1 ~ ~ ~ ~ ~ ~ ~] [a1 ~ ~ a1 ~ ~ g#1 ~ f#1 ~ ~ f#1 e1 ~ ~ ~] [d1 ~ ~ ~ b#1 ~ ~ ~ c#1 ~ ~ ~ ~ ~ ~ ~]>")
       .s("sawtooth").lpf(1050).resonance(8)
       .decay(0.1).sustain(0).dist(0.35).gain(0.56),
@@ -77,7 +78,7 @@ setbpm(100);
       .s("sine").lpf(190).decay(0.13).sustain(0).dist(0.15).gain(0.42),
     note("<[g#2, d#3, b2] [g#2, d#3, b2] [a2, e3, c#3] [g#2, d#3, b#2]>").s("wt_choir")
       .attack(0.4).release(2.0).lpf(1000).room(0.75)
-      .gain(saw.range(0.1, 0.26).fast(4)).pan(0.42),
+      .gain(0.1).pan(0.42),
     note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [12 ~ 9 ~ 7 ~ 6 ~] [7 ~ ~ ~ 6 ~ 7 ~]>")
       .scale("C#4:harmonic minor").s("sawtooth")
       .lpf(2800).resonance(6).decay(0.2).sustain(0.12)
@@ -87,7 +88,7 @@ setbpm(100);
     note("<[c#1 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
       .s("sine").attack(0.001).decay(0.5).sustain(0).release(4)
       .lpf(180).dist(0.4).room(0.7).roomsize(0.9).gain(0.6),
-    s("<[bd ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~]>")
+    s("<[bd ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~]>").bank("RolandTR909")
       .gain(0.95).dist(0.3).room(0.6).roomsize(0.9),
     note("c#1").s("sine").slow(4).attack(1.5).release(10).gain(0.34)
   ),

@@ -16,7 +16,7 @@ const server = await createServer({
     optimizeDeps: {noDiscovery: true, include: []},
 });
 after(() => server.close());
-const {TrackModel, MAX_EVENTS_PER_TRACK} = await server.ssrLoadModule('/src/viz/tracks.ts');
+const {TrackModel, MAX_EVENTS_PER_TRACK, instrumentFamily} = await server.ssrLoadModule('/src/viz/tracks.ts');
 const {defaultTheme} = await server.ssrLoadModule('/src/viz/theme.ts');
 const {isoCityDef} = await server.ssrLoadModule('/src/viz/modes/iso-city.ts');
 const {neonCircuitDef} = await server.ssrLoadModule('/src/viz/modes/neon-circuit.ts');
@@ -242,4 +242,17 @@ test('PLASMA reuses faded vacancies after churn without aliasing lifetime slots'
     assert.ok(other > 0);
     assert.equal(plasma.pitchTarget[0], bassTarget);
     assert.ok(plasma.pitchTarget[other] > 0);
+});
+
+test('drum families hold for banked and spelled-out machine voices', (t) => {
+    const {source} = fixture(t, 's("bd sd hh cr").bank("RolandTR909")');
+    const model = new TrackModel();
+    const families = [0, 0.3, 0.55, 0.8, 0.99]
+        .flatMap((cycle) => onsets(model, source, cycle))
+        .map(([name]) => [name, instrumentFamily(name)]);
+    assert.deepEqual(families.map(([, f]) => f), ['kick', 'snare', 'hat', 'hat'], JSON.stringify(families));
+    assert.equal(instrumentFamily('RolandTR909_bd'), 'kick');
+    assert.equal(instrumentFamily('RolandTR727_perc'), 'perc');
+    assert.equal(instrumentFamily('gm_piano'), 'perc');
+    assert.equal(instrumentFamily('wt_bass'), 'perc');
 });
