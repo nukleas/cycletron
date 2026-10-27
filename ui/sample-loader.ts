@@ -19,6 +19,7 @@ import {
     UZU_BASE,
     VCSL_ONESHOTS,
     VCSL_PITCHED,
+    takeIndex,
 } from './sample-tables.js';
 
 /**
@@ -326,9 +327,10 @@ export class SampleLoader {
     async loadMachineKits(): Promise<number> {
         let total = 0;
         for (const [machine, displayName, voices] of MACHINE_KITS) {
-            const samples = voices.map(([v, url]) => ({
+            const samples = voices.map(([v, url], i) => ({
                 name: `${machine}_${v}`,
                 url,
+                sampleIdx: takeIndex(voices, i),
             }));
             const {loaded} = await this._loadKitBatch(samples, displayName);
             total += loaded;

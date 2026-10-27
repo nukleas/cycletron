@@ -444,27 +444,6 @@
   "RolandTR808_cb": [
     "machines/RolandTR808_cb.wav"
   ],
-  "RolandTR909_bd": [
-    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-bd/Bassdrum-01.wav"
-  ],
-  "RolandTR909_sd": [
-    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-sd/naredrum.wav"
-  ],
-  "RolandTR909_hh": [
-    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-hh/hh01.wav"
-  ],
-  "RolandTR909_oh": [
-    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-oh/Hat%20Open.wav"
-  ],
-  "RolandTR909_cp": [
-    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-cp/Clap.wav"
-  ],
-  "RolandTR909_rd": [
-    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-rd/Ride.wav"
-  ],
-  "RolandTR909_rim": [
-    "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/RolandTR909/rolandtr909-rim/Rimhot.wav"
-  ],
   "RolandTR707_bd": [
     "machines/RolandTR707_bd.wav"
   ],
@@ -509,5 +488,101 @@
   ],
   "BossDR55_rim": [
     "https://raw.githubusercontent.com/geikha/tidal-drum-machines/master/machines/BossDR55/bossdr55-rim/Rimshot.wav"
+  ],
+  "RolandTR909_bd": [
+    "machines/RolandTR909_bd.wav",
+    "machines/RolandTR909_bd-1.wav",
+    "machines/RolandTR909_bd-2.wav",
+    "machines/RolandTR909_bd-3.wav"
+  ],
+  "RolandTR909_sd": [
+    "machines/RolandTR909_sd.wav",
+    "machines/RolandTR909_sd-1.wav",
+    "machines/RolandTR909_sd-2.wav",
+    "machines/RolandTR909_sd-3.wav"
+  ],
+  "RolandTR909_hh": [
+    "machines/RolandTR909_hh.wav",
+    "machines/RolandTR909_hh-1.wav"
+  ],
+  "RolandTR909_oh": [
+    "machines/RolandTR909_oh.wav",
+    "machines/RolandTR909_oh-1.wav"
+  ],
+  "RolandTR909_cp": [
+    "machines/RolandTR909_cp.wav",
+    "machines/RolandTR909_cp-1.wav"
+  ],
+  "RolandTR909_rim": [
+    "machines/RolandTR909_rim.wav"
+  ],
+  "RolandTR909_cr": [
+    "machines/RolandTR909_cr.wav",
+    "machines/RolandTR909_cr-1.wav"
+  ],
+  "RolandTR909_rd": [
+    "machines/RolandTR909_rd.wav",
+    "machines/RolandTR909_rd-1.wav"
+  ],
+  "RolandTR909_lt": [
+    "machines/RolandTR909_lt.wav",
+    "machines/RolandTR909_lt-1.wav"
+  ],
+  "RolandTR909_mt": [
+    "machines/RolandTR909_mt.wav",
+    "machines/RolandTR909_mt-1.wav"
+  ],
+  "RolandTR909_ht": [
+    "machines/RolandTR909_ht.wav",
+    "machines/RolandTR909_ht-1.wav"
+  ],
+  "RolandTR606_bd": [
+    "machines/RolandTR606_bd.wav",
+    "machines/RolandTR606_bd-1.wav",
+    "machines/RolandTR606_bd-2.wav"
+  ],
+  "RolandTR606_sd": [
+    "machines/RolandTR606_sd.wav",
+    "machines/RolandTR606_sd-1.wav",
+    "machines/RolandTR606_sd-2.wav"
+  ],
+  "RolandTR606_hh": [
+    "machines/RolandTR606_hh.wav",
+    "machines/RolandTR606_hh-1.wav"
+  ],
+  "RolandTR606_oh": [
+    "machines/RolandTR606_oh.wav",
+    "machines/RolandTR606_oh-1.wav"
+  ],
+  "RolandTR606_cr": [
+    "machines/RolandTR606_cr.wav",
+    "machines/RolandTR606_cr-1.wav"
+  ],
+  "RolandTR606_lt": [
+    "machines/RolandTR606_lt.wav",
+    "machines/RolandTR606_lt-1.wav"
+  ],
+  "RolandTR606_ht": [
+    "machines/RolandTR606_ht.wav",
+    "machines/RolandTR606_ht-1.wav"
+  ],
+  "RolandTR727_perc": [
+    "machines/RolandTR727_perc.wav",
+    "machines/RolandTR727_perc-1.wav",
+    "machines/RolandTR727_perc-2.wav",
+    "machines/RolandTR727_perc-3.wav",
+    "machines/RolandTR727_perc-4.wav",
+    "machines/RolandTR727_perc-5.wav",
+    "machines/RolandTR727_perc-6.wav",
+    "machines/RolandTR727_perc-7.wav",
+    "machines/RolandTR727_perc-8.wav",
+    "machines/RolandTR727_perc-9.wav",
+    "machines/RolandTR727_perc-10.wav",
+    "machines/RolandTR727_perc-11.wav",
+    "machines/RolandTR727_perc-12.wav",
+    "machines/RolandTR727_perc-13.wav"
+  ],
+  "RolandTR727_sh": [
+    "machines/RolandTR727_sh.wav"
   ]
 }

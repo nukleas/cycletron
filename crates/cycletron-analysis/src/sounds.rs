@@ -144,7 +144,9 @@ pub const MACHINE_KITS: &[(&str, &str, &[&str])] = &[
     (
         "RolandTR909",
         "TR-909",
-        &["bd", "sd", "hh", "oh", "cp", "rd", "rim"],
+        &[
+            "bd", "sd", "hh", "oh", "cp", "rim", "cr", "rd", "lt", "mt", "ht",
+        ],
     ),
     (
         "RolandTR707",
@@ -153,6 +155,12 @@ pub const MACHINE_KITS: &[(&str, &str, &[&str])] = &[
     ),
     ("LinnDrum", "LinnDrum", &["bd", "sd", "hh", "cp"]),
     ("BossDR55", "DR-55", &["bd", "sd", "hh", "rim"]),
+    (
+        "RolandTR606",
+        "TR-606",
+        &["bd", "sd", "hh", "oh", "cr", "lt", "ht"],
+    ),
+    ("RolandTR727", "TR-727", &["perc", "sh"]),
 ];
 
 /// Every General MIDI voice the engine dispatches, straight from the
