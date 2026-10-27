@@ -19,7 +19,7 @@ import {
 } from '@codemirror/view';
 import {tags} from '@lezer/highlight';
 import {basename, relativePath} from '../paths.js';
-import {invoke} from '../tauri.js';
+import {invoke, isTauri, listen} from '../tauri.js';
 import {strudelThemeExtension} from '../theme.js';
 import {VIZ_MODES} from '../viz/registry.js';
 import {type AssistSources, completions, hover} from './assist.js';
@@ -77,7 +77,7 @@ class ShowPane {
     private wired = false;
     /** Kept across focus moving to the palette, menus or dialogs. */
     private lastEditor: 'song' | 'show' = 'song';
-    /** The library's songs, listed once per open. */
+    /** The library's songs; cleared when the library changes or the listing fails. */
     private songs: Promise<string[]> | null = null;
 
     get isOpen(): boolean {
@@ -186,9 +186,14 @@ class ShowPane {
             modes: VIZ_MODES.map((m) => ({id: m.id, name: m.name})),
             sections: (index) => this.handlers?.sections(index) ?? [],
             songs: async () => {
-                this.songs ??= invoke<string[]>('list_library_songs').catch(() => []);
+                const songs = (this.songs ??= invoke<string[]>('list_library_songs'));
                 const dir = (this.path ?? '').replace(/[\\/][^\\/]*$/, '');
-                return (await this.songs).map((song) => relativePath(dir, song));
+                try {
+                    return (await songs).map((song) => relativePath(dir, song));
+                } catch {
+                    if (this.songs === songs) this.songs = null;
+                    return [];
+                }
             },
         };
     }
@@ -249,6 +254,7 @@ class ShowPane {
         if (this.wired) return;
         this.wired = true;
         element('showPaneClose').addEventListener('click', () => this.handlers?.onClose());
+        if (isTauri) void listen('library-changed', () => { this.songs = null; });
         document.addEventListener('focusin', (e) => {
             const target = e.target as Node;
             if (element('showPaneEditor').contains(target)) this.lastEditor = 'show';
