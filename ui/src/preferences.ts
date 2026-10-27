@@ -783,7 +783,7 @@ export class PreferencesModal {
         this.renderOscTarget(error);
     }
 
-    private renderOscTarget(error?: string | null): void {
+    private renderOscTarget(error: string | null = oscOut.lastError): void {
         if (!this.oscTarget) return;
         this.oscTarget.classList.toggle('is-ok', !error && oscOut.settings.enabled);
         this.oscTarget.textContent = error

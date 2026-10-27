@@ -403,7 +403,10 @@ export class StrudelApp {
             if (this.scheduler) this.scheduler.launchQuantum = cycles;
         });
         mixer.init(this._reapplyMix);
-        void oscOut.init();
+        const oscError = (error: string) => this.setStatus(`OSC: ${error}`);
+        void oscOut.init(oscError).then(error => {
+            if (error) oscError(error);
+        });
         // A peer's tempo change comes in through applyBpm exactly like the
         // slider's does.
         void linkSync.init(bpm => this.applyBpm(bpm), currentBpm()).then(error => {
@@ -1137,7 +1140,8 @@ export class StrudelApp {
 
     /** Tell OSC listeners where the transport went. `cps = bpm / 240`. */
     private _announceTransport(state: 'playing' | 'paused' | 'stopped'): void {
-        const bpm = parseInt(this.elements.bpmSlider.value, 10) || 120;
+        // The scheduler's tempo, not the slider's: the slider rounds to whole BPM.
+        const bpm = currentBpm();
         oscOut.transport(state, bpm, bpm / 240);
     }
 

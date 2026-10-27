@@ -18,6 +18,12 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 - macOS asks once for local network access, which Link needs to find other apps.
 - Saving Preferences no longer resets the tempo unless you changed the default tempo.
 
+### OSC output
+- **OSC no longer drops notes.** A note near the end of a bar, a note that started while the previous send was still going out, and very large frames (which macOS discarded without an error) were all lost. They now all arrive.
+- A pattern change mid-bar no longer resends the new pattern's notes from the start of the bar.
+- `/cycletron/transport` sends the exact tempo instead of rounding it to a whole BPM.
+- If OSC can't send, the status line says so once, and Preferences shows the error.
+
 ### Fixed
 - Linux: animated labels in NEON CIRCUIT, MARBLE CORE, MARBLE DROP, PLASMA and TUNNEL held the frame rate to about 35 fps, because WebKitGTK loaded a new font size every frame. They now run at full speed.
 - tokio 1.54.1, which fixes a race in its interval timer, plus routine dependency updates.

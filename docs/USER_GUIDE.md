@@ -316,10 +316,14 @@ or the reason it failed.
 | Address | Arguments |
 |---------|-----------|
 | `/cycletron/transport` | `state` (`playing` / `paused` / `stopped`), `bpm`, `cps` |
-| `/cycletron/cycle` | `cycle` — absolute transport position, sent continuously |
+| `/cycletron/cycle` | `cycle` — absolute transport position, sent every frame while playing |
 | `/cycletron/hap` | `track`, `note` (NaN when unpitched), `dur` in cycles, `index` |
 
-`/cycletron/cycle` and the haps for a frame are sent together in one bundle.
+`/cycletron/cycle` and the haps for a frame are sent together in one bundle. A
+frame with too many haps for one UDP packet is split across several bundles
+sent back to back; only the first carries `/cycletron/cycle`. `bpm` is the exact
+tempo, so it can be fractional.
+
 Track names are the sound names the engine reports (`bd`, `sd`, `sawtooth`), the
 same ones the visualizers colour by.
 
@@ -327,6 +331,16 @@ Onsets are emitted on the animation frame that crosses them (~16 ms), which is
 what visuals and lighting want. It is **not** sample-accurate, so this is not a
 way to drive an external sampler or synth in time — that needs full per-hap
 parameter maps the engine doesn't expose yet.
+
+Known limits:
+
+- Output follows the screen's frame loop, so it pauses while the window is
+  hidden or minimised. Onsets missed while hidden are not sent later.
+- A note held across a bar line is sent again at the start of the next bar.
+
+If sending fails (the receiver's host is unreachable, or macOS hasn't been
+given local network access), the status line says so once, and the OSC
+section in Preferences shows the last error.
 
 ---
 
