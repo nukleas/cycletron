@@ -28,6 +28,10 @@ tambourine `tb`, and amen-style `brk`.
 - Source: https://github.com/tidalcycles/uzu-drumkit
 - License: **Unlicense** ([`licenses/uzu-drumkit-LICENSE.txt`](licenses/uzu-drumkit-LICENSE.txt)).
 - `rim` is registered as the same bank as `rs` (Fischer rimshot + two uzu rims).
+- `hh:2` and `hh:5` (`11_hh_mot4i.wav`, `14_hh_mot4i.wav`) are by **Mot4i**,
+  from the Garden pack (https://github.com/mot4i/garden), which asks for
+  credit: "You are free to use, share, and adapt the samples, as long as you
+  credit the source."
 
 ## Percussion & texture colors — `ui/public/samples/{perc,click,metal,east,hand,industrial,space,arpy,tabla,jvbass}/`
 
@@ -104,7 +108,9 @@ in-tune melodies prefer `gm_*` soundfonts or `wt_*` wavetables.
   Released under the **MIT license**; Frank Wen's copyright notice and the MIT
   text are reproduced in [`licenses/FluidR3_GM.txt`](licenses/FluidR3_GM.txt).
   Bundled as WebAudioFont-format renderings (MP3/JS mechanical conversion ©
-  2017 Sergey Surikov, MIT) from https://github.com/surikov/webaudiofontdata.
+  2017 Sergey Surikov, MIT) from https://github.com/surikov/webaudiofontdata;
+  his MIT notice is in
+  [`licenses/webaudiofontdata-LICENSE.txt`](licenses/webaudiofontdata-LICENSE.txt).
 - **GeneralUser GS** by **S. Christian Collins** — *streamed at runtime only,
   not bundled*. Used under the GeneralUser GS License v2.0, which permits use
   in software projects and commercial use of music made with it.
