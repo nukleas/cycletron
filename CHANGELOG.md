@@ -12,7 +12,7 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; rename 
 ### Fixed
 - Linux: animated labels in NEON CIRCUIT, MARBLE CORE, MARBLE DROP, PLASMA and TUNNEL held the frame rate to about 35 fps, because WebKitGTK loaded a new font size every frame. They now run at full speed.
 - tokio 1.54.1, which fixes a race in its interval timer, plus routine dependency updates.
-- Ableton Link, OSC output, Reload Corpus, the show pane's song suggestions and the after-update What's New were blocked by the app's command permissions and did nothing. They work now.
+- The after-update What's New, Reload Corpus and the show pane's song suggestions did nothing, because the app's command permissions blocked them. They work now. The same bug blocked Ableton Link and OSC output; they now connect, with more fixes to come.
 
 ## 0.1.0-alpha.25 (2026-10-21)
 
