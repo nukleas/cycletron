@@ -378,6 +378,7 @@ pub fn run() {
             desktop_theme::get_desktop_theme,
             link::link_enable,
             link::link_snapshot,
+            link::link_set_tempo,
             osc::osc_configure,
             osc::osc_transport,
             osc::osc_frame,

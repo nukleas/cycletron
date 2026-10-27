@@ -9,6 +9,12 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; rename 
 - **Help → What's New** has the notes for every release. It's also in the command palette and About.
 - **The update prompt shows the new release's notes** before you install. On deb and AUR installs it shows them with a link to the releases page.
 
+### Ableton Link
+- **Cycletron is now a full Link peer.** Changing the tempo here (the slider, `setbpm`, the assistant) sets it for everyone in the session, and a change from another app still comes back. Before, Link held Cycletron at 120 BPM when no other app was in the session.
+- If Link can't start when Cycletron opens, the status line and Preferences say why.
+- macOS asks once for local network access, which Link needs to find other apps.
+- Saving Preferences no longer resets the tempo unless you changed the default tempo.
+
 ### Fixed
 - Linux: animated labels in NEON CIRCUIT, MARBLE CORE, MARBLE DROP, PLASMA and TUNNEL held the frame rate to about 35 fps, because WebKitGTK loaded a new font size every frame. They now run at full speed.
 - tokio 1.54.1, which fixes a race in its interval timer, plus routine dependency updates.

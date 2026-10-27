@@ -5,13 +5,11 @@
  * timelines line up; this module owns the policy: what Cycletron does with what
  * Link reports.
  *
- * Two behaviours, both deliberately one-directional — Cycletron follows the
- * session and never writes to it:
+ * Two behaviours:
  *
- *   - **Tempo.** Polled and pushed through `applyBpm`, which is the app's sole
- *     tempo writer. While Link is on, the session tempo also *overrides* the
- *     one a pattern carries: evaluating `setbpm 140` mid-session would
- *     otherwise silently desync you from everyone else. See {@link resolveBpm}.
+ *   - **Tempo.** Cycletron is a full peer. A local change (slider, `setbpm`,
+ *     the assistant) goes to the session through `proposeBpm`; a peer's change
+ *     is polled and pushed through `applyBpm`, the app's sole tempo writer.
  *
  *   - **Start alignment.** Play and Resume wait for the bar line, so pressing
  *     play at any point in a bar still lands you in phase. This reuses nothing
@@ -54,17 +52,29 @@ class LinkSync {
     /** Last reading, for the Preferences readout. Null until the first poll. */
     snapshot: LinkSnapshot | null = null;
 
+    /** Why the last join failed, for the Preferences readout. Null when it worked. */
+    lastError: string | null = null;
+
     private timer: number | null = null;
+    /**
+     * Bumped when a tempo push starts and again when it lands. A poll that
+     * spans either edge read the session before the push took, so its tempo
+     * would drag the app back to the old value for one poll.
+     */
+    private pushes = 0;
     private onTempo: ((bpm: number) => void) | null = null;
     private onUpdate: (() => void) | null = null;
 
     /**
-     * Restore the stored setting and rejoin if it was on.
+     * Restore the stored setting and rejoin if it was on, at `bpm` if alone.
      *
      * `onTempo` receives the session tempo whenever it changes — wire it to the
      * app's tempo writer. `onUpdate` fires on every poll for the readout.
+     *
+     * @returns the join error, if rejoining failed. The stored setting stays
+     *          on (see {@link apply}), so each launch retries and reports.
      */
-    async init(onTempo: (bpm: number) => void, onUpdate?: () => void): Promise<void> {
+    async init(onTempo: (bpm: number) => void, bpm: number, onUpdate?: () => void): Promise<string | null> {
         this.onTempo = onTempo;
         this.onUpdate = onUpdate ?? null;
         try {
@@ -73,7 +83,8 @@ class LinkSync {
         } catch {
             this.settings = {...LINK_DEFAULTS};
         }
-        if (this.settings.enabled) await this.apply(this.settings.enabled);
+        if (!this.settings.enabled) return null;
+        return this.apply(true, bpm);
     }
 
     /** True when Cycletron is in a session and should defer to it. */
@@ -87,27 +98,31 @@ class LinkSync {
     }
 
     /**
-     * Join or leave the session. Returns an error string on failure, leaving
-     * Link off rather than half-joined.
+     * Join or leave the session; alone, `bpm` becomes the session tempo.
+     * Returns an error string on failure, leaving Link off rather than
+     * half-joined. The choice is stored before the backend answers, so a
+     * failure is retried on the next launch rather than forgotten.
      */
-    async apply(enabled: boolean, bpm = 120): Promise<string | null> {
+    async apply(enabled: boolean, bpm: number): Promise<string | null> {
         this.settings = {enabled};
         localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
 
-        if (!isTauri) {
+        const fail = (error: string | null): string | null => {
             this.settings.enabled = false;
             this.snapshot = null;
-            return enabled ? 'Ableton Link needs the desktop app.' : null;
-        }
+            this._stopPolling();
+            this.lastError = error;
+            return error;
+        };
+
+        if (!isTauri) return fail(enabled ? 'Ableton Link needs the desktop app.' : null);
 
         try {
             this.snapshot = await invoke<LinkSnapshot>('link_enable', {enabled, bpm});
         } catch (e) {
-            this.settings.enabled = false;
-            this.snapshot = null;
-            this._stopPolling();
-            return String(e);
+            return fail(String(e));
         }
+        this.lastError = null;
 
         if (enabled) {
             this._startPolling();
@@ -122,16 +137,25 @@ class LinkSync {
     }
 
     /**
-     * The tempo that should actually apply, given a requested one.
+     * Send a local tempo change to the session.
      *
-     * While Link is on the session wins, so a pattern's `setbpm` and the BPM
-     * slider both resolve to it. This keeps the override in one place: the
-     * app's tempo writer runs this over every value it receives, including the
-     * ones this module pushes — which are already the session tempo, so they
-     * pass through unchanged.
+     * The app's tempo writer runs this over every value it receives, including
+     * the ones this module pushes — those already match the session, so they
+     * don't go back out.
      */
-    resolveBpm(requested: number): number {
-        return this.active ? this._sessionBpm() : requested;
+    proposeBpm(bpm: number): void {
+        if (!this.active || bpm === this._sessionBpm()) return;
+        // Show the new tempo now; the next poll would otherwise read the old one.
+        this.snapshot = {...this.snapshot!, tempo: bpm};
+        this.pushes++;
+        void invoke<LinkSnapshot>('link_set_tempo', {bpm})
+            .then(snapshot => {
+                if (this.settings.enabled) this.snapshot = snapshot;
+            })
+            .catch(() => {})
+            .finally(() => {
+                this.pushes++;
+            });
     }
 
     /**
@@ -180,11 +204,15 @@ class LinkSync {
     }
 
     private async _poll(): Promise<void> {
+        const pushes = this.pushes;
+        let snapshot: LinkSnapshot;
         try {
-            this.snapshot = await invoke<LinkSnapshot>('link_snapshot');
+            snapshot = await invoke<LinkSnapshot>('link_snapshot');
         } catch {
             return; // transient IPC failure — keep the last reading
         }
+        if (pushes !== this.pushes || !this.settings.enabled) return;
+        this.snapshot = snapshot;
         this._pushTempo();
         this.onUpdate?.();
     }

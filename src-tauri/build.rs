@@ -99,6 +99,7 @@ const COMMANDS: &[&str] = &[
     "take_whats_new",
     "link_enable",
     "link_snapshot",
+    "link_set_tempo",
     "osc_configure",
     "osc_transport",
     "osc_frame",

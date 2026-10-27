@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-link-set-tempo"
+description = "Enables the link_set_tempo command without any pre-configured scope."
+commands.allow = ["link_set_tempo"]
+
+[[permission]]
+identifier = "deny-link-set-tempo"
+description = "Denies the link_set_tempo command without any pre-configured scope."
+commands.deny = ["link_set_tempo"]

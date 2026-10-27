@@ -278,17 +278,24 @@ on either.
 
 Two things change while Link is on:
 
-- **The session owns the tempo.** The BPM slider and a pattern's `setbpm` both
-  defer to it, because a local tempo change would otherwise silently drop you out
-  of sync with everyone else. Turn Link off to get the tempo back.
+- **Tempo is shared.** Cycletron is a full Link peer: changing the tempo here
+  (the slider, a pattern's `setbpm`, the assistant) sets it for the whole
+  session, and a tempo change in another app comes back to Cycletron. Joining
+  a session that already has peers takes its tempo; joining alone starts one at
+  yours. Re-evaluating a pattern doesn't re-send an unchanged `setbpm`, so it
+  won't undo a change someone else just made; edit the number to send it.
 - **Play waits for the bar line.** Pressing play mid-bar starts on the session's
   next downbeat instead, so you come in on the beat rather than wherever you
   happened to press. The status line says `Waiting for Link bar…` while it holds.
   Alone in a session there is no phase to wait for, so play starts immediately.
 
-Cycletron follows the session and never changes it: it does not propose its
-tempo to peers, and Link's start/stop sync is not used. Set the tempo on the
-other app.
+Link's start/stop sync is not used. The tempo range is 30–300 BPM; a session
+outside it is clamped, and that clamped tempo is what Cycletron sends back.
+
+On macOS, the first time Link starts, the system asks to let Cycletron use the
+local network. Allow it, or Link finds no peers. You can change it later in
+System Settings → Privacy & Security → Local Network. If Link can't start, the
+status line and the Preferences section say why.
 
 Once playing, the two apps free-run against different clocks — Cycletron's
 transport is anchored to its audio device, Link's to the system clock — so they

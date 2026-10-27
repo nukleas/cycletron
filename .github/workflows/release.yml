@@ -135,7 +135,9 @@ jobs:
           # runner image unless we name it. alpha.10 shipped with pulsesink and
           # no alsasink, leaving autoaudiosink with nothing to fall back to on a
           # host with no pulse server (#7). Pin both so the set is ours.
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libudev-dev xdg-utils gstreamer1.0-alsa gstreamer1.0-pulseaudio
+          #
+          # cmake, clang and libclang-dev build Ableton Link (rusty_link), as in ci.yml.
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libudev-dev xdg-utils gstreamer1.0-alsa gstreamer1.0-pulseaudio cmake clang libclang-dev
 
       # tauri-bundler downloads NSIS at bundle time with an HTTP client that
       # intermittently dies on GitHub's release-assets CDN ("io: Peer
