@@ -71,6 +71,7 @@
     "allow-inspect-midi",
     "allow-save-midi-to-library",
     "allow-get-user-settings",
+    "allow-finish-first-run",
     "allow-set-user-settings",
     "allow-set-provider-key",
     "allow-has-provider-key",

@@ -796,6 +796,18 @@ pub fn get_user_settings(state: State<'_, AppState>) -> UserSettings {
     state.user_settings.lock().clone()
 }
 
+/// Record that onboarding was seen. Sets just this flag, so the welcome flow
+/// can't write back a stale copy of the rest of the settings.
+#[tauri::command]
+pub fn finish_first_run(state: State<'_, AppState>) -> Result<(), String> {
+    let mut settings = state.user_settings.lock();
+    settings.first_run_done = true;
+    if let Some(dir) = state.app_data_dir() {
+        settings.save(&dir).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Persist `settings` and rebuild dependent state (e.g. the AI client).
 /// API keys are NOT part of `settings` — they go through `set_provider_key`
 /// into the OS keychain.

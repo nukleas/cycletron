@@ -48,6 +48,7 @@ const COMMANDS: &[&str] = &[
     "inspect_midi",
     "save_midi_to_library",
     "get_user_settings",
+    "finish_first_run",
     "set_user_settings",
     "set_provider_key",
     "has_provider_key",
