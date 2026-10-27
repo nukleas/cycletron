@@ -24,6 +24,7 @@ import {launchQuantum} from './launch-quantum.js';
 import {mixer} from './mixer.js';
 import {oscOut} from './osc-out.js';
 import {linkSync} from './link-sync.js';
+import {currentBpm} from './bpm.js';
 import {ExamplesBrowser} from './examples.js';
 import {invoke, isTauri} from './tauri.js';
 import type {SampleSourceManifest} from './types/tauri-commands.js';
@@ -400,7 +401,10 @@ export class StrudelApp {
             if (this.scheduler) this.scheduler.launchQuantum = cycles;
         });
         mixer.init(this._reapplyMix);
-        void oscOut.init();
+        const oscError = (error: string) => this.setStatus(`OSC: ${error}`);
+        void oscOut.init(oscError).then(error => {
+            if (error) oscError(error);
+        });
         // Link is the tempo authority while it is on, so it pushes through
         // applyBpm exactly like the slider does.
         void linkSync.init(bpm => this.applyBpm(bpm));
@@ -1130,7 +1134,8 @@ export class StrudelApp {
 
     /** Tell OSC listeners where the transport went. `cps = bpm / 240`. */
     private _announceTransport(state: 'playing' | 'paused' | 'stopped'): void {
-        const bpm = parseInt(this.elements.bpmSlider.value, 10) || 120;
+        // The scheduler's tempo, not the slider's: the slider rounds to whole BPM.
+        const bpm = currentBpm();
         oscOut.transport(state, bpm, bpm / 240);
     }
 

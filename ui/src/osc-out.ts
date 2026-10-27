@@ -27,6 +27,8 @@ const VIEW_CAPACITY = 4096;
 /** Per-track hap cap, matching the visualizer's. Guards `note("c*2048")`. */
 const MAX_EVENTS_PER_TRACK = 64;
 const MAX_TRACKS = 128;
+/** Haps held while a send is in flight. Bounds memory if IPC stalls for good. */
+const MAX_PENDING = 4096;
 
 const STORAGE_KEY = 'oscOut';
 
@@ -65,6 +67,8 @@ class OscOut {
     settings: OscSettings = {...OSC_DEFAULTS};
     /** Resolved `host:port` reported by the backend, for the Preferences readout. */
     target = '';
+    /** The last configure or send failure, for the Preferences readout. */
+    lastError: string | null = null;
 
     private source: OscSource | null = null;
     private tracks: OscTrack[] = [];
@@ -74,16 +78,31 @@ class OscOut {
     private lastBar = -1;
     private prevPhase = 0;
     private inFlight = false;
+    /** Haps collected while a send was in flight; they go out with the next one. */
+    private pending: HapPayload[] = [];
+    /** Send failures are reported once per configuration, not once per frame. */
+    private reported = false;
+    private onError: ((error: string) => void) | null = null;
 
-    /** Restore the stored settings and apply them to the backend. */
-    async init(): Promise<void> {
+    /**
+     * Restore the stored settings and apply them to the backend.
+     *
+     * `onError` hears the first send failure after each configure — wire it to
+     * somewhere the user looks.
+     *
+     * @returns the configure error, if reopening the socket failed. The stored
+     *          setting stays on, so each launch retries and reports.
+     */
+    async init(onError?: (error: string) => void): Promise<string | null> {
+        this.onError = onError ?? null;
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (raw) this.settings = {...OSC_DEFAULTS, ...JSON.parse(raw)};
         } catch {
             this.settings = {...OSC_DEFAULTS};
         }
-        if (this.settings.enabled) await this.apply(this.settings);
+        if (!this.settings.enabled) return null;
+        return this.apply(this.settings);
     }
 
     attach(source: OscSource): void {
@@ -96,6 +115,7 @@ class OscOut {
         this.lastPattern = null;
         this.lastBar = -1;
         this.prevPhase = 0;
+        this.pending.length = 0;
     }
 
     get enabled(): boolean {
@@ -104,15 +124,20 @@ class OscOut {
 
     /**
      * Push settings to the backend socket. Returns an error string on failure,
-     * leaving output disabled rather than silently half-configured.
+     * leaving output disabled rather than silently half-configured. The choice
+     * is stored before the backend answers, so a failure is retried on the
+     * next launch rather than forgotten.
      */
     async apply(next: OscSettings): Promise<string | null> {
         this.settings = {...next};
         localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
+        this.reported = false;
+        this.pending.length = 0;
 
         if (!isTauri) {
             this.target = '';
-            return this.settings.enabled ? 'OSC output needs the desktop app.' : null;
+            this.lastError = this.settings.enabled ? 'OSC output needs the desktop app.' : null;
+            return this.lastError;
         }
 
         try {
@@ -122,18 +147,20 @@ class OscOut {
                 port: this.settings.port,
             });
             this.target = status.target;
+            this.lastError = null;
             return null;
         } catch (e) {
             this.settings.enabled = false;
             this.target = '';
-            return String(e);
+            this.lastError = String(e);
+            return this.lastError;
         }
     }
 
     /** Announce a transport change. */
     transport(state: 'playing' | 'paused' | 'stopped', bpm: number, cps: number): void {
         if (!this.settings.enabled || !isTauri) return;
-        void invoke('osc_transport', {state, bpm, cps}).catch(() => {});
+        void invoke('osc_transport', {state, bpm, cps}).catch(this.sendFailed);
     }
 
     /**
@@ -146,17 +173,30 @@ class OscOut {
         if (!this.settings.enabled || !isTauri || !this.source) return;
 
         const haps = this.collectOnsets(cycle);
+        if (this.pending.length + haps.length <= MAX_PENDING) this.pending.push(...haps);
 
         // One request in flight at a time: a stalled IPC round-trip must not
-        // queue up frames faster than they drain.
+        // queue up frames faster than they drain. What this frame found waits
+        // in `pending` and goes out with the next send.
         if (this.inFlight) return;
         this.inFlight = true;
-        void invoke('osc_frame', {cycle, haps})
-            .catch(() => {})
+        const batch = this.pending;
+        this.pending = [];
+        void invoke('osc_frame', {cycle, haps: batch})
+            .catch(this.sendFailed)
             .finally(() => {
                 this.inFlight = false;
             });
     }
+
+    /** Record a failed send, and tell the user about the first one. */
+    private sendFailed = (e: unknown): void => {
+        this.lastError = String(e);
+        if (this.reported) return;
+        this.reported = true;
+        console.warn('OSC send failed:', this.lastError);
+        this.onError?.(this.lastError);
+    };
 
     /**
      * The haps that started between the previous frame and `cycle`.
@@ -170,31 +210,46 @@ class OscOut {
 
         const pattern = this.source.scheduler.pattern;
         if (!pattern) {
+            // Stopped: the next start is a fresh bar, with no tail to flush.
             this.lastPattern = null;
+            this.lastBar = -1;
+            this.tracks.length = 0;
             return [];
         }
 
+        const haps: HapPayload[] = [];
         const bar = Math.floor(cycle);
-        if (pattern !== this.lastPattern || bar !== this.lastBar) {
+        if (bar !== this.lastBar) {
+            // Moving on to the next bar: the old bar's tail since the last
+            // frame played too. A jump (seek, stall, restart) has no tail.
+            if (bar === this.lastBar + 1) this.scan(this.prevPhase, 1, haps);
             this.lastPattern = pattern;
             this.lastBar = bar;
             this.rebuild(pattern);
             // Let a hap sitting exactly on the downbeat fire this frame.
             this.prevPhase = -1e-6;
+        } else if (pattern !== this.lastPattern) {
+            // A new pattern mid-bar starts from here; what it would have
+            // played earlier in the bar never sounded.
+            this.lastPattern = pattern;
+            this.rebuild(pattern);
         }
 
         const phase = cycle - bar;
-        const prevPhase = this.prevPhase;
+        this.scan(this.prevPhase, phase, haps);
         this.prevPhase = phase;
+        return haps;
+    }
 
-        const haps: HapPayload[] = [];
+    /** Append the cached bar's haps that begin in `(from, to]`. */
+    private scan(from: number, to: number, out: HapPayload[]): void {
         for (let t = 0; t < this.tracks.length; t++) {
             const track = this.tracks[t];
             for (let i = 0; i < track.count; i++) {
                 const begin = track.begins[i];
-                if (begin > prevPhase && begin <= phase) {
+                if (begin > from && begin <= to) {
                     const note = track.notes[i];
-                    haps.push({
+                    out.push({
                         track: track.name,
                         note: Number.isNaN(note) ? null : note,
                         dur: track.ends[i] - begin,
@@ -203,8 +258,6 @@ class OscOut {
                 }
             }
         }
-
-        return haps;
     }
 
     /** Re-read this bar's haps from the shared cycle-view buffer. */
