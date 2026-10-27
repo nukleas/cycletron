@@ -166,10 +166,10 @@ pub fn genre_recipe(
 /// Reload the corpus index and genre recipes from disk. Recipes are otherwise
 /// read once at startup, so a running app never picks up newly-generated recipes
 /// (e.g. after `cargo run -p gen-recipes`) until restart — this refreshes them in
-/// place. Returns the number of recipes now loaded.
+/// place. Returns the number of recipes now loaded, or why the corpus failed.
 #[tauri::command]
 pub fn reload_corpus(state: State<'_, AppState>) -> Result<usize, String> {
-    Ok(state.load_knowledge())
+    state.load_knowledge().map_err(|e| format!("{e:#}"))
 }
 
 /// Get pattern history for the current session.
