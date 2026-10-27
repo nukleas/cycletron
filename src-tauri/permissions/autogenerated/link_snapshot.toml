@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-link-snapshot"
+description = "Enables the link_snapshot command without any pre-configured scope."
+commands.allow = ["link_snapshot"]
+
+[[permission]]
+identifier = "deny-link-snapshot"
+description = "Denies the link_snapshot command without any pre-configured scope."
+commands.deny = ["link_snapshot"]

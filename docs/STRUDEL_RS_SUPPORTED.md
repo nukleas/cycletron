@@ -432,8 +432,8 @@ Custom `strudel.json` sample-map banks are **not yet** wired (GM only for now).
 **Offline bundling:** the default drum kit and ~21 common GM instruments are
 vendored into `ui/public/{samples,soundfonts}/` and served same-origin, so they
 load with no network. `ui/sample-loader.ts` is offline-first (bundled path →
-CDN fallback), so other GM instruments and the TR-808/909 kits still stream from
-the network when referenced.
+CDN fallback), so other GM instruments and the DR-55 kit still stream from the
+network when referenced.
 
 **Local sample folders (desktop):** users install their own samples as a pack
 (command palette → "Install Sample Pack…"; `src-tauri/src/packs.rs` +
@@ -490,7 +490,7 @@ inspection — re-check when upgrading):
 
 (`$:` multi-track / labelled-section syntax **is** supported — see §1. `.bank(...)`
 **is** supported and resolves in-app for the bundled drum-machine kits
-(RolandTR808/909/707, LinnDrum, BossDR55) — see §6. Only arbitrary *custom*
+(RolandTR808/909/707/606/727, LinnDrum, BossDR55) — see §6. Only arbitrary *custom*
 `strudel.json` manifest banks aren't auto-wired yet; the bundled kits are.)
 
 ## 10. Validation contract
