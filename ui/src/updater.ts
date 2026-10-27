@@ -135,25 +135,24 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
         }
         // deb/rpm/pacman installs are owned by the system package manager —
         // the plugin's self-update path can't work there (and fails silently
-        // on distros without dpkg/rpm). Notify instead of pretending.
-        let installKind = 'native';
-        try {
-            installKind = await invoke<string>('updater_install_kind');
-        } catch {
-            // Older backend without the command — assume self-update works.
-        }
-        if (installKind === 'package') {
+        // on distros without dpkg/rpm). Notify instead of pretending. If the
+        // kind can't be read, don't guess: point at the releases page too.
+        const installKind = await invoke<string>('updater_install_kind').catch(() => 'unknown');
+        if (installKind !== 'native' && installKind !== 'appimage') {
+            const packaged = installKind === 'package';
             if (manual) {
                 const open = await askToUpdate(
                     update.version, update.body,
-                    "Your system package manager owns this install, so update it there; the app can't update itself.",
+                    packaged
+                        ? "Your system package manager owns this install, so update it there; the app can't update itself."
+                        : "Couldn't tell how this copy was installed, so it won't update itself. Get the new version from the releases page.",
                     'Open releases page',
                 );
                 if (open) await openExternal(RELEASES_URL);
             } else {
                 void notify(
                     `Cycletron ${update.version} available`,
-                    'Update via your package manager.',
+                    packaged ? 'Update via your package manager.' : 'Get it from the releases page.',
                 );
             }
             return;
