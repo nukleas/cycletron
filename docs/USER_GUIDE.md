@@ -199,8 +199,8 @@ data directory and is not uploaded.
 
 ## Samples & sounds
 
-The app bundles a full default kit: essential drums, five drum-machine kits
-(TR-808 / TR-909 / TR-707 / LinnDrum / DR-55 — use `.bank("RolandTR808")`),
+The app bundles a full default kit: essential drums, seven drum-machine kits
+(TR-808 / TR-909 / TR-707 / TR-606 / TR-727 / LinnDrum / DR-55 — use `.bank("RolandTR808")`),
 percussion and texture banks (`perc metal east hand industrial space arpy
 tabla jvbass` …), melodic and speech banks (`flbass uke cpluck cbow speech` —
 pick variants with `s("flbass:2")`), synth waveforms, wavetables, and GM
