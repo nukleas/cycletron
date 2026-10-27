@@ -24,7 +24,7 @@
     "@codemirror/lang-javascript": "^6.2.1",
     "@codemirror/legacy-modes": "^6.5.5",
     "@codemirror/lint": "^6.0.0",
-    "@lezer/common": "^1.5.3",
+    "@lezer/common": "^1.5.4",
     "@lezer/highlight": "^1.2.5",
     "@lezer/javascript": "^1.5.6",
     "@tauri-apps/api": "^2.12.4",
@@ -43,7 +43,7 @@
     "playwright": "^1.64.1",
     "typescript": "^7.0.2",
     "unplugin-inline-enum": "^0.8.4",
-    "vite": "^8.3.4",
+    "vite": "^8.3.5",
     "vite-plugin-tsc": "^0.1.1"
   }
 }
