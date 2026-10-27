@@ -2,6 +2,8 @@ import {defineConfig} from 'vite';
 import tsc from 'vite-plugin-tsc';
 import type {Plugin} from 'vite';
 import {InlineEnum} from "unplugin-inline-enum";
+import {readdirSync} from 'node:fs';
+import {join} from 'node:path';
 
 function wasmMemoryLeakFixPlugin(): Plugin {
     return {
@@ -64,6 +66,23 @@ ${cacheResets}
     };
 }
 
+// `_*` folders are local staging (gitignored), but vite copies all of
+// `public/` into the build, so one left there would ship in the app.
+function noPrivatePublicDirsPlugin(): Plugin {
+    let publicDir = '';
+    return {
+        name: 'no-private-public-dirs',
+        apply: 'build',
+        configResolved(config) {
+            publicDir = config.publicDir;
+        },
+        buildStart() {
+            const found = readdirSync(publicDir).find((name) => name.startsWith('_'));
+            if (found) this.error(`${join(publicDir, found)} is private staging; move it out of public/ before building`);
+        },
+    };
+}
+
 export default defineConfig(({mode}) => ({
     // No base path — served from Tauri webview root
     clearScreen: false,
@@ -120,6 +139,7 @@ export default defineConfig(({mode}) => ({
         // 'render' and needs no type-check watcher.
         ...(mode === 'render' ? [] : [tsc()]),
         InlineEnum.vite(),
-        wasmMemoryLeakFixPlugin()
+        wasmMemoryLeakFixPlugin(),
+        noPrivatePublicDirsPlugin(),
     ]
 }));
