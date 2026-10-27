@@ -28,9 +28,9 @@ setbpm(104);
       .decay(0.15).sustain(0.25).dist(0.15).gain(0.5)
   ),
   highway: stack(
-    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.9).dist(0.2),
-    s("~ sd ~ sd").bank("RolandTR909").velocity(0.9).room(0.55).roomsize(0.75).gain(0.62),
-    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.2).pan(sine.range(0.4, 0.6)),
+    s("bd*4").bank("RolandTR909").gain(0.9).dist(0.2),
+    s("~ sd ~ sd").bank("RolandTR909").velocity(0.7).room(0.55).roomsize(0.75).gain(0.62),
+    s("hh*8").bank("RolandTR909").velocity(0.43).gain(0.2).pan(sine.range(0.4, 0.6)),
     note("<[c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ a0 ~] [e1 ~ ~ e1 ~ ~ e1 ~ ~ b0 ~ ~ b0 ~ b0 ~] [c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ a0 ~] [b0 ~ ~ b0 ~ ~ b0 ~ ~ b0 ~ b0 ~ b0 ~]>")
       .s("sawtooth").lpf(680).resonance(7)
       .decay(0.15).sustain(0.25).dist(0.18).gain(0.55),
@@ -42,10 +42,10 @@ setbpm(104);
       .gain(saw.range(0.12, 0.3).fast(4))
   ),
   skyline: stack(
-    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.9).dist(0.2),
-    s("~ sd ~ sd").bank("RolandTR909").velocity(0.9).room(0.55).roomsize(0.75).gain(0.64),
-    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.2).pan(sine.range(0.4, 0.6)),
-    s("~ ~ ~ oh").bank("RolandTR909").velocity(0.85).gain(0.22),
+    s("bd*4").bank("RolandTR909").gain(0.9).dist(0.2),
+    s("~ sd ~ sd").bank("RolandTR909").velocity(0.7).room(0.55).roomsize(0.75).gain(0.64),
+    s("hh*8").bank("RolandTR909").velocity(0.43).gain(0.2).pan(sine.range(0.4, 0.6)),
+    s("~ ~ ~ oh").bank("RolandTR909").velocity(0.9).gain(0.22),
     note("<[c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ a0 ~] [e1 ~ ~ e1 ~ ~ e1 ~ ~ b0 ~ ~ b0 ~ b0 ~] [c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ a0 ~] [b0 ~ ~ b0 ~ ~ b0 ~ ~ b0 ~ b0 ~ b0 ~]>")
       .s("sawtooth").lpf(700).resonance(7)
       .decay(0.15).sustain(0.25).dist(0.18).gain(0.53),
@@ -60,7 +60,7 @@ setbpm(104);
       .gain(saw.range(0.12, 0.3).fast(4))
   ),
   tunnel: stack(
-    s("bd*4").bank("RolandTR909").velocity(0.85).lpf(600).gain(0.75),
+    s("bd*4").bank("RolandTR909").lpf(600).gain(0.75),
     note("<[c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ a0 ~] [b0 ~ ~ b0 ~ ~ b0 ~ ~ b0 ~ b0 ~ b0 ~]>")
       .s("sawtooth").lpf(450).resonance(6)
       .decay(0.15).sustain(0.25).dist(0.12).gain(0.52),
@@ -72,10 +72,10 @@ setbpm(104);
       .attack(0.8).release(1.6).lpf(800).chorus(0.5).room(0.7).gain(0.24)
   ),
   highway2: stack(
-    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.92).dist(0.22),
-    s("~ sd ~ sd").bank("RolandTR909").velocity(0.9).room(0.55).roomsize(0.75).gain(0.66),
-    s("hh*8").bank("RolandTR909").velocity(0.4).gain(0.22).pan(sine.range(0.4, 0.6)),
-    s("~ ~ ~ oh").bank("RolandTR909").velocity(0.85).gain(0.24),
+    s("bd*4").bank("RolandTR909").gain(0.92).dist(0.22),
+    s("~ sd ~ sd").bank("RolandTR909").velocity(0.7).room(0.55).roomsize(0.75).gain(0.66),
+    s("hh*8").bank("RolandTR909").velocity(0.43).gain(0.22).pan(sine.range(0.4, 0.6)),
+    s("~ ~ ~ oh").bank("RolandTR909").velocity(0.9).gain(0.24),
     note("<[c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ ~ a0 ~ a0 ~] [b0 ~ ~ b0 ~ ~ b0 ~ ~ b0 ~ b0 ~ b0 ~]>")
       .s("sawtooth").lpf(750).resonance(7)
       .decay(0.15).sustain(0.25).dist(0.2).gain(0.55),
@@ -91,8 +91,8 @@ setbpm(104);
       .gain(saw.range(0.12, 0.3).fast(4))
   ),
   exit: stack(
-    s("bd*4").bank("RolandTR909").velocity(0.85).lpf(isaw.range(150, 900).slow(4)).gain(0.7),
-    s("rim ~ rim ~").bank("RolandTR909").velocity(0.55).gain(0.18).pan(0.62),
+    s("bd*4").bank("RolandTR909").lpf(isaw.range(150, 900).slow(4)).gain(0.7),
+    s("rim ~ rim ~").bank("RolandTR909").velocity(0.5).gain(0.18).pan(0.62),
     note("<[c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ c#1 ~ c#1 ~] [c#1 ~ ~ c#1 ~ ~ c#1 ~ ~ ~ ~ ~ ~ ~ ~ ~] [c#1 ~ ~ c#1 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [c#1 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>")
       .s("sawtooth").lpf(isaw.range(250, 600).slow(4))
       .decay(0.15).sustain(0.25).dist(0.12).gain(0.5),

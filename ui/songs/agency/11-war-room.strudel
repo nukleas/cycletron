@@ -20,12 +20,12 @@ setbpm(92);
     note("g#1").s("sine").slow(2).attack(2).release(4).gain(0.44),
     note("<[g#2, d#3] [g#2, d#3] [e2, b2] [f#2, c#3]>").s("wt_choir")
       .attack(2).release(3.5).lpf(700).room(0.8).gain(0.24).pan(0.45),
-    s("<[~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~] [bd ~ ~ ~]>").bank("RolandTR909").velocity(0.85).lpf(300).gain(0.7)
+    s("<[~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~] [bd ~ ~ ~]>").bank("RolandTR909").lpf(300).gain(0.7)
   ),
   path: stack(
-    s("<[bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909").velocity(0.85)
+    s("<[bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909")
       .gain(0.92).dist(0.2),
-    s("~ ~ sd ~").bank("RolandTR909").velocity(0.9).room(0.65).roomsize(0.85).gain(0.72),
+    s("~ ~ sd ~").bank("RolandTR909").velocity(0.7).room(0.65).roomsize(0.85).gain(0.72),
     note("<[g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ e1 ~ ~ e1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ d#1 ~ ~ ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [e1 ~ ~ e1 ~ ~ f#1 ~ g#1 ~ ~ ~ ~ ~ ~ ~] [d#1 ~ ~ ~ ~ ~ ~ ~ g#1 ~ ~ ~ ~ ~ ~ ~]>")
       .s("sawtooth").lpf(750).resonance(7)
       .decay(0.11).sustain(0).dist(0.3).gain(0.58),
@@ -34,10 +34,10 @@ setbpm(92);
     note("g#1").s("sine").slow(2).attack(2).release(4).gain(0.3)
   ),
   assault: stack(
-    s("<[bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909").velocity(0.85)
+    s("<[bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909")
       .gain(0.93).dist(0.22),
-    s("~ ~ sd ~").bank("RolandTR909").velocity(0.9).room(0.65).roomsize(0.85).gain(0.74),
-    s("hh ~ hh hh ~ hh hh ~").bank("RolandTR909").velocity(0.4).gain(0.16).pan(0.58),
+    s("~ ~ sd ~").bank("RolandTR909").velocity(0.7).room(0.65).roomsize(0.85).gain(0.74),
+    s("hh ~ hh hh ~ hh hh ~").bank("RolandTR909").velocity(0.43).gain(0.16).pan(0.58),
     note("<[g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ e1 ~ ~ e1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ d#1 ~ ~ ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ g#1 ~ b1 ~ ~ ~ ~ ~ ~ ~] [g#1 ~ ~ g#1 ~ ~ b1 ~ c#2 ~ ~ ~ ~ ~ ~ ~] [e1 ~ ~ e1 ~ ~ f#1 ~ g#1 ~ ~ ~ ~ ~ ~ ~] [d#1 ~ ~ ~ ~ ~ ~ ~ g#1 ~ ~ ~ ~ ~ ~ ~]>")
       .s("sawtooth").lpf(800).resonance(7)
       .decay(0.11).sustain(0).dist(0.3).gain(0.56),
@@ -54,13 +54,13 @@ setbpm(92);
     note("<[g#2, d#3, b2] [g#2, d#3, b2] [e2, b2, g#2] [f#2, c#3, a#2]>").s("wt_choir")
       .attack(2.5).release(4).lpf(sine.range(500, 1000).slow(8))
       .room(0.85).gain(0.28).pan(sine.range(0.4, 0.6).slow(12)),
-    s("<[~ ~ ~ ~] [~ ~ sd ~] [~ ~ ~ ~] [~ ~ sd ~]>").bank("RolandTR909").velocity(0.9).room(0.7).roomsize(0.9).gain(0.4)
+    s("<[~ ~ ~ ~] [~ ~ sd ~] [~ ~ ~ ~] [~ ~ sd ~]>").bank("RolandTR909").velocity(0.7).room(0.7).roomsize(0.9).gain(0.4)
   ),
   path2: stack(
-    s("<[bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909").velocity(0.85)
+    s("<[bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909")
       .gain(0.95).dist(0.25),
-    s("~ ~ sd ~").bank("RolandTR909").velocity(0.9).room(0.65).roomsize(0.85).gain(0.76),
-    s("hh ~ hh hh ~ hh hh ~").bank("RolandTR909").velocity(0.4).gain(0.18).pan(0.58),
+    s("~ ~ sd ~").bank("RolandTR909").velocity(0.7).room(0.65).roomsize(0.85).gain(0.76),
+    s("hh ~ hh hh ~ hh hh ~").bank("RolandTR909").velocity(0.43).gain(0.18).pan(0.58),
     note("<[g#2 ~ ~ g#2 ~ ~ g#2 ~ b2 ~ ~ ~ ~ ~ ~ ~] [g#2 ~ ~ g#2 ~ ~ b2 ~ c#3 ~ ~ ~ ~ ~ ~ ~] [e2 ~ ~ e2 ~ ~ f#2 ~ g#2 ~ ~ ~ ~ ~ ~ ~] [d#2 ~ ~ ~ ~ ~ ~ ~ g#2 ~ ~ ~ ~ ~ ~ ~]>")
       .s("sawtooth").lpf(1200).resonance(7)
       .decay(0.11).sustain(0).dist(0.32).gain(0.5),

@@ -16,7 +16,7 @@ setbpm(120);
 "<intro@2 groove@4 deep@4 drift@2 return@4 dawn@2>".slow(4).pickRestart({
   intro: stack(
     s("crackle*4").gain(0.3),
-    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.14).pan(0.45),
+    s("rim*4").bank("RolandTR909").velocity(0.5).gain(0.14).pan(0.45),
     note("<f#1 ~ f#1 a1>").s("sine").attack(0.4).release(1.2).gain(0.5),
     chord("<F#m7 F#m7 F#m7 AM7>").voicing().s("supersaw").struct("~ 1 ~ ~")
       .attack(0.05).release(0.9).lpf(850)
@@ -24,9 +24,9 @@ setbpm(120);
   ),
   groove: stack(
     s("crackle*4").gain(0.26),
-    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.12).pan(0.45),
-    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.72),
-    s("~ hh ~ hh").bank("RolandTR909").velocity(0.4).late(0.02).gain(0.2).pan(0.6),
+    s("rim*4").bank("RolandTR909").velocity(0.5).gain(0.12).pan(0.45),
+    s("bd*4").bank("RolandTR909").gain(0.72),
+    s("~ hh ~ hh").bank("RolandTR909").velocity(0.43).late(0.02).gain(0.2).pan(0.6),
     note("<[f#1 ~ ~ f#1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ a1 ~] [e1 ~ ~ e1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ c#1 ~] [f#1 ~ ~ f#1 ~ ~ ~ ~] [a1 ~ ~ a1 ~ ~ b1 ~] [e1 ~ ~ e1 ~ ~ g#1 ~] [f#1 ~ ~ ~ ~ ~ ~ ~]>")
       .s("sine").attack(0.03).release(0.7).gain(0.55),
     chord("<F#m7 F#m7 F#m7 AM7>").voicing().s("supersaw").struct("~ 1 ~ ~")
@@ -35,10 +35,10 @@ setbpm(120);
   ),
   deep: stack(
     s("crackle*4").gain(0.24),
-    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.12).pan(0.45),
-    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.74),
-    s("~ hh ~ hh").bank("RolandTR909").velocity(0.4).late(0.02).gain(0.22).pan(0.6),
-    s("~ ~ oh ~").bank("RolandTR909").velocity(0.85).gain(0.12).pan(0.35),
+    s("rim*4").bank("RolandTR909").velocity(0.5).gain(0.12).pan(0.45),
+    s("bd*4").bank("RolandTR909").gain(0.74),
+    s("~ hh ~ hh").bank("RolandTR909").velocity(0.43).late(0.02).gain(0.22).pan(0.6),
+    s("~ ~ oh ~").bank("RolandTR909").velocity(0.9).gain(0.12).pan(0.35),
     note("<[f#1 ~ ~ f#1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ a1 ~] [e1 ~ ~ e1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ c#1 ~] [f#1 ~ ~ f#1 ~ ~ ~ ~] [a1 ~ ~ a1 ~ ~ b1 ~] [e1 ~ ~ e1 ~ ~ g#1 ~] [f#1 ~ ~ ~ ~ ~ ~ ~]>")
       .s("sine").attack(0.03).release(0.7).gain(0.55),
     note("<[9 ~ ~ ~ 7 ~ ~ ~] [~ ~ 4 ~ ~ ~ ~ ~] [11 ~ ~ ~ 9 ~ ~ ~] [~ ~ 7 ~ ~ 4 ~ ~] [9 ~ ~ ~ 11 ~ ~ ~] [~ ~ 7 ~ ~ ~ ~ ~] [4 ~ ~ ~ 7 ~ ~ ~] [~ ~ 9 ~ ~ ~ ~ ~]>")
@@ -50,9 +50,9 @@ setbpm(120);
   ),
   drift: stack(
     s("crackle*4").gain(0.28),
-    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.1).pan(0.45),
-    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").bank("RolandTR909").velocity(0.85).gain(0.55),
-    s("~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~").bank("RolandTR909").velocity(0.9).lpf(2000).gain(0.3),
+    s("rim*4").bank("RolandTR909").velocity(0.5).gain(0.1).pan(0.45),
+    s("bd ~ ~ ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").bank("RolandTR909").gain(0.55),
+    s("~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~ ~ ~").bank("RolandTR909").velocity(0.7).lpf(2000).gain(0.3),
     note("<[9 ~ ~ ~ ~ ~ 7 ~] [~ ~ ~ 4 ~ ~ ~ ~] [~ 11 ~ ~ ~ 9 ~ ~] [~ ~ ~ ~ 7 ~ ~ ~]>")
       .scale("F#4:minor").s("wt_bell")
       .delay(0.6).delaytime(0.375).delayfeedback(0.6).room(0.85).gain(0.25).pan(0.55),
@@ -63,10 +63,10 @@ setbpm(120);
   ),
   return: stack(
     s("crackle*4").gain(0.24),
-    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.12).pan(0.45),
-    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.76),
-    s("~ hh ~ hh").bank("RolandTR909").velocity(0.4).late(0.02).gain(0.22).pan(0.6),
-    s("~ ~ oh ~").bank("RolandTR909").velocity(0.85).gain(0.13).pan(0.35),
+    s("rim*4").bank("RolandTR909").velocity(0.5).gain(0.12).pan(0.45),
+    s("bd*4").bank("RolandTR909").gain(0.76),
+    s("~ hh ~ hh").bank("RolandTR909").velocity(0.43).late(0.02).gain(0.22).pan(0.6),
+    s("~ ~ oh ~").bank("RolandTR909").velocity(0.9).gain(0.13).pan(0.35),
     note("<[f#1 ~ ~ f#1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ a1 ~] [e1 ~ ~ e1 ~ ~ ~ ~] [f#1 ~ ~ f#1 ~ ~ c#1 ~] [f#1 ~ ~ f#1 ~ ~ ~ ~] [a1 ~ ~ a1 ~ ~ b1 ~] [e1 ~ ~ e1 ~ ~ g#1 ~] [f#1 ~ ~ ~ ~ ~ ~ ~]>")
       .s("sine").attack(0.03).release(0.7).gain(0.55),
     note("<[9 ~ ~ ~ 7 ~ ~ ~] [~ ~ 4 ~ ~ ~ ~ ~] [11 ~ ~ ~ 9 ~ ~ ~] [14 ~ 11 ~ 9 ~ 7 ~] [9 ~ ~ ~ 11 ~ ~ ~] [~ ~ 14 ~ ~ ~ ~ ~] [16 ~ 14 ~ 11 ~ 9 ~] [7 ~ ~ ~ ~ ~ ~ ~]>")
@@ -80,8 +80,8 @@ setbpm(120);
   ),
   dawn: stack(
     s("crackle*4").gain(isaw.range(0.05, 0.24).slow(8)),
-    s("rim*4").bank("RolandTR909").velocity(0.55).gain(0.12).pan(0.45),
-    s("bd*4").bank("RolandTR909").velocity(0.85).gain(0.6),
+    s("rim*4").bank("RolandTR909").velocity(0.5).gain(0.12).pan(0.45),
+    s("bd*4").bank("RolandTR909").gain(0.6),
     note("<f#1 f#1 a1 a1>").s("sine").attack(0.4).release(1.2).gain(0.5),
     note("<[9 ~ ~ ~ 11 ~ ~ ~] [~ ~ 14 ~ ~ ~ ~ ~] [16 ~ ~ ~ 14 ~ ~ ~] [~ ~ 11 ~ ~ ~ 9 ~]>")
       .scale("F#4:minor").s("wt_bell")
