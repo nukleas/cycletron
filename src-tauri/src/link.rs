@@ -14,13 +14,12 @@
 //! and Link-space differ only by a factor of four; there is no phase mismatch to
 //! reconcile.
 //!
-//! ## What this module deliberately does not do
+//! ## Tempo goes both ways
 //!
-//! It reports the session and never writes to it: the local tempo is not
-//! proposed to peers, and start/stop sync is not enabled. Cycletron follows.
-//! Making tempo bidirectional means resolving what an evaluated `setbpm` should
-//! do to everyone else in the session, which is a design question, not a
-//! plumbing one.
+//! Cycletron is a full peer: a local tempo change (slider, `setbpm`, the
+//! assistant) is committed to the session with [`link_set_tempo`], and a
+//! peer's change comes back through [`link_snapshot`]. Start/stop sync is not
+//! enabled.
 //!
 //! Phase is reported as [`LinkSnapshot::seconds_to_next_bar`] rather than as an
 //! absolute position on Link's clock. The frontend's clock is the
@@ -74,18 +73,43 @@ impl LinkSnapshot {
 
 /// Join or leave the Link session.
 ///
-/// The instance is kept alive across a disable so that re-enabling rejoins with
-/// the tempo it last saw rather than snapping back to a default and dragging
-/// every peer with it.
+/// Alone, `bpm` becomes the session tempo. With peers already in view the
+/// session keeps its tempo and Cycletron follows it, as any app joining a
+/// Link session does. Peers that are found after this call merge timelines
+/// the same way.
 #[tauri::command]
 pub fn link_enable(enabled: bool, bpm: f64) -> LinkSnapshot {
     let mut guard = LINK.lock();
     let link = guard.get_or_insert_with(|| AblLink::new(bpm));
-    link.enable(enabled);
     if !enabled {
+        link.enable(false);
         return LinkSnapshot::disabled();
     }
+    if link.num_peers() == 0 {
+        commit_tempo(link, bpm);
+    }
+    link.enable(true);
     snapshot_of(link)
+}
+
+/// Propose a tempo to the session. Every peer follows it.
+#[tauri::command]
+pub fn link_set_tempo(bpm: f64) -> LinkSnapshot {
+    let guard = LINK.lock();
+    match guard.as_ref() {
+        Some(link) if link.is_enabled() => {
+            commit_tempo(link, bpm);
+            snapshot_of(link)
+        }
+        _ => LinkSnapshot::disabled(),
+    }
+}
+
+fn commit_tempo(link: &AblLink, bpm: f64) {
+    let mut state = SessionState::new();
+    link.capture_app_session_state(&mut state);
+    state.set_tempo(bpm, link.clock_micros());
+    link.commit_app_session_state(&state);
 }
 
 /// Read the session. Polled by the frontend; cheap enough for the UI loop.
@@ -164,15 +188,31 @@ mod tests {
             snap.phase
         );
 
+        // Setting the tempo alone moves the session.
+        let set = link_set_tempo(142.0);
+        assert!((set.tempo - 142.0).abs() < 1e-9, "tempo {}", set.tempo);
+        assert!((link_snapshot().tempo - 142.0).abs() < 1e-9);
+
         // Leaving reports disabled, and stays that way on a later read — the
         // instance is kept alive, so this asserts `enable(false)` really took.
         assert!(!link_enable(false, 130.0).enabled);
         assert!(!link_snapshot().enabled);
+        assert!(!link_set_tempo(150.0).enabled, "set while off is a no-op");
+
+        // Rejoining alone takes the new tempo, not the one the instance was
+        // created with.
+        let rejoined = link_enable(true, 90.0);
+        assert!(
+            (rejoined.tempo - 90.0).abs() < 1e-9,
+            "tempo {}",
+            rejoined.tempo
+        );
+        link_enable(false, 90.0);
     }
 
     /// Peer discovery, which needs a second Link participant on the network and
-    /// so is not a hermetic test. Start any Link app (or the `link-spike`
-    /// binary) and run:
+    /// so is not a hermetic test. Start any Link app (or this same
+    /// test in a second terminal) and run:
     ///
     /// ```text
     /// cargo test -p cycletron-app discovers_peers -- --ignored --nocapture

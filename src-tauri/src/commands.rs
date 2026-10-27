@@ -166,10 +166,10 @@ pub fn genre_recipe(
 /// Reload the corpus index and genre recipes from disk. Recipes are otherwise
 /// read once at startup, so a running app never picks up newly-generated recipes
 /// (e.g. after `cargo run -p gen-recipes`) until restart — this refreshes them in
-/// place. Returns the number of recipes now loaded.
+/// place. Returns the number of recipes now loaded, or why the corpus failed.
 #[tauri::command]
 pub fn reload_corpus(state: State<'_, AppState>) -> Result<usize, String> {
-    Ok(state.load_knowledge())
+    state.load_knowledge().map_err(|e| format!("{e:#}"))
 }
 
 /// Get pattern history for the current session.
@@ -794,6 +794,18 @@ fn guard_path(state: &State<'_, AppState>, path: &str) -> Result<PathBuf, String
 #[tauri::command]
 pub fn get_user_settings(state: State<'_, AppState>) -> UserSettings {
     state.user_settings.lock().clone()
+}
+
+/// Record that onboarding was seen. Sets just this flag, so the welcome flow
+/// can't write back a stale copy of the rest of the settings.
+#[tauri::command]
+pub fn finish_first_run(state: State<'_, AppState>) -> Result<(), String> {
+    let mut settings = state.user_settings.lock();
+    settings.first_run_done = true;
+    if let Some(dir) = state.app_data_dir() {
+        settings.save(&dir).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 /// Persist `settings` and rebuild dependent state (e.g. the AI client).

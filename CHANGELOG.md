@@ -12,6 +12,12 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 ### Sounds
 - **TR-909, TR-606 and TR-727 kits are bundled** and work offline: `s("bd*4").bank("RolandTR909")`. The 909 gains crash and toms, and most voices have several takes (`bd:3` is the 909's attack kick). The 727 is Latin percussion: `perc:0`–`perc:13` and `sh`. They're CC0 recordings of a Roland TR-8.
 
+### Ableton Link
+- **Cycletron is now a full Link peer.** Changing the tempo here (the slider, `setbpm`, the assistant) sets it for everyone in the session, and a change from another app still comes back. Before, Link held Cycletron at 120 BPM when no other app was in the session.
+- If Link can't start when Cycletron opens, the status line and Preferences say why.
+- macOS asks once for local network access, which Link needs to find other apps.
+- Saving Preferences no longer resets the tempo unless you changed the default tempo.
+
 ### OSC output
 - **OSC no longer drops notes.** A note near the end of a bar, a note that started while the previous send was still going out, and very large frames (which macOS discarded without an error) were all lost. They now all arrive.
 - A pattern change mid-bar no longer resends the new pattern's notes from the start of the bar.
@@ -22,6 +28,11 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 - Linux: animated labels in NEON CIRCUIT, MARBLE CORE, MARBLE DROP, PLASMA and TUNNEL held the frame rate to about 35 fps, because WebKitGTK loaded a new font size every frame. They now run at full speed.
 - tokio 1.54.1, which fixes a race in its interval timer, plus routine dependency updates.
 - The after-update What's New, Reload Corpus and the show pane's song suggestions did nothing, because the app's command permissions blocked them. They work now. The same bug blocked Ableton Link and OSC output; they now connect, with more fixes to come.
+- Failed calls to the app's backend now show up in Help → Show Logs instead of failing silently.
+- The show pane's song suggestions pick up songs added to the library while the pane is open, and try again after a failed listing.
+- If Cycletron can't tell how it was installed, the update prompt links to the releases page instead of trying to update itself.
+- View → Reload Corpus & Recipes says in the app whether it worked, and reports a corpus that failed to load.
+- Finishing the welcome tour no longer undoes Preferences changes made since launch.
 
 ## 0.1.0-alpha.25 (2026-10-21)
 

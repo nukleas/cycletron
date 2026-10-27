@@ -176,6 +176,8 @@ export class StrudelApp {
      *  value: dragging the slider (or typing in the box) changes that control
      *  before applyBpm runs, so comparing against it skipped the others. */
     private _shownBpm = '';
+    /** The `setbpm` of the last installed pattern, to tell an edit from a re-evaluate. */
+    private _patternBpm: number | undefined = undefined;
     /** 128-bit set (4×u32) of GM instruments referenced but not yet loaded. */
     private gmBitsView: Uint32Array | null;
     /** Per-instrument 32-bit set of which soundfont variants are missing. */
@@ -405,9 +407,11 @@ export class StrudelApp {
         void oscOut.init(oscError).then(error => {
             if (error) oscError(error);
         });
-        // Link is the tempo authority while it is on, so it pushes through
-        // applyBpm exactly like the slider does.
-        void linkSync.init(bpm => this.applyBpm(bpm));
+        // A peer's tempo change comes in through applyBpm exactly like the
+        // slider's does.
+        void linkSync.init(bpm => this.applyBpm(bpm), currentBpm()).then(error => {
+            if (error) this.setStatus(`Ableton Link: ${error}`);
+        });
         document.getElementById('mixerClear')?.addEventListener('click', () => mixer.clear());
 
         // Returns a touchend handler that fires callback on double-tap
@@ -880,7 +884,9 @@ export class StrudelApp {
                     const total = drums + machineCount + extraBanks.length + packSamples;
                     this.elements.sampleCount.textContent = `${total}`;
                     if (extraBanks.length && isTauri) {
-                        void invoke('register_sound_banks', {names: extraBanks}).catch(() => {});
+                        void invoke('register_sound_banks', {names: extraBanks}).catch((e) => {
+                            console.warn('[app] register_sound_banks failed; the AI will not know these banks', e);
+                        });
                     }
                     document.dispatchEvent(new CustomEvent('sounds:changed'));
                 });
@@ -1144,7 +1150,12 @@ export class StrudelApp {
         // Redraw the sequence grid now rather than waiting for the next frame,
         // matching what the keystroke path did before it shared this code.
         this.visualizer?.render();
-        this.applyBpm(bpm ?? parseInt(this.elements.bpmSlider.value, 10));
+        // Every evaluate re-applies the pattern's `setbpm`. In a Link session
+        // only an edit to it counts, so an unchanged one doesn't drag the
+        // session back after a peer moved it.
+        const edited = bpm !== this._patternBpm;
+        this._patternBpm = bpm;
+        this.applyBpm(bpm !== undefined && (edited || !linkSync.active) ? bpm : currentBpm());
     };
 
     parsePatternWithTempo(code: string): { pattern: PatternHandle; bpm: number | undefined } {
@@ -1556,11 +1567,10 @@ export class StrudelApp {
      *  value box, stats readout, immersive HUD) updates here, so no surface
      *  can go stale regardless of what triggered the change. */
     applyBpm(bpm: number): void {
-        // While in a Link session the shared tempo wins, so a pattern's
-        // `setbpm` cannot silently desync this instance from its peers.
-        bpm = linkSync.resolveBpm(bpm);
         bpm = Math.max(30, Math.min(300, bpm));
         if (isNaN(bpm)) return;
+        // In a Link session every peer follows a local change.
+        linkSync.proposeBpm(bpm);
         // The BPM control is a range input with step 1; a fractional string
         // is rejected by the DOM and the slider stays put.
         const value = String(Math.round(bpm));

@@ -22,7 +22,6 @@ class WelcomeModal {
     private libraryRoot: HTMLElement | null = null;
     private cleanup: (() => void) | null = null;
     private idx = 0;
-    private settings: UserSettings | null = null;
 
     init(): void {
         this.root = document.getElementById('welcomeModal');
@@ -41,20 +40,18 @@ class WelcomeModal {
     /** Show the modal if this is a first run. Resolves either way. */
     async maybeOpen(): Promise<void> {
         if (!isTauri || !this.root) return;
+        let settings: UserSettings;
         try {
-            this.settings = await invoke<UserSettings>('get_user_settings');
+            settings = await invoke<UserSettings>('get_user_settings');
         } catch {
             return;
         }
-        if (this.settings.first_run_done) return;
+        if (settings.first_run_done) return;
         await this.openExplicit();
     }
 
     async openExplicit(): Promise<void> {
         if (!this.root) return;
-        if (!this.settings && isTauri) {
-            try { this.settings = await invoke<UserSettings>('get_user_settings'); } catch { /* ignore */ }
-        }
         this.idx = 0;
         this.renderStep();
         try {
@@ -89,12 +86,10 @@ class WelcomeModal {
     }
 
     private async finish(_dismissed: boolean): Promise<void> {
-        if (this.settings && isTauri) {
+        if (isTauri) {
             try {
                 // Onboarding never turns AI on — only records that it was seen.
-                const next: UserSettings = {...this.settings, first_run_done: true};
-                await invoke<void>('set_user_settings', {settings: next});
-                this.settings = next;
+                await invoke<void>('finish_first_run');
             } catch (e) {
                 console.warn('[welcome] could not persist:', e);
             }
