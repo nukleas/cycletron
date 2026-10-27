@@ -15,7 +15,7 @@ import {logsModal} from './logs-modal.js';
 import {welcomeModal} from './welcome-modal.js';
 import {helpModal} from './help-modal.js';
 import {diag} from './diagnostics.js';
-import {notify} from './notifications.js';
+import {errorDialog, infoDialog} from './dialog.js';
 import {openExternal} from './external-link.js';
 
 
@@ -40,9 +40,9 @@ export async function initMenuEvents(): Promise<void> {
         'menu:reload_corpus': async () => {
             try {
                 const n = await invoke<number>('reload_corpus');
-                void notify('Corpus reloaded', `${n} genre recipe${n === 1 ? '' : 's'} now loaded.`);
+                await infoDialog(`Corpus reloaded. ${n} genre recipe${n === 1 ? '' : 's'} now loaded.`);
             } catch (e) {
-                void notify('Corpus reload failed', String(e));
+                await errorDialog(`Corpus reload failed:\n${e}`);
             }
         },
         'menu:play_pause': () => {

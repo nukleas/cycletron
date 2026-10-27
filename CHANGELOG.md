@@ -16,6 +16,11 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 - Linux: animated labels in NEON CIRCUIT, MARBLE CORE, MARBLE DROP, PLASMA and TUNNEL held the frame rate to about 35 fps, because WebKitGTK loaded a new font size every frame. They now run at full speed.
 - tokio 1.54.1, which fixes a race in its interval timer, plus routine dependency updates.
 - The after-update What's New, Reload Corpus and the show pane's song suggestions did nothing, because the app's command permissions blocked them. They work now. The same bug blocked Ableton Link and OSC output; they now connect, with more fixes to come.
+- Failed calls to the app's backend now show up in Help → Show Logs instead of failing silently.
+- The show pane's song suggestions pick up songs added to the library while the pane is open, and try again after a failed listing.
+- If Cycletron can't tell how it was installed, the update prompt links to the releases page instead of trying to update itself.
+- View → Reload Corpus & Recipes says in the app whether it worked, and reports a corpus that failed to load.
+- Finishing the welcome tour no longer undoes Preferences changes made since launch.
 
 ## 0.1.0-alpha.25 (2026-10-21)
 

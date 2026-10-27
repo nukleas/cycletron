@@ -876,7 +876,9 @@ export class StrudelApp {
                     const total = drums + machineCount + extraBanks.length + packSamples;
                     this.elements.sampleCount.textContent = `${total}`;
                     if (extraBanks.length && isTauri) {
-                        void invoke('register_sound_banks', {names: extraBanks}).catch(() => {});
+                        void invoke('register_sound_banks', {names: extraBanks}).catch((e) => {
+                            console.warn('[app] register_sound_banks failed; the AI will not know these banks', e);
+                        });
                     }
                     document.dispatchEvent(new CustomEvent('sounds:changed'));
                 });

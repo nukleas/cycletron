@@ -266,8 +266,11 @@ impl AppState {
         }
         *self.user_settings.lock() = user;
 
-        // Corpus + genre recipes — the agent's knowledge base.
-        self.load_knowledge();
+        // Corpus + genre recipes — the agent's knowledge base. A broken corpus
+        // shouldn't stop the app; the AI just searches less.
+        if let Err(e) = self.load_knowledge() {
+            tracing::warn!("corpus failed to load: {e}");
+        }
 
         // AI backend, built from the active provider profile + its keychain key.
         let client = self.build_agent_client();
@@ -299,8 +302,9 @@ impl AppState {
     /// call again at runtime — the `reload_corpus` command uses it so regenerated
     /// recipes / edited corpus entries are picked up without restarting the app
     /// (recipes are otherwise read exactly once at startup). Returns the recipe
-    /// count for the caller to report.
-    pub fn load_knowledge(&self) -> usize {
+    /// count for the caller to report. Recipes always reload; a corpus that
+    /// fails to load keeps the previous index and returns the error.
+    pub fn load_knowledge(&self) -> anyhow::Result<usize> {
         let config = self.config.lock();
         // The config path may be relative — anchor it against the workspace root
         // (one level up from this crate's manifest dir) so `cargo tauri dev` works
@@ -331,10 +335,7 @@ impl AppState {
             }
         });
 
-        match InMemoryCorpusIndex::load_with_curated(&corpus_path, curated_path.as_deref()) {
-            Ok(corpus) => *self.corpus.lock() = Some(corpus),
-            Err(e) => tracing::warn!("corpus failed to load: {e}"),
-        }
+        let corpus = InMemoryCorpusIndex::load_with_curated(&corpus_path, curated_path.as_deref());
 
         // Genre recipes live under `<corpus>/genres/` — prefer the curated dir
         // (the repo's hand-gated corpus), falling back to the bulk corpus path.
@@ -345,7 +346,8 @@ impl AppState {
         let n = recipes.len();
         tracing::info!("loaded {n} genre recipe(s) from {}", genres_dir.display());
         *self.recipes.lock() = recipes;
-        n
+        *self.corpus.lock() = Some(corpus?);
+        Ok(n)
     }
 
     pub fn library_root(&self) -> PathBuf {
@@ -471,5 +473,31 @@ mod tests {
         s.reset_read_budget();
         assert!(s.account_read(MAX_READ_BYTES_PER_TURN).is_ok());
         assert!(s.account_read(1).is_err());
+    }
+
+    /// A corpus that can't be read is an error for `reload_corpus`, recipes
+    /// still reload, and the last good index stays.
+    #[test]
+    fn load_knowledge_reports_a_broken_corpus() {
+        let dir = tempfile::tempdir().unwrap();
+        let genres = dir.path().join("genres");
+        std::fs::create_dir_all(&genres).unwrap();
+        std::fs::write(genres.join("dub.md"), "# Dub\n\n## Tempo\n\n70\n").unwrap();
+
+        let s = AppState::new();
+        {
+            let mut config = s.config.lock();
+            config.corpus.path = dir.path().to_path_buf();
+            config.corpus.curated_path = None;
+        }
+        assert!(s.load_knowledge().is_ok());
+        assert!(s.corpus.lock().is_some());
+
+        // The metadata index is a directory, so reading it fails.
+        std::fs::create_dir_all(dir.path().join("inventory/normalized-metadata.jsonl")).unwrap();
+        let err = s.load_knowledge().unwrap_err();
+        assert!(!err.to_string().is_empty());
+        assert_eq!(s.recipes.lock().len(), 1);
+        assert!(s.corpus.lock().is_some());
     }
 }
