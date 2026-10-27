@@ -18,6 +18,7 @@ import {setNotificationsEnabled} from './notifications.js';
 import {setFollowDesktopTheme} from './desktop-theme.js';
 import {oscOut} from './osc-out.js';
 import {linkSync} from './link-sync.js';
+import {currentBpm} from './bpm.js';
 import {metronome} from './metronome.js';
 import {midiInput} from './midi-input.js';
 import {midiPads, PAD_ACTIONS} from './midi-pads.js';
@@ -707,6 +708,7 @@ export class PreferencesModal {
                 if (this.apiKey) this.apiKey.value = '';
             }
             const prevSampleSet = this.loaded?.samples?.active ?? 'cycletron';
+            const prevTempo = this.loaded?.audio?.default_tempo;
             await invoke<void>('set_user_settings', {settings: next});
             if (next.samples.active !== prevSampleSet) {
                 // Reload the audio stack so live playback picks up the new
@@ -718,8 +720,10 @@ export class PreferencesModal {
             document.dispatchEvent(new CustomEvent('ai-consent:changed'));
             this.flash('Saved');
             // Reflect immediate-effect prefs in the running UI without a reload.
+            // Only a changed default tempo applies: saving anything else must
+            // not reset the tempo, which in a Link session moves every peer.
             const tempo = parseFloat(this.defaultTempo?.value ?? '');
-            if (Number.isFinite(tempo)) {
+            if (Number.isFinite(tempo) && tempo !== prevTempo) {
                 window.strudelApp?.applyBpm?.(tempo);
             }
             setNotificationsEnabled(next.notifications.enabled);
@@ -741,16 +745,13 @@ export class PreferencesModal {
      * section's hint line rather than aborting the save, exactly as OSC does.
      */
     private async applyLink(): Promise<void> {
-        const error = await linkSync.apply(
-            !!this.linkEnabled?.checked,
-            parseFloat(this.defaultTempo?.value || '') || 120,
-        );
+        const error = await linkSync.apply(!!this.linkEnabled?.checked, currentBpm());
         if (this.linkEnabled) this.linkEnabled.checked = linkSync.settings.enabled;
         this.renderLinkStatus(error);
     }
 
     /** Peer count is the only readout that matters: it says whether anyone heard you. */
-    private renderLinkStatus(error?: string | null): void {
+    private renderLinkStatus(error: string | null = linkSync.lastError): void {
         if (!this.linkStatus) return;
         this.linkStatus.classList.toggle('is-ok', !error && linkSync.active);
         if (error) {

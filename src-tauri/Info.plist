@@ -4,6 +4,8 @@
 <dict>
   <key>NSMicrophoneUsageDescription</key>
   <string>Cycletron uses the microphone for the live audio recording feature in the Pattern Console.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Cycletron uses the local network to sync tempo with Ableton Link apps and to send OSC to other software.</string>
   <key>NSAppleEventsUsageDescription</key>
   <string>Cycletron uses Apple Events to reveal files in Finder.</string>
   <key>LSApplicationCategoryType</key>

@@ -123,6 +123,7 @@
     "allow-take-whats-new",
     "allow-link-enable",
     "allow-link-snapshot",
+    "allow-link-set-tempo",
     "allow-osc-configure",
     "allow-osc-transport",
     "allow-osc-frame"
