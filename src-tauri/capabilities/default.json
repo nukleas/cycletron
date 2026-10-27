@@ -116,6 +116,14 @@
     "allow-list-midi-input-devices",
     "allow-start-midi-input-listening",
     "allow-stop-midi-input-listening",
-    "allow-get-midi-input-status"
+    "allow-get-midi-input-status",
+    "allow-reload-corpus",
+    "allow-list-library-songs",
+    "allow-take-whats-new",
+    "allow-link-enable",
+    "allow-link-snapshot",
+    "allow-osc-configure",
+    "allow-osc-transport",
+    "allow-osc-frame"
   ]
 }

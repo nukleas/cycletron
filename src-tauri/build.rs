@@ -94,6 +94,14 @@ const COMMANDS: &[&str] = &[
     "start_midi_input_listening",
     "stop_midi_input_listening",
     "get_midi_input_status",
+    "reload_corpus",
+    "list_library_songs",
+    "take_whats_new",
+    "link_enable",
+    "link_snapshot",
+    "osc_configure",
+    "osc_transport",
+    "osc_frame",
 ];
 
 fn main() {

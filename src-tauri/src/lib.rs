@@ -422,3 +422,40 @@ pub fn run() {
             }
         });
 }
+
+#[cfg(test)]
+mod command_permission_tests {
+    /// The webview origin is remote, so a handler missing from `build.rs`
+    /// COMMANDS or the default capability fails at runtime with "not allowed".
+    #[test]
+    fn every_invoke_handler_is_registered_and_granted() {
+        let lib = include_str!("lib.rs");
+        let start = lib.find("generate_handler![").unwrap();
+        let block = &lib[start..start + lib[start..].find("])").unwrap()];
+        let handlers: Vec<&str> = block
+            .lines()
+            .skip(1)
+            .filter_map(|l| l.trim().strip_suffix(','))
+            .filter_map(|l| l.rsplit("::").next())
+            .collect();
+        assert!(
+            handlers.len() > 50,
+            "parsed only {} handlers",
+            handlers.len()
+        );
+
+        let build = include_str!("../build.rs");
+        let capability = include_str!("../capabilities/default.json");
+        for h in handlers {
+            assert!(
+                build.contains(&format!("\"{h}\",")),
+                "{h} is missing from build.rs COMMANDS"
+            );
+            let grant = format!("\"allow-{}\"", h.replace('_', "-"));
+            assert!(
+                capability.contains(&grant),
+                "{h} is missing from capabilities/default.json"
+            );
+        }
+    }
+}
