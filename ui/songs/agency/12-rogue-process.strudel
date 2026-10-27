@@ -1,4 +1,5 @@
-// AGENCY OST — 12 · Rogue Process
+// AGENCY OST — 12 · Rogue Process (v2)
+// v2 of Demos/Songs/agency/12-rogue-process.strudel — original arrangement plus bug fixes only; see REVIEW.md
 // ACT II. The escaped process forks itself faster than it can be killed.
 // Perturbator club-mode: four-on-floor, 16th chug under a stop-riff, big
 // arps — and every 8th bar the whole mix slam-stops on the back half
@@ -39,7 +40,7 @@ setbpm(122);
       .delay(0.25).delaytime(0.1875).room(0.3).gain(0.3).pan(0.6),
     chord("<F#m F#m D E>").voicing().s("supersaw")
       .attack(0.05).release(0.9).lpf(1300).chorus(0.4).room(0.5)
-      .gain(saw.range(0.1, 0.26).fast(4))
+      .gain(0.1)
   ),
   swarm: stack(
     s("<[bd*4] [bd*4] [bd*4] [bd*4] [bd*4] [bd*4] [bd*4] [bd bd ~ ~]>").bank("RolandTR909").gain(0.94).dist(0.28),

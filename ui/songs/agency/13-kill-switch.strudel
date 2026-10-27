@@ -1,4 +1,5 @@
-// AGENCY OST — 13 · Kill Switch
+// AGENCY OST — 13 · Kill Switch (v2)
+// v2 of Demos/Songs/agency/13-kill-switch.strudel — original arrangement plus bug fixes only; see REVIEW.md
 // ACT II finale. One command ends the rogue process — and the legacy system
 // with it. The Agency motif (0 2 4 6 · 7 4 2 0) is no longer a melody:
 // it IS the bass riff, distorted, full of stops, doubled by sub. Harmonic
@@ -36,7 +37,7 @@ setbpm(100);
       .s("sine").lpf(190).decay(0.13).sustain(0).dist(0.15).gain(0.4),
     chord("<C#m C#m A B>").voicing().s("supersaw")
       .attack(0.05).release(1.0).lpf(950).chorus(0.4).room(0.6)
-      .gain(saw.range(0.1, 0.26).fast(4))
+      .gain(0.1)
   ),
   strike: stack(
     s("<[bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ bd ~ ~ ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~] [bd ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909")
@@ -77,7 +78,7 @@ setbpm(100);
       .s("sine").lpf(190).decay(0.13).sustain(0).dist(0.15).gain(0.42),
     note("<[g#2, d#3, b2] [g#2, d#3, b2] [a2, e3, c#3] [g#2, d#3, b#2]>").s("wt_choir")
       .attack(0.4).release(2.0).lpf(1000).room(0.75)
-      .gain(saw.range(0.1, 0.26).fast(4)).pan(0.42),
+      .gain(0.1).pan(0.42),
     note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [12 ~ 9 ~ 7 ~ 6 ~] [7 ~ ~ ~ 6 ~ 7 ~]>")
       .scale("C#4:harmonic minor").s("sawtooth")
       .lpf(2800).resonance(6).decay(0.2).sustain(0.12)

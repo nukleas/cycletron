@@ -50,8 +50,9 @@ the whole mix stops with it — Perturbator / The Rebel Path mold)
   writes the same rest gaps, so the full mix slams to a stop and the reverb
   hangs. In Track 12 the Agency motif itself becomes the stop-riff bass.
 - **The kit** — the drums are the TR-909 (`.bank("RolandTR909")`), with the
-  lighter TR-606 for Track 8's dawn. Each banked line carries a `velocity`
-  trim that keeps the old balance against the default kit.
+  lighter TR-606 for Track 8's dawn, and the LinnDrum on Track 2. A `velocity`
+  on a banked line keeps that line at its level on the default kit; filtered
+  rim ticks stay on the default kit's `rs`.
 
 Every track states its FORM contract (sections · bars · energy · layers) in a
 header comment and uses `pickRestart` with 4-bar section granularity, so the

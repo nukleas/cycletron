@@ -1,4 +1,5 @@
-// AGENCY OST — 10 · Black ICE
+// AGENCY OST — 10 · Black ICE (v2)
+// v2 of Demos/Songs/agency/10-black-ice.strudel — original arrangement plus bug fixes only; see REVIEW.md
 // ACT II. The Agency deploys its own countermeasure AI. Darksynth in the
 // Perturbator mold: the bass IS the riff — staccato, distorted, full of
 // holes — and the whole mix stops with it. Sub-sine doubles the riff for
@@ -36,7 +37,7 @@ setbpm(106);
       .s("sine").lpf(200).decay(0.12).sustain(0).dist(0.2).gain(0.42),
     chord("<C#m C#m A B>").voicing().s("supersaw")
       .attack(0.05).release(0.9).lpf(1000).chorus(0.4).room(0.6)
-      .gain(saw.range(0.1, 0.26).fast(4))
+      .gain(0.1)
   ),
   surge: stack(
     s("<[bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ bd ~ bd ~ bd ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~ ~ bd bd ~ ~ ~ ~ ~] [bd ~ ~ bd ~ ~ bd ~ ~ ~ ~ ~ ~ ~ ~ ~]>").bank("RolandTR909")

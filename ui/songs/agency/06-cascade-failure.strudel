@@ -1,4 +1,5 @@
-// AGENCY OST — 06 · Cascade Failure
+// AGENCY OST — 06 · Cascade Failure (v2)
+// v2 of Demos/Songs/agency/06-cascade-failure.strudel — original arrangement plus bug fixes only; see REVIEW.md
 // Systems fall like dominoes. Neurofunk with breakcore edits at the peak.
 //
 // FORM (174 BPM · 1 cycle = 1 bar · 72 bars ≈ 1:39 · loops):
@@ -7,7 +8,7 @@
 //   drop    16 e5  full two-step break + reese + falling-domino arp
 //   glitch  8  e5  breakcore edits: chopped kicks, snare rolls, bitcrush
 //   break   8  e2  half-time disbelief — sub + airy pad, alarm distant
-//   drop2   16 e5  full + 16th hats + octave stab double
+//   drop2   16 e5  full + 16th hats + the stab echoed an octave up half a bar later
 //   outro   8  e1  drums filter away, the alarm never stops
 // hook: the falling-domino arp (descending cascades) — both drops.
 
@@ -75,7 +76,7 @@ setbpm(174);
       .decay(0.1).sustain(0).delay(0.25).delaytime(0.34).gain(0.34).pan(0.6),
     note("<g#3 d#3 b3 g#3 e3 b3 f#3 d#3>").s("supersaw")
       .lpf(2400).dist(0.35).decay(0.18).sustain(0)
-      .off(0.5, x => x.add(12).gain(0.5)).gain(0.36)
+      .gain(0.36).off(0.5, x => x.add(12).gain(0.5))
   ),
   outro: stack(
     note("<[d#5 e5 d#5 e5] [d#5 e5 d#5 e5] [d#5 ~ e5 ~] [d#5 ~ ~ ~]>")

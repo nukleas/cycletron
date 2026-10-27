@@ -1,4 +1,5 @@
-// AGENCY OST — 04 · First Incident
+// AGENCY OST — 04 · First Incident (v2)
+// v2 of Demos/Songs/agency/04-first-incident.strudel — original arrangement plus bug fixes only; see REVIEW.md
 // The pager goes off at 2 PM. First contact with the intruders. Darksynth:
 // gated snare, grinding octave bass, the palm-muted chug, horror pad.
 // The Agency motif returns — same shape as track 1, but in HARMONIC minor:
@@ -80,8 +81,8 @@ setbpm(110);
     note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 6 ~ 7 ~ 9 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [9 ~ 7 ~ 6 ~ 4 ~] [2 ~ 0 ~ ~ ~ ~ ~]>")
       .scale("C#4:harmonic minor").s("sawtooth")
       .lpf(2600).resonance(6).decay(0.2).sustain(0.12)
-      .off(0.5, x => x.add(12).gain(0.42))
       .dist(0.15).delay(0.25).delaytime(0.2045).room(0.3).gain(0.38)
+      .off(0.5, x => x.add(12).gain(0.42))
   ),
   outro: stack(
     chord("<C#m C#m C#m C#m>").voicing().s("supersaw")

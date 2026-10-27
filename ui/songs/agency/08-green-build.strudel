@@ -1,4 +1,5 @@
-// AGENCY OST — 08 · Green Build
+// AGENCY OST — 08 · Green Build (v2)
+// v2 of Demos/Songs/agency/08-green-build.strudel — original arrangement plus bug fixes only; see REVIEW.md
 // It ships. Dawn through the blinds. Synthwave in E major — the relative major
 // of home. The mainframe drone from "Legacy System" returns and resolves up a
 // major third; the Agency motif (0 2 4 6 · 7 4 2 0) finally lands in major.
@@ -9,7 +10,7 @@
 //   lift    4  e3  + snare, line climbs into the light
 //   chorus  16 e4  full: gated snare, wide pad, the motif sung in major
 //   break   8  e2  drums out — choir and pad, deep breath, sunrise
-//   chorus2 16 e5  everything, octave double, all the hats
+//   chorus2 16 e5  everything, an octave-up echo a beat late, all the hats
 //   outro   8  e1  drone on E alone. The build is green.
 // hook: the Agency motif, major-voiced — both choruses.
 
@@ -78,8 +79,8 @@ setbpm(102);
       .s("sawtooth").lpf(820).decay(0.18).sustain(0.25).gain(0.5),
     note("<[0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 9 ~ 7 ~ 4 ~] [0 ~ 2 ~ 4 ~ 6 ~] [7 ~ 4 ~ 2 ~ 0 ~] [4 ~ 6 ~ 7 ~ 9 ~] [7 ~ ~ ~ ~ ~ ~ ~]>")
       .scale("E4:major").s("supersaw").release(0.3).lpf(2600)
-      .off(0.25, x => x.add(12).gain(0.4))
-      .delay(0.22).delaytime(0.368).room(0.3).gain(0.4),
+      .delay(0.22).delaytime(0.368).room(0.3).gain(0.4)
+      .off(0.25, x => x.add(12).gain(0.4)),
     chord("<E B C#m A>").voicing().s("supersaw")
       .attack(0.3).release(0.9).lpf(2000).chorus(0.45).room(0.5).gain(0.24)
   ),
