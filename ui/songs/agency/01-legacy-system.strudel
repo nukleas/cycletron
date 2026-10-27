@@ -4,18 +4,18 @@
 // ALBUM MOTIF: scale degrees 0 2 4 6 · 7 4 2 0 (rise to the subtonic,
 // answer falling from the octave) — it returns in tracks 4, 5 and 8.
 //
-// FORM (56 BPM · 1 cycle = 1 bar ≈ 4.3s · 48 bars ≈ 3:26 · loops):
-//   boot   8  e1  sub drone + detuned octave beating
-//   hum    8  e1  + machine noise wash, electrical hum
-//   wake   8  e2  + evolving pad (i→VI), tritone unease underneath
-//   drift  12 e3  + the motif enters as a sequencer line
-//   surge  8  e3  pad opens, cello fifth, motif migrates up a fourth
-//   fade   4  e1  everything recedes; the drone never stops
+// FORM (56 BPM · 1 cycle = 1 bar ≈ 4.3s · 24 bars ≈ 1:43 · loops):
+//   boot   4  e1  sub drone + detuned octave beating
+//   hum    4  e1  + machine noise wash, electrical hum
+//   wake   4  e2  + evolving pad (i→VI), tritone unease underneath
+//   drift  6  e3  + the motif enters as a sequencer line
+//   surge  4  e3  pad opens, cello fifth, motif migrates up a fourth
+//   fade   2  e1  everything recedes; the drone never stops
 // hook: the Agency motif — first statement, high and patient.
 
 setbpm(56);
 
-"<boot@2 hum@2 wake@2 drift@3 surge@2 fade>".slow(4).pickRestart({
+"<boot@2 hum@2 wake@2 drift@3 surge@2 fade>".slow(2).pickRestart({
   boot: stack(
     note("c#1").s("sine").slow(4).attack(4).release(12).gain(0.55),
     note("c#2").s("sine").slow(4).attack(6).release(12).detune(9).gain(0.26)
