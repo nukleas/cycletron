@@ -1,3 +1,5 @@
+import {diag} from './diagnostics.js';
+
 /**
  * Shared Tauri IPC helper. Every module that talks to the Rust backend should
  * import `invoke` from here rather than re-deriving the `window.__TAURI__`
@@ -6,7 +8,15 @@
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
     const api = window.__TAURI__?.core;
     if (!api) throw new Error('Tauri not available');
-    return api.invoke<T>(cmd, args);
+    return api.invoke<T>(cmd, args).catch((e: unknown) => failed(cmd, e));
+}
+
+/** Log a rejected command, then rethrow. Callers may fall back to a default;
+ *  the log keeps failures like "not allowed" visible in the Logs modal. */
+function failed(cmd: string, e: unknown): never {
+    console.warn(`[ipc] ${cmd} failed:`, e);
+    void diag('warn', 'ipc', `${cmd} failed: ${String(e)}`);
+    throw e;
 }
 
 /**
@@ -24,7 +34,7 @@ export async function invokeRaw<T>(
 ): Promise<T> {
     const api = window.__TAURI__?.core;
     if (!api) throw new Error('Tauri not available');
-    return api.invoke<T>(cmd, body, {headers});
+    return api.invoke<T>(cmd, body, {headers}).catch((e: unknown) => failed(cmd, e));
 }
 
 /** Subscribe to a backend event. Throws when there's no Tauri shell — callers
