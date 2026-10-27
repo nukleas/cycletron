@@ -1,11 +1,18 @@
 name: CI
 
+# Branches get CI through their PR; pushing to a branch as well ran every
+# commit twice, and the two runs queued behind each other.
 on:
   push:
-    branches: [master, main, 'feat/**']
+    branches: [master]
   pull_request:
-    branches: [master, main]
+    branches: [master]
   workflow_dispatch:
+
+# A new commit on a PR cancels that PR's older run. master runs every commit.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
