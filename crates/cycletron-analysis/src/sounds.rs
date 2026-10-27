@@ -58,7 +58,7 @@ pub const DEFAULT_DRUMS: &[&str] = &[
 
 /// Percussion & texture "color" banks — CC0 recordings (VCSL) bundled in
 /// `ui/public/samples/` and loaded in the background at startup (see
-/// `PERCUSSION_COLORS` in `ui/sample-loader.ts`, which must stay in sync).
+/// `PERCUSSION_COLORS` in `ui/sample-tables.ts`, which must stay in sync).
 /// Each bank is a single raw fortissimo one-shot (anvil, brake drum, claves…)
 /// with no `:n` variants; agent guidance treats them as sparse
 /// genre-appropriate accents, not default percussion.
@@ -76,7 +76,7 @@ pub const PERCUSSION: &[&str] = &[
 ];
 
 /// Melodic / speech expansion banks — short CC0 slices from the Tidal
-/// Clean-Samples ecosystem (see `INSTRUMENT_BANKS` in `ui/sample-loader.ts`,
+/// Clean-Samples ecosystem (see `INSTRUMENT_BANKS` in `ui/sample-tables.ts`,
 /// which must stay in sync). Multi-variant unpitched one-shots: use
 /// `s("flbass:2")` for a different take. Not chromatically multisampled —
 /// for in-tune pitched melodies prefer `gm_*` or `wt_*`.
@@ -131,7 +131,9 @@ pub const DRUM_MACHINE_NOTE: &str = "Two equivalent forms: s(\"RolandTR808_bd\")
      s(\"bd cr\").bank(\"LinnDrum\") drops the crash. .bank() only affects samples; \
      it no-ops on synths/GM.";
 
-/// Bundled drum machine kits and their voices.
+/// Drum machine kits and their voices. Most are bundled; kits with no cleanly
+/// licensed sample set stream from upstream (see `MACHINE_KITS` in
+/// `ui/sample-tables.ts`).
 /// Bank names are `{MachineName}_{voice}`, e.g. `s("RolandTR808_bd")`.
 /// `.bank()` prefix lookup IS implemented in the engine, so `s("bd").bank("RolandTR808")`
 /// resolves to the same sample — the two forms are interchangeable.
