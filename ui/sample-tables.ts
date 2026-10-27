@@ -116,6 +116,87 @@ export const ESSENTIAL_DRUMS: DrumBank[] = [
 ];
 
 /**
+ * Kits recorded from a Roland TR-8 (MckAudio/MckSamplePacks, CC0): its models
+ * of the 909, 606 and 727, not the original machines. Voices follow strudel.cc's
+ * names for these machines. Each take is [voice, path under the pack's `TR8/`];
+ * `scripts/vendor-tr8.mjs` trims and converts them into `ui/public/machines/`.
+ */
+export const TR8_KITS: Array<[string, string, Array<[string, string]>]> = [
+    ['RolandTR909', 'TR-909', [
+        ['bd',  'BD/004_909_Bass_Drum_1.wav'],
+        ['bd',  'BD/005_909_Bass_Drum_2.wav'],
+        ['bd',  'BD/006_909_Bass_Drum_3.wav'],
+        ['bd',  'BD/012_909_AttackBD_1.wav'],
+        ['sd',  'SD/005_909_Snare_Drum_1.wav'],
+        ['sd',  'SD/006_909_Snare_Drum_2.wav'],
+        ['sd',  'SD/007_909_Snare_Drum_3.wav'],
+        ['sd',  'SD/011_909_AttackSD_1.wav'],
+        ['hh',  'HATS/008_909_Closed_HiHat.wav'],
+        ['hh',  'HATS/010_909_Closed_HiHat_Short.wav'],
+        ['oh',  'HATS/007_909_Open_HiHat.wav'],
+        ['oh',  'HATS/009_909_Open_HiHat_Short.wav'],
+        ['cp',  'PERC/019_909_Hand_Clap.wav'],
+        ['cp',  'PERC/020_909_Hand_Clap_Long.wav'],
+        ['rim', 'PERC/009_909_Rim_Shot.wav'],
+        ['cr',  'HATS/020_909_Crash_Cymbal.wav'],
+        ['cr',  'HATS/021_909_Crash_Cymbal_Short.wav'],
+        ['rd',  'HATS/026_909_Ride_Cymbal.wav'],
+        ['rd',  'HATS/027_909_Ride_Cymbal_Short.wav'],
+        ['lt',  'TOMS/010_909_Low_Tom.wav'],
+        ['lt',  'TOMS/013_909_Low_Tom_Short.wav'],
+        ['mt',  'TOMS/011_909_Mid_Tom.wav'],
+        ['mt',  'TOMS/014_909_Mid_Tom_Short.wav'],
+        ['ht',  'TOMS/012_909_High_Tom.wav'],
+        ['ht',  'TOMS/015_909_High_Tom_Short.wav'],
+    ]],
+    ['RolandTR606', 'TR-606', [
+        ['bd',  'BD/015_606_Bass_Drum_1.wav'],
+        ['bd',  'BD/016_606_Bass_Drum_2.wav'],
+        ['bd',  'BD/017_606_Bass_Drum_3.wav'],
+        ['sd',  'SD/013_606_Snare_Drum_1.wav'],
+        ['sd',  'SD/014_606_Snare_Drum_2.wav'],
+        ['sd',  'SD/015_606_Snare_Drum_3.wav'],
+        ['hh',  'HATS/014_606_Closed_HiHat.wav'],
+        ['hh',  'HATS/016_606_Closed_HiHat_Long.wav'],
+        ['oh',  'HATS/013_606_Open_HiHat.wav'],
+        ['oh',  'HATS/015_606_Open_HiHat_Long.wav'],
+        ['cr',  'HATS/024_606_Cymbal.wav'],
+        ['cr',  'HATS/025_606_Cymbal_Short.wav'],
+        ['lt',  'TOMS/035_606_Low_Tom.wav'],
+        ['lt',  'TOMS/034_606_Floor_Tom.wav'],
+        ['ht',  'TOMS/036_606_High_Tom.wav'],
+        ['ht',  'TOMS/039_606_High_Tom_Long.wav'],
+    ]],
+    ['RolandTR727', 'TR-727', [
+        ['perc', 'PERC/001_727_Low_Conga.wav'],
+        ['perc', 'PERC/002_727_Open_High_Conga.wav'],
+        ['perc', 'PERC/003_727_Mute_High_Conga.wav'],
+        ['perc', 'PERC/006_727_Low_Bongo.wav'],
+        ['perc', 'PERC/007_727_High_Bongo.wav'],
+        ['perc', 'PERC/004_727_Low_Timbale.wav'],
+        ['perc', 'PERC/005_727_High_Timbale.wav'],
+        ['perc', 'PERC/014_727_Agogo_Low.wav'],
+        ['perc', 'PERC/015_727_Agogo_Mid.wav'],
+        ['perc', 'PERC/016_727_Agogo_High.wav'],
+        ['perc', 'PERC/029_727_Short_Whistle.wav'],
+        ['perc', 'PERC/030_727_Long_Whistle.wav'],
+        ['perc', 'PERC/031_727_Quijada.wav'],
+        ['perc', 'PERC/035_727_Star_Chime.wav'],
+        ['sh',   'PERC/028_727_Cabasa.wav'],
+    ]],
+];
+
+/** How many earlier takes share take `i`'s voice: its `:n`. */
+export function takeIndex(takes: Array<[string, string]>, i: number): number {
+    return takes.slice(0, i).filter(([v]) => v === takes[i][0]).length;
+}
+
+/** Bundled path of a TR-8 take: `RolandTR909_bd.wav`, then `RolandTR909_bd-1.wav`, … */
+export function tr8Url(machine: string, voice: string, n: number): string {
+    return `/machines/${machine}_${voice}${n ? `-${n}` : ''}.wav`;
+}
+
+/**
  * All drum machine voices, each mapped to the URL it loads from.
  * Naming: `{MachineName}_{voice}` — these are the canonical web-strudel names.
  * The engine supports `.bank()` prefix lookup, so `s("bd").bank("RolandTR808")`
@@ -125,9 +206,11 @@ export const ESSENTIAL_DRUMS: DrumBank[] = [
  * the first `_`.
  *
  * TR-808 (Michael Fischer's CC0 set), TR-707 (public-domain hyperreal set),
- * and LinnDrum (BushDrum, CC0) are bundled in `ui/public/machines/`; TR-909
- * and DR-55 have no cleanly licensed sample set, so they stream from upstream.
- * See ATTRIBUTION.md. Grouped as [machineName, displayName, [voice, url][]].
+ * LinnDrum (BushDrum, CC0) and the TR-8 kits below are bundled in
+ * `ui/public/machines/`; DR-55 has no cleanly licensed sample set, so it
+ * streams from upstream. See ATTRIBUTION.md.
+ * Grouped as [machineName, displayName, [voice, url][]]; a voice listed more
+ * than once gets `:n` variants in listed order.
  */
 export const MACHINE_KITS: Array<[string, string, Array<[string, string]>]> = [
     ['RolandTR808', 'TR-808', [
@@ -141,15 +224,6 @@ export const MACHINE_KITS: Array<[string, string, Array<[string, string]>]> = [
         ['mt',  '/machines/RolandTR808_mt.wav'],
         ['ht',  '/machines/RolandTR808_ht.wav'],
         ['cb',  '/machines/RolandTR808_cb.wav'],
-    ]],
-    ['RolandTR909', 'TR-909', [
-        ['bd',  TDM_BASE + 'RolandTR909/rolandtr909-bd/Bassdrum-01.wav'],
-        ['sd',  TDM_BASE + 'RolandTR909/rolandtr909-sd/naredrum.wav'],
-        ['hh',  TDM_BASE + 'RolandTR909/rolandtr909-hh/hh01.wav'],
-        ['oh',  TDM_BASE + 'RolandTR909/rolandtr909-oh/Hat%20Open.wav'],
-        ['cp',  TDM_BASE + 'RolandTR909/rolandtr909-cp/Clap.wav'],
-        ['rd',  TDM_BASE + 'RolandTR909/rolandtr909-rd/Ride.wav'],
-        ['rim', TDM_BASE + 'RolandTR909/rolandtr909-rim/Rimhot.wav'],
     ]],
     ['RolandTR707', 'TR-707', [
         ['bd',  '/machines/RolandTR707_bd.wav'],
@@ -172,6 +246,11 @@ export const MACHINE_KITS: Array<[string, string, Array<[string, string]>]> = [
         ['hh',  TDM_BASE + 'BossDR55/bossdr55-hh/Hihat1.wav'],
         ['rim', TDM_BASE + 'BossDR55/bossdr55-rim/Rimshot.wav'],
     ]],
+    ...TR8_KITS.map(([machine, display, takes]): [string, string, Array<[string, string]>] => [
+        machine,
+        display,
+        takes.map(([voice], i) => [voice, tr8Url(machine, voice, takeIndex(takes, i))]),
+    ]),
 ];
 
 /**

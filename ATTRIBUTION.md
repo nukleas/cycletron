@@ -92,11 +92,16 @@ in-tune melodies prefer `gm_*` soundfonts or `wt_*` wavetables.
   original LinnDrum LM-2, **CC0**
   ([`licenses/BushDrum-LICENSE.txt`](licenses/BushDrum-LICENSE.txt)).
   Source: https://github.com/EwonRael/BushDrum
-- **TR-909 and Boss DR-55 are not bundled.** No cleanly licensed sample set of
-  these machines is available, so Cycletron streams them at runtime from the
-  upstream community collection
+- **TR-909, TR-606, TR-727** (`RolandTR909_*`, `RolandTR606_*`, `RolandTR727_*`):
+  recordings of a Roland TR-8's models of these machines, not the original
+  hardware, from **MckSamplePacks** by MckAudio — **CC0**
+  ([`licenses/MckSamplePacks-LICENSE.txt`](licenses/MckSamplePacks-LICENSE.txt)).
+  Source: https://github.com/MckAudio/MckSamplePacks (`TR8/`). Trimmed,
+  normalised and downmixed by `ui/scripts/vendor-tr8.mjs`.
+- **Boss DR-55 is not bundled.** No cleanly licensed sample set is available,
+  so Cycletron streams it at runtime from the upstream community collection
   (https://github.com/geikha/tidal-drum-machines, no stated license) and never
-  redistributes the files. Offline, these two kits are unavailable.
+  redistributes the files. Offline, this kit is unavailable.
 
 ## Soundfonts (General MIDI) — `ui/public/soundfonts/`
 
@@ -159,8 +164,8 @@ the strudel-rs engine streams from) into the local app cache.
 
 ## Trademarks
 
-Roland, TR-808, TR-909, TR-707, and Boss DR-55 are trademarks of Roland
-Corporation; LinnDrum is associated with Linn Electronics / inMusic Brands;
+Roland, TR-8, TR-808, TR-909, TR-707, TR-606, TR-727, and Boss DR-55 are
+trademarks of Roland Corporation; LinnDrum is associated with Linn Electronics / inMusic Brands;
 TX81Z is a trademark of Yamaha Corporation. Product names are used here solely
 to identify the hardware the recordings were sampled from. Cycletron is not
 affiliated with or endorsed by any of these companies.

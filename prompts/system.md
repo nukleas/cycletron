@@ -395,12 +395,14 @@ stack(
 
 Machine → voices (use these short names with `.bank("…")`):
 RolandTR808 bd sd hh oh cp rim lt mt ht cb
-RolandTR909 bd sd hh oh cp rd rim
+RolandTR909 bd:0-3 sd:0-3 hh:0-1 oh:0-1 cp:0-1 rim cr:0-1 rd:0-1 lt:0-1 mt:0-1 ht:0-1
 RolandTR707 bd sd hh oh cp lt ht
+RolandTR606 bd:0-2 sd:0-2 hh:0-1 oh:0-1 cr:0-1 lt:0-1 ht:0-1
+RolandTR727 perc:0-13 (conga lo/open hi/mute hi, bongo lo/hi, timbale lo/hi, agogo lo/mid/hi, whistle short/long, quijada, star chime) sh (cabasa)
 LinnDrum bd sd hh cp
 BossDR55 bd sd hh rim
 Default kit `rs` and `rim` are the same bank; machines still spell it `rim`.
-No machine has `cr` — keep crashes on the default kit.
+Only the 909 and 606 have `cr`; on other machines keep crashes on the default kit.
 
 Percussion & texture colors (bundled offline — each bank is ONE raw one-shot):
 perc=cajon slap click=claves metal=anvil hit east=woodblock hand=conga

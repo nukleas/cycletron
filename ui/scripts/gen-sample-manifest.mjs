@@ -61,7 +61,7 @@ for (const [name, files] of VCSL_ONESHOTS) {
 }
 for (const [machine, , voices] of MACHINE_KITS) {
     for (const [voice, url] of voices) {
-        banks[`${machine}_${voice}`] = [manifestPath(url)];
+        (banks[`${machine}_${voice}`] ??= []).push(manifestPath(url));
     }
 }
 

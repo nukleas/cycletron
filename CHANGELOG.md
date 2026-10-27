@@ -1,6 +1,6 @@
 # Changelog
 
-Each release's notes, newest first. Add to `Unreleased` as changes land; rename it to the version when tagging.
+Each release's notes, newest first. Add to `Unreleased` as changes land; `scripts/cut-release.sh` dates them when tagging.
 
 ## Unreleased
 
@@ -8,6 +8,9 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; rename 
 - **After an update, Cycletron shows what changed** in every release since the version you last ran. It's shown once, and not on a fresh install.
 - **Help → What's New** has the notes for every release. It's also in the command palette and About.
 - **The update prompt shows the new release's notes** before you install. On deb and AUR installs it shows them with a link to the releases page.
+
+### Sounds
+- **TR-909, TR-606 and TR-727 kits are bundled** and work offline: `s("bd*4").bank("RolandTR909")`. The 909 gains crash and toms, and most voices have several takes (`bd:3` is the 909's attack kick). The 727 is Latin percussion: `perc:0`–`perc:13` and `sh`. They're CC0 recordings of a Roland TR-8.
 
 ### OSC output
 - **OSC no longer drops notes.** A note near the end of a bar, a note that started while the previous send was still going out, and very large frames (which macOS discarded without an error) were all lost. They now all arrive.
