@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-link-enable"
+description = "Enables the link_enable command without any pre-configured scope."
+commands.allow = ["link_enable"]
+
+[[permission]]
+identifier = "deny-link-enable"
+description = "Denies the link_enable command without any pre-configured scope."
+commands.deny = ["link_enable"]

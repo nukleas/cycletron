@@ -59,21 +59,25 @@ still produce unsigned builds.
 Nothing is public until the draft is reviewed on GitHub and **published**.
 
 Release notes live in `CHANGELOG.md`, which the app bundles for What's New.
-Before tagging, rename `## Unreleased` to `## <version> (<date>)`, where
-`<version>` is the tag without the `v` (`0.1.0-alpha.26`): the workflow stamps
-that into the build, and What's New looks it up by that exact string. Start a
-new empty `Unreleased`.
-
-The workflow fails before building if that section is missing. Otherwise it
-becomes the draft's notes, with `.github/release-footer.md` (AGPL, AI key,
-Play first, dialect) appended, and the `notes` in `latest.json`, which the
-update prompt shows before installing.
+Add to `## Unreleased` as changes land. To cut a release, from a clean master
+level with origin and with CI green:
 
 ```bash
-# clean tree, green CI
-git tag -a v0.1.0-alpha.6 -m "Cycletron alpha 6"
-git push origin v0.1.0-alpha.6
+scripts/cut-release.sh            # next alpha after the latest tag
+scripts/cut-release.sh 0.1.0-beta.1
+git push origin master v0.1.0-alpha.26
 ```
+
+The script renames the Unreleased notes to `## <version> (<date>)`, starts a
+new empty `Unreleased`, commits, and tags `v<version>`. It pushes nothing; the
+push starts the release workflow. The heading must be the tag without the `v`:
+the workflow stamps that version into the build, and What's New looks it up by
+that exact string.
+
+The workflow fails before building if that section is missing or empty.
+Otherwise it becomes the draft's notes, with `.github/release-footer.md` (AGPL,
+AI key, Play first, dialect) appended, and the `notes` in `latest.json`, which
+the update prompt shows before installing.
 
 Publish with `gh release edit <tag> --draft=false --prerelease=false --latest`.
 To fix the notes, edit `CHANGELOG.md` and retag: editing the draft changes

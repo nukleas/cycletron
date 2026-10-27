@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-take-whats-new"
+description = "Enables the take_whats_new command without any pre-configured scope."
+commands.allow = ["take_whats_new"]
+
+[[permission]]
+identifier = "deny-take-whats-new"
+description = "Denies the take_whats_new command without any pre-configured scope."
+commands.deny = ["take_whats_new"]

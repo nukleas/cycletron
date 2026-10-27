@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-library-songs"
+description = "Enables the list_library_songs command without any pre-configured scope."
+commands.allow = ["list_library_songs"]
+
+[[permission]]
+identifier = "deny-list-library-songs"
+description = "Denies the list_library_songs command without any pre-configured scope."
+commands.deny = ["list_library_songs"]
