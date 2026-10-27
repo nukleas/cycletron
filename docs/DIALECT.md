@@ -99,7 +99,7 @@ s("<bd | sd>")
 
 - Prefer `setbpm(120);` with parentheses and a semicolon.
 - Prefer **double quotes** for mini-notation, though `'…'` and `` `…` `` also parse.
-- `.bank("RolandTR808")` works for the built-in machine kits (RolandTR808/909/707,
+- `.bank("RolandTR808")` works for the built-in machine kits (RolandTR808/909/707/606/727,
   LinnDrum, BossDR55); only arbitrary *custom* sample banks are unsupported.
 - Euclid rotation must be a **literal** number: `bd(3,8,1)` not a nested pattern.
 
