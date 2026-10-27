@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reload-corpus"
+description = "Enables the reload_corpus command without any pre-configured scope."
+commands.allow = ["reload_corpus"]
+
+[[permission]]
+identifier = "deny-reload-corpus"
+description = "Denies the reload_corpus command without any pre-configured scope."
+commands.deny = ["reload_corpus"]
