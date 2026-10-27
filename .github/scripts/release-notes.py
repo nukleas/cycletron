@@ -37,7 +37,7 @@ def main() -> None:
     if not notes:
         sys.exit(
             f"::error::CHANGELOG.md has no notes under '## {version}'. "
-            "Rename Unreleased to the version before tagging (docs/RELEASE.md)."
+            "Cut releases with scripts/cut-release.sh (docs/RELEASE.md)."
         )
     print(notes + ("\n\n" + footer if footer else ""))
 

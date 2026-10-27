@@ -1,6 +1,6 @@
 # Changelog
 
-Each release's notes, newest first. Add to `Unreleased` as changes land; rename it to the version when tagging.
+Each release's notes, newest first. Add to `Unreleased` as changes land; `scripts/cut-release.sh` dates them when tagging.
 
 ## Unreleased
 
