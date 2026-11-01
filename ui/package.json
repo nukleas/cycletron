@@ -14,6 +14,7 @@
     "test:viz": "node --test scripts/viz.test.mjs",
     "test:render": "node --test scripts/render-viz.test.mjs",
     "test:show": "node --test scripts/show.test.mjs",
+    "test:section": "node --test scripts/section-song.test.mjs",
     "test:scheduler": "node --test scripts/scheduler.test.mjs",
     "test:osc": "node --test scripts/osc-out.test.mjs",
     "preview": "vite preview --port 5173",
