@@ -163,7 +163,7 @@ export function drawSkeleton(ctx: CanvasRenderingContext2D, pose: Pose, x: numbe
     for (let i = 1; i <= 3; i++) {
         const t = 0.2 + i * 0.17;
         const cy = ny + (py - ny) * t;
-        if (cy >= 0) continue;
+        if (cy >= -0.08) continue;
         const cx = nx + (px - nx) * t;
         const hw = (0.11 - i * 0.015) * scale;
         ctx.moveTo(x + cx * scale - hw, groundY + cy * scale);

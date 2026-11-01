@@ -310,8 +310,8 @@ class GraveyardMode implements VizMode {
             ctx.fillRect(0, 0, vw, vh);
         }
 
-        // Hill, darker against the flash.
-        ctx.fillStyle = flash > 0.02 ? this.silhouette : this.hillCss;
+        // The hill keeps its colour, so the stones go dark against it in a flash.
+        ctx.fillStyle = this.hillCss;
         if (this.hill) ctx.fill(this.hill);
 
         for (let row = 0; row < ROWS.length; row++) {

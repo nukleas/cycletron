@@ -190,8 +190,8 @@ class HauntedHouseMode implements VizMode {
         // Porch roof and posts.
         const porchY = g - FLOOR_H * u * 0.95;
         body.rect(blockL - 0.02 * u, porchY, blockW + 0.04 * u, 0.012 * u);
-        for (let i = 0; i <= 4; i++) {
-            body.rect(blockL - 0.02 * u + (blockW + 0.04 * u) * (i / 4) - 0.004 * u, porchY, 0.008 * u, g - porchY);
+        for (const px of [blockL - 0.02 * u, blockL + blockW / 2 - 0.09 * u, blockL + blockW / 2 + 0.09 * u, blockR + 0.02 * u]) {
+            body.rect(px - 0.004 * u, porchY, 0.008 * u, g - porchY);
         }
 
         const roof = new Path2D();
@@ -474,24 +474,24 @@ class HauntedHouseMode implements VizMode {
     private drawSteps(ctx: CanvasRenderingContext2D, g: number, cycle: number): void {
         const {vh, doorX} = this;
         const stepH = vh * 0.012;
-        let w = this.doorW * 1.6;
+        let w = this.doorW * 1.8;
         for (let i = 0; i < STEPS; i++) {
             ctx.fillStyle = i % 2 === 0 ? this.wall : this.roof;
             ctx.fillRect(doorX - w / 2, g + i * stepH, w, stepH);
-            w += this.doorW * 0.5;
+            w += this.doorW * 0.9;
         }
         // Lanterns along the step edges, alternating sides.
-        const r = vh * 0.011;
+        const r = vh * 0.009;
+        const [nr, ng, nb] = rgbOf(this.lantern, [255, 122, 26]);
         for (let i = 0; i < LANTERNS; i++) {
             const side = i % 2 === 0 ? -1 : 1;
-            const sw = this.doorW * 1.6 + this.doorW * 0.5 * i;
-            const x = doorX + side * (sw / 2 - r * 1.2);
+            const sw = this.doorW * 1.8 + this.doorW * 0.9 * i;
+            const x = doorX + side * (sw / 2 - r * 1.3);
             const y = g + i * stepH - r * 0.9;
             const glow = 0.5 + 0.2 * Math.sin(TAU * (cycle * 3 + i * 0.37)) + this.lanterns[i];
-            const [nr, ng, nb] = rgbOf(this.lantern, [255, 122, 26]);
-            ctx.fillStyle = `rgba(${nr}, ${ng}, ${nb}, ${(0.18 * glow).toFixed(3)})`;
+            ctx.fillStyle = `rgba(${nr}, ${ng}, ${nb}, ${(0.14 * glow).toFixed(3)})`;
             ctx.beginPath();
-            ctx.arc(x, y, r * (1.8 + glow), 0, TAU);
+            ctx.arc(x, y, r * (1.4 + glow), 0, TAU);
             ctx.fill();
             ctx.fillStyle = this.lantern;
             ctx.beginPath();

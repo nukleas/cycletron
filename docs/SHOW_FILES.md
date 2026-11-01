@@ -70,7 +70,9 @@ A section's length in bars is its weight times the `slow` factor. Here
 `intro@2` under `.slow(4)` is 8 bars, and `outro` is 4. The labels (`intro`,
 `drop`, …) are what `[song.sections]` refers to. To list a song's sections
 with their bars, run `cargo run -p song-check -- song.strudel` from the
-Cycletron repo.
+Cycletron repo. A flat MIDI import (one `$:` track per instrument) gets a form
+from `node ui/scripts/section-song.mjs song.strudel --sections intro:0-5,…`,
+which slices every track at the bars you name.
 
 ### Bars
 
