@@ -26,6 +26,9 @@ import {forestDriveDef} from './modes/forest-drive.js';
 import {cockpitDef} from './modes/cockpit.js';
 import {tankFieldDef} from './modes/tank-field.js';
 import {starRoadDef} from './modes/star-road.js';
+import {graveyardDef} from './modes/graveyard.js';
+import {hauntedHouseDef} from './modes/haunted-house.js';
+import {ghostFogDef} from './modes/ghost-fog.js';
 import {logoDef} from './modes/logo.js';
 
 export const VIZ_MODES: readonly VizModeDef[] = [
@@ -49,6 +52,9 @@ export const VIZ_MODES: readonly VizModeDef[] = [
     cockpitDef,
     tankFieldDef,
     starRoadDef,
+    graveyardDef,
+    hauntedHouseDef,
+    ghostFogDef,
     logoDef,
 ];
 

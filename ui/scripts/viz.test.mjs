@@ -243,3 +243,38 @@ test('PLASMA reuses faded vacancies after churn without aliasing lifetime slots'
     assert.equal(plasma.pitchTarget[0], bassTarget);
     assert.ok(plasma.pitchTarget[other] > 0);
 });
+
+test('halloweenRole classes drums by voice and notes by register', async () => {
+    const {halloweenRole, isLong, registerPos} = await server.ssrLoadModule('/src/viz/modes/halloween/roles.ts');
+    assert.equal(halloweenRole('bd', NaN), 'kick');
+    assert.equal(halloweenRole('RolandTR909_sd', NaN), 'snare');
+    assert.equal(halloweenRole('cr', NaN), 'crash');
+    assert.equal(halloweenRole('ht', NaN), 'tom');
+    assert.equal(halloweenRole('cb', NaN), 'hat');
+    assert.equal(halloweenRole('tb', NaN), 'hat');
+    assert.equal(halloweenRole('hh', NaN), 'hat');
+    assert.equal(halloweenRole('gm_piano', NaN), 'perc');
+    assert.equal(halloweenRole('supersaw', 40), 'bass');
+    assert.equal(halloweenRole('gm_piano', 60), 'mid');
+    assert.equal(halloweenRole('square', 80), 'lead');
+    assert.equal(isLong(0, 0.5), false);
+    assert.equal(isLong(0, 0.75), true);
+    assert.equal(registerPos(48), 0);
+    assert.equal(registerPos(60), 0.5);
+    assert.equal(registerPos(100), 1);
+});
+
+test('graveFor takes the pitch column, then the nearest free one, stepping from the seeded side', async () => {
+    const {graveFor, COLS} = await server.ssrLoadModule('/src/viz/modes/graveyard.ts');
+    const taken = new Uint8Array(COLS);
+    assert.equal(graveFor(5, 0, taken), 5);
+    taken[5] = 1;
+    assert.equal(graveFor(5, 0, taken), 6);   // even seed steps right first
+    assert.equal(graveFor(5, 1, taken), 4);   // odd seed steps left first
+    taken[6] = 1;
+    taken[4] = 1;
+    assert.equal(graveFor(5, 0, taken), 7);
+    assert.equal(graveFor(0, 1, taken), 0);
+    taken.fill(1);
+    assert.equal(graveFor(5, 0, taken), -1);
+});

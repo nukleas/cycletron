@@ -33,6 +33,8 @@ const SWATCHES = {
         more: ['#05ffa1', '#ff9de2', '#7af7ff']},
     toxic: {bg: '#030803', neon: '#7dff3a', secondary: '#d4ff00', active: '#ffffff', violet: '#3aff9d', red: '#ff3a3a',
         more: ['#1ec74a', '#f0ff6b', '#9dff7a']},
+    pumpkin: {bg: '#0b0514', neon: '#ff7a1a', secondary: '#8a3cff', active: '#fff3b0', violet: '#5a2a9a', red: '#ff2e4d',
+        more: ['#7cff3f', '#e6f0ff', '#e8dcc0']},
 } satisfies Record<string, Swatch>;
 
 export const PALETTES = ['neon', ...Object.keys(SWATCHES)] as readonly string[];
