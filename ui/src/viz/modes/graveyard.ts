@@ -15,6 +15,7 @@
 import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
 import {type FieldHap, type FieldTeam, HapField, type Rgb} from '../hap-field.js';
 import {TAU, alphaRamp, clamp01, hash32, lerpRgb, mixRgb, rand01, rgbOf} from '../util.js';
+import {COLS, graveFor} from './halloween/graves.js';
 import {type Role, halloweenRole, isLong, registerPos} from './halloween/roles.js';
 import {type Pose, drawSkeleton, makePose, skeletonPose} from './halloween/skeleton.js';
 import {type Bat, type Bolt, GradientCache, ageBats, ageBolts, boltFlash, drawBats, drawBolt, drawGhost, drawMoon, drawStars, makeBat, makeBolt} from './halloween/sky.js';
@@ -28,7 +29,6 @@ const IDLE_RATE = 0.25;
 /** Cycles a skeleton takes to climb out before its onset, and to sink after. */
 const RISE = 0.12;
 const SINK = 0.3;
-export const COLS = 12;
 const HORIZON = 0.56;
 const MOON_X = 0.78;
 const MOON_Y = 0.2;
@@ -59,22 +59,6 @@ interface Dancer extends FieldHap<Team> {
     /** Dance phase offset so a chorus isn't in lockstep. */
     phaseOff: number;
     flash: number;
-}
-
-/**
- * The column a new dancer takes: its pitch column, else the nearest free
- * one, stepping outward with the first side from the seed; -1 when the row
- * is full.
- */
-export function graveFor(col: number, seed: number, taken: Uint8Array): number {
-    const first = (seed & 1) === 0 ? 1 : -1;
-    for (let d = 0; d < taken.length; d++) {
-        for (const side of d === 0 ? [0] : [first, -first]) {
-            const c = col + side * d;
-            if (c >= 0 && c < taken.length && !taken[c]) return c;
-        }
-    }
-    return -1;
 }
 
 const taken = new Uint8Array(COLS);

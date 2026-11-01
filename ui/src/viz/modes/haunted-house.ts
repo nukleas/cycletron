@@ -14,10 +14,10 @@
 import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
 import {type FieldHap, type FieldTeam, HapField, type Rgb} from '../hap-field.js';
 import {TAU, alphaRamp, clamp01, follow, hash32, lerpRgb, mixRgb, rand01, rgbOf} from '../util.js';
+import {graveFor} from './halloween/graves.js';
 import {type Role, halloweenRole, isLong, registerPos} from './halloween/roles.js';
 import {type Pose, drawSilhouette, makePose, skeletonPose} from './halloween/skeleton.js';
 import {type Bolt, GradientCache, ageBolts, boltFlash, drawBolt, drawGhost, drawMoon, drawStars, makeBolt} from './halloween/sky.js';
-import {graveFor} from './graveyard.js';
 
 const REFERENCE_HEIGHT = 1080;
 const LOOKAHEAD = 2;

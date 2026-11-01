@@ -284,6 +284,7 @@ function makeGhost(base: FieldHap<Team>): Ghost {
 export const ghostFogDef: VizModeDef = {
     id: 'ghost-fog',
     name: 'GHOST FOG',
+    // Slower fades (0.12) left residue older than the 3 s preroll, failing the render seam test.
     trailFade: 0.16,
     create: () => new GhostFogMode(),
 };

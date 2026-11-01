@@ -265,7 +265,7 @@ test('halloweenRole classes drums by voice and notes by register', async () => {
 });
 
 test('graveFor takes the pitch column, then the nearest free one, stepping from the seeded side', async () => {
-    const {graveFor, COLS} = await server.ssrLoadModule('/src/viz/modes/graveyard.ts');
+    const {graveFor, COLS} = await server.ssrLoadModule('/src/viz/modes/halloween/graves.ts');
     const taken = new Uint8Array(COLS);
     assert.equal(graveFor(5, 0, taken), 5);
     taken[5] = 1;
