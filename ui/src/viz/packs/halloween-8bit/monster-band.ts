@@ -4,14 +4,14 @@
  * a long note holds the pose, and a kick thumps the stage.
  */
 
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {type FieldHap, type FieldTeam, HapField, type Rgb} from '../hap-field.js';
-import {bakePix, drawHud, drawSprite, frameRect, nearest, PW, PxScreen, type Pix} from './halloween/pixel.js';
-import {isLong, registerPos} from './halloween/roles.js';
-import {MOON} from './halloween/sprites.js';
+import type {VizMode, VizModeDef, VizServices} from '../../sdk.js';
+import {type FieldHap, type FieldTeam, HapField, type Rgb} from '../../sdk.js';
+import {bakePix, drawHud, drawSprite, frameRect, nearest, PW, PxScreen, type Pix} from './lib/pixel.js';
+import {isLong, registerPos} from './lib/roles.js';
+import {MOON} from './lib/sprites.js';
 import {
     type Cast, type KitFlash, type KitPiece, castFor, drawPerformer, kitPiece,
-} from './halloween/monsters.js';
+} from './lib/monsters.js';
 
 const LOOKAHEAD = 1;
 const MAX_HAPS = 480;
@@ -22,6 +22,8 @@ const CAP = 8;
 const FRONT_FOOT = 154;
 const BACK_FOOT = 102;
 const LIGHT_Y = 164;
+/** Cycles a hat, crash, snare, or tom keeps the arms posed after the hit. */
+const ARM_HOLD = 0.5;
 
 const RANK: Record<Cast, number> = {
     drummer: 0, frank: 1, wolf: 2, mummy: 3, vamp: 4, witch: 5, keytar: 6, ghost: 7,
@@ -91,6 +93,8 @@ class MonsterBandMode implements VizMode {
     };
     private readonly kitTeam: Record<KitPiece, string> = {kick: '', snare: '', hat: '', tom: '', crash: ''};
     private thump = 0;
+    /** Cycle when the raised or outstretched arms settle. */
+    private armUntil = 0;
     private pix!: Pix;
 
     layout(s: VizServices): void {
@@ -106,6 +110,7 @@ class MonsterBandMode implements VizMode {
             this.poses.clear();
             this.locked.clear();
             this.thump = 0;
+            this.armUntil = 0;
             this.zeroKit();
         }
         const decay = Math.exp(-dt * 8);
@@ -148,6 +153,7 @@ class MonsterBandMode implements VizMode {
                 pose.frame = (pose.frame + 1) % 3;
             }
         }
+        this.relaxArms();
         this.assemble();
     }
 
@@ -155,15 +161,24 @@ class MonsterBandMode implements VizMode {
         const piece = kitPiece(h.team.name, h.note);
         const pose = this.poseFor('*kit');
         pose.hit = 1;
-        if (piece === 'other') {
-            pose.frame = (pose.frame + 1) % 3;
-            return;
-        }
+        // A rest or an unnamed hit still flashes the hands. It does not pick a pose.
+        if (piece === 'other') return;
         this.kit[piece] = 1;
         this.kitTeam[piece] = h.team.name;
-        if (piece === 'kick') this.thump = 1;
-        else if (piece === 'snare' || piece === 'tom') pose.frame = 2;
-        else pose.frame = 1;
+        if (piece === 'kick') {
+            this.thump = 1;
+            return;
+        }
+        pose.frame = piece === 'snare' || piece === 'tom' ? 2 : 1;
+        const until = h.end + ARM_HOLD;
+        if (until > this.armUntil) this.armUntil = until;
+    }
+
+    /** Kick-only bars leave the arms down once the last cymbal or snare pose ends. */
+    private relaxArms(): void {
+        if (this.field.cycle < this.armUntil) return;
+        const pose = this.poses.get('*kit');
+        if (pose) pose.frame = 0;
     }
 
     /** Lock the costume once a pitched sine has been seen; other names lock immediately. */

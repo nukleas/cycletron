@@ -3,7 +3,7 @@
  * update(); drawing them is a pure read of that state plus `cycle`.
  */
 
-import {hash32, rand01, SeededRandom, TAU} from '../../util.js';
+import {hash32, rand01, SeededRandom, TAU} from '../../../sdk.js';
 import {drawSprite, PH, PW, type Pix} from './pixel.js';
 import {BATS, GHOSTS, MOON, TREE} from './sprites.js';
 

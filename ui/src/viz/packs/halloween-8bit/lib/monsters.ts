@@ -5,11 +5,10 @@
  * `perc` bucket — that bucket is every non-drum, including a trumpet.
  */
 
-import {drawSprite, type Ink} from './pixel.js';
+import {type Ink} from './pixel.js';
 import {halloweenRole, type Role} from './roles.js';
 import {drawGhostAt} from './sky.js';
-import {SKEL_DOWN, SKEL_OUT, SKEL_UP} from './sprites.js';
-import {instrumentFamily} from '../../tracks.js';
+import {instrumentFamily} from '../../../sdk.js';
 
 export type Cast = 'drummer' | 'frank' | 'wolf' | 'mummy' | 'vamp' | 'witch' | 'keytar' | 'ghost';
 
@@ -322,63 +321,118 @@ function drawChoir(
     ctx.fillRect(gx + 8, gy + 14, 8, mouth);
 }
 
+/** Taller than the front row, so the skull and the rib gaps read from the riser. */
+const DRUMMER_H = 56;
+
 function drawDrummer(
     ctx: CanvasRenderingContext2D, x: number, foot: number, frame: number, hit: number,
     accent: string, ink: Ink, kit?: KitFlash,
 ): void {
-    const sprite = frame % 3 === 1 ? SKEL_UP : frame % 3 === 2 ? SKEL_OUT : SKEL_DOWN;
-    const hop = frame % 3 === 1 ? 2 : 0;
-    const eyes = hit > 0.4 ? accent : ink.line;
-    drawSprite(
-        ctx, sprite,
-        Math.round(x - sprite.w * 2 / 2), Math.round(foot - sprite.h * 2 - hop),
-        [null, ink.bone, eyes],
-        {scale: 2, outline: ink.line},
-    );
+    const hop = frame % 3 === 1 ? 3 : 0;
+    const r = pen(ctx, x, foot - DRUMMER_H - hop);
+    drawBandSkeleton(r, frame % 3, hit > 0.4 ? accent : ink.bone, ink);
     if (kit) drawKit(ctx, x, foot, kit, ink);
+}
+
+/** Round skull, dark sockets, a separate jaw, ribs with gaps. Sockets stay dark. */
+function drawBandSkeleton(r: Rect, frame: number, grip: string, ink: Ink): void {
+    const bone = ink.bone;
+    const hole = ink.line;
+    r(-2, 0, 4, 1, bone);
+    r(-4, 1, 8, 2, bone);
+    r(-6, 3, 12, 2, bone);
+    r(-7, 5, 14, 7, bone);
+    r(-6, 12, 12, 2, bone);
+    r(-5, 6, 4, 3, hole);
+    r(2, 6, 4, 3, hole);
+    r(-1, 10, 2, 2, hole);
+    r(-5, 14, 10, 1, hole);
+    r(-4, 15, 8, 3, bone);
+    r(-3, 15, 1, 1, hole);
+    r(-1, 15, 1, 1, hole);
+    r(1, 15, 1, 1, hole);
+    r(3, 15, 1, 1, hole);
+    r(-1, 18, 2, 4, bone);
+    r(-1, 22, 2, 14, bone);
+    r(-8, 22, 7, 2, bone);
+    r(1, 22, 7, 2, bone);
+    r(-7, 26, 6, 2, bone);
+    r(1, 26, 6, 2, bone);
+    r(-6, 30, 5, 2, bone);
+    r(1, 30, 5, 2, bone);
+    r(-5, 35, 10, 3, bone);
+    if (frame === 1) {
+        r(-12, 8, 2, 12, bone);
+        r(-14, 3, 2, 7, bone);
+        r(-16, 1, 3, 2, grip);
+        r(8, 6, 2, 14, bone);
+        r(10, 2, 2, 6, bone);
+        r(12, 0, 3, 2, grip);
+    } else if (frame === 2) {
+        r(-16, 22, 8, 2, bone);
+        r(-18, 20, 3, 2, grip);
+        r(8, 20, 10, 2, bone);
+        r(18, 18, 3, 2, grip);
+    } else {
+        r(-12, 21, 4, 2, bone);
+        r(-13, 23, 2, 10, bone);
+        r(-14, 33, 2, 8, bone);
+        r(-16, 41, 3, 2, grip);
+        r(8, 21, 4, 2, bone);
+        r(11, 23, 2, 10, bone);
+        r(12, 33, 2, 8, bone);
+        r(13, 41, 3, 2, grip);
+    }
+    const step = frame === 2 ? 2 : 0;
+    r(-4, 39, 3, 7, bone);
+    r(1, 39, 3, 7, bone);
+    r(-4, 47, 2, 6, bone);
+    r(2 + step, 47, 2, 6, bone);
+    r(-6, 53, 4, 3, bone);
+    r(1 + step, 53, 5, 3, bone);
 }
 
 function hot(amount: number, css: string, idle: string): string {
     return amount > 0.35 && css ? css : idle;
 }
 
-/** Kit around the drummer. Pieces stay outside the skull and over the shins. */
+/** Kit scaled to the tall drummer. Pieces stay outside the skull and over the shins. */
 function drawKit(ctx: CanvasRenderingContext2D, x: number, foot: number, kit: KitFlash, ink: Ink): void {
     const X = Math.round(x);
     const kick = kit.kick > 0.35;
     ctx.fillStyle = ink.line;
-    ctx.fillRect(X - 34, foot - 26, 1, 26);
-    ctx.fillRect(X + 30, foot - 18, 1, 18);
-    ctx.fillRect(X - 24, foot - 16, 1, 16);
-    ctx.fillRect(X + 20, foot - 11, 1, 11);
-    const swing = kit.crash > 0.35 ? -3 : 0;
+    ctx.fillRect(X - 46, foot - 54, 1, 54);
+    ctx.fillRect(X + 42, foot - 50, 1, 50);
+    ctx.fillRect(X - 30, foot - 34, 1, 34);
+    ctx.fillRect(X + 28, foot - 26, 1, 26);
+    const swing = kit.crash > 0.35 ? -4 : 0;
     ctx.fillStyle = hot(kit.crash, kit.crashCss, ink.moon);
-    ctx.fillRect(X - 44, foot - 26 + swing, 14, 2);
-    if (kit.crash > 0.35) ctx.fillRect(X - 40, foot - 28 + swing, 8, 1);
-    const gap = kit.hat > 0.35 ? 3 : 1;
+    ctx.fillRect(X - 58, foot - 56 + swing, 20, 2);
+    if (kit.crash > 0.35) ctx.fillRect(X - 54, foot - 58 + swing, 12, 1);
+    const gap = kit.hat > 0.35 ? 4 : 1;
     ctx.fillStyle = hot(kit.hat, kit.hatCss, ink.moon);
-    ctx.fillRect(X + 24, foot - 20 - gap, 11, 2);
-    ctx.fillRect(X + 24, foot - 17, 11, 2);
+    ctx.fillRect(X + 34, foot - 50 - gap, 16, 2);
+    ctx.fillRect(X + 34, foot - 46, 16, 2);
     ctx.fillStyle = ink.line;
-    ctx.fillRect(X - 30, foot - 14, 10, 5);
-    ctx.fillRect(X - 28, foot - 20, 8, 4);
+    ctx.fillRect(X - 40, foot - 28, 14, 8);
+    ctx.fillRect(X - 36, foot - 40, 12, 6);
     if (kit.tom > 0.35) {
         ctx.fillStyle = hot(kit.tom, kit.tomCss, ink.roof);
-        ctx.fillRect(X - 29, foot - 13, 8, 3);
-        ctx.fillRect(X - 27, foot - 19, 6, 2);
+        ctx.fillRect(X - 38, foot - 26, 10, 4);
+        ctx.fillRect(X - 34, foot - 38, 8, 3);
     }
-    const snareY = foot - 15 - (kit.snare > 0.35 ? 1 : 0);
+    const snareY = foot - 32 - (kit.snare > 0.35 ? 2 : 0);
     ctx.fillStyle = hot(kit.snare, kit.snareCss, ink.stone);
-    ctx.fillRect(X + 16, snareY, 10, 4);
+    ctx.fillRect(X + 18, snareY, 14, 6);
     ctx.fillStyle = ink.bone;
-    ctx.fillRect(X + 18, snareY - (kit.snare > 0.35 ? 2 : 1), kit.snare > 0.35 ? 7 : 5, 1);
+    ctx.fillRect(X + 20, snareY - (kit.snare > 0.35 ? 2 : 1), kit.snare > 0.35 ? 10 : 6, 1);
     ctx.fillStyle = hot(kit.kick, kit.kickCss, ink.stoneDark);
-    ctx.fillRect(X - 8, foot - 12, 16, 10);
+    ctx.fillRect(X - 10, foot - 11, 20, 10);
     ctx.fillStyle = kick ? ink.moon : ink.line;
-    ctx.fillRect(X - 4, foot - 9, 8, 5);
+    ctx.fillRect(X - 6, foot - 9, 12, 6);
     ctx.fillStyle = ink.bone;
-    ctx.fillRect(X + 2, foot - 2, 6, 2);
-    ctx.fillRect(X + 4, kick ? foot - 11 : foot - 7, 2, kick ? 4 : 5);
+    ctx.fillRect(X + 2, foot - 2, 8, 2);
+    ctx.fillRect(X + 5, kick ? foot - 10 : foot - 6, 2, 5);
 }
 
 function arms(r: Rect, frame: number, up: number, skin: string, y = 15): void {

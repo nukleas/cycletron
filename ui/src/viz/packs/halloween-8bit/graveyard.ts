@@ -7,15 +7,15 @@
  * Painted into a 320×180 buffer. Spawns run in update().
  */
 
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {type FieldHap, type FieldTeam, HapField} from '../hap-field.js';
-import {clamp01, hash32, rand01} from '../util.js';
-import {COLS, graveFor} from './halloween/graves.js';
-import {bakePix, drawHud, drawSprite, HUD_Y, nearest, PW, PxScreen, type Pix} from './halloween/pixel.js';
-import {type Role, halloweenRole, isLong, registerPos} from './halloween/roles.js';
-import {danceFrame, drawDancer} from './halloween/skeleton.js';
-import {TOMBS} from './halloween/sprites.js';
-import {type Bat, type Bolt, ageBats, ageBolts, boltFlash, drawBats, drawBolt, drawGhostAt, drawNight, drawTree, makeBat, makeBolt} from './halloween/sky.js';
+import type {VizMode, VizModeDef, VizServices} from '../../sdk.js';
+import {type FieldHap, type FieldTeam, HapField} from '../../sdk.js';
+import {clamp01, hash32, rand01} from '../../sdk.js';
+import {COLS, graveFor} from './lib/graves.js';
+import {bakePix, drawHud, drawSprite, HUD_Y, nearest, PW, PxScreen, type Pix} from './lib/pixel.js';
+import {type Role, halloweenRole, isLong, registerPos} from './lib/roles.js';
+import {danceFrame, drawDancer} from './lib/skeleton.js';
+import {TOMBS} from './lib/sprites.js';
+import {type Bat, type Bolt, ageBats, ageBolts, boltFlash, drawBats, drawBolt, drawGhostAt, drawNight, drawTree, makeBat, makeBolt} from './lib/sky.js';
 
 const LOOKAHEAD = 2;
 const MAX_HAPS = 400;

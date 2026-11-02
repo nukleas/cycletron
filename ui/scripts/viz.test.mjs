@@ -245,7 +245,7 @@ test('PLASMA reuses faded vacancies after churn without aliasing lifetime slots'
 });
 
 test('halloweenRole classes drums by voice and notes by register', async () => {
-    const {halloweenRole, isLong, registerPos} = await server.ssrLoadModule('/src/viz/modes/halloween/roles.ts');
+    const {halloweenRole, isLong, registerPos} = await server.ssrLoadModule('/src/viz/packs/halloween-8bit/lib/roles.ts');
     assert.equal(halloweenRole('bd', NaN), 'kick');
     assert.equal(halloweenRole('RolandTR909_sd', NaN), 'snare');
     assert.equal(halloweenRole('cr', NaN), 'crash');
@@ -265,7 +265,7 @@ test('halloweenRole classes drums by voice and notes by register', async () => {
 });
 
 test('graveFor takes the pitch column, then the nearest free one, stepping from the seeded side', async () => {
-    const {graveFor, COLS} = await server.ssrLoadModule('/src/viz/modes/halloween/graves.ts');
+    const {graveFor, COLS} = await server.ssrLoadModule('/src/viz/packs/halloween-8bit/lib/graves.ts');
     const taken = new Uint8Array(COLS);
     assert.equal(graveFor(5, 0, taken), 5);
     taken[5] = 1;
@@ -277,4 +277,27 @@ test('graveFor takes the pitch column, then the nearest free one, stepping from 
     assert.equal(graveFor(0, 1, taken), 0);
     taken.fill(1);
     assert.equal(graveFor(5, 0, taken), -1);
+});
+
+test('a pack registers its modes and palettes, and imports only the sdk', async () => {
+    const {PACKS} = await server.ssrLoadModule('/src/viz/packs/index.ts');
+    const {VIZ_MODES} = await server.ssrLoadModule('/src/viz/registry.ts');
+    const {PALETTES} = await server.ssrLoadModule('/src/viz/palettes.ts');
+    assert.ok(PACKS.length >= 1);
+    for (const pack of PACKS) {
+        assert.deepEqual(pack.modes.map((m) => m.id), pack.manifest.modes);
+        for (const id of pack.manifest.modes) assert.ok(VIZ_MODES.some((m) => m.id === id), `${id} registered`);
+        for (const name of pack.manifest.palettes) assert.ok(PALETTES.includes(name), `${name} registered`);
+    }
+    // Pack code may reach `viz/` only through the sdk entry.
+    const {readdirSync} = await import('node:fs');
+    const root = fileURLToPath(new URL('../src/viz/packs/halloween-8bit/', import.meta.url));
+    const files = readdirSync(root, {recursive: true}).filter((f) => f.endsWith('.ts') && f !== 'index.ts');
+    for (const f of files) {
+        const src = readFileSync(root + f, 'utf8');
+        for (const m of src.matchAll(/from '([^']+)'/g)) {
+            const spec = m[1];
+            assert.ok(!spec.startsWith('../') || /\/sdk\.js$/.test(spec), `${f} imports ${spec}`);
+        }
+    }
 });

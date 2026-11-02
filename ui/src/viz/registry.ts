@@ -2,7 +2,8 @@
  * Ordered registry of ambient visualizer modes. This list is the single
  * source of truth: HUD labels, the Visuals menu, keyboard cycling, auto-cycle,
  * and persistence (by stable `id`) all derive from it. To add a mode, write
- * `viz/modes/<id>.ts` and append its def here.
+ * `viz/modes/<id>.ts` and append its def here, or ship it in a pack
+ * (`viz/packs/`). The end card stays last.
  */
 
 import type {VizModeDef} from './types.js';
@@ -26,11 +27,8 @@ import {forestDriveDef} from './modes/forest-drive.js';
 import {cockpitDef} from './modes/cockpit.js';
 import {tankFieldDef} from './modes/tank-field.js';
 import {starRoadDef} from './modes/star-road.js';
-import {graveyardDef} from './modes/graveyard.js';
-import {hauntedHouseDef} from './modes/haunted-house.js';
-import {monsterBandDef} from './modes/monster-band.js';
-import {ghostFogDef} from './modes/ghost-fog.js';
 import {logoDef} from './modes/logo.js';
+import {PACKS} from './packs/index.js';
 
 export const VIZ_MODES: readonly VizModeDef[] = [
     neonCircuitDef,
@@ -53,12 +51,13 @@ export const VIZ_MODES: readonly VizModeDef[] = [
     cockpitDef,
     tankFieldDef,
     starRoadDef,
-    graveyardDef,
-    hauntedHouseDef,
-    monsterBandDef,
-    ghostFogDef,
+    ...PACKS.flatMap((p) => p.modes),
     logoDef,
 ];
+
+for (const [i, m] of VIZ_MODES.entries()) {
+    if (VIZ_MODES.findIndex((o) => o.id === m.id) !== i) throw new Error(`two visualizer modes share the id '${m.id}'`);
+}
 
 /** Resolve a persisted mode id to its registry index; unknown ids → 0. */
 export function modeIndexById(id: string | null): number {

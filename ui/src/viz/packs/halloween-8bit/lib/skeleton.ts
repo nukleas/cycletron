@@ -1,6 +1,6 @@
 /** Two- and four-frame skeleton cycles, plus the figure in a window. */
 
-import {clamp01} from '../../util.js';
+import {clamp01} from '../../../sdk.js';
 import {drawSprite} from './pixel.js';
 import {SKEL_DOWN, SKEL_OUT, SKEL_STEP, SKEL_UP, WIN_A, WIN_B, type Sprite} from './sprites.js';
 

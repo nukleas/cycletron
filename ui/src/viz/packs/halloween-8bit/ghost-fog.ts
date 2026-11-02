@@ -6,13 +6,13 @@
  * No trail fade. The buffer is redrawn from state every frame.
  */
 
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {type FieldHap, type FieldTeam, HapField} from '../hap-field.js';
-import {clamp01, hash32, rand01, TAU} from '../util.js';
-import {bakePix, drawHud, drawSprite, HUD_Y, nearest, PW, PxScreen, type Pix} from './halloween/pixel.js';
-import {type Role, halloweenRole} from './halloween/roles.js';
-import {REED} from './halloween/sprites.js';
-import {drawGhostAt, drawNight, drawRidge, drawTree} from './halloween/sky.js';
+import type {VizMode, VizModeDef, VizServices} from '../../sdk.js';
+import {type FieldHap, type FieldTeam, HapField} from '../../sdk.js';
+import {clamp01, hash32, rand01, TAU} from '../../sdk.js';
+import {bakePix, drawHud, drawSprite, HUD_Y, nearest, PW, PxScreen, type Pix} from './lib/pixel.js';
+import {type Role, halloweenRole} from './lib/roles.js';
+import {REED} from './lib/sprites.js';
+import {drawGhostAt, drawNight, drawRidge, drawTree} from './lib/sky.js';
 
 const LOOKAHEAD = 1;
 const MAX_GHOSTS = 240;

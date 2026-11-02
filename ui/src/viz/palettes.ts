@@ -4,21 +4,12 @@
  * mode. `neon` is the app's own theme, as read from its CSS.
  */
 
+import type {Swatch} from './pack.js';
+import {PACKS} from './packs/index.js';
 import type {Theme} from './types.js';
 import {hueOf, rgbOf} from './util.js';
 
 type Rgb = [number, number, number];
-
-interface Swatch {
-    bg: string;
-    /** Primary, secondary and highlight accents, then four more for track colors. */
-    neon: string;
-    secondary: string;
-    active: string;
-    violet: string;
-    red: string;
-    more: [string, string, string];
-}
 
 const SWATCHES = {
     amber: {bg: '#0a0603', neon: '#ffb000', secondary: '#ff5e1a', active: '#fff1c1', violet: '#c7792b', red: '#ff3d2e',
@@ -33,11 +24,17 @@ const SWATCHES = {
         more: ['#05ffa1', '#ff9de2', '#7af7ff']},
     toxic: {bg: '#030803', neon: '#7dff3a', secondary: '#d4ff00', active: '#ffffff', violet: '#3aff9d', red: '#ff3a3a',
         more: ['#1ec74a', '#f0ff6b', '#9dff7a']},
-    pumpkin: {bg: '#0b0514', neon: '#ff7a1a', secondary: '#8a3cff', active: '#fff3b0', violet: '#5a2a9a', red: '#ff2e4d',
-        more: ['#7cff3f', '#e6f0ff', '#e8dcc0']},
 } satisfies Record<string, Swatch>;
 
-export const PALETTES = ['neon', ...Object.keys(SWATCHES)] as readonly string[];
+const ALL: Record<string, Swatch> = {...SWATCHES};
+for (const pack of PACKS) {
+    for (const [name, swatch] of Object.entries(pack.palettes)) {
+        if (name in ALL) throw new Error(`pack ${pack.manifest.id} redefines palette '${name}'`);
+        ALL[name] = swatch;
+    }
+}
+
+export const PALETTES = ['neon', ...Object.keys(ALL)] as readonly string[];
 
 const themes = new Map<string, Theme>();
 
@@ -46,7 +43,7 @@ export function paletteTheme(name: string, base: Theme): Theme {
     if (name === 'neon') return base;
     let theme = themes.get(name);
     if (!theme) {
-        const swatch = (SWATCHES as Record<string, Swatch>)[name];
+        const swatch = ALL[name];
         if (!swatch) throw new Error(`no palette '${name}' (have: ${PALETTES.join(', ')})`);
         theme = themeOf(swatch);
         themes.set(name, theme);

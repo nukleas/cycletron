@@ -3,8 +3,8 @@
  * Modes redraw this buffer from state every frame and blit it sharp.
  */
 
-import type {Theme} from '../../types.js';
-import {mixRgb, rgbOf} from '../../util.js';
+import type {Theme} from '../../../sdk.js';
+import {mixRgb, rgbOf} from '../../../sdk.js';
 
 export const PW = 320;
 export const PH = 180;

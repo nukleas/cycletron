@@ -7,16 +7,16 @@
  * Painted into a 320×180 buffer. The door and lanterns advance in update().
  */
 
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {type FieldHap, type FieldTeam, type Rgb, HapField} from '../hap-field.js';
-import {clamp01, follow, hash32, rand01} from '../util.js';
-import {graveFor} from './halloween/graves.js';
-import {HOUSE, drawShell} from './halloween/mansion.js';
-import {drawBigBoo, drawWindowMonster, windowMonster} from './halloween/monsters.js';
-import {bakePix, drawHud, drawSprite, frameRect, nearest, PW, PxScreen, type Pix} from './halloween/pixel.js';
-import {type Role, halloweenRole, isLong, registerPos} from './halloween/roles.js';
-import {PUMPS} from './halloween/sprites.js';
-import {type Bolt, ageBolts, boltFlash, drawBolt, drawGhostAt, drawNight, makeBolt} from './halloween/sky.js';
+import type {VizMode, VizModeDef, VizServices} from '../../sdk.js';
+import {type FieldHap, type FieldTeam, type Rgb, HapField} from '../../sdk.js';
+import {clamp01, follow, hash32, rand01} from '../../sdk.js';
+import {graveFor} from './lib/graves.js';
+import {HOUSE, drawShell} from './lib/mansion.js';
+import {drawBigBoo, drawWindowMonster, windowMonster} from './lib/monsters.js';
+import {bakePix, drawHud, drawSprite, frameRect, nearest, PW, PxScreen, type Pix} from './lib/pixel.js';
+import {type Role, halloweenRole, isLong, registerPos} from './lib/roles.js';
+import {PUMPS} from './lib/sprites.js';
+import {type Bolt, ageBolts, boltFlash, drawBolt, drawGhostAt, drawNight, makeBolt} from './lib/sky.js';
 
 const LOOKAHEAD = 2;
 const MAX_HAPS = 400;
