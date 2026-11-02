@@ -177,8 +177,9 @@ test('every mode of a pack loaded from its built module matches across a chunk s
     };
     const total = SECONDS * FPS;
     const from = 4 * FPS;
-    // Adjacent pairs, so every mode is drawn on both sides of a cut.
-    const pairs = modes.length === 1 ? [[modes[0], modes[0]]] : modes.slice(1).map((m, i) => [modes[i], m]);
+    // Each mode cut in after the one before it (the first after the last), so
+    // every mode is the one drawn at the seam once.
+    const pairs = modes.map((m, i) => [modes[(i + modes.length - 1) % modes.length], m]);
     for (const [one, two] of pairs) {
         const [whole, chunk] = await Promise.all([renderWithPack(0, total, one, two), renderWithPack(from, total - from, one, two)]);
         const differing = chunk.flatMap((h, i) => (h === whole[from + i] ? [] : [from + i]));
