@@ -1,19 +1,20 @@
 /**
  * HAUNTED HOUSE — a NES mansion. Each floor is a register and pitch picks
- * the window, lit with a two-frame silhouette. Kicks open the door, hats
- * light the porch pumpkins, held notes leave as chimney ghosts.
+ * the window, lit around a pixel monster. Kicks open the door, hats light
+ * the porch pumpkins, held notes leave as chimney ghosts, and a crash puts
+ * a Big Boo in the attic for a bar.
  *
  * Painted into a 320×180 buffer. The door and lanterns advance in update().
  */
 
 import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {type FieldHap, type FieldTeam, HapField} from '../hap-field.js';
+import {type FieldHap, type FieldTeam, type Rgb, HapField} from '../hap-field.js';
 import {clamp01, follow, hash32, rand01} from '../util.js';
 import {graveFor} from './halloween/graves.js';
 import {HOUSE, drawShell} from './halloween/mansion.js';
+import {drawBigBoo, drawWindowMonster, windowMonster} from './halloween/monsters.js';
 import {bakePix, drawHud, drawSprite, frameRect, nearest, PW, PxScreen, type Pix} from './halloween/pixel.js';
 import {type Role, halloweenRole, isLong, registerPos} from './halloween/roles.js';
-import {drawWindowDancer} from './halloween/skeleton.js';
 import {PUMPS} from './halloween/sprites.js';
 import {type Bolt, ageBolts, boltFlash, drawBolt, drawGhostAt, drawNight, makeBolt} from './halloween/sky.js';
 
@@ -66,6 +67,8 @@ class HauntedHouseMode implements VizMode {
     private doorAmp = 1;
     private vaneKick = 0;
     private thump = 0;
+    private booUntil = 0;
+    private booRgb: Rgb = [255, 46, 77];
     private pix!: Pix;
 
     layout(s: VizServices): void {
@@ -109,6 +112,7 @@ class HauntedHouseMode implements VizMode {
             this.bolts.length = 0;
             this.doorHold = 0;
             this.thump = 0;
+            this.booUntil = 0;
         }
         for (const h of field.haps) {
             h.flash *= Math.exp(-dt * 4);
@@ -123,7 +127,11 @@ class HauntedHouseMode implements VizMode {
                     break;
                 case 'hat': this.lanterns[h.seed % LANTERNS] = 1; break;
                 case 'snare': this.strike(h.seed, 1, 0.25); break;
-                case 'crash': this.strike(h.seed, 2, 0.5); break;
+                case 'crash':
+                    this.strike(h.seed, 2, 0.5);
+                    this.booUntil = field.cycle + 1;
+                    this.booRgb = [h.team.rgb[0], h.team.rgb[1], h.team.rgb[2]];
+                    break;
                 case 'perc': this.vaneKick = 1; break;
                 default: break;
             }
@@ -187,24 +195,37 @@ class HauntedHouseMode implements VizMode {
 
     private drawWindows(ctx: CanvasRenderingContext2D, cycle: number): void {
         const ink = this.pix.ink;
+        const boo = cycle < this.booUntil;
+        const booFrame = Math.floor(cycle * 4) % 3;
+        const booAccent = this.colorOf(this.booRgb);
         const idle = this.field.locked ? -1 : hash32(Math.floor(cycle * 0.5), 3) % HOUSE.windows.length;
         for (let i = 0; i < HOUSE.windows.length; i++) {
             const w = HOUSE.windows[i];
+            const attic = w.y <= 58;
             ctx.fillStyle = ink.line;
             ctx.fillRect(w.x, w.y, w.w, w.h);
-            let lit = this.lit[i];
-            const by = this.litBy[i];
-            if (i === idle) lit = Math.max(lit, 0.4);
-            if (lit > 0.08) {
-                ctx.fillStyle = lit > 0.5 && by ? this.colorOf(by.team.rgb) : ink.moonDim;
-                ctx.fillRect(w.x + 1, w.y + 1, w.w - 2, w.h - 2);
+            if (boo && attic) {
+                drawBigBoo(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, booFrame, booAccent, ink);
+            } else {
+                let lit = this.lit[i];
+                const by = this.litBy[i];
+                if (i === idle) lit = Math.max(lit, 0.4);
+                if (lit > 0.08) {
+                    ctx.fillStyle = lit > 0.5 && by ? this.colorOf(by.team.rgb) : ink.moonDim;
+                    ctx.fillRect(w.x + 1, w.y + 1, w.w - 2, w.h - 2);
+                }
+                ctx.fillStyle = ink.wallDark;
+                ctx.fillRect(w.x + (w.w >> 1), w.y, 1, w.h);
+                ctx.fillRect(w.x, w.y + (w.h >> 1), w.w, 1);
                 if (by && lit > 0.5 && !by.long) {
-                    drawWindowDancer(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, Math.floor(cycle * 8 + by.phaseOff), ink.line);
+                    const frame = (Math.floor(cycle * 4) + (by.seed % 3)) % 3;
+                    drawWindowMonster(
+                        ctx, windowMonster(by.seed, by.role),
+                        w.x + 1, w.y + 1, w.w - 2, w.h - 2,
+                        frame, this.colorOf(by.team.rgb), ink,
+                    );
                 }
             }
-            ctx.fillStyle = ink.wallDark;
-            ctx.fillRect(w.x + (w.w >> 1), w.y, 1, w.h);
-            ctx.fillRect(w.x, w.y + (w.h >> 1), w.w, 1);
             frameRect(ctx, w.x, w.y, w.w, w.h, ink.stone);
         }
     }

@@ -28,6 +28,7 @@ import {tankFieldDef} from './modes/tank-field.js';
 import {starRoadDef} from './modes/star-road.js';
 import {graveyardDef} from './modes/graveyard.js';
 import {hauntedHouseDef} from './modes/haunted-house.js';
+import {monsterBandDef} from './modes/monster-band.js';
 import {ghostFogDef} from './modes/ghost-fog.js';
 import {logoDef} from './modes/logo.js';
 
@@ -54,6 +55,7 @@ export const VIZ_MODES: readonly VizModeDef[] = [
     starRoadDef,
     graveyardDef,
     hauntedHouseDef,
+    monsterBandDef,
     ghostFogDef,
     logoDef,
 ];

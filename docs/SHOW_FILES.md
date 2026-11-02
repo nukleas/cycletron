@@ -203,6 +203,7 @@ uses the section's `transition`.
 | `forest-drive` | A country road at dusk. Every tree on the verge is a note, reaching the windshield on its beat. | the pattern |
 | `graveyard` | An 8-bit graveyard at night. Every note is a skeleton rising from its grave to dance; kicks thump the ground, snares strike lightning, hats send bats across the moon, held notes rise as ghosts. | the pattern |
 | `haunted-house` | An 8-bit haunted house. Notes light windows by floor and pitch with a dancer inside; kicks swing the front door, hats flare the porch lanterns, held notes puff ghosts from the chimney, snares strike lightning behind it. | the pattern |
+| `monster-band` | An 8-bit stage where every track is a monster playing its instrument: a skeleton drummer whose kit fires per drum, Frankenstein on bass, a werewolf on guitar, a mummy on horn, a vampire at the organ, a witch on the synth, Boos for the rest. Each plays on its own track's notes. | the pattern |
 | `ghost-fog` | 8-bit ghosts drifting over a swamp, one per note, in their track's colour, with will-o'-wisps on the hats. Calm; for intros and outros. | the pattern |
 | `tunnel` | Octagonal rings flying at you, one per beat, each reaching the gate on time. | the pattern |
 | `marble-core` | Concentric rings, one per track, with a playhead arm sweeping once per bar. | the pattern |
