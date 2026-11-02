@@ -62,7 +62,9 @@ Pack code imports `@cycletron/viz-sdk` and nothing else from the app. That is
 `VizServices`, `Theme`), `HapField` for modes that turn scheduled notes into
 persistent objects, `TrackModel` for one-bar views, `instrumentFamily`, the
 drawing and math helpers (`hash32`, `rand01`, `SeededRandom`, `alphaRamp`,
-`lerpRgb`, and so on), and `validatePack`. Inside the repo the name resolves
+`lerpRgb`, and so on), the 320×180 pixel screen for 8-bit modes (`PxScreen`,
+`spr` bitmaps, `drawSprite`, `frameRect`, `fillTri`, `nearest`; sdk 1.1), and
+`validatePack`. Inside the repo the name resolves
 to the source (`tsconfig.json` paths and the vite alias); a built pack keeps
 it as an external import that the page's import map resolves.
 
@@ -112,7 +114,9 @@ whole, code and all; one without is treated as samples and only its audio is
 read. The dialog shows the pack's name, author, license and what it carries; a
 pack with visualizer code says so, since that code runs inside the app with
 the app's permissions. Install copies the folder to `Packs/<id>/` and enables
-it, and its visualizers load right away.
+it, and its visualizers load right away. Installing a pack whose id is already
+installed offers to replace it; the pack keeps its enabled state, and new
+visualizer code loads at the next launch.
 
 Only enabled packs load. `Packs/enabled.json` lists them; the Samples panel
 toggles any installed pack, with or without sample banks. A pack copied into

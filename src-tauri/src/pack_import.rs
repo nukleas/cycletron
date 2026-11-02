@@ -111,6 +111,8 @@ pub struct InstallRequest {
     pub token: String,
     pub root: String,
     pub enable: Option<bool>,
+    /// Swap out an installed pack of the same id. It keeps its enabled state.
+    pub replace: Option<bool>,
 }
 
 /// The reviewed mapping, as approved in the import UI.
@@ -821,7 +823,7 @@ pub fn commit_pack_install(
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<PackInstallResult, String> {
-    let InstallRequest { token, root, enable } = request;
+    let InstallRequest { token, root, enable, replace } = request;
     let root = PathBuf::from(&root);
     if !token.is_empty() {
         let stage = stage_dir(&app_handle, &token)?;
@@ -838,21 +840,14 @@ pub fn commit_pack_install(
         return Err(format!("visualizer pack {} is not built (no dist/index.js)", v.id));
     }
     let packs_dir = packs::ensured_packs_root(&state);
-    let dest = packs_dir.join(&manifest.id);
-    if dest.exists() {
-        return Err(format!(
-            "pack {} already exists — remove it or pick another id",
-            manifest.id
-        ));
-    }
-    let (file_count, bytes) = match packs::copy_dir_all(&root, &dest) {
-        Ok(n) => n,
-        Err(e) => {
-            let _ = fs::remove_dir_all(&dest);
-            return Err(e);
-        }
-    };
-    let load = if enable.unwrap_or(true) {
+    let was_enabled = packs::read_enabled(&packs_dir)
+        .enabled
+        .iter()
+        .any(|id| id == &manifest.id);
+    let (dest, file_count, bytes, existed) =
+        place_pack(&root, &packs_dir, &manifest.id, replace.unwrap_or(false))?;
+    let want_enabled = if existed { was_enabled } else { enable.unwrap_or(true) };
+    let load = if want_enabled {
         match packs::enable_pack_inner(&packs_dir, &manifest.id) {
             Ok(r) => Some(r),
             Err(e) => {
@@ -877,6 +872,39 @@ pub fn commit_pack_install(
         load,
         viz: viz.into_iter().map(|v| v.id).collect(),
     })
+}
+
+/// Copy a pack folder into `Packs/<id>` through a temp folder, so a failed
+/// copy never touches what is installed. With `replace`, an installed pack of
+/// the same id is swapped out. Returns the destination, files, bytes, and
+/// whether a pack was there before.
+fn place_pack(
+    root: &Path,
+    packs_dir: &Path,
+    id: &str,
+    replace: bool,
+) -> Result<(PathBuf, usize, u64, bool), String> {
+    let dest = packs_dir.join(id);
+    let existed = dest.exists();
+    if existed && !replace {
+        return Err(format!(
+            "pack {id} already exists — remove it or pick another id"
+        ));
+    }
+    let tmp = packs_dir.join(format!(".{id}.installing"));
+    let _ = fs::remove_dir_all(&tmp);
+    let (files, bytes) = match packs::copy_dir_all(root, &tmp) {
+        Ok(n) => n,
+        Err(e) => {
+            let _ = fs::remove_dir_all(&tmp);
+            return Err(e);
+        }
+    };
+    if existed {
+        fs::remove_dir_all(&dest).map_err(|e| format!("remove {}: {e}", dest.display()))?;
+    }
+    fs::rename(&tmp, &dest).map_err(|e| format!("place {}: {e}", dest.display()))?;
+    Ok((dest, files, bytes, existed))
 }
 
 #[cfg(test)]
@@ -968,6 +996,35 @@ mod tests {
         assert!(root.join("songs/a.strudel").is_file());
         assert!(root.join("shows/a.show.toml").is_file());
         assert!(root.join("viz/snow/src/index.ts").is_file());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn replacing_an_installed_pack_swaps_the_folder() {
+        let dir = tmp("replace");
+        let packs = dir.join("Packs");
+        fs::create_dir_all(&packs).unwrap();
+        let v1 = dir.join("v1");
+        fs::create_dir_all(&v1).unwrap();
+        fs::write(v1.join("pack.json"), "1").unwrap();
+        fs::write(v1.join("old.txt"), "x").unwrap();
+        let v2 = dir.join("v2");
+        fs::create_dir_all(&v2).unwrap();
+        fs::write(v2.join("pack.json"), "2").unwrap();
+
+        let (dest, files, _, existed) = place_pack(&v1, &packs, "demo", false).unwrap();
+        assert!(!existed);
+        assert_eq!(files, 2);
+        assert!(place_pack(&v2, &packs, "demo", false).is_err(), "no replace, no overwrite");
+        assert!(dest.join("old.txt").exists());
+
+        let (dest2, files2, _, existed2) = place_pack(&v2, &packs, "demo", true).unwrap();
+        assert!(existed2);
+        assert_eq!(files2, 1);
+        assert_eq!(dest, dest2);
+        assert!(!dest.join("old.txt").exists(), "the old folder is gone, not merged");
+        assert_eq!(fs::read_to_string(dest.join("pack.json")).unwrap(), "2");
+        assert!(!packs.join(".demo.installing").exists());
         let _ = fs::remove_dir_all(&dir);
     }
 

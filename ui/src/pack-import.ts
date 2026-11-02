@@ -170,7 +170,13 @@ export class PackImport {
         if (pack.viz.length) {
             lines.push('', 'This pack includes visualizer code that runs inside Cycletron with the app\'s own permissions. Install it only if you trust where it came from.');
         }
-        const ok = await confirmDialog(lines.join('\n'), {title: 'Install pack', okLabel: 'Install', cancelLabel: 'Cancel', kind: pack.viz.length ? 'warning' : 'info'});
+        const installed = (await invoke<Array<{id: string; version: string; enabled: boolean}>>('list_packs').catch(() => []))
+            .find((p) => p.id === pack.id);
+        if (installed) {
+            const viz = pack.viz.length ? '; the new visualizers load at the next launch' : '';
+            lines.push('', `Already installed: v${installed.version}. Replace it with v${pack.version}? It stays ${installed.enabled ? 'enabled' : 'disabled'}${viz}.`);
+        }
+        const ok = await confirmDialog(lines.join('\n'), {title: installed ? 'Replace pack' : 'Install pack', okLabel: installed ? 'Replace' : 'Install', cancelLabel: 'Cancel', kind: pack.viz.length ? 'warning' : 'info'});
         if (!ok) {
             if (preview.staged && preview.token) void invoke('cancel_pack_import', {token: preview.token}).catch(() => {});
             return;
@@ -178,7 +184,7 @@ export class PackImport {
         try {
             const result = await invoke<{id: string; name: string; viz: string[]; banks: string[]; file_count: number;
                 load: {banks: Array<{name: string; files: string[]}>} | null}>('commit_pack_install', {
-                request: {token: preview.token, root: preview.root, enable: true},
+                request: {token: preview.token, root: preview.root, enable: true, replace: installed !== undefined},
             });
             let loaded = 0;
             if (result.load?.banks?.length) {
@@ -188,7 +194,8 @@ export class PackImport {
             const parts = [`${result.file_count} files`];
             if (result.banks.length) parts.push(`${result.banks.length} banks, ${loaded} samples loaded`);
             if (vizLoaded.length) parts.push(`visualizers ${vizLoaded.join(', ')} ready`);
-            void notify('Pack installed', `${result.name}: ${parts.join(' · ')}`);
+            else if (installed && pack.viz.length) parts.push('restart Cycletron to load the new visualizers');
+            void notify(installed ? 'Pack replaced' : 'Pack installed', `${result.name}: ${parts.join(' · ')}`);
             document.dispatchEvent(new CustomEvent('sounds:changed'));
         } catch (e) {
             await errorDialog(`Install failed:\n${e}`);
