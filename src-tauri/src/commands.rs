@@ -241,6 +241,53 @@ pub fn read_text(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("read {path}: {e}"))
 }
 
+/// A built visualizer pack found in the library, ready to load.
+#[derive(serde::Serialize)]
+pub struct VizPackSource {
+    pub id: String,
+    pub path: String,
+    pub source: String,
+}
+
+/// The built visualizer packs in the library: every `Packs/*/pack.json` whose
+/// `viz` entries point at folders with a `pack.json` and a `dist/index.js`.
+/// Packs without a build are skipped with a log line, not an error.
+#[tauri::command]
+pub fn list_viz_packs(state: State<'_, AppState>) -> Result<Vec<VizPackSource>, String> {
+    let root = state.library_root().join("Packs");
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(&root) else { return Ok(out) };
+    let mut dirs: Vec<PathBuf> = entries.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
+    dirs.sort();
+    for dir in dirs {
+        let manifest = dir.join("pack.json");
+        let Ok(text) = std::fs::read_to_string(&manifest) else { continue };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+            tracing::warn!("{}: not valid JSON, skipped", manifest.display());
+            continue;
+        };
+        let Some(viz) = json.get("viz").and_then(|v| v.as_array()) else { continue };
+        for rel in viz.iter().filter_map(|v| v.as_str()) {
+            let viz_dir = dir.join(rel);
+            let viz_manifest = viz_dir.join("pack.json");
+            let Ok(vtext) = std::fs::read_to_string(&viz_manifest) else {
+                tracing::warn!("{}: no pack.json, skipped", viz_dir.display());
+                continue;
+            };
+            let id = serde_json::from_str::<serde_json::Value>(&vtext)
+                .ok()
+                .and_then(|j| j.get("id").and_then(|v| v.as_str()).map(str::to_string))
+                .unwrap_or_else(|| rel.to_string());
+            let built = viz_dir.join("dist").join("index.js");
+            match std::fs::read_to_string(&built) {
+                Ok(source) => out.push(VizPackSource { id, path: viz_dir.to_string_lossy().into_owned(), source }),
+                Err(_) => tracing::warn!("{}: not built (no dist/index.js), skipped", viz_dir.display()),
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// Write a show file as is: no frontmatter, unlike a song.
 #[tauri::command]
 pub fn write_text(path: String, text: String) -> Result<(), String> {

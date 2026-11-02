@@ -26,6 +26,11 @@ const {memory} = initSync({
 });
 const theme = defaultTheme();
 
+// The Halloween pack lives in the user's library; its unit tests run when it's there.
+const HALLOWEEN_DIR = `${process.env.HOME}/Code/strulibrary/Packs/halloween/viz/halloween-8bit/src/`;
+const HALLOWEEN = (await import('node:fs')).existsSync(HALLOWEEN_DIR);
+const loadLibPack = (rel) => server.ssrLoadModule('/@fs' + HALLOWEEN_DIR + rel);
+
 // Only the circuit's tempo accessor needs a browser global.
 globalThis.window = {strudelApp: {scheduler: {tempo: {bpm: 120}}}};
 after(() => { delete globalThis.window; });
@@ -244,8 +249,8 @@ test('PLASMA reuses faded vacancies after churn without aliasing lifetime slots'
     assert.ok(plasma.pitchTarget[other] > 0);
 });
 
-test('halloweenRole classes drums by voice and notes by register', async () => {
-    const {halloweenRole, isLong, registerPos} = await server.ssrLoadModule('/src/viz/packs/halloween-8bit/lib/roles.ts');
+test('halloweenRole classes drums by voice and notes by register', {skip: !HALLOWEEN}, async () => {
+    const {halloweenRole, isLong, registerPos} = await loadLibPack('lib/roles.ts');
     assert.equal(halloweenRole('bd', NaN), 'kick');
     assert.equal(halloweenRole('RolandTR909_sd', NaN), 'snare');
     assert.equal(halloweenRole('cr', NaN), 'crash');
@@ -264,8 +269,8 @@ test('halloweenRole classes drums by voice and notes by register', async () => {
     assert.equal(registerPos(100), 1);
 });
 
-test('graveFor takes the pitch column, then the nearest free one, stepping from the seeded side', async () => {
-    const {graveFor, COLS} = await server.ssrLoadModule('/src/viz/packs/halloween-8bit/lib/graves.ts');
+test('graveFor takes the pitch column, then the nearest free one, stepping from the seeded side', {skip: !HALLOWEEN}, async () => {
+    const {graveFor, COLS} = await loadLibPack('lib/graves.ts');
     const taken = new Uint8Array(COLS);
     assert.equal(graveFor(5, 0, taken), 5);
     taken[5] = 1;
@@ -279,25 +284,13 @@ test('graveFor takes the pitch column, then the nearest free one, stepping from 
     assert.equal(graveFor(5, 0, taken), -1);
 });
 
-test('a pack registers its modes and palettes, and imports only the sdk', async () => {
-    const {PACKS} = await server.ssrLoadModule('/src/viz/packs/index.ts');
-    const {VIZ_MODES} = await server.ssrLoadModule('/src/viz/registry.ts');
-    const {PALETTES} = await server.ssrLoadModule('/src/viz/palettes.ts');
-    assert.ok(PACKS.length >= 1);
-    for (const pack of PACKS) {
-        assert.deepEqual(pack.modes.map((m) => m.id), pack.manifest.modes);
-        for (const id of pack.manifest.modes) assert.ok(VIZ_MODES.some((m) => m.id === id), `${id} registered`);
-        for (const name of pack.manifest.palettes) assert.ok(PALETTES.includes(name), `${name} registered`);
-    }
-    // Pack code may reach `viz/` only through the sdk entry.
-    const {readdirSync} = await import('node:fs');
-    const root = fileURLToPath(new URL('../src/viz/packs/halloween-8bit/', import.meta.url));
-    const files = readdirSync(root, {recursive: true}).filter((f) => f.endsWith('.ts') && f !== 'index.ts');
-    for (const f of files) {
-        const src = readFileSync(root + f, 'utf8');
-        for (const m of src.matchAll(/from '([^']+)'/g)) {
-            const spec = m[1];
-            assert.ok(!spec.startsWith('../') || /\/sdk\.js$/.test(spec), `${f} imports ${spec}`);
-        }
-    }
+test('validatePack holds a manifest to what the code exports', async () => {
+    const {validatePack} = await server.ssrLoadModule('/src/viz/pack.ts');
+    const mode = (id) => ({id, name: id.toUpperCase(), create: () => ({layout() {}, update() {}, render() {}})});
+    const swatch = {bg: '#000', neon: '#fff', secondary: '#f0f', active: '#ff0', violet: '#808', red: '#f00', more: ['#111', '#222', '#333']};
+    const manifest = {id: 'a/b', name: 'B', version: '0.0.1', author: 'a', license: 'MIT', description: '', modes: ['x'], palettes: ['p']};
+    assert.ok(validatePack({manifest, modes: [mode('x')], palettes: {p: swatch}}));
+    assert.throws(() => validatePack({manifest, modes: [mode('y')], palettes: {p: swatch}}), /lists mode 'x'/);
+    assert.throws(() => validatePack({manifest, modes: [mode('x'), mode('y')], palettes: {p: swatch}}), /exports mode 'y'/);
+    assert.throws(() => validatePack({manifest, modes: [mode('x')], palettes: {}}), /lists palette 'p'/);
 });

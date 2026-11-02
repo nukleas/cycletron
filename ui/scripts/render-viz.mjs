@@ -26,7 +26,7 @@
 
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {access, mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile} from 'node:fs/promises';
 import {availableParallelism, homedir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -57,7 +57,11 @@ if (positional.length !== 1) {
 }
 const showPath = path.resolve(positional[0]);
 
-const server = await createServer({root: UI, mode: 'render', logLevel: 'error', server: {port: 0}});
+// The show's visualizer packs, built if needed, before the server so it may serve them.
+const packs = await showPacks(showPath);
+const packSources = packs.map((p) => p.source);
+const server = await createServer({root: UI, mode: 'render', logLevel: 'error',
+    server: {port: 0, fs: {allow: [UI, ...packs.map((p) => p.dir)]}}});
 let parts = null;
 try {
     await server.listen();
@@ -69,7 +73,12 @@ try {
 
 async function main() {
     const {parseShow, cue, ShowError} = await server.ssrLoadModule('/src/show/show.ts');
-    const {VIZ_MODES} = await server.ssrLoadModule('/src/viz/registry.ts');
+    const {VIZ_MODES, registerPack} = await server.ssrLoadModule('/src/viz/registry.ts');
+    // Register the packs here too, so the parser knows their modes and palettes.
+    for (const p of packs) {
+        const mod = await server.ssrLoadModule('/@fs' + p.built);
+        registerPack(mod.default ?? Object.values(mod).find((v) => v && typeof v === 'object' && 'manifest' in v));
+    }
     const ctx = {dir: path.dirname(showPath), home: homedir(), modes: VIZ_MODES.map((m) => m.id)};
     let show;
     try {
@@ -156,7 +165,7 @@ async function main() {
     await Promise.allSettled(Array.from({length: Math.min(jobs, chunks.length)}, async () => {
         while (next < chunks.length && !failure) {
             const k = next++;
-            await renderChunk(chunks[k], chunkPath(k), {url, width, height, fps, progress, failed: () => failure})
+            await renderChunk(chunks[k], chunkPath(k), {url, width, height, fps, progress, failed: () => failure, packSources})
                 .catch((e) => {
                     failure ??= e;
                 });
@@ -201,7 +210,7 @@ async function exported(song) {
 }
 
 /** Render `chunk.count` frames of its song from song frame `chunk.start` to a video-only part. */
-async function renderChunk({t, start, count}, out, {url, width, height, fps, progress, failed}) {
+async function renderChunk({t, start, count}, out, {url, width, height, fps, progress, failed, packSources}) {
     const browser = await chromium.launch();
     let ffmpeg = null;
     try {
@@ -212,6 +221,7 @@ async function renderChunk({t, start, count}, out, {url, width, height, fps, pro
         await page.goto(url);
         await page.waitForFunction(() => 'vizRender' in window);
         await page.evaluate((opts) => window.vizRender.setup(opts), {
+            packs: packSources,
             code: t.performance.code, bpm: t.performance.bpm, cues: t.cues, song: {passes: t.song.passes, fade: t.song.fade},
             width, height, fps,
             startFrame: start, sensitivity: t.song.sensitivity, audio: '/__render/mix.wav',
@@ -265,4 +275,49 @@ function exited(child) {
 function fail(message) {
     console.error(`render-viz: ${message}`);
     process.exit(1);
+}
+
+/**
+ * The visualizer packs a show plays on: the nearest `pack.json` above the
+ * show file, its `viz` folders, each built (or rebuilt when `src/` is newer
+ * than `dist/index.js`). Returns `[{id, modes, source}]`, empty for a show
+ * outside a pack.
+ */
+async function showPacks(showPath) {
+    let dir = path.dirname(showPath);
+    let manifestPath = null;
+    while (true) {
+        const candidate = path.join(dir, 'pack.json');
+        if (await access(candidate).then(() => true, () => false)) { manifestPath = candidate; break; }
+        const up = path.dirname(dir);
+        if (up === dir) break;
+        dir = up;
+    }
+    if (!manifestPath) return [];
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    const out = [];
+    for (const rel of manifest.viz ?? []) {
+        const vizDir = path.resolve(path.dirname(manifestPath), rel);
+        const vizManifest = JSON.parse(await readFile(path.join(vizDir, 'pack.json'), 'utf8'));
+        const built = path.join(vizDir, 'dist', 'index.js');
+        if (await stale(built, path.join(vizDir, 'src'))) {
+            const {buildPack} = await import('./pack-build.mjs');
+            await buildPack(vizDir);
+            console.error(`${vizManifest.id}: built`);
+        }
+        out.push({id: vizManifest.id, dir: vizDir, built, modes: vizManifest.modes ?? [], source: await readFile(built, 'utf8')});
+    }
+    return out;
+}
+
+/** True when `built` is missing or older than any file under `srcDir`. */
+async function stale(built, srcDir) {
+    const builtAt = await stat(built).then((s) => s.mtimeMs, () => -1);
+    if (builtAt < 0) return true;
+    const files = await readdir(srcDir, {recursive: true});
+    for (const f of files) {
+        const st = await stat(path.join(srcDir, f));
+        if (st.isFile() && st.mtimeMs > builtAt) return true;
+    }
+    return false;
 }

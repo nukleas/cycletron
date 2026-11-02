@@ -28,9 +28,11 @@ import {cockpitDef} from './modes/cockpit.js';
 import {tankFieldDef} from './modes/tank-field.js';
 import {starRoadDef} from './modes/star-road.js';
 import {logoDef} from './modes/logo.js';
+import type {VizPack} from './pack.js';
 import {PACKS} from './packs/index.js';
+import {registerPalettes} from './palettes.js';
 
-export const VIZ_MODES: readonly VizModeDef[] = [
+const modes: VizModeDef[] = [
     neonCircuitDef,
     marbleCoreDef,
     marbleDropDef,
@@ -51,13 +53,22 @@ export const VIZ_MODES: readonly VizModeDef[] = [
     cockpitDef,
     tankFieldDef,
     starRoadDef,
-    ...PACKS.flatMap((p) => p.modes),
     logoDef,
 ];
 
-for (const [i, m] of VIZ_MODES.entries()) {
-    if (VIZ_MODES.findIndex((o) => o.id === m.id) !== i) throw new Error(`two visualizer modes share the id '${m.id}'`);
+/** Every mode, in menu order. Packs add theirs before the end card; the array is mutated in place, so hold the reference. */
+export const VIZ_MODES: readonly VizModeDef[] = modes;
+
+/** Add a pack's modes and palettes. Throws on an id already taken. */
+export function registerPack(pack: VizPack): void {
+    for (const m of pack.modes) {
+        if (modes.some((o) => o.id === m.id)) throw new Error(`pack ${pack.manifest.id}: a mode with id '${m.id}' is already registered`);
+    }
+    registerPalettes(pack.manifest.id, pack.palettes);
+    modes.splice(modes.length - 1, 0, ...pack.modes);
 }
+
+for (const pack of PACKS) registerPack(pack);
 
 /** Resolve a persisted mode id to its registry index; unknown ids → 0. */
 export function modeIndexById(id: string | null): number {

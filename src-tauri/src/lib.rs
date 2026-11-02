@@ -337,6 +337,7 @@ pub fn run() {
             commands::session_undo,
             commands::session_redo,
             commands::get_library_root,
+            commands::list_viz_packs,
             commands::set_library_root,
             commands::list_library,
             commands::create_library_folder,

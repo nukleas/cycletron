@@ -3,7 +3,7 @@ import tsc from 'vite-plugin-tsc';
 import type {Plugin} from 'vite';
 import {InlineEnum} from "unplugin-inline-enum";
 import {readdirSync} from 'node:fs';
-import {join} from 'node:path';
+import {join, resolve} from 'node:path';
 
 function wasmMemoryLeakFixPlugin(): Plugin {
     return {
@@ -83,9 +83,25 @@ function noPrivatePublicDirsPlugin(): Plugin {
     };
 }
 
+// Visualizer packs import the sdk as `cycletron/viz-sdk`. In the app that
+// resolves to the source; a pack loaded at runtime resolves it through the
+// import map in index.html, which this plugin points at the built sdk chunk.
+function vizSdkImportMapPlugin(): Plugin {
+    return {
+        name: 'viz-sdk-import-map',
+        apply: 'build',
+        transformIndexHtml(html) {
+            return html.replace('"cycletron/viz-sdk": "/src/viz/sdk.ts"', '"cycletron/viz-sdk": "/viz-sdk.js"');
+        },
+    };
+}
+
 export default defineConfig(({mode}) => ({
     // No base path — served from Tauri webview root
     clearScreen: false,
+    resolve: {
+        alias: {'cycletron/viz-sdk': resolve(__dirname, 'src/viz/sdk.ts')},
+    },
     build: {
         outDir: 'dist',
         assetsDir: 'assets',
@@ -96,10 +112,14 @@ export default defineConfig(({mode}) => ({
                 // audio-manager.ts loads it via addModule('worklet.js') at runtime,
                 // so it must land at the root of the output directory as worklet.js.
                 worklet: 'worklet.ts',
+                // The visualizer sdk as its own chunk, at a fixed name the
+                // import map can point at, so runtime-loaded packs share it.
+                'viz-sdk': 'src/viz/sdk.ts',
             },
             output: {
                 entryFileNames: chunk =>
                     chunk.name === 'worklet' ? 'worklet.js' :
+                        chunk.name === 'viz-sdk' ? 'viz-sdk.js' :
                         'assets/[name]-[hash].js',
                 manualChunks: (id) => {
                     // Never pull worklet code into shared chunks - it must remain
@@ -141,5 +161,6 @@ export default defineConfig(({mode}) => ({
         InlineEnum.vite(),
         wasmMemoryLeakFixPlugin(),
         noPrivatePublicDirsPlugin(),
+        vizSdkImportMapPlugin(),
     ]
 }));

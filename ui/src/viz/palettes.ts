@@ -5,7 +5,6 @@
  */
 
 import type {Swatch} from './pack.js';
-import {PACKS} from './packs/index.js';
 import type {Theme} from './types.js';
 import {hueOf, rgbOf} from './util.js';
 
@@ -27,14 +26,18 @@ const SWATCHES = {
 } satisfies Record<string, Swatch>;
 
 const ALL: Record<string, Swatch> = {...SWATCHES};
-for (const pack of PACKS) {
-    for (const [name, swatch] of Object.entries(pack.palettes)) {
-        if (name in ALL) throw new Error(`pack ${pack.manifest.id} redefines palette '${name}'`);
+
+/** Palette names, `neon` first. Packs push theirs on; the array is mutated in place. */
+export const PALETTES: readonly string[] = ['neon', ...Object.keys(ALL)];
+
+/** Add a pack's palettes. Throws on a name already taken. */
+export function registerPalettes(packId: string, swatches: Readonly<Record<string, Swatch>>): void {
+    for (const [name, swatch] of Object.entries(swatches)) {
+        if (name in ALL || name === 'neon') throw new Error(`pack ${packId} redefines palette '${name}'`);
         ALL[name] = swatch;
+        (PALETTES as string[]).push(name);
     }
 }
-
-export const PALETTES = ['neon', ...Object.keys(ALL)] as readonly string[];
 
 const themes = new Map<string, Theme>();
 

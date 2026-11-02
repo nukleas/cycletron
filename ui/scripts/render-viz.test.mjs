@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {after, before, test} from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
@@ -138,4 +139,35 @@ test('every mode matches the continuous render across a chunk seam', async () =>
         }));
     }
     assert.deepEqual(failing, {});
+});
+
+// A pack loaded at runtime must be as deterministic as a built-in mode. The
+// Halloween pack lives in the user's library; this runs when it's built there.
+const PACK = `${process.env.HOME}/Code/strulibrary/Packs/halloween/viz/halloween-8bit/dist/index.js`;
+const {existsSync} = await import('node:fs');
+test('a pack loaded from its built module matches across a chunk seam', {skip: !existsSync(PACK)}, async () => {
+    const source = readFileSync(PACK, 'utf8');
+    const renderWithPack = async (startFrame, count) => {
+        const browser = await chromium.launch();
+        try {
+            const page = await browser.newPage({viewport: {width: 480, height: 270}, deviceScaleFactor: 1});
+            await page.route('**/__render/mix.wav', (route) => route.fulfill({body: WAV, contentType: 'audio/wav'}));
+            await page.goto(url);
+            await page.waitForFunction(() => 'vizRender' in window);
+            await page.evaluate((opts) => window.vizRender.setup(opts), {
+                code: CODE, bpm: BPM, cues: cues('graveyard', 'monster-band'), song: {passes: 1, fade: {in: 0, out: 0}},
+                width: 480, height: 270, fps: FPS, startFrame, sensitivity: 1, audio: '/__render/mix.wav', packs: [source],
+            });
+            const hashes = [];
+            for (let i = 0; i < count; i++) hashes.push(createHash('sha1').update(await page.evaluate(() => window.vizRender.frame())).digest('hex'));
+            return hashes;
+        } finally {
+            await browser.close();
+        }
+    };
+    const total = SECONDS * FPS;
+    const from = 4 * FPS;
+    const [whole, chunk] = await Promise.all([renderWithPack(0, total), renderWithPack(from, total - from)]);
+    const differing = chunk.flatMap((h, i) => (h === whole[from + i] ? [] : [from + i]));
+    assert.deepEqual(differing, [], 'frames that differ from the continuous render');
 });

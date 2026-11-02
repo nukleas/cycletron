@@ -42,7 +42,8 @@ import {editorEmptyState} from './editor-empty-state.js';
 import {basename} from './paths.js';
 import {currentBpm} from './bpm.js';
 import {toolRowFromTrace} from './ai-tool-row.js';
-import type {CurrentFile, SessionSnapshot, UserSettings, WhatsNew} from './types/tauri-commands.js';
+import {loadPackSource} from './viz/pack-loader.js';
+import type {CurrentFile, SessionSnapshot, UserSettings, VizPackSource, WhatsNew} from './types/tauri-commands.js';
 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -142,6 +143,7 @@ function setupAppShortcuts(): void {
 }
 
 async function boot(): Promise<void> {
+    await loadVizPacks();
     if (!isTauri) {
         console.log('[boot] not running in Tauri — file management disabled');
         return;
@@ -407,4 +409,24 @@ function setupAutosave(): void {
 
     // Autosave on window blur so the most recent state is always on disk.
     window.addEventListener('blur', trigger);
+}
+
+/** Register the visualizer packs built in the library: each pack.json under Packs, its `viz` folders. A broken pack is reported, not fatal. */
+async function loadVizPacks(): Promise<void> {
+    if (!isTauri) return;
+    let packs: VizPackSource[];
+    try {
+        packs = await invoke<VizPackSource[]>('list_viz_packs');
+    } catch (e) {
+        console.warn(`viz packs: couldn't list: ${String(e)}`);
+        return;
+    }
+    for (const p of packs) {
+        try {
+            await loadPackSource(p.source, p.id);
+            console.info(`viz packs: loaded ${p.id} from ${p.path}`);
+        } catch (e) {
+            notify(`Visualizer pack ${p.id} failed to load: ${e instanceof Error ? e.message : String(e)}`, 'error');
+        }
+    }
 }

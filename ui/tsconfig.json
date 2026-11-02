@@ -13,6 +13,9 @@
     "preserveConstEnums": false,
     "preserveWatchOutput": true,
     "resolveJsonModule": true,
+    "paths": {
+      "cycletron/viz-sdk": ["./src/viz/sdk.ts"]
+    },
     "isolatedModules": false,
     "noEmit": true,
     "strict": true,

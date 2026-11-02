@@ -12,4 +12,5 @@ export {
     TAU, SeededRandom, TransientDetector, alphaRamp, beatEnv, clamp01, drawLabel, follow, hash32, lerpRgb,
     mixRgb, rampAt, rand01, rgbOf,
 } from './util.js';
-export type {Swatch} from './pack.js';
+export {validatePack} from './pack.js';
+export type {PackManifest, Swatch, VizPack} from './pack.js';
