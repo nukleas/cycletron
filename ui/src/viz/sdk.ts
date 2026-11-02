@@ -13,7 +13,9 @@ export {
     mixRgb, rampAt, rand01, rgbOf,
 } from './util.js';
 export {validatePack, sdkSatisfies} from './pack.js';
+export {PW, PH, PxScreen, spr, drawSprite, frameRect, fillTri, nearest} from './pixel.js';
+export type {Sprite, DrawOpt} from './pixel.js';
 
 /** The sdk's version. A pack declares the range it needs in its manifest (`sdk`). Semver: a breaking change here bumps the major. */
-export const SDK_VERSION = '1.0.0';
+export const SDK_VERSION = '1.1.0';
 export type {PackManifest, Swatch, VizPack} from './pack.js';
