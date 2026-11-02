@@ -22,6 +22,9 @@ export interface Ink {
     dirt: string;
     stone: string;
     stoneDark: string;
+    /** Cooler than bone, so graves don't match the skeletons. */
+    tomb: string;
+    tombShade: string;
     bone: string;
     moon: string;
     moonDim: string;
@@ -69,7 +72,9 @@ export function bakePix(t: Theme): Pix {
         dirt: css(mixRgb(bg, mixRgb(red, green, 0.45), 0.4)),
         stone: css(mixRgb(bg, active, 0.78)),
         stoneDark: css(mixRgb(bg, active, 0.42)),
-        bone: css(mixRgb(active, white, 0.18)),
+        tomb: css(mixRgb(bg, khaki(text, green), 0.52)),
+        tombShade: css(mixRgb(bg, khaki(text, green), 0.3)),
+        bone: css(mixRgb(text, white, 0.82)),
         moon: css(active),
         moonDim: css(mixRgb(active, violet, 0.4)),
         accent: css(neon),
@@ -396,6 +401,12 @@ function checker(a: string, b: string): CanvasPattern {
     const pattern = g.createPattern(c, 'repeat');
     if (!pattern) throw new Error('pattern');
     return pattern;
+}
+
+/** Grey, pulled a little toward green so it stays cooler than near-white bone. */
+function khaki(text: Rgb, green: Rgb): Rgb {
+    const lum = Math.round((text[0] + text[1] + text[2]) / 3);
+    return mixRgb([lum, lum, lum], green, 0.28);
 }
 
 function css(rgb: readonly [number, number, number]): string {

@@ -199,7 +199,7 @@ class GraveyardMode implements VizMode {
         for (let col = 0; col < COLS; col++) {
             const shape = TOMBS[hash32(row * 17 + col, 3) % TOMBS.length];
             const x = colX(row, col, 0);
-            drawSprite(ctx, shape, x - (shape.w >> 1), gy - shape.h - 2, [null, ink.stone, ink.stoneDark], {outline: ink.line});
+            drawSprite(ctx, shape, x - (shape.w >> 1), gy - shape.h - 2, [null, ink.tomb, ink.tombShade], {outline: ink.line});
         }
     }
 
@@ -230,8 +230,7 @@ class GraveyardMode implements VizMode {
             const dancing = cycle >= h.begin && cycle < h.end;
             const frame = dancing ? danceFrame(cycle * 4 + h.phaseOff, h.reach > 0.72 ? 0 : h.style) : 0;
             const bone = h.flash > 0.4 ? ink.moon : ink.bone;
-            const eye = dancing ? this.colorOf(h.team.rgb) : ink.line;
-            drawDancer(ctx, x, gy, frame, up, bone, eye, ink.line);
+            drawDancer(ctx, x, gy, frame, up, bone, ink.line, ink.line);
         }
     }
 

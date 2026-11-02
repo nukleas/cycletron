@@ -201,9 +201,9 @@ uses the section's `transition`.
 | `neon-circuit` | The pattern as a circuit board in the same isometric view: traces, vias and lit chips. | the pattern |
 | `cockpit` | A vector flight display. Kicks are armored targets, snares winged craft, notes diamonds, intercepted on their onsets. | the pattern |
 | `forest-drive` | A country road at dusk. Every tree on the verge is a note, reaching the windshield on its beat. | the pattern |
-| `graveyard` | A graveyard at night. Every note is a skeleton rising from its grave to dance; kicks thump the ground, snares strike lightning, hats send bats across the moon, held notes rise as ghosts. | the pattern |
-| `haunted-house` | A haunted house. Notes light windows by floor and pitch with a dancer inside; kicks swing the front door, hats flare the porch lanterns, held notes puff ghosts from the chimney, snares strike lightning behind it. | the pattern |
-| `ghost-fog` | Ghosts drifting through fog over a swamp, one per note, with will-o'-wisps on the hats. Calm, with trails; for intros and outros. | the pattern |
+| `graveyard` | An 8-bit graveyard at night. Every note is a skeleton rising from its grave to dance; kicks thump the ground, snares strike lightning, hats send bats across the moon, held notes rise as ghosts. | the pattern |
+| `haunted-house` | An 8-bit haunted house. Notes light windows by floor and pitch with a dancer inside; kicks swing the front door, hats flare the porch lanterns, held notes puff ghosts from the chimney, snares strike lightning behind it. | the pattern |
+| `ghost-fog` | 8-bit ghosts drifting over a swamp, one per note, in their track's colour, with will-o'-wisps on the hats. Calm; for intros and outros. | the pattern |
 | `tunnel` | Octagonal rings flying at you, one per beat, each reaching the gate on time. | the pattern |
 | `marble-core` | Concentric rings, one per track, with a playhead arm sweeping once per bar. | the pattern |
 | `marble-drop` | A Galton board: every hit drops a marble that fills a histogram. | the pattern |
