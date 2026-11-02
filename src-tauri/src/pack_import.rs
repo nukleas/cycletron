@@ -220,6 +220,24 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
     let mut unsupported = 0usize;
     let mut unsafe_paths = 0usize;
 
+    // A pack archive (pack.json at the root or one folder down) is staged
+    // whole: its code, songs and shows are the point. Anything else is a bag
+    // of samples, and only the audio comes out.
+    let mut whole = false;
+    for i in 0..zip.len() {
+        let entry = zip
+            .by_index_raw(i)
+            .map_err(|e| format!("zip entry {i}: {e}"))?;
+        if let Some(rel) = entry.enclosed_name()
+            && rel.file_name().and_then(|n| n.to_str()) == Some(MANIFEST)
+            && rel.components().count() <= 2
+        {
+            whole = true;
+        }
+    }
+    let wanted = |rel: &Path| whole || sounds::is_audio(rel);
+    let kind = if whole { "" } else { "audio " };
+
     // Declared sizes first: refuse a bomb before writing a single byte.
     let mut declared_files = 0usize;
     let mut declared_bytes = 0u64;
@@ -234,7 +252,7 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
             unsafe_paths += 1;
             continue;
         };
-        if !sounds::is_audio(&rel) {
+        if !wanted(&rel) {
             continue;
         }
         declared_files += 1;
@@ -242,13 +260,13 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
     }
     if declared_files > MAX_INSTALL_FILES {
         return Err(format!(
-            "archive holds {declared_files} audio files (limit {MAX_INSTALL_FILES}) — \
+            "archive holds {declared_files} {kind}files (limit {MAX_INSTALL_FILES}) — \
              import a subset instead"
         ));
     }
     if declared_bytes > MAX_INSTALL_BYTES {
         return Err(format!(
-            "archive holds {} MB of audio (limit {} MB) — import a subset instead",
+            "archive holds {} MB of {kind}files (limit {} MB) — import a subset instead",
             declared_bytes / (1024 * 1024),
             MAX_INSTALL_BYTES / (1024 * 1024)
         ));
@@ -286,7 +304,7 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
         {
             continue;
         }
-        if !sounds::is_audio(&rel) {
+        if !wanted(&rel) {
             if is_doc_name(&name) && entry.size() <= 64 * 1024 {
                 docs.push(name);
             }
@@ -332,7 +350,7 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
 
     if files == 0 {
         let _ = fs::remove_dir_all(stage);
-        return Err("no audio files in that archive".into());
+        return Err(format!("no {kind}files in that archive"));
     }
     if symlinks > 0 {
         warnings.push(format!("skipped {symlinks} symlink(s)"));
@@ -909,6 +927,47 @@ mod tests {
         assert_eq!(files, 2, "only the audio should be extracted");
         assert!(bytes > 0);
         assert!(!stage.join("notes.txt").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_pack_archive_is_staged_whole_and_reads_as_a_ready_pack() {
+        let dir = tmp("packzip");
+        fs::create_dir_all(&dir).unwrap();
+        let zip_path = dir.join("christmas.zip");
+        let manifest = br#"{"schema":1,"id":"christmas","name":"Christmas","version":"0.1.0",
+            "authors":["x"],"license":"MIT","description":"d",
+            "viz":["viz/snow"],"songs":["songs/a.strudel"],"shows":["shows/a.show.toml"]}"#;
+        let viz = br#"{"id":"x/snow","name":"Snow","version":"0.1.0","author":"x","license":"MIT",
+            "sdk":"^1","description":"d","modes":["snowfall"],"palettes":["evergreen"]}"#;
+        make_zip(
+            &zip_path,
+            &[
+                ("christmas/pack.json", manifest),
+                ("christmas/README.md", b"a pack"),
+                ("christmas/viz/snow/pack.json", viz),
+                ("christmas/viz/snow/src/index.ts", b"export default 1;"),
+                ("christmas/viz/snow/dist/index.js", b"export default {};"),
+                ("christmas/songs/a.strudel", b"s(\"bd\")"),
+                ("christmas/shows/a.show.toml", b"[show]\n"),
+                ("christmas/.DS_Store", b"junk"),
+            ],
+        );
+        let stage = dir.join("stage");
+        let (files, _, warnings) = stage_zip(&zip_path, &stage).unwrap();
+        assert_eq!(files, 7, "every file but the dot file is staged");
+        assert!(warnings.is_empty(), "{warnings:?}");
+        let root = unwrap_single_root(&stage);
+        assert!(root.join(MANIFEST).is_file(), "the pack roots at its folder");
+        let m = packs::parse_manifest(&root).unwrap();
+        assert_eq!(m.id, "christmas");
+        let viz = packs::viz_entries(&root, &m);
+        assert_eq!(viz.len(), 1);
+        assert!(viz[0].built);
+        assert_eq!(viz[0].modes, vec!["snowfall"]);
+        assert!(root.join("songs/a.strudel").is_file());
+        assert!(root.join("shows/a.show.toml").is_file());
+        assert!(root.join("viz/snow/src/index.ts").is_file());
         let _ = fs::remove_dir_all(&dir);
     }
 
