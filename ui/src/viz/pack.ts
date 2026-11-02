@@ -26,6 +26,8 @@ export interface PackManifest {
     license: string;
     /** What's in it, in a sentence. */
     description: string;
+    /** The sdk versions the pack was built for: `^1`, `^1.2`, `1.x` or an exact version. */
+    sdk?: string;
     /** Mode ids the pack registers, as show files name them. */
     modes: string[];
     /** Palette names the pack registers. */
@@ -56,4 +58,18 @@ export function validatePack(pack: VizPack): VizPack {
         if (!manifest.palettes.includes(name)) throw new Error(`pack ${manifest.id} exports palette '${name}' but its manifest doesn't list it`);
     }
     return pack;
+}
+
+/**
+ * Whether sdk `version` satisfies `range`: `^1`, `^1.2`, `1`, `1.x`, or an
+ * exact version. Same major, and at least the minor the range names.
+ */
+export function sdkSatisfies(range: string, version: string): boolean {
+    const want = /^\^?(\d+)(?:\.(\d+|x))?(?:\.(\d+|x))?$/.exec(range.trim());
+    const have = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
+    if (!want || !have) return false;
+    const [, major, minor] = want;
+    if (Number(major) !== Number(have[1])) return false;
+    if (minor === undefined || minor === 'x') return true;
+    return Number(have[2]) >= Number(minor);
 }

@@ -288,9 +288,21 @@ test('validatePack holds a manifest to what the code exports', async () => {
     const {validatePack} = await server.ssrLoadModule('/src/viz/pack.ts');
     const mode = (id) => ({id, name: id.toUpperCase(), create: () => ({layout() {}, update() {}, render() {}})});
     const swatch = {bg: '#000', neon: '#fff', secondary: '#f0f', active: '#ff0', violet: '#808', red: '#f00', more: ['#111', '#222', '#333']};
-    const manifest = {id: 'a/b', name: 'B', version: '0.0.1', author: 'a', license: 'MIT', description: '', modes: ['x'], palettes: ['p']};
+    const manifest = {id: 'a/b', name: 'B', version: '0.0.1', author: 'a', license: 'MIT', sdk: '^1', description: '', modes: ['x'], palettes: ['p']};
     assert.ok(validatePack({manifest, modes: [mode('x')], palettes: {p: swatch}}));
     assert.throws(() => validatePack({manifest, modes: [mode('y')], palettes: {p: swatch}}), /lists mode 'x'/);
     assert.throws(() => validatePack({manifest, modes: [mode('x'), mode('y')], palettes: {p: swatch}}), /exports mode 'y'/);
     assert.throws(() => validatePack({manifest, modes: [mode('x')], palettes: {}}), /lists palette 'p'/);
+});
+
+test('sdkSatisfies matches majors and a minimum minor', async () => {
+    const {sdkSatisfies} = await server.ssrLoadModule('/src/viz/pack.ts');
+    assert.equal(sdkSatisfies('^1', '1.0.0'), true);
+    assert.equal(sdkSatisfies('^1', '1.4.2'), true);
+    assert.equal(sdkSatisfies('^1.2', '1.1.0'), false);
+    assert.equal(sdkSatisfies('^1.2', '1.2.0'), true);
+    assert.equal(sdkSatisfies('1.x', '1.9.0'), true);
+    assert.equal(sdkSatisfies('^2', '1.9.0'), false);
+    assert.equal(sdkSatisfies('1.0.0', '1.0.3'), true);
+    assert.equal(sdkSatisfies('nonsense', '1.0.0'), false);
 });

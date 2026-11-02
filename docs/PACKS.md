@@ -37,20 +37,23 @@ has: `banks` of samples (with a `license_file`), `viz` folders, `songs` and
   "version": "0.1.0",
   "author": "NaderLabs",
   "license": "AGPL-3.0-or-later",
+  "sdk": "^1",
   "description": "A graveyard, a haunted house, a monster band and a swamp of ghosts, all 8-bit, made for the Bustin' show.",
   "modes": ["graveyard", "haunted-house", "monster-band", "ghost-fog"],
   "palettes": ["pumpkin"]
 }
 ```
 
-`modes` and `palettes` must match what `src/index.ts` exports; `validatePack`
+`sdk` is the sdk range the pack was built for (`^1`); the loader refuses a
+pack whose range this Cycletron's `SDK_VERSION` doesn't satisfy. `modes` and
+`palettes` must match what `src/index.ts` exports; `validatePack`
 (`ui/src/viz/pack.ts`) throws when they don't. Mode ids are what show files
 name (`mode = "graveyard"`) and must be unique across the app. `src/index.ts`
 exports the `VizPack` as its default export.
 
 ## What a pack may use
 
-Pack code imports `cycletron/viz-sdk` and nothing else from the app. That is
+Pack code imports `@cycletron/viz-sdk` and nothing else from the app. That is
 `ui/src/viz/sdk.ts`: the mode contract (`VizModeDef`, `VizMode`,
 `VizServices`, `Theme`), `HapField` for modes that turn scheduled notes into
 persistent objects, `TrackModel` for one-bar views, `instrumentFamily`, the
@@ -74,7 +77,7 @@ build.
 - **The app** asks the backend for every `Packs/*/pack.json` in the library,
   reads each `viz` folder's `dist/index.js`, imports it from a Blob URL and
   registers it (`ui/src/viz/pack-loader.ts`, called from `boot.ts` before
-  anything draws). The import map in `index.html` maps `cycletron/viz-sdk` to
+  anything draws). The import map in `index.html` maps `@cycletron/viz-sdk` to
   the app's sdk: the source in dev, the `viz-sdk.js` chunk in a build. A pack
   that fails to load is reported in a notification; the app goes on without it.
 - **The renderer** (`ui/scripts/render-viz.mjs`) finds the nearest `pack.json`

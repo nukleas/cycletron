@@ -12,5 +12,8 @@ export {
     TAU, SeededRandom, TransientDetector, alphaRamp, beatEnv, clamp01, drawLabel, follow, hash32, lerpRgb,
     mixRgb, rampAt, rand01, rgbOf,
 } from './util.js';
-export {validatePack} from './pack.js';
+export {validatePack, sdkSatisfies} from './pack.js';
+
+/** The sdk's version. A pack declares the range it needs in its manifest (`sdk`). Semver: a breaking change here bumps the major. */
+export const SDK_VERSION = '1.0.0';
 export type {PackManifest, Swatch, VizPack} from './pack.js';

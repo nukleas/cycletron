@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Build a visualizer pack: `src/index.ts` into `dist/index.js`, one ES module
-// with the sdk left as the external import `cycletron/viz-sdk`, which the app
+// with the sdk left as the external import `@cycletron/viz-sdk`, which the app
 // resolves through its import map when it loads the pack.
 //
 // Usage:
@@ -28,14 +28,14 @@ export async function buildPack(dir) {
         configFile: false,
         root,
         logLevel: 'warn',
-        resolve: {alias: {'cycletron/viz-sdk': path.join(UI, 'src/viz/sdk.ts')}},
+        resolve: {alias: {'@cycletron/viz-sdk': path.join(UI, 'src/viz/sdk.ts')}},
         build: {
             outDir: path.join(root, 'dist'),
             emptyOutDir: true,
             target: 'es2022',
             minify: false,
             lib: {entry, formats: ['es'], fileName: () => 'index.js'},
-            rollupOptions: {external: ['cycletron/viz-sdk']},
+            rollupOptions: {external: ['@cycletron/viz-sdk']},
         },
     });
     return {manifest, out: path.join(root, 'dist', 'index.js')};

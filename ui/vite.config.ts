@@ -83,7 +83,7 @@ function noPrivatePublicDirsPlugin(): Plugin {
     };
 }
 
-// Visualizer packs import the sdk as `cycletron/viz-sdk`. In the app that
+// Visualizer packs import the sdk as `@cycletron/viz-sdk`. In the app that
 // resolves to the source; a pack loaded at runtime resolves it through the
 // import map in index.html, which this plugin points at the built sdk chunk.
 function vizSdkImportMapPlugin(): Plugin {
@@ -91,7 +91,7 @@ function vizSdkImportMapPlugin(): Plugin {
         name: 'viz-sdk-import-map',
         apply: 'build',
         transformIndexHtml(html) {
-            return html.replace('"cycletron/viz-sdk": "/src/viz/sdk.ts"', '"cycletron/viz-sdk": "/viz-sdk.js"');
+            return html.replace('"@cycletron/viz-sdk": "/src/viz/sdk.ts"', '"@cycletron/viz-sdk": "/viz-sdk.js"');
         },
     };
 }
@@ -100,7 +100,7 @@ export default defineConfig(({mode}) => ({
     // No base path — served from Tauri webview root
     clearScreen: false,
     resolve: {
-        alias: {'cycletron/viz-sdk': resolve(__dirname, 'src/viz/sdk.ts')},
+        alias: {'@cycletron/viz-sdk': resolve(__dirname, 'src/viz/sdk.ts')},
     },
     build: {
         outDir: 'dist',
