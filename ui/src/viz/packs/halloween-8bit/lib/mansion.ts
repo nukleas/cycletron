@@ -1,6 +1,6 @@
 /** The NES mansion: one layout, drawn as flat rects and two roof triangles. */
 
-import {frameRect, fillTri, HUD_Y, PW, type Pix} from './pixel.js';
+import {frameRect, fillTri, PH, PW, type Pix} from './pixel.js';
 import {drawRidge, drawTree} from './sky.js';
 import {PUMP_A} from './sprites.js';
 
@@ -38,11 +38,11 @@ export function drawShell(ctx: CanvasRenderingContext2D, pix: Pix): void {
     const {main, tower, porch, door, chimney, posts, gable, spire, yard, horizon} = HOUSE;
 
     ctx.fillStyle = ink.hillDark;
-    ctx.fillRect(0, horizon, PW, HUD_Y - horizon);
+    ctx.fillRect(0, horizon, PW, PH - horizon);
     ctx.fillStyle = pix.hillDither;
     ctx.fillRect(0, horizon - 6, PW, 8);
     ctx.fillStyle = ink.hill;
-    ctx.fillRect(0, yard, PW, HUD_Y - yard);
+    ctx.fillRect(0, yard, PW, PH - yard);
 
     drawRidge(ctx, horizon, ink.sil);
     drawTree(ctx, 4, horizon + 6, 2, ink.line);

@@ -6,11 +6,11 @@
 
 import type {VizMode, VizModeDef, VizServices} from '../../sdk.js';
 import {type FieldHap, type FieldTeam, HapField, type Rgb} from '../../sdk.js';
-import {bakePix, drawHud, drawSprite, frameRect, nearest, PW, PxScreen, type Pix} from './lib/pixel.js';
+import {bakePix, drawSprite, frameRect, nearest, PH, PW, PxScreen, type Pix} from './lib/pixel.js';
 import {isLong, registerPos} from './lib/roles.js';
 import {MOON} from './lib/sprites.js';
 import {
-    type Cast, type KitFlash, type KitPiece, castFor, drawPerformer, kitPiece,
+    type Cast, type Costume, type KitFlash, type KitPiece, castFor, drawPerformer, isOscillator, kitPiece, voiceOf,
 } from './lib/monsters.js';
 
 const LOOKAHEAD = 1;
@@ -22,16 +22,19 @@ const CAP = 8;
 const FRONT_FOOT = 154;
 const BACK_FOOT = 102;
 const LIGHT_Y = 164;
-/** Cycles a hat, crash, snare, or tom keeps the arms posed after the hit. */
-const ARM_HOLD = 0.5;
+/** The front row centres on the stage and spreads out as it grows, up to this gap and the stage's edges. */
+const MAX_GAP = 72;
+const STAGE_W = 240;
+/** How fast a player walks to a new spot, per second. */
+const WALK = 6;
 
 const RANK: Record<Cast, number> = {
-    drummer: 0, frank: 1, wolf: 2, mummy: 3, vamp: 4, witch: 5, keytar: 6, ghost: 7,
+    drummer: 0, frank: 1, wolf: 2, mummy: 3, vamp: 4, witch: 5, pumpkin: 6, ghost: 7,
 };
 
 /** Duplicates past the first of each kind. A second mummy is kept before a second frank. */
 const EXTRA: Record<Cast, number> = {
-    mummy: 0, frank: 1, vamp: 2, wolf: 3, witch: 4, keytar: 5, ghost: 6, drummer: 7,
+    mummy: 0, frank: 1, vamp: 2, wolf: 3, witch: 4, pumpkin: 5, ghost: 6, drummer: 7,
 };
 
 interface Team extends FieldTeam {}
@@ -46,7 +49,7 @@ interface Pose {
 }
 
 interface Member {
-    cast: Cast;
+    costume: Costume;
     x: number;
     foot: number;
     accent: string;
@@ -54,6 +57,7 @@ interface Member {
     frame: number;
     hit: number;
     lift: number;
+    held: boolean;
 }
 
 interface Cand {
@@ -71,6 +75,9 @@ interface Burst {
 
 const PIECES: readonly KitPiece[] = ['kick', 'snare', 'hat', 'tom', 'crash'];
 
+/** Keyboard players in the order they take the stage; past the bride, everyone gets a keytar. */
+const KEYS: readonly Costume[] = ['vamp', 'bride', 'keytarist'];
+
 class MonsterBandMode implements VizMode {
     private readonly screen = new PxScreen();
     private readonly field = new HapField<Team, Note>({
@@ -86,15 +93,17 @@ class MonsterBandMode implements VizMode {
     private readonly colors = new Map<number, string>();
     private readonly poses = new Map<string, Pose>();
     private readonly locked = new Map<string, Cast>();
+    /** A keyboard player's costume, kept while it stays on stage. */
+    private readonly costumes = new Map<string, Costume>();
     private readonly members: Member[] = [];
+    /** Where each front-row player stands now; it eases to the slot. */
+    private readonly spots = new Map<string, number>();
     private readonly kit: KitFlash = {
-        kick: 0, snare: 0, hat: 0, tom: 0, crash: 0,
+        kick: 0, snare: 0, hat: 0, tom: 0, crash: 0, snareHand: 0, floorTom: false,
         kickCss: '', snareCss: '', hatCss: '', tomCss: '', crashCss: '',
     };
     private readonly kitTeam: Record<KitPiece, string> = {kick: '', snare: '', hat: '', tom: '', crash: ''};
     private thump = 0;
-    /** Cycle when the raised or outstretched arms settle. */
-    private armUntil = 0;
     private pix!: Pix;
 
     layout(s: VizServices): void {
@@ -109,8 +118,9 @@ class MonsterBandMode implements VizMode {
         if (field.restarted) {
             this.poses.clear();
             this.locked.clear();
+            this.costumes.clear();
+            this.spots.clear();
             this.thump = 0;
-            this.armUntil = 0;
             this.zeroKit();
         }
         const decay = Math.exp(-dt * 8);
@@ -153,8 +163,7 @@ class MonsterBandMode implements VizMode {
                 pose.frame = (pose.frame + 1) % 3;
             }
         }
-        this.relaxArms();
-        this.assemble();
+        this.assemble(dt);
     }
 
     private hitDrum(h: Note): void {
@@ -165,39 +174,61 @@ class MonsterBandMode implements VizMode {
         if (piece === 'other') return;
         this.kit[piece] = 1;
         this.kitTeam[piece] = h.team.name;
-        if (piece === 'kick') {
-            this.thump = 1;
-            return;
-        }
-        pose.frame = piece === 'snare' || piece === 'tom' ? 2 : 1;
-        const until = h.end + ARM_HOLD;
-        if (until > this.armUntil) this.armUntil = until;
+        if (piece === 'kick') this.thump = 1;
+        else if (piece === 'tom') this.kit.floorTom = /^lt/.test(voiceOf(h.team.name));
+        else if (piece === 'snare') this.kit.snareHand = 1 - this.kit.snareHand;
     }
 
-    /** Kick-only bars leave the arms down once the last cymbal or snare pose ends. */
-    private relaxArms(): void {
-        if (this.field.cycle < this.armUntil) return;
-        const pose = this.poses.get('*kit');
-        if (pose) pose.frame = 0;
-    }
-
-    /** Lock the costume once a pitched sine has been seen; other names lock immediately. */
+    /** Lock the costume once a bare oscillator has played a pitch; named sounds lock at once. */
     private castOf(team: Team): Cast {
         const known = this.locked.get(team.name);
         if (known) return known;
-        const note = this.lowest(team);
-        const cast = castFor(team.name, note);
-        if (!isSine(team.name) || Number.isFinite(note)) this.locked.set(team.name, cast);
-        return cast;
-    }
-
-    private lowest(team: Team): number {
         let note = NaN;
+        let chord = false;
         for (const h of this.field.haps) {
             if (h.team !== team || !Number.isFinite(h.note)) continue;
             if (!Number.isFinite(note) || h.note < note) note = h.note;
+            if (!chord) {
+                for (const o of this.field.haps) {
+                    if (o !== h && o.team === team && o.begin === h.begin && o.note !== h.note && Number.isFinite(o.note)) {
+                        chord = true;
+                        break;
+                    }
+                }
+            }
         }
-        return note;
+        const cast = castFor(team.name, note, chord);
+        if (!isOscillator(team.name) || Number.isFinite(note)) this.locked.set(team.name, cast);
+        return cast;
+    }
+
+    /**
+     * Keyboard players on stage keep their costume; a newcomer takes the first
+     * free one. Leaving the stage gives the costume back.
+     */
+    private dress(picked: readonly Cand[]): void {
+        const staged = new Set<string>();
+        for (const cand of picked) if (cand.cast === 'vamp') staged.add(cand.name);
+        for (const name of [...this.costumes.keys()]) {
+            if (!staged.has(name)) this.costumes.delete(name);
+        }
+        const worn = new Set(this.costumes.values());
+        for (const cand of picked) {
+            if (cand.cast !== 'vamp' || this.costumes.has(cand.name)) continue;
+            const costume = KEYS.find((k) => !worn.has(k)) ?? 'keytarist';
+            this.costumes.set(cand.name, costume);
+            worn.add(costume);
+        }
+    }
+
+    /** Slot `index` of `n`, centred. A newcomer starts on its slot; everyone else walks over. */
+    private walk(name: string, index: number, n: number, dt: number): number {
+        const gap = n > 1 ? Math.min(MAX_GAP, STAGE_W / (n - 1)) : 0;
+        const slot = 160 + (index - (n - 1) / 2) * gap;
+        const now = this.spots.get(name);
+        const x = now === undefined ? slot : slot + (now - slot) * Math.exp(-dt * WALK);
+        this.spots.set(name, x);
+        return Math.round(x);
     }
 
     private poseFor(key: string): Pose {
@@ -214,13 +245,15 @@ class MonsterBandMode implements VizMode {
             this.kit[piece] = 0;
             this.kitTeam[piece] = '';
         }
+        this.kit.snareHand = 0;
+        this.kit.floorTom = false;
     }
 
     private colorOf(rgb: Rgb): string {
         return nearest(rgb, this.pix.ink.pool, this.colors);
     }
 
-    private assemble(): void {
+    private assemble(dt: number): void {
         const cands: Cand[] = [];
         let drum: Cand | null = null;
         let drumActivity = -1;
@@ -256,27 +289,31 @@ class MonsterBandMode implements VizMode {
         const staged = drum ? [drum, ...first, ...extra] : [...first, ...extra];
         const picked = staged.slice(0, CAP);
         const front = picked.filter((c) => c.cast !== 'drummer');
+        this.dress(picked);
         const ink = this.pix.ink;
         this.members.length = 0;
         for (const cand of picked) {
             const pose = this.poseFor(cand.name);
-            const n = front.length;
-            const index = front.indexOf(cand);
+            const x = cand.cast === 'drummer' ? 160 : this.walk(cand.name, front.indexOf(cand), front.length, dt);
             const accentTeam = cand.cast === 'drummer' ? drumTeam : cand.team;
             this.members.push({
-                cast: cand.cast,
-                x: cand.cast === 'drummer' || n <= 1 ? 160 : Math.round(40 + (240 * index) / (n - 1)),
+                costume: this.costumes.get(cand.name) ?? cand.cast,
+                x,
                 foot: cand.cast === 'drummer' ? BACK_FOOT : FRONT_FOOT,
                 accent: accentTeam ? this.colorOf(accentTeam.rgb) : ink.moon,
                 activity: cand.cast === 'drummer' ? Math.max(0, drumActivity) : (cand.team?.activity ?? 0),
                 frame: pose.frame,
                 hit: pose.hit,
                 lift: pose.lift,
+                held: this.field.cycle < pose.hold,
             });
         }
         this.paintKitColors(ink.moon);
         const live = new Set(this.field.teams.map((t) => t.name));
         if (drum) live.add('*kit');
+        for (const key of [...this.spots.keys()]) {
+            if (!front.some((c) => c.name === key)) this.spots.delete(key);
+        }
         for (const key of [...this.poses.keys()]) {
             if (!live.has(key)) this.poses.delete(key);
         }
@@ -300,15 +337,15 @@ class MonsterBandMode implements VizMode {
         p.setTransform(1, 0, 0, 1, 0, hop);
         p.imageSmoothingEnabled = false;
         drawBackdrop(p, this.pix);
+        drawFloor(p, this.pix);
         const ink = this.pix.ink;
         for (const m of this.members) {
-            if (m.cast !== 'drummer') continue;
-            drawPerformer(p, m.cast, m.x, m.foot, m.frame, m.hit, m.lift, m.accent, ink, this.kit);
+            if (m.costume !== 'drummer') continue;
+            drawPerformer(p, m.costume, m.x, m.foot, m.frame, m.hit, m.lift, m.held, m.accent, ink, this.kit);
         }
-        drawFloor(p, this.pix);
         for (const m of this.members) {
-            if (m.cast === 'drummer') continue;
-            drawPerformer(p, m.cast, m.x, m.foot, m.frame, m.hit, m.lift, m.accent, ink);
+            if (m.costume === 'drummer') continue;
+            drawPerformer(p, m.costume, m.x, m.foot, m.frame, m.hit, m.lift, m.held, m.accent, ink);
         }
         drawFootlights(p, this.members, this.pix);
         p.setTransform(1, 0, 0, 1, 0, 0);
@@ -316,23 +353,14 @@ class MonsterBandMode implements VizMode {
             p.fillStyle = ink.skyDeep;
             p.fillRect(0, 0, PW, 1);
         }
-        drawHud(p, ink, 'MONSTER BAND', this.field.cycle, hop === 1);
         this.screen.blit(ctx, s.width, s.height, ink.bg);
-        this.screen.stampHud(ctx, s.width, s.height);
     }
-}
-
-function isSine(name: string): boolean {
-    const lower = name.toLowerCase();
-    const cut = lower.lastIndexOf('_');
-    const voice = cut >= 0 ? lower.slice(cut + 1) : lower;
-    return voice === 'sine' || lower === 'sine';
 }
 
 function drawBackdrop(ctx: CanvasRenderingContext2D, pix: Pix): void {
     const ink = pix.ink;
     ctx.fillStyle = ink.skyDeep;
-    ctx.fillRect(0, 0, PW, 172);
+    ctx.fillRect(0, 0, PW, BACK_FOOT);
     ctx.fillStyle = ink.roof;
     ctx.fillRect(0, 6, PW, BACK_FOOT - 6);
     ctx.fillStyle = ink.roofAlt;
@@ -350,22 +378,14 @@ function drawBackdrop(ctx: CanvasRenderingContext2D, pix: Pix): void {
     ctx.fillRect(wx + 14, wy, 1, 26);
     ctx.fillRect(wx, wy + 13, 28, 1);
     frameRect(ctx, wx, wy, 28, 26, ink.stone);
-    ctx.fillStyle = ink.wall;
-    ctx.fillRect(0, BACK_FOOT, PW, 28);
-    ctx.fillStyle = ink.wallDark;
-    ctx.fillRect(86, BACK_FOOT, 148, 28);
-    ctx.fillStyle = ink.stone;
-    ctx.fillRect(86, BACK_FOOT, 148, 3);
 }
 
 function drawFloor(ctx: CanvasRenderingContext2D, pix: Pix): void {
     const ink = pix.ink;
     ctx.fillStyle = ink.dirt;
-    ctx.fillRect(0, 130, PW, 42);
+    ctx.fillRect(0, BACK_FOOT, PW, PH - BACK_FOOT);
     ctx.fillStyle = ink.line;
-    for (let y = 138; y < 160; y += 8) ctx.fillRect(8, y, PW - 16, 1);
-    ctx.fillStyle = ink.stoneDark;
-    ctx.fillRect(0, 160, PW, 4);
+    for (let y = BACK_FOOT + 8; y < LIGHT_Y; y += 8) ctx.fillRect(8, y, PW - 16, 1);
 }
 
 function drawFootlights(ctx: CanvasRenderingContext2D, members: readonly Member[], pix: Pix): void {

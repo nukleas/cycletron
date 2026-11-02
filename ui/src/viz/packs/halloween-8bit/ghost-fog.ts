@@ -9,7 +9,7 @@
 import type {VizMode, VizModeDef, VizServices} from '../../sdk.js';
 import {type FieldHap, type FieldTeam, HapField} from '../../sdk.js';
 import {clamp01, hash32, rand01, TAU} from '../../sdk.js';
-import {bakePix, drawHud, drawSprite, HUD_Y, nearest, PW, PxScreen, type Pix} from './lib/pixel.js';
+import {bakePix, drawSprite, nearest, PH, PW, PxScreen, type Pix} from './lib/pixel.js';
 import {type Role, halloweenRole} from './lib/roles.js';
 import {REED} from './lib/sprites.js';
 import {drawGhostAt, drawNight, drawRidge, drawTree} from './lib/sky.js';
@@ -158,15 +158,13 @@ class GhostFogMode implements VizMode {
             p.fillStyle = this.pix.ink.skyDeep;
             p.fillRect(0, 0, PW, 1);
         }
-        drawHud(p, this.pix.ink, 'GHOSTS', cycle, hop === 1 || this.shine > 0.4);
         this.screen.blit(ctx, s.width, s.height, this.pix.ink.bg);
-        this.screen.stampHud(ctx, s.width, s.height);
     }
 
     private drawSwamp(ctx: CanvasRenderingContext2D, cycle: number): void {
         const {ink} = this.pix;
         ctx.fillStyle = ink.hillDark;
-        ctx.fillRect(0, 100, PW, HUD_Y - 100);
+        ctx.fillRect(0, 100, PW, PH - 100);
         ctx.fillStyle = this.pix.hillDither;
         ctx.fillRect(0, 94, PW, 8);
         drawRidge(ctx, 100, ink.sil);
@@ -175,11 +173,11 @@ class GhostFogMode implements VizMode {
         drawTree(ctx, 250, 100, 1, ink.sil);
 
         ctx.fillStyle = this.pix.waterDither;
-        ctx.fillRect(0, WATER_Y, PW, HUD_Y - WATER_Y);
+        ctx.fillRect(0, WATER_Y, PW, PH - WATER_Y);
         const phase = Math.floor(cycle * 5) % 14;
         ctx.fillStyle = ink.moonDim;
         ctx.beginPath();
-        for (let y = WATER_Y + 5; y < HUD_Y - 2; y += 6) {
+        for (let y = WATER_Y + 5; y < PH - 2; y += 6) {
             const shift = (phase + y) % 14;
             for (let x = -14 + shift; x < PW; x += 22) {
                 ctx.rect(x, y, 8, 1);
@@ -214,7 +212,7 @@ class GhostFogMode implements VizMode {
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
             const y = WATER_Y + 6 + i * 5;
-            if (y >= HUD_Y) break;
+            if (y >= PH) break;
             const wob = ((Math.floor(cycle * 6) + i) & 1) ? 1 : -1;
             const half = 7 - i;
             ctx.rect(mx - half + wob, y, half * 2, 1);

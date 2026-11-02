@@ -13,7 +13,7 @@ import {clamp01, follow, hash32, rand01} from '../../sdk.js';
 import {graveFor} from './lib/graves.js';
 import {HOUSE, drawShell} from './lib/mansion.js';
 import {drawBigBoo, drawWindowMonster, windowMonster} from './lib/monsters.js';
-import {bakePix, drawHud, drawSprite, frameRect, nearest, PW, PxScreen, type Pix} from './lib/pixel.js';
+import {bakePix, drawSprite, frameRect, nearest, PW, PxScreen, type Pix} from './lib/pixel.js';
 import {type Role, halloweenRole, isLong, registerPos} from './lib/roles.js';
 import {PUMPS} from './lib/sprites.js';
 import {type Bolt, ageBolts, boltFlash, drawBolt, drawGhostAt, drawNight, makeBolt} from './lib/sky.js';
@@ -173,9 +173,7 @@ class HauntedHouseMode implements VizMode {
             p.fillStyle = this.pix.ink.skyDeep;
             p.fillRect(0, 0, PW, 1);
         }
-        drawHud(p, this.pix.ink, 'HAUNTED', cycle, hop === 1 || flash > 0.5);
         this.screen.blit(ctx, s.width, s.height, this.pix.ink.bg);
-        this.screen.stampHud(ctx, s.width, s.height);
     }
 
     private gather(cycle: number): void {

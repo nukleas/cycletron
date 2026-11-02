@@ -11,7 +11,7 @@ import type {VizMode, VizModeDef, VizServices} from '../../sdk.js';
 import {type FieldHap, type FieldTeam, HapField} from '../../sdk.js';
 import {clamp01, hash32, rand01} from '../../sdk.js';
 import {COLS, graveFor} from './lib/graves.js';
-import {bakePix, drawHud, drawSprite, HUD_Y, nearest, PW, PxScreen, type Pix} from './lib/pixel.js';
+import {bakePix, drawSprite, nearest, PH, PW, PxScreen, type Pix} from './lib/pixel.js';
 import {type Role, halloweenRole, isLong, registerPos} from './lib/roles.js';
 import {danceFrame, drawDancer} from './lib/skeleton.js';
 import {TOMBS} from './lib/sprites.js';
@@ -162,24 +162,22 @@ class GraveyardMode implements VizMode {
             p.fillStyle = this.pix.ink.skyDeep;
             p.fillRect(0, 0, PW, 1);
         }
-        drawHud(p, this.pix.ink, 'GRAVEYARD', this.field.cycle, hop === 1 || flash > 0.5);
         this.screen.blit(ctx, s.width, s.height, this.pix.ink.bg);
-        this.screen.stampHud(ctx, s.width, s.height);
     }
 
     private drawYard(ctx: CanvasRenderingContext2D): void {
         const {ink} = this.pix;
         const cycle = this.field.cycle;
         ctx.fillStyle = ink.hillDark;
-        ctx.fillRect(0, 68, PW, HUD_Y - 68);
+        ctx.fillRect(0, 68, PW, PH - 68);
         ctx.fillStyle = this.pix.hillDither;
         ctx.fillRect(0, 62, PW, 8);
         ctx.fillStyle = ink.dirt;
-        ctx.fillRect(0, 108, PW, HUD_Y - 108);
+        ctx.fillRect(0, 108, PW, PH - 108);
         ctx.fillStyle = ink.hill;
-        ctx.fillRect(0, 140, PW, HUD_Y - 140);
+        ctx.fillRect(0, 140, PW, PH - 140);
         ctx.fillStyle = ink.dirt;
-        ctx.fillRect(152, 68, 16, HUD_Y - 68);
+        ctx.fillRect(152, 68, 16, PH - 68);
         for (const x of [24, 70, 230, 276]) drawTree(ctx, x, 68, 1, ink.sil);
         drawFence(ctx, 60, ink.line);
         drawTree(ctx, 2, ROW_Y[0], 2, ink.line);
@@ -255,7 +253,7 @@ class GraveyardMode implements VizMode {
         for (let i = 0; i < 26; i++) {
             const x = 4 + (hash32(i, 51) % (PW - 10));
             const y = 152 + (hash32(i, 53) % 12);
-            if (y >= HUD_Y - 2) continue;
+            if (y >= PH - 2) continue;
             ctx.rect(x, y, 1, 2);
             ctx.rect(x - 1 + sway, y - 2, 1, 2);
             ctx.rect(x + 1 + sway, y - 1, 1, 2);

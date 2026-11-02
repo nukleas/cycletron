@@ -1,5 +1,5 @@
 /**
- * 320×180 screen, baked solids, bitmap sprites, and the status strip.
+ * 320×180 screen, baked solids and bitmap sprites.
  * Modes redraw this buffer from state every frame and blit it sharp.
  */
 
@@ -8,8 +8,6 @@ import {mixRgb, rgbOf} from '../../../sdk.js';
 
 export const PW = 320;
 export const PH = 180;
-export const HUD_H = 8;
-export const HUD_Y = PH - HUD_H;
 
 type Rgb = [number, number, number];
 
@@ -151,21 +149,6 @@ export class PxScreen {
         ctx.drawImage(this.canvas, Math.floor((w - dw) / 2), Math.floor((h - dh) / 2), dw, dh);
         ctx.imageSmoothingEnabled = prev;
     }
-
-    /** Status strip on the glass. The show camera crops the buffer's bottom edge. */
-    stampHud(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.imageSmoothingEnabled = false;
-        const scale = Math.min(w / PW, h / PH);
-        const dw = Math.floor(PW * scale);
-        const dh = Math.floor(PH * scale);
-        const sh = Math.max(1, Math.round(HUD_H * scale));
-        const ox = Math.floor((w - dw) / 2);
-        const oy = Math.floor((h - dh) / 2);
-        ctx.drawImage(this.canvas, 0, HUD_Y, PW, HUD_H, ox, oy + dh - sh, dw, sh);
-        ctx.restore();
-    }
 }
 
 export interface Sprite {
@@ -257,97 +240,6 @@ export function fillTri(
         ctx.fillStyle = (Math.floor(y / 3) & 1) === 0 ? fill : alt;
         ctx.fillRect(left, y, right - left, 1);
     }
-}
-
-const FONT: Record<string, readonly string[]> = {
-    A: ['010', '101', '111', '101', '101'],
-    B: ['110', '101', '110', '101', '110'],
-    C: ['011', '100', '100', '100', '011'],
-    D: ['110', '101', '101', '101', '110'],
-    E: ['111', '100', '110', '100', '111'],
-    F: ['111', '100', '110', '100', '100'],
-    G: ['011', '100', '101', '101', '011'],
-    H: ['101', '101', '111', '101', '101'],
-    I: ['111', '010', '010', '010', '111'],
-    J: ['001', '001', '001', '101', '010'],
-    K: ['101', '101', '110', '101', '101'],
-    L: ['100', '100', '100', '100', '111'],
-    M: ['101', '111', '101', '101', '101'],
-    N: ['110', '101', '101', '101', '101'],
-    O: ['010', '101', '101', '101', '010'],
-    P: ['110', '101', '110', '100', '100'],
-    Q: ['010', '101', '101', '011', '001'],
-    R: ['110', '101', '110', '101', '101'],
-    S: ['011', '100', '010', '001', '110'],
-    T: ['111', '010', '010', '010', '010'],
-    U: ['101', '101', '101', '101', '011'],
-    V: ['101', '101', '101', '010', '010'],
-    W: ['101', '101', '101', '111', '101'],
-    X: ['101', '101', '010', '101', '101'],
-    Y: ['101', '101', '010', '010', '010'],
-    Z: ['111', '001', '010', '100', '111'],
-    '0': ['111', '101', '101', '101', '111'],
-    '1': ['110', '010', '010', '010', '111'],
-    '2': ['110', '001', '010', '100', '111'],
-    '3': ['110', '001', '011', '001', '110'],
-    '4': ['101', '101', '111', '001', '001'],
-    '5': ['111', '100', '110', '001', '110'],
-    '6': ['011', '100', '110', '101', '011'],
-    '7': ['111', '001', '010', '100', '100'],
-    '8': ['111', '101', '010', '101', '111'],
-    '9': ['111', '101', '111', '001', '110'],
-};
-
-export function textWidth(text: string): number {
-    return text.length * 4;
-}
-
-export function drawText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string): void {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    let cx = x | 0;
-    const y0 = y | 0;
-    const upper = text.toUpperCase();
-    for (let i = 0; i < upper.length; i++) {
-        const g = FONT[upper[i]];
-        if (g) {
-            for (let r = 0; r < 5; r++) {
-                const row = g[r];
-                for (let c = 0; c < 3; c++) if (row[c] === '1') ctx.rect(cx + c, y0 + r, 1, 1);
-            }
-        }
-        cx += 4;
-    }
-    ctx.fill();
-}
-
-/** Bottom status strip: mode name, beat pips, bar count. */
-export function drawHud(ctx: CanvasRenderingContext2D, ink: Ink, title: string, cycle: number, hot: boolean): void {
-    ctx.fillStyle = ink.line;
-    ctx.fillRect(0, HUD_Y, PW, HUD_H);
-    ctx.fillStyle = hot ? ink.moon : ink.accent;
-    ctx.fillRect(0, HUD_Y, PW, 1);
-    drawSkull(ctx, 2, HUD_Y + 2, hot ? ink.moon : ink.bone, hot ? ink.red : ink.bg);
-    drawText(ctx, title, 10, HUD_Y + 2, ink.bone);
-    const bar = String(Math.floor(cycle) % 100).padStart(2, '0');
-    const label = `BAR ${bar}`;
-    const lx = PW - 3 - textWidth(label);
-    drawText(ctx, label, lx, HUD_Y + 2, ink.moon);
-    const beat = Math.floor((cycle % 1) * 4) % 4;
-    for (let i = 0; i < 4; i++) {
-        ctx.fillStyle = i === beat ? ink.accent : ink.purple;
-        ctx.fillRect(lx - 18 + i * 4, HUD_Y + 3, 2, 2);
-    }
-}
-
-function drawSkull(ctx: CanvasRenderingContext2D, x: number, y: number, bone: string, eye: string): void {
-    ctx.fillStyle = bone;
-    ctx.fillRect(x + 1, y, 3, 1);
-    ctx.fillRect(x, y + 1, 5, 3);
-    ctx.fillRect(x + 1, y + 4, 3, 1);
-    ctx.fillStyle = eye;
-    ctx.fillRect(x + 1, y + 2, 1, 1);
-    ctx.fillRect(x + 3, y + 2, 1, 1);
 }
 
 function blit(
