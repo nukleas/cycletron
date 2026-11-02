@@ -100,7 +100,7 @@ export default defineConfig(({mode}) => ({
     // No base path — served from Tauri webview root
     clearScreen: false,
     resolve: {
-        alias: {'@cycletron/viz-sdk': resolve(__dirname, 'src/viz/sdk.ts')},
+        alias: {'@cycletron/viz-sdk': resolve(import.meta.dirname, 'src/viz/sdk.ts')},
     },
     build: {
         outDir: 'dist',
