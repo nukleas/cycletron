@@ -150,14 +150,14 @@ const PACK_DIR = process.env.VIZ_PACK ?? HALLOWEEN;
 const PACK = `${PACK_DIR}/dist/index.js`;
 const {existsSync} = await import('node:fs');
 const packModes = (dir) => JSON.parse(readFileSync(`${dir}/pack.json`, 'utf8')).modes;
-test('a pack loaded from its built module matches across a chunk seam', {skip: !existsSync(PACK)}, async () => {
+test('every mode of a pack loaded from its built module matches across a chunk seam', {skip: !existsSync(PACK)}, async () => {
     const sources = [readFileSync(PACK, 'utf8')];
     const modes = packModes(PACK_DIR);
     if (PACK_DIR !== HALLOWEEN && existsSync(`${HALLOWEEN}/dist/index.js`)) {
         sources.push(readFileSync(`${HALLOWEEN}/dist/index.js`, 'utf8'));
         modes.push(packModes(HALLOWEEN)[0]);
     }
-    const renderWithPack = async (startFrame, count) => {
+    const renderWithPack = async (startFrame, count, one, two) => {
         const browser = await chromium.launch();
         try {
             const page = await browser.newPage({viewport: {width: 480, height: 270}, deviceScaleFactor: 1});
@@ -165,7 +165,7 @@ test('a pack loaded from its built module matches across a chunk seam', {skip: !
             await page.goto(url);
             await page.waitForFunction(() => 'vizRender' in window);
             await page.evaluate((opts) => window.vizRender.setup(opts), {
-                code: CODE, bpm: BPM, cues: cues(modes[0], modes[modes.length - 1]), song: {passes: 1, fade: {in: 0, out: 0}},
+                code: CODE, bpm: BPM, cues: cues(one, two), song: {passes: 1, fade: {in: 0, out: 0}},
                 width: 480, height: 270, fps: FPS, startFrame, sensitivity: 1, audio: '/__render/mix.wav', packs: sources,
             });
             const hashes = [];
@@ -177,7 +177,11 @@ test('a pack loaded from its built module matches across a chunk seam', {skip: !
     };
     const total = SECONDS * FPS;
     const from = 4 * FPS;
-    const [whole, chunk] = await Promise.all([renderWithPack(0, total), renderWithPack(from, total - from)]);
-    const differing = chunk.flatMap((h, i) => (h === whole[from + i] ? [] : [from + i]));
-    assert.deepEqual(differing, [], 'frames that differ from the continuous render');
+    // Adjacent pairs, so every mode is drawn on both sides of a cut.
+    const pairs = modes.length === 1 ? [[modes[0], modes[0]]] : modes.slice(1).map((m, i) => [modes[i], m]);
+    for (const [one, two] of pairs) {
+        const [whole, chunk] = await Promise.all([renderWithPack(0, total, one, two), renderWithPack(from, total - from, one, two)]);
+        const differing = chunk.flatMap((h, i) => (h === whole[from + i] ? [] : [from + i]));
+        assert.deepEqual(differing, [], `${one} → ${two}: frames that differ from the continuous render`);
+    }
 });
