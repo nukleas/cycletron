@@ -249,6 +249,11 @@ class VisualsMenu {
 
     private refresh(): void {
         if (!this.menu) return;
+        // A pack installed while the app runs adds modes; rebuild so they show up.
+        if (this.modeItems.length !== VIZ_MODES.length) {
+            this.build();
+            return;
+        }
 
         const savedGrid = parseInt(localStorage.getItem(GRID_MODE_KEY) ?? '0', 10);
         const gridMode = (Number.isInteger(savedGrid) && savedGrid >= 0 && savedGrid < GRID_MODES.length
