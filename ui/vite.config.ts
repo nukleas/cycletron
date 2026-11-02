@@ -86,12 +86,28 @@ function noPrivatePublicDirsPlugin(): Plugin {
 // Visualizer packs import the sdk as `@cycletron/viz-sdk`. In the app that
 // resolves to the source; a pack loaded at runtime resolves it through the
 // import map in index.html, which this plugin points at the built sdk chunk.
-function vizSdkImportMapPlugin(): Plugin {
+// The chunk is emitted here, not as an input, so its exports keep their names:
+// vite builds app entries with preserveEntrySignatures off, which would mangle them.
+function vizSdkPlugin(): Plugin {
     return {
-        name: 'viz-sdk-import-map',
+        name: 'viz-sdk',
         apply: 'build',
+        buildStart() {
+            this.emitFile({
+                type: 'chunk',
+                id: resolve(import.meta.dirname, 'src/viz/sdk.ts'),
+                fileName: 'viz-sdk.js',
+                preserveSignature: 'strict',
+            });
+        },
         transformIndexHtml(html) {
             return html.replace('"@cycletron/viz-sdk": "/src/viz/sdk.ts"', '"@cycletron/viz-sdk": "/viz-sdk.js"');
+        },
+        generateBundle(_options, bundle) {
+            const sdk = bundle['viz-sdk.js'];
+            if (sdk?.type !== 'chunk' || !sdk.exports.includes('HapField')) {
+                this.error('viz-sdk.js lost its named exports; packs import the sdk by name');
+            }
         },
     };
 }
@@ -112,15 +128,9 @@ export default defineConfig(({mode}) => ({
                 // audio-manager.ts loads it via addModule('worklet.js') at runtime,
                 // so it must land at the root of the output directory as worklet.js.
                 worklet: 'worklet.ts',
-                // The visualizer sdk as its own chunk, at a fixed name the
-                // import map can point at, so runtime-loaded packs share it.
-                'viz-sdk': 'src/viz/sdk.ts',
             },
             output: {
-                entryFileNames: chunk =>
-                    chunk.name === 'worklet' ? 'worklet.js' :
-                        chunk.name === 'viz-sdk' ? 'viz-sdk.js' :
-                        'assets/[name]-[hash].js',
+                entryFileNames: chunk => chunk.name === 'worklet' ? 'worklet.js' : 'assets/[name]-[hash].js',
                 manualChunks: (id) => {
                     // Never pull worklet code into shared chunks - it must remain
                     // a standalone script with no dynamic imports.
@@ -161,6 +171,6 @@ export default defineConfig(({mode}) => ({
         InlineEnum.vite(),
         wasmMemoryLeakFixPlugin(),
         noPrivatePublicDirsPlugin(),
-        vizSdkImportMapPlugin(),
+        vizSdkPlugin(),
     ]
 }));

@@ -9,6 +9,7 @@ import {sdkSatisfies, validatePack, type VizPack} from './pack.js';
 import {SDK_VERSION} from './sdk.js';
 import {registerPack} from './registry.js';
 import {invoke, isTauri} from '../tauri.js';
+import {diag} from '../diagnostics.js';
 import type {VizPackSource} from '../types/tauri-commands.js';
 
 /** Ids of the packs loaded so far, so a pack enabled later isn't loaded twice. */
@@ -45,7 +46,7 @@ export async function loadLibraryPacks(onError: (id: string, message: string) =>
     try {
         packs = await invoke<VizPackSource[]>('list_viz_packs');
     } catch (e) {
-        console.warn(`viz packs: couldn't list: ${String(e)}`);
+        void diag('warn', 'viz-packs', `couldn't list packs: ${String(e)}`);
         return [];
     }
     const loaded: string[] = [];
@@ -53,10 +54,12 @@ export async function loadLibraryPacks(onError: (id: string, message: string) =>
         if (LOADED_PACKS.has(p.id)) continue;
         try {
             await loadPackSource(p.source, p.id);
-            console.info(`viz packs: loaded ${p.id} from ${p.path}`);
+            void diag('info', 'viz-packs', `loaded ${p.id} from ${p.path}`);
             loaded.push(p.id);
         } catch (e) {
-            onError(p.id, e instanceof Error ? e.message : String(e));
+            const message = e instanceof Error ? e.message : String(e);
+            void diag('error', 'viz-packs', `${p.id} failed to load: ${message}`);
+            onError(p.id, message);
         }
     }
     return loaded;
