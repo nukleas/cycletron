@@ -1,50 +1,45 @@
 /**
- * GHOST FOG — ghosts drifting through fog over a swamp, one per note. A calm
- * trail mode: the host fades the background instead of clearing it, so each
- * ghost smears into fog behind it. Pitch is height, length is size, and the
- * hats send will-o'-wisps up from the water; kicks ripple it, snares catch
- * the moon's reflection.
+ * GHOST FOG — a swamp at night. One Pac-Man ghost per note: pitch is height,
+ * length is 1× or 2×. Each ghost leaves two dim afterimages of its own path.
+ * Hats lift wisps, kicks ripple the water, snares catch the moon.
  *
- * Nothing here paints the whole frame, or the trails would vanish. Spawns
- * happen in update(); render() is a pure function of the field and the pools.
+ * No trail fade. The buffer is redrawn from state every frame.
  */
 
 import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {type FieldHap, type FieldTeam, HapField, type Rgb} from '../hap-field.js';
-import {TAU, alphaRamp, clamp01, hash32, lerpRgb, mixRgb, rampAt, rand01, rgbOf} from '../util.js';
+import {type FieldHap, type FieldTeam, HapField} from '../hap-field.js';
+import {clamp01, hash32, rand01, TAU} from '../util.js';
+import {bakePix, drawHud, drawSprite, HUD_Y, nearest, PW, PxScreen, type Pix} from './halloween/pixel.js';
 import {type Role, halloweenRole} from './halloween/roles.js';
-import {drawGhost} from './halloween/sky.js';
+import {REED} from './halloween/sprites.js';
+import {drawGhostAt, drawNight, drawRidge, drawTree} from './halloween/sky.js';
 
-const REFERENCE_HEIGHT = 1080;
 const LOOKAHEAD = 1;
 const MAX_GHOSTS = 240;
 const MAX_PER_TRACK = 32;
 const DRUM_CAP = 12;
 const IDLE_RATE = 0.2;
-/** Cycles a ghost lingers after its note ends. */
 const TAIL = 0.75;
 const MAX_WISPS = 32;
 const WISP_LIFE = 1.6;
 const MAX_RIPPLES = 8;
 const RIPPLE_LIFE = 0.8;
-const WATER_Y = 0.72;
-const REEDS = 8;
+const WATER_Y = 122;
+const MOON_X = 36;
+const MOON_Y = 16;
 
 interface Team extends FieldTeam {}
 
 interface Ghost extends FieldHap<Team> {
     role: Role;
-    /** Start x as a fraction of the frame width. */
     x0: number;
     dir: number;
-    /** Size as a fraction of the frame height. */
-    size: number;
 }
 
 interface Wisp {
     age: number;
-    x0: number;
-    y0: number;
+    x: number;
+    y: number;
     phase: number;
 }
 
@@ -53,7 +48,15 @@ interface Ripple {
     x: number;
 }
 
+interface Place {
+    x: number;
+    y: number;
+    scale: number;
+    dim: boolean;
+}
+
 class GhostFogMode implements VizMode {
+    private readonly screen = new PxScreen();
     private readonly field = new HapField<Team, Ghost>({
         lookahead: LOOKAHEAD,
         maxHaps: MAX_GHOSTS,
@@ -66,40 +69,16 @@ class GhostFogMode implements VizMode {
     });
     private readonly wisps: Wisp[] = [];
     private readonly ripples: Ripple[] = [];
+    private readonly order: Ghost[] = [];
+    private readonly colors = new Map<number, string>();
     private shine = 0;
+    private thump = 0;
     private lastIdleWisp = -1;
-
-    private vw = 0;
-    private vh = 0;
-    private renderScale = 1;
-    private ghostFill = '#ffffff';
-    private ghostEye = '#000000';
-    private wispRamp: string[] = [];
-    private rippleRamp: string[] = [];
-    private moonCss = '';
-    private moonFill = '';
-    private waterCss = '';
-    private reedCss = '';
-    private shineRamp: string[] = [];
-    private white: Rgb = [255, 255, 255];
+    private pix!: Pix;
 
     layout(s: VizServices): void {
-        this.renderScale = Math.max(1, s.height / REFERENCE_HEIGHT);
-        this.vw = s.width / this.renderScale;
-        this.vh = s.height / this.renderScale;
-        const t = s.theme;
-        const ghost = mixRgb(t.textRgb, this.white, 0.5);
-        this.ghostFill = `rgb(${ghost[0]}, ${ghost[1]}, ${ghost[2]})`;
-        this.ghostEye = t.bg;
-        this.wispRamp = alphaRamp(rgbOf(t.neon, [255, 122, 26]));
-        this.rippleRamp = alphaRamp(rgbOf(t.neonSecondary, [138, 60, 255]));
-        const moon = alphaRamp(rgbOf(t.active, [255, 243, 176]));
-        this.moonCss = rampAt(moon, 0.35);
-        this.moonFill = rampAt(moon, 0.08);
-        this.shineRamp = moon;
-        const border = alphaRamp(t.borderRgb);
-        this.waterCss = rampAt(border, 0.3);
-        this.reedCss = rampAt(border, 0.45);
+        this.pix = bakePix(s.theme);
+        this.colors.clear();
         this.field.invalidate();
     }
 
@@ -110,6 +89,7 @@ class GhostFogMode implements VizMode {
             this.wisps.length = 0;
             this.ripples.length = 0;
             this.shine = 0;
+            this.thump = 0;
         }
         let spawned = 0;
         for (const h of field.haps) {
@@ -121,7 +101,10 @@ class GhostFogMode implements VizMode {
                     if (spawned < 2) { this.spawnWisp(h.seed); spawned++; }
                     break;
                 case 'kick':
-                    if (this.ripples.length < MAX_RIPPLES) this.ripples.push({age: 0, x: 0.15 + 0.7 * rand01(hash32(h.seed, 5))});
+                    this.thump = 1;
+                    if (this.ripples.length < MAX_RIPPLES) {
+                        this.ripples.push({age: 0, x: 16 + rand01(hash32(h.seed, 5)) * (PW - 32)});
+                    }
                     break;
                 case 'snare':
                 case 'crash':
@@ -132,7 +115,6 @@ class GhostFogMode implements VizMode {
             }
         }
         if (!field.locked) {
-            // Idle: a wisp every other cycle keeps the swamp alive.
             const tick = Math.floor(field.cycle / 2);
             if (tick !== this.lastIdleWisp) {
                 this.lastIdleWisp = tick;
@@ -148,143 +130,191 @@ class GhostFogMode implements VizMode {
             if (this.ripples[i].age >= RIPPLE_LIFE) this.ripples.splice(i, 1);
         }
         this.shine *= Math.exp(-dt * 4);
+        this.thump *= Math.exp(-dt * 9);
     }
 
     private spawnWisp(seed: number): void {
         if (this.wisps.length >= MAX_WISPS) return;
-        this.wisps.push({age: 0, x0: 0.08 + 0.84 * rand01(hash32(seed, 1)), y0: WATER_Y - 0.02 * rand01(hash32(seed, 2)), phase: rand01(hash32(seed, 3)) * TAU});
+        this.wisps.push({
+            age: 0,
+            x: 12 + rand01(hash32(seed, 1)) * (PW - 24),
+            y: WATER_Y - 2,
+            phase: rand01(hash32(seed, 3)) * TAU,
+        });
     }
 
-    render(ctx: CanvasRenderingContext2D): void {
-        const {vw, vh, field} = this;
-        const cycle = field.cycle;
-        ctx.save();
-        ctx.scale(this.renderScale, this.renderScale);
-        ctx.lineCap = 'round';
+    render(ctx: CanvasRenderingContext2D, s: VizServices): void {
+        const p = this.screen.ctx;
+        const cycle = this.field.cycle;
+        const hop = this.thump > 0.5 ? 1 : 0;
+        p.setTransform(1, 0, 0, 1, 0, hop);
+        p.imageSmoothingEnabled = false;
+        drawNight(p, this.pix, cycle, 0, MOON_X, MOON_Y, false);
+        this.drawSwamp(p, cycle);
+        this.drawGhosts(p, cycle);
+        this.drawWisps(p);
+        p.setTransform(1, 0, 0, 1, 0, 0);
+        if (hop) {
+            p.fillStyle = this.pix.ink.skyDeep;
+            p.fillRect(0, 0, PW, 1);
+        }
+        drawHud(p, this.pix.ink, 'GHOSTS', cycle, hop === 1 || this.shine > 0.4);
+        this.screen.blit(ctx, s.width, s.height, this.pix.ink.bg);
+        this.screen.stampHud(ctx, s.width, s.height);
+    }
 
-        // Moon, thin, so the trails show through it.
-        const mx = vw * 0.18;
-        const my = vh * 0.2;
-        const mr = vh * 0.06;
-        ctx.fillStyle = this.moonFill;
-        ctx.beginPath();
-        ctx.arc(mx, my, mr, 0, TAU);
-        ctx.fill();
-        ctx.strokeStyle = this.moonCss;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+    private drawSwamp(ctx: CanvasRenderingContext2D, cycle: number): void {
+        const {ink} = this.pix;
+        ctx.fillStyle = ink.hillDark;
+        ctx.fillRect(0, 100, PW, HUD_Y - 100);
+        ctx.fillStyle = this.pix.hillDither;
+        ctx.fillRect(0, 94, PW, 8);
+        drawRidge(ctx, 100, ink.sil);
+        drawTree(ctx, 4, WATER_Y, 2, ink.line);
+        drawTree(ctx, PW - 30, WATER_Y, 2, ink.line);
+        drawTree(ctx, 250, 100, 1, ink.sil);
 
-        // Water line and its reflection of the moon.
-        const wy = vh * WATER_Y;
-        ctx.strokeStyle = this.waterCss;
-        ctx.lineWidth = 1;
+        ctx.fillStyle = this.pix.waterDither;
+        ctx.fillRect(0, WATER_Y, PW, HUD_Y - WATER_Y);
+        const phase = Math.floor(cycle * 5) % 14;
+        ctx.fillStyle = ink.moonDim;
         ctx.beginPath();
-        ctx.moveTo(0, wy);
-        ctx.lineTo(vw, wy);
-        ctx.stroke();
-        if (this.shine > 0.02) {
-            ctx.strokeStyle = rampAt(this.shineRamp, this.shine * 0.6);
-            ctx.lineWidth = 2;
-            for (let i = 0; i < 4; i++) {
-                const y = wy + 6 + i * 9;
-                const half = mr * (1.1 - i * 0.2) * (0.8 + 0.2 * Math.sin(cycle * 7 + i));
-                ctx.beginPath();
-                ctx.moveTo(mx - half, y);
-                ctx.lineTo(mx + half, y);
-                ctx.stroke();
+        for (let y = WATER_Y + 5; y < HUD_Y - 2; y += 6) {
+            const shift = (phase + y) % 14;
+            for (let x = -14 + shift; x < PW; x += 22) {
+                ctx.rect(x, y, 8, 1);
+                ctx.rect(x + 2, y + 1, 4, 1);
             }
         }
+        ctx.fill();
+        ctx.fillStyle = ink.hill;
+        ctx.fillRect(0, WATER_Y, PW, 2);
+        ctx.fillStyle = ink.moonDim;
+        ctx.fillRect(0, WATER_Y, PW, 1);
 
-        // Reeds.
-        ctx.strokeStyle = this.reedCss;
-        ctx.lineWidth = 1.5;
-        for (let i = 0; i < REEDS; i++) {
-            const x = (0.04 + 0.92 * rand01(hash32(i, 23))) * vw;
-            const h = (0.06 + 0.07 * rand01(hash32(i, 29))) * vh;
-            const sway = Math.sin(cycle * TAU * 0.25 + i) * 4;
-            ctx.beginPath();
-            ctx.moveTo(x, wy + 2);
-            ctx.quadraticCurveTo(x + sway * 0.5, wy - h * 0.5, x + sway, wy - h);
-            ctx.stroke();
+        ctx.fillStyle = ink.stoneDark;
+        ctx.fillRect(8, WATER_Y - 3, 40, 3);
+        ctx.fillStyle = ink.stone;
+        for (let i = 0; i < 3; i++) ctx.fillRect(14 + i * 12, WATER_Y, 3, 8);
+
+        const sway = Math.floor(cycle * 2) & 1;
+        for (let i = 0; i < 8; i++) {
+            const x = 6 + (hash32(i, 23) % (PW - 14));
+            const y = (i % 3 === 0 ? 100 : WATER_Y + 3) - REED.h;
+            drawSprite(ctx, REED, x, y, [null, ink.stem, ink.line], {flip: ((sway + i) & 1) === 1});
         }
 
-        // Ripples.
-        for (const r of this.ripples) {
-            const t = r.age / RIPPLE_LIFE;
-            ctx.strokeStyle = rampAt(this.rippleRamp, (1 - t) * 0.3);
-            ctx.lineWidth = 1.2;
-            ctx.beginPath();
-            ctx.ellipse(r.x * vw, wy, vh * 0.1 * t + 2, vh * 0.018 * t + 1, 0, 0, TAU);
-            ctx.stroke();
-        }
-
-        // Ghosts.
-        for (const h of field.haps) {
-            if (h.role !== 'bass' && h.role !== 'mid' && h.role !== 'lead') continue;
-            const t = cycle - h.begin;
-            if (t < 0) continue;
-            const dur = h.end - h.begin;
-            const life = dur + TAIL;
-            const fadeIn = clamp01(t / 0.1);
-            const fadeOut = clamp01((life - t) / TAIL);
-            const alpha = (0.55 / (1 + dur)) * fadeIn * fadeOut * h.fade;
-            const x = (h.x0 + h.dir * 0.06 * t) * vw;
-            const y = (0.68 - 0.56 * clamp01((h.note - 36) / 60)) * vh - t * 0.02 * vh;
-            const size = h.size * vh;
-            const fill = lerpRgb(h.team.rgb, this.white, 0.5);
-            drawGhost(ctx, x, y, size, size * 1.5, alpha, fill, this.ghostEye, cycle * TAU * 0.5 + h.seed);
-        }
-        if (!field.locked) this.drawIdleGhosts(ctx, cycle);
-
-        // Wisps.
-        for (const w of this.wisps) {
-            const t = w.age / WISP_LIFE;
-            const x = (w.x0 + 0.04 * Math.sin(TAU * (w.age * 0.7 + w.phase))) * vw;
-            const y = (w.y0 - 0.08 * t) * vh;
-            const a = Math.sin(t * Math.PI);
-            ctx.fillStyle = rampAt(this.wispRamp, a * 0.3);
-            ctx.beginPath();
-            ctx.arc(x, y, 6, 0, TAU);
-            ctx.fill();
-            ctx.fillStyle = rampAt(this.wispRamp, a);
-            ctx.beginPath();
-            ctx.arc(x, y, 3, 0, TAU);
-            ctx.fill();
-        }
-        ctx.restore();
+        for (const r of this.ripples) drawRipple(ctx, r.x, WATER_Y + 3, r.age / RIPPLE_LIFE, ink.moon);
+        this.drawReflection(ctx, cycle, this.shine > 0.12 ? ink.moon : ink.moonDim);
     }
 
-    /** Two seeded ghosts per 3-cycle window while nothing plays. */
-    private drawIdleGhosts(ctx: CanvasRenderingContext2D, cycle: number): void {
+    private drawReflection(ctx: CanvasRenderingContext2D, cycle: number, color: string): void {
+        const mx = MOON_X + 8;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const y = WATER_Y + 6 + i * 5;
+            if (y >= HUD_Y) break;
+            const wob = ((Math.floor(cycle * 6) + i) & 1) ? 1 : -1;
+            const half = 7 - i;
+            ctx.rect(mx - half + wob, y, half * 2, 1);
+        }
+        ctx.fill();
+    }
+
+    private drawGhosts(ctx: CanvasRenderingContext2D, cycle: number): void {
+        const list = this.order;
+        list.length = 0;
+        for (const h of this.field.haps) {
+            if (h.role === 'bass' || h.role === 'mid' || h.role === 'lead') list.push(h);
+        }
+        list.sort((a, b) => b.note - a.note);
+        for (const h of list) {
+            for (const lag of [0.32, 0.16]) this.drawOne(ctx, h, cycle - lag, true);
+            this.drawOne(ctx, h, cycle, false);
+        }
+        if (!this.field.locked) this.drawIdle(ctx, cycle);
+    }
+
+    private drawOne(ctx: CanvasRenderingContext2D, h: Ghost, time: number, trail: boolean): void {
+        const at = placeGhost(h, time);
+        if (!at) return;
+        const ink = this.pix.ink;
+        const body = trail || at.dim ? ink.purple : this.colorOf(h.team.rgb);
+        const bob = (Math.floor(time * 4 + h.seed) & 1) ? -1 : 0;
+        drawGhostAt(ctx, at.x, at.y + bob, Math.floor(time * 6 + h.seed), body, ink.line, ink.ghost, trail ? undefined : ink.line, at.scale);
+    }
+
+    private drawIdle(ctx: CanvasRenderingContext2D, cycle: number): void {
+        const ink = this.pix.ink;
         const k = Math.floor(cycle / 3);
         const t = cycle - k * 3;
+        if (t < 0.25 || t > 2.75) return;
         for (let n = 0; n < 2; n++) {
             const seed = hash32(k, n + 1);
             const dir = (seed & 1) === 0 ? 1 : -1;
-            const x = (0.15 + 0.7 * rand01(hash32(seed, 1)) + dir * 0.05 * t) * this.vw;
-            const y = (0.25 + 0.35 * rand01(hash32(seed, 2)) - 0.02 * t) * this.vh;
-            const alpha = 0.22 * Math.sin((t / 3) * Math.PI);
-            drawGhost(ctx, x, y, 0.06 * this.vh, 0.09 * this.vh, alpha, this.ghostFill, this.ghostEye, cycle * TAU * 0.5 + seed);
+            const x = (0.15 + 0.7 * rand01(hash32(seed, 1))) * PW + dir * 8 * t;
+            const y = 28 + rand01(hash32(seed, 2)) * 48 - t * 3;
+            drawGhostAt(ctx, x, y, Math.floor(cycle * 5 + seed), ink.ghost, ink.line, ink.moon);
         }
+    }
+
+    private drawWisps(ctx: CanvasRenderingContext2D): void {
+        const {ink} = this.pix;
+        for (const w of this.wisps) {
+            const t = w.age / WISP_LIFE;
+            const x = Math.round(w.x + Math.sin(w.age * 3 + w.phase) * 3);
+            const y = Math.round(w.y - t * 34);
+            const flick = (Math.floor(w.age * 10) & 1) === 0;
+            ctx.fillStyle = ink.accent;
+            ctx.fillRect(x - 1, y - 1, 3, 3);
+            ctx.fillStyle = flick ? ink.moon : ink.stem;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    private colorOf(rgb: readonly [number, number, number]): string {
+        return nearest(rgb, this.pix.ink.pool, this.colors);
     }
 }
 
+function placeGhost(h: Ghost, time: number): Place | null {
+    const t = time - h.begin;
+    const dur = h.end - h.begin;
+    const life = dur + TAIL;
+    if (!(t >= 0 && t <= life)) return null;
+    return {
+        x: h.x0 * (PW - 16) + h.dir * 24 * t,
+        y: 108 - clamp01((h.note - 36) / 60) * 86 - t * 8,
+        scale: dur >= 1 ? 2 : 1,
+        dim: t < 0.1 || t > life - 0.28,
+    };
+}
+
 function makeGhost(base: FieldHap<Team>): Ghost {
-    const dur = base.end - base.begin;
     const r = (n: number) => rand01(hash32(base.seed, n));
     return {
         ...base,
         role: halloweenRole(base.team.name, base.note),
-        x0: 0.1 + 0.8 * r(1),
+        x0: 0.08 + 0.84 * r(1),
         dir: (base.seed & 1) === 0 ? 1 : -1,
-        size: 0.05 * (1 + Math.min(2, dur) * 0.6),
     };
+}
+
+function drawRipple(ctx: CanvasRenderingContext2D, x: number, y: number, t: number, color: string): void {
+    const r = 2 + Math.floor(t * 16);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (let a = 0; a < 10; a++) {
+        const px = x + Math.round(Math.cos((a / 10) * TAU) * r);
+        const py = y + Math.round(Math.sin((a / 10) * TAU) * r * 0.35);
+        ctx.rect(px, py, 2, 1);
+    }
+    ctx.fill();
 }
 
 export const ghostFogDef: VizModeDef = {
     id: 'ghost-fog',
     name: 'GHOST FOG',
-    // Slower fades (0.12) left residue older than the 3 s preroll, failing the render seam test.
-    trailFade: 0.16,
     create: () => new GhostFogMode(),
 };

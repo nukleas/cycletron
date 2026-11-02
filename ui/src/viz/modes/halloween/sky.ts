@@ -1,152 +1,67 @@
 /**
- * Night-sky kit shared by the Halloween scenes: sky gradient, stars, moon,
- * lightning, bats and the ghost shape. Everything here is a pure draw
- * function of its arguments or a small pool the owning mode advances in
- * update(); nothing draws random numbers at render time.
+ * Night sky, staircase bolts, and bats. Bolts and bats are spawned in
+ * update(); drawing them is a pure read of that state plus `cycle`.
  */
 
-import type {Rgb} from '../../hap-field.js';
-import {SeededRandom, TAU, hash32, rand01} from '../../util.js';
-
-// ---- sky ---------------------------------------------------------------------
-
-/** One cached gradient, rebuilt when its key changes. */
-export class GradientCache {
-    private key = '';
-    private grad: CanvasGradient | null = null;
-
-    linear(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, stops: readonly [number, string][]): CanvasGradient {
-        const key = `l|${x0}|${y0}|${x1}|${y1}|${stops.map((s) => s.join(':')).join(',')}`;
-        if (key !== this.key || !this.grad) {
-            const g = ctx.createLinearGradient(x0, y0, x1, y1);
-            for (const [at, css] of stops) g.addColorStop(at, css);
-            this.grad = g;
-            this.key = key;
-        }
-        return this.grad;
-    }
-
-    radial(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, stops: readonly [number, string][]): CanvasGradient {
-        const key = `r|${x}|${y}|${r}|${stops.map((s) => s.join(':')).join(',')}`;
-        if (key !== this.key || !this.grad) {
-            const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-            for (const [at, css] of stops) g.addColorStop(at, css);
-            this.grad = g;
-            this.key = key;
-        }
-        return this.grad;
-    }
-}
-
-/** Stars above the horizon; positions re-seed every 8 bars, twinkle every half bar. */
-export function drawStars(ctx: CanvasRenderingContext2D, w: number, horizonY: number, cycle: number, count: number, ramp: readonly string[]): void {
-    const epoch = Math.floor(cycle / 8);
-    const tick = Math.floor(cycle * 2);
-    for (let i = 0; i < count; i++) {
-        const x = rand01(hash32(i * 7 + 1, epoch)) * w;
-        const y = rand01(hash32(i * 7 + 2, epoch)) * horizonY * 0.92;
-        const a = 0.25 + 0.75 * rand01(hash32(i * 7 + 3, tick));
-        const size = rand01(hash32(i * 7 + 4, epoch)) < 0.15 ? 2 : 1;
-        ctx.fillStyle = ramp[Math.round(a * (ramp.length - 1))];
-        ctx.fillRect(x, y, size, size);
-    }
-}
-
-/** Moon disc with a soft glow and three seeded craters. `glow` scales the halo. */
-export function drawMoon(ctx: CanvasRenderingContext2D, cache: GradientCache, x: number, y: number, r: number, disc: string, glowRgb: Rgb, glow: number): void {
-    const [gr, gg, gb] = glowRgb;
-    const outer = r * 3.2;
-    ctx.save();
-    ctx.globalAlpha = 0.35 + 0.4 * glow;
-    ctx.fillStyle = cache.radial(ctx, x, y, outer, [[0, `rgba(${gr}, ${gg}, ${gb}, 0.55)`], [0.35, `rgba(${gr}, ${gg}, ${gb}, 0.12)`], [1, `rgba(${gr}, ${gg}, ${gb}, 0)`]]);
-    ctx.fillRect(x - outer, y - outer, outer * 2, outer * 2);
-    ctx.restore();
-    ctx.fillStyle = disc;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.09)';
-    for (let i = 0; i < 3; i++) {
-        const a = rand01(hash32(11, i)) * TAU;
-        const d = (0.2 + 0.5 * rand01(hash32(13, i))) * r;
-        const cr = (0.12 + 0.14 * rand01(hash32(17, i))) * r;
-        ctx.beginPath();
-        ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, cr, 0, TAU);
-        ctx.fill();
-    }
-}
-
-// ---- lightning -------------------------------------------------------------------
+import {hash32, rand01, SeededRandom, TAU} from '../../util.js';
+import {drawSprite, PH, PW, type Pix} from './pixel.js';
+import {BATS, GHOSTS, MOON, TREE} from './sprites.js';
 
 export interface Bolt {
     age: number;
     life: number;
-    /** Main stroke and forks, each a flat x,y list. */
     paths: Float32Array[];
 }
 
-/** A jagged bolt from (x, y0) down to y1, built from its seed in update(). */
+/** Jagged bolt from (x, y0) to y1, built in update(). */
 export function makeBolt(seed: number, x: number, y0: number, y1: number, forks: number, life: number): Bolt {
     const rnd = new SeededRandom(seed);
-    const segs = 14;
+    const segs = 8;
     const main = new Float32Array((segs + 1) * 2);
     const dy = (y1 - y0) / segs;
     let px = x;
     for (let i = 0; i <= segs; i++) {
-        main[i * 2] = px;
-        main[i * 2 + 1] = y0 + dy * i;
-        px += rnd.range(-0.9, 0.9) * dy;
+        main[i * 2] = Math.round(px);
+        main[i * 2 + 1] = Math.round(y0 + dy * i);
+        px += rnd.range(-12, 12);
     }
     const paths = [main];
     for (let f = 0; f < forks; f++) {
-        const at = 3 + Math.floor(rnd.next() * (segs - 6));
-        const n = 5;
+        const at = 2 + Math.floor(rnd.next() * (segs - 3));
+        const n = 4;
         const fork = new Float32Array((n + 1) * 2);
         let fx = main[at * 2];
         let fy = main[at * 2 + 1];
         const side = rnd.next() < 0.5 ? -1 : 1;
         for (let i = 0; i <= n; i++) {
-            fork[i * 2] = fx;
-            fork[i * 2 + 1] = fy;
-            fx += side * rnd.range(0.3, 1.1) * dy;
-            fy += rnd.range(0.5, 1) * dy;
+            fork[i * 2] = Math.round(fx);
+            fork[i * 2 + 1] = Math.round(fy);
+            fx += side * rnd.range(4, 10);
+            fy += rnd.range(4, 9);
         }
         paths.push(fork);
     }
     return {age: 0, life, paths};
 }
 
-export function drawBolt(ctx: CanvasRenderingContext2D, bolt: Bolt, css: string, width: number): void {
+export function drawBolt(ctx: CanvasRenderingContext2D, bolt: Bolt, css: string): void {
     const k = 1 - bolt.age / bolt.life;
-    if (k <= 0) return;
-    ctx.save();
-    ctx.strokeStyle = css;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    for (let pass = 0; pass < 2; pass++) {
-        ctx.globalAlpha = pass === 0 ? 0.22 * k : k;
-        ctx.lineWidth = pass === 0 ? width * 4 : width;
-        for (const p of bolt.paths) {
-            ctx.beginPath();
-            ctx.moveTo(p[0], p[1]);
-            for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
-            ctx.stroke();
-        }
+    if (k <= 0.15) return;
+    ctx.fillStyle = css;
+    for (const p of bolt.paths) {
+        for (let i = 2; i < p.length; i += 2) stair(ctx, p[i - 2], p[i - 1], p[i], p[i + 1]);
     }
-    ctx.restore();
 }
 
-/** How bright the sky flashes this frame, 0..1. */
 export function boltFlash(bolts: readonly Bolt[]): number {
     let f = 0;
     for (const b of bolts) {
         const k = 1 - b.age / b.life;
-        if (k > 0) f = Math.max(f, k * k);
+        if (k > f) f = k;
     }
     return f;
 }
 
-/** Age the pool, dropping spent bolts. */
 export function ageBolts(bolts: Bolt[], dt: number): void {
     for (let i = bolts.length - 1; i >= 0; i--) {
         bolts[i].age += dt;
@@ -154,52 +69,38 @@ export function ageBolts(bolts: Bolt[], dt: number): void {
     }
 }
 
-// ---- bats ----------------------------------------------------------------------
-
 export interface Bat {
     age: number;
     life: number;
     x0: number;
     y0: number;
-    /** Flight direction, -1 or 1. */
     dir: number;
     speed: number;
     phase: number;
-    size: number;
 }
 
-/** A bat entering from one side at a seeded height. */
-export function makeBat(seed: number, w: number, h: number): Bat {
+/** A bat crossing the 320-wide sky. */
+export function makeBat(seed: number): Bat {
     const r = (n: number) => rand01(hash32(seed, n));
     const dir = (seed & 1) === 0 ? 1 : -1;
+    const speed = 90 + r(2) * 50;
     return {
         age: 0,
-        life: 1.4,
-        x0: dir > 0 ? -0.05 * w : 1.05 * w,
-        y0: (0.08 + 0.4 * r(1)) * h,
+        life: (PW + 36) / speed,
+        x0: dir > 0 ? -14 : PW + 4,
+        y0: 16 + r(1) * 48,
         dir,
-        speed: (0.55 + 0.35 * r(2)) * w / 1.4,
+        speed,
         phase: r(3) * TAU,
-        size: (0.012 + 0.01 * r(4)) * h,
     };
 }
 
-export function drawBats(ctx: CanvasRenderingContext2D, bats: readonly Bat[], h: number, css: string): void {
-    if (!bats.length) return;
-    ctx.fillStyle = css;
+export function drawBats(ctx: CanvasRenderingContext2D, bats: readonly Bat[], css: string): void {
     for (const b of bats) {
-        const t = b.age;
-        const x = b.x0 + b.dir * b.speed * t;
-        const y = b.y0 + Math.sin(t * 3 + b.phase) * 0.04 * h;
-        const flap = Math.sin(t * 22 + b.phase);
-        const s = b.size;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.quadraticCurveTo(x - s * 0.6, y - s * (0.9 * flap + 0.2), x - s * 1.4, y - s * (0.3 * flap));
-        ctx.quadraticCurveTo(x - s * 0.7, y + s * 0.15, x, y + s * 0.3);
-        ctx.quadraticCurveTo(x + s * 0.7, y + s * 0.15, x + s * 1.4, y - s * (0.3 * flap));
-        ctx.quadraticCurveTo(x + s * 0.6, y - s * (0.9 * flap + 0.2), x, y);
-        ctx.fill();
+        const x = Math.round(b.x0 + b.dir * b.speed * b.age);
+        const y = Math.round(b.y0 + Math.sin(b.age * 3 + b.phase) * 5);
+        const frame = Math.floor(b.age * 12 + b.phase) & 1;
+        drawSprite(ctx, BATS[frame], x, y, [null, css]);
     }
 }
 
@@ -210,43 +111,117 @@ export function ageBats(bats: Bat[], dt: number): void {
     }
 }
 
-// ---- ghosts ----------------------------------------------------------------------
+/** Pac-Man ghost. Colour 1 body, 2 pupil, 3 eye. */
+export function drawGhostAt(
+    ctx: CanvasRenderingContext2D, x: number, y: number, frame: number,
+    body: string, pupil: string, eye: string, outline?: string, scale = 1,
+): void {
+    drawSprite(ctx, GHOSTS[frame & 1], Math.round(x), Math.round(y), [null, body, pupil, eye], {scale, outline});
+}
 
-/**
- * A sheet ghost centred on (x, y): domed head, straight sides, a hem of
- * three scallops that ripple with `wave`, and two eye holes. `alpha` is the
- * sheet's opacity; the eyes are cut in `eye`.
- */
-export function drawGhost(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, alpha: number, fill: string, eye: string, wave: number): void {
-    if (alpha <= 0.01) return;
-    const hw = w / 2;
-    const top = y - h / 2;
-    const bottom = y + h / 2;
-    const shoulder = top + hw;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = fill;
-    ctx.beginPath();
-    ctx.moveTo(x - hw, bottom);
-    ctx.lineTo(x - hw, shoulder);
-    ctx.arc(x, shoulder, hw, Math.PI, 0);
-    ctx.lineTo(x + hw, bottom);
-    const scallop = hw / 1.5;
-    const dip = h * 0.12;
-    for (let i = 0; i < 3; i++) {
-        const x1 = x + hw - scallop * (i + 1);
-        const cx = x1 + scallop / 2;
-        const cy = bottom - dip * (1 + 0.6 * Math.sin(wave + i * 2.1));
-        ctx.quadraticCurveTo(cx, cy, x1, bottom);
+export function drawTree(ctx: CanvasRenderingContext2D, x: number, groundY: number, scale: number, color: string): void {
+    drawSprite(ctx, TREE, x, groundY - TREE.h * scale, [null, color], {scale});
+}
+
+/** Sky, scrolling dither clouds, moon, and two ambient bats. */
+export function drawNight(
+    ctx: CanvasRenderingContext2D, pix: Pix, cycle: number, flash: number,
+    moonX: number, moonY: number, bats = true,
+): void {
+    const hot = flash > 0.88;
+    ctx.fillStyle = hot ? pix.ink.moon : pix.ink.skyDeep;
+    ctx.fillRect(0, 0, PW, 44);
+    ctx.fillStyle = hot ? pix.ink.moonDim : pix.ink.sky;
+    ctx.fillRect(0, 44, PW, PH - 44);
+    if (!hot) {
+        ctx.fillStyle = pix.skyDither;
+        ctx.fillRect(0, 32, PW, 18);
+        drawStars(ctx, 80, cycle, pix.ink.moon);
+        drawClouds(ctx, cycle, pix.skyDither);
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = eye;
-    const ey = shoulder + h * 0.02;
-    const er = Math.max(1, w * 0.09);
+    drawSprite(ctx, MOON, moonX, moonY, [null, hot ? pix.ink.bone : pix.ink.moon, pix.ink.moonDim]);
+    if (bats) drawAmbientBats(ctx, cycle, pix.ink.line);
+}
+
+function drawStars(ctx: CanvasRenderingContext2D, horizon: number, cycle: number, color: string): void {
+    const epoch = Math.floor(cycle / 8);
+    const tick = Math.floor(cycle * 2);
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.ellipse(x - hw * 0.38, ey, er, er * 1.4, 0, 0, TAU);
-    ctx.ellipse(x + hw * 0.38, ey, er, er * 1.4, 0, 0, TAU);
+    for (let i = 0; i < 42; i++) {
+        if ((hash32(i * 7 + 3, tick) & 3) === 0) continue;
+        const x = hash32(i * 7 + 1, epoch) % PW;
+        const y = hash32(i * 7 + 2, epoch) % horizon;
+        ctx.rect(x, y, 1, 1);
+        if ((hash32(i * 7 + 4, epoch) & 7) === 0) {
+            ctx.rect(x - 1, y, 1, 1);
+            ctx.rect(x + 1, y, 1, 1);
+            ctx.rect(x, y - 1, 1, 1);
+            ctx.rect(x, y + 1, 1, 1);
+        }
+    }
     ctx.fill();
-    ctx.restore();
+}
+
+function drawClouds(ctx: CanvasRenderingContext2D, cycle: number, pattern: CanvasPattern): void {
+    const span = PW + 48;
+    const scroll = Math.floor(cycle * 6) % span;
+    ctx.fillStyle = pattern;
+    const blobs = [
+        [12, 16, 28, 5],
+        [84, 26, 18, 4],
+        [156, 14, 34, 6],
+        [236, 24, 22, 4],
+        [308, 18, 24, 5],
+    ];
+    for (const [x, y, w, h] of blobs) {
+        let px = x - scroll;
+        if (px < -w) px += span;
+        ctx.fillRect(px, y, w, h);
+        if (w > 10) ctx.fillRect(px + 3, y - 2, w - 8, 3);
+    }
+}
+
+/** Stepped hills on a horizon. Sizes come from the index, not from a clock. */
+export function drawRidge(ctx: CanvasRenderingContext2D, base: number, color: string): void {
+    ctx.fillStyle = color;
+    for (let i = 0; i < 8; i++) {
+        const w = 28 + (hash32(i, 4) % 14);
+        const h = 8 + (hash32(i, 9) % 10);
+        const x = i * 42 - 12;
+        ctx.fillRect(x, base - (h >> 1), w, h >> 1);
+        ctx.fillRect(x + 4, base - h, w - 8, h);
+        ctx.fillRect(x + 10, base - h - 5, Math.max(6, w - 20), 6);
+    }
+}
+
+function drawAmbientBats(ctx: CanvasRenderingContext2D, cycle: number, css: string): void {
+    for (let i = 0; i < 2; i++) {
+        const t = cycle * 0.35 + i * 1.7;
+        const x = Math.round(PW * (0.12 + 0.76 * (0.5 + 0.5 * Math.sin(t))));
+        const y = Math.round(22 + i * 12 + 5 * Math.sin(t * 2.2));
+        const frame = Math.floor(cycle * 8 + i) & 1;
+        drawSprite(ctx, BATS[frame], x, y, [null, css]);
+    }
+}
+
+function stair(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number): void {
+    let x = x0 | 0;
+    let y = y0 | 0;
+    const tx = x1 | 0;
+    const ty = y1 | 0;
+    const sx = Math.sign(tx - x);
+    const sy = Math.sign(ty - y);
+    ctx.fillRect(x, y, 2, 1);
+    let guard = 0;
+    while ((x !== tx || y !== ty) && guard++ < 80) {
+        for (let i = 0; i < 3 && x !== tx; i++) {
+            x += sx;
+            ctx.fillRect(x, y, 2, 1);
+        }
+        for (let i = 0; i < 3 && y !== ty; i++) {
+            y += sy;
+            ctx.fillRect(x, y, 2, 1);
+        }
+    }
 }

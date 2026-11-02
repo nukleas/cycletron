@@ -1,49 +1,32 @@
 /**
- * GRAVEYARD — a graveyard at night where every note is a skeleton. Rows of
- * graves sit on a hill under the moon: the front row is the bass register,
- * the middle the mids, the back the leads, and a note's pitch picks its
- * column. A skeleton climbs out of its grave just before its onset, dances
- * while the note sounds and sinks back after it; a held note rises as a
- * ghost instead. Kicks thump the ground, snares strike lightning, hats send
- * bats across the moon.
+ * GRAVEYARD — an 8-bit yard. Bass stands in front, leads in back, and pitch
+ * picks the column. The skeleton climbs out, cycles a dance on the beat, and
+ * sinks. Held notes are ghosts. Kicks hop the ground, snares throw bolts,
+ * hats send bats.
  *
- * Every grave is decided once, when the hap enters the field, so a dancer
- * never moves between frames. render() is pure: bolts and bats are spawned
- * in update() from the hap's seed.
+ * Painted into a 320×180 buffer. Spawns run in update().
  */
 
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {type FieldHap, type FieldTeam, HapField, type Rgb} from '../hap-field.js';
-import {TAU, alphaRamp, clamp01, hash32, lerpRgb, mixRgb, rand01, rgbOf} from '../util.js';
+import type {VizMode, VizModeDef, VizServices} from '../types.js';
+import {type FieldHap, type FieldTeam, HapField} from '../hap-field.js';
+import {clamp01, hash32, rand01} from '../util.js';
 import {COLS, graveFor} from './halloween/graves.js';
+import {bakePix, drawHud, drawSprite, HUD_Y, nearest, PW, PxScreen, type Pix} from './halloween/pixel.js';
 import {type Role, halloweenRole, isLong, registerPos} from './halloween/roles.js';
-import {type Pose, drawSkeleton, makePose, skeletonPose} from './halloween/skeleton.js';
-import {type Bat, type Bolt, GradientCache, ageBats, ageBolts, boltFlash, drawBats, drawBolt, drawGhost, drawMoon, drawStars, makeBat, makeBolt} from './halloween/sky.js';
+import {danceFrame, drawDancer} from './halloween/skeleton.js';
+import {TOMBS} from './halloween/sprites.js';
+import {type Bat, type Bolt, ageBats, ageBolts, boltFlash, drawBats, drawBolt, drawGhostAt, drawNight, drawTree, makeBat, makeBolt} from './halloween/sky.js';
 
-const REFERENCE_HEIGHT = 1080;
 const LOOKAHEAD = 2;
 const MAX_HAPS = 400;
 const MAX_PER_TRACK = 64;
 const DRUM_CAP = 16;
 const IDLE_RATE = 0.25;
-/** Cycles a skeleton takes to climb out before its onset, and to sink after. */
 const RISE = 0.12;
 const SINK = 0.3;
-const HORIZON = 0.56;
-const MOON_X = 0.78;
-const MOON_Y = 0.2;
 const MAX_BOLTS = 4;
 const MAX_BATS = 24;
-const STARS = 90;
-const GRASS = 14;
-
-/** Back to front: the lead, mid and bass registers. */
-const ROWS = [
-    {y: 0.6, scale: 0.55},
-    {y: 0.7, scale: 0.75},
-    {y: 0.86, scale: 1},
-] as const;
-const ROW_OF: Record<string, number> = {lead: 0, mid: 1, bass: 2};
+const ROW_Y = [96, 126, 156];
 
 interface Team extends FieldTeam {}
 
@@ -53,10 +36,8 @@ interface Dancer extends FieldHap<Team> {
     style: number;
     row: number;
     col: number;
-    /** Offset in columns when the grave is shared. */
     xOff: number;
     reach: number;
-    /** Dance phase offset so a chorus isn't in lockstep. */
     phaseOff: number;
     flash: number;
 }
@@ -64,6 +45,7 @@ interface Dancer extends FieldHap<Team> {
 const taken = new Uint8Array(COLS);
 
 class GraveyardMode implements VizMode {
+    private readonly screen = new PxScreen();
     private readonly field = new HapField<Team, Dancer>({
         lookahead: LOOKAHEAD,
         maxHaps: MAX_HAPS,
@@ -74,127 +56,19 @@ class GraveyardMode implements VizMode {
         cap: (_team, note) => (Number.isFinite(note) ? Infinity : DRUM_CAP),
         keep: (h, cycle) => h.end + (h.long ? 1 : SINK) + 0.05 >= cycle,
     });
-    private readonly pose: Pose = makePose();
     private readonly bolts: Bolt[] = [];
     private readonly bats: Bat[] = [];
-    private readonly sky = new GradientCache();
-    private readonly moonGlow = new GradientCache();
-    private readonly fogs = [new GradientCache(), new GradientCache(), new GradientCache()];
     private readonly drawList: Dancer[] = [];
+    private readonly colors = new Map<number, string>();
     private thump = 0;
     private lastIdleBat = -1;
-
-    private vw = 0;
-    private vh = 0;
-    private renderScale = 1;
-    private hill: Path2D | null = null;
-    private readonly tombs: Path2D[] = [];
-    private skyTop = '';
-    private skyHorizon = '';
-    private moon = '';
-    private moonGlowRgb: Rgb = [255, 243, 176];
-    private starRamp: string[] = [];
-    private hillCss = '';
-    private fogRgb: Rgb = [0, 0, 0];
-    private tomb = '';
-    private tombEdge = '';
-    private bone = '';
-    private socket = '';
-    private ghostRgb: Rgb = [255, 255, 255];
-    private flashRgb: Rgb = [255, 255, 255];
-    private grass = '';
-    private silhouette = '';
-    private bat = '';
-    private readonly white: Rgb = [255, 255, 255];
+    private pix!: Pix;
 
     layout(s: VizServices): void {
-        this.renderScale = Math.max(1, s.height / REFERENCE_HEIGHT);
-        this.vw = s.width / this.renderScale;
-        this.vh = s.height / this.renderScale;
-        this.bakePalette(s.theme);
-        this.buildHill();
-        this.buildTombs();
+        this.pix = bakePix(s.theme);
+        this.colors.clear();
         this.field.invalidate();
     }
-
-    private bakePalette(t: Theme): void {
-        const bg = t.bgRgb;
-        const violet = rgbOf(t.violet, [90, 42, 154]);
-        const active = rgbOf(t.active, [255, 243, 176]);
-        const neon = rgbOf(t.neon, [255, 122, 26]);
-        this.skyTop = t.bg;
-        this.skyHorizon = lerpRgb(bg, violet, 0.35);
-        this.moon = t.active;
-        this.moonGlowRgb = active;
-        this.starRamp = alphaRamp(mixRgb(t.textRgb, this.white, 0.4), 16);
-        this.hillCss = lerpRgb(bg, violet, 0.12);
-        this.fogRgb = mixRgb(t.bgLightRgb, violet, 0.25);
-        this.tomb = lerpRgb(t.bgLighterRgb, t.textRgb, 0.3);
-        this.tombEdge = lerpRgb(t.bgRgb, t.borderRgb, 0.9);
-        this.bone = lerpRgb(t.textRgb, this.white, 0.6);
-        this.socket = t.bg;
-        this.ghostRgb = mixRgb(t.textRgb, this.white, 0.5);
-        this.flashRgb = mixRgb(active, this.white, 0.6);
-        this.grass = lerpRgb(bg, neon, 0.1);
-        this.silhouette = lerpRgb(bg, violet, 0.06);
-        this.bat = lerpRgb(bg, violet, 0.03);
-    }
-
-    private buildHill(): void {
-        const {vw, vh} = this;
-        const p = new Path2D();
-        p.moveTo(0, vh);
-        for (let i = 0; i <= 64; i++) {
-            const u = i / 64;
-            p.lineTo(u * vw, this.hillY(u));
-        }
-        p.lineTo(vw, vh);
-        p.closePath();
-        this.hill = p;
-    }
-
-    private hillY(u: number): number {
-        return this.vh * (HORIZON + 0.025 * Math.sin(u * 3.1 + 0.4) + 0.012 * Math.sin(u * 7.3 + 2) - 0.03 * Math.sin(u * 1.7));
-    }
-
-    /** Four tombstone shapes in a unit box, drawn scaled per row. */
-    private buildTombs(): void {
-        this.tombs.length = 0;
-        const round = new Path2D();
-        round.moveTo(0, 1);
-        round.lineTo(0, 0.35);
-        round.arc(0.5, 0.35, 0.5, Math.PI, 0);
-        round.lineTo(1, 1);
-        round.closePath();
-        const cross = new Path2D();
-        cross.rect(0.38, 0, 0.24, 1);
-        cross.rect(0.08, 0.22, 0.84, 0.2);
-        const point = new Path2D();
-        point.moveTo(0.1, 1);
-        point.lineTo(0.1, 0.3);
-        point.lineTo(0.5, 0);
-        point.lineTo(0.9, 0.3);
-        point.lineTo(0.9, 1);
-        point.closePath();
-        const slab = new Path2D();
-        slab.moveTo(0, 1);
-        slab.lineTo(0.05, 0.25);
-        slab.lineTo(0.95, 0.18);
-        slab.lineTo(1, 1);
-        slab.closePath();
-        this.tombs.push(round, cross, point, slab);
-    }
-
-    private colX(row: number, col: number): number {
-        const width = 0.84 / COLS;
-        return this.vw * (0.08 + width * (col + 0.5 + (row === 0 ? 0.5 : 0)));
-    }
-
-    private groundY(row: number): number {
-        return this.vh * ROWS[row].y;
-    }
-
-    // ---- schedule ---------------------------------------------------------------
 
     private makeDancer(base: FieldHap<Team>): Dancer {
         const role = halloweenRole(base.team.name, base.note);
@@ -204,7 +78,7 @@ class GraveyardMode implements VizMode {
         let col = Math.floor(r(2) * COLS);
         let xOff = 0;
         if (role === 'bass' || role === 'mid' || role === 'lead') {
-            row = ROW_OF[role];
+            row = role === 'lead' ? 0 : role === 'mid' ? 1 : 2;
             const want = Math.round(registerPos(base.note) * (COLS - 1));
             taken.fill(0);
             const lo = base.begin - RISE;
@@ -249,7 +123,10 @@ class GraveyardMode implements VizMode {
                 case 'snare': this.strike(h.seed, 1, 0.25); break;
                 case 'crash': this.strike(h.seed, 2, 0.5); break;
                 case 'hat':
-                    if (bats < 2 && this.bats.length < MAX_BATS) { this.bats.push(makeBat(h.seed, this.vw, this.vh)); bats++; }
+                    if (bats < 2 && this.bats.length < MAX_BATS) {
+                        this.bats.push(makeBat(h.seed));
+                        bats++;
+                    }
                     break;
                 default: break;
             }
@@ -258,7 +135,7 @@ class GraveyardMode implements VizMode {
             const tick = Math.floor(field.cycle / 4);
             if (tick !== this.lastIdleBat) {
                 this.lastIdleBat = tick;
-                if (this.bats.length < MAX_BATS) this.bats.push(makeBat(hash32(tick, 1), this.vw, this.vh));
+                if (this.bats.length < MAX_BATS) this.bats.push(makeBat(hash32(tick, 1)));
             }
         }
         ageBolts(this.bolts, dt);
@@ -268,91 +145,66 @@ class GraveyardMode implements VizMode {
 
     private strike(seed: number, forks: number, life: number): void {
         if (this.bolts.length >= MAX_BOLTS) return;
-        const x = (0.15 + 0.7 * rand01(hash32(seed, 9))) * this.vw;
-        this.bolts.push(makeBolt(seed, x, -0.02 * this.vh, this.hillY(x / this.vw), forks, life));
+        const x = Math.round(16 + rand01(hash32(seed, 9)) * (PW - 32));
+        this.bolts.push(makeBolt(seed, x, 8, ROW_Y[0] - 4, forks, life));
     }
 
-    // ---- render -----------------------------------------------------------------
-
-    render(ctx: CanvasRenderingContext2D): void {
-        const {vw, vh, field} = this;
-        const cycle = field.cycle;
+    render(ctx: CanvasRenderingContext2D, s: VizServices): void {
+        const p = this.screen.ctx;
+        const hop = this.thump > 0.5 ? 1 : 0;
         const flash = boltFlash(this.bolts);
-        ctx.save();
-        ctx.scale(this.renderScale, this.renderScale);
-
-        ctx.fillStyle = this.sky.linear(ctx, 0, 0, 0, vh * HORIZON, [[0, this.skyTop], [1, this.skyHorizon]]);
-        ctx.fillRect(0, 0, vw, vh);
-        drawStars(ctx, vw, vh * HORIZON, cycle, STARS, this.starRamp);
-        const breathe = field.locked ? 0.3 : 0.5 + 0.5 * Math.sin(TAU * cycle / 4);
-        drawMoon(ctx, this.moonGlow, vw * MOON_X, vh * MOON_Y, vh * 0.07, this.moon, this.moonGlowRgb, breathe);
-        drawBats(ctx, this.bats, vh, this.bat);
-        const flashCss = `rgb(${this.flashRgb[0]}, ${this.flashRgb[1]}, ${this.flashRgb[2]})`;
-        for (const b of this.bolts) drawBolt(ctx, b, flashCss, 2);
-        if (flash > 0.01) {
-            ctx.fillStyle = `rgba(${this.flashRgb[0]}, ${this.flashRgb[1]}, ${this.flashRgb[2]}, ${(0.35 * flash).toFixed(3)})`;
-            ctx.fillRect(0, 0, vw, vh);
+        p.setTransform(1, 0, 0, 1, 0, hop);
+        p.imageSmoothingEnabled = false;
+        drawNight(p, this.pix, this.field.cycle, flash, 248, 16);
+        this.drawYard(p);
+        p.setTransform(1, 0, 0, 1, 0, 0);
+        if (hop) {
+            p.fillStyle = this.pix.ink.skyDeep;
+            p.fillRect(0, 0, PW, 1);
         }
+        drawHud(p, this.pix.ink, 'GRAVEYARD', this.field.cycle, hop === 1 || flash > 0.5);
+        this.screen.blit(ctx, s.width, s.height, this.pix.ink.bg);
+        this.screen.stampHud(ctx, s.width, s.height);
+    }
 
-        // The hill keeps its colour, so the stones go dark against it in a flash.
-        ctx.fillStyle = this.hillCss;
-        if (this.hill) ctx.fill(this.hill);
-
-        for (let row = 0; row < ROWS.length; row++) {
-            this.drawFog(ctx, row, 0.5);
-            this.drawTombs(ctx, row, flash);
-            this.drawDancers(ctx, row, cycle, flash);
+    private drawYard(ctx: CanvasRenderingContext2D): void {
+        const {ink} = this.pix;
+        const cycle = this.field.cycle;
+        ctx.fillStyle = ink.hillDark;
+        ctx.fillRect(0, 68, PW, HUD_Y - 68);
+        ctx.fillStyle = this.pix.hillDither;
+        ctx.fillRect(0, 62, PW, 8);
+        ctx.fillStyle = ink.dirt;
+        ctx.fillRect(0, 108, PW, HUD_Y - 108);
+        ctx.fillStyle = ink.hill;
+        ctx.fillRect(0, 140, PW, HUD_Y - 140);
+        ctx.fillStyle = ink.dirt;
+        ctx.fillRect(152, 68, 16, HUD_Y - 68);
+        for (const x of [24, 70, 230, 276]) drawTree(ctx, x, 68, 1, ink.sil);
+        drawFence(ctx, 60, ink.line);
+        drawTree(ctx, 2, ROW_Y[0], 2, ink.line);
+        drawTree(ctx, PW - 28, ROW_Y[0], 2, ink.line);
+        for (const b of this.bolts) drawBolt(ctx, b, ink.moon);
+        for (let row = 0; row < ROW_Y.length; row++) {
+            this.drawTombs(ctx, row);
+            this.drawDancers(ctx, row, cycle);
         }
+        drawBats(ctx, this.bats, ink.line);
         this.drawGrass(ctx, cycle);
-        this.drawFog(ctx, 2, 0.9);
-        ctx.restore();
     }
 
-    private drawFog(ctx: CanvasRenderingContext2D, row: number, strength: number): void {
-        const {vw, vh} = this;
-        const y = this.groundY(row);
-        const h = vh * 0.07 * ROWS[row].scale;
-        const [r, g, b] = this.fogRgb;
-        const a = (0.22 * strength).toFixed(3);
-        ctx.fillStyle = this.fogs[row].linear(ctx, 0, y - h, 0, y + h * 0.6, [
-            [0, `rgba(${r}, ${g}, ${b}, 0)`], [0.6, `rgba(${r}, ${g}, ${b}, ${a})`], [1, `rgba(${r}, ${g}, ${b}, 0)`],
-        ]);
-        ctx.fillRect(0, y - h, vw, h * 1.6);
-    }
-
-    private drawTombs(ctx: CanvasRenderingContext2D, row: number, flash: number): void {
-        const {vh} = this;
-        const rs = ROWS[row].scale;
-        const tw = vh * 0.045 * rs;
-        const th = vh * 0.065 * rs;
-        const hop = -6 * rs * this.thump;
-        const gy = this.groundY(row) + hop;
-        const fill = flash > 0.02 ? this.silhouette : this.tomb;
+    private drawTombs(ctx: CanvasRenderingContext2D, row: number): void {
+        const {ink} = this.pix;
+        const gy = ROW_Y[row];
         for (let col = 0; col < COLS; col++) {
-            const shape = this.tombs[hash32(row * 31 + col, 3) & 3];
-            const x = this.colX(row, col) + (rand01(hash32(row, col)) - 0.5) * tw * 0.5;
-            ctx.save();
-            ctx.translate(x - tw / 2, gy - th);
-            ctx.scale(tw, th);
-            ctx.fillStyle = fill;
-            ctx.fill(shape);
-            ctx.restore();
-            // Base line of the grave.
-            ctx.strokeStyle = this.tombEdge;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(x - tw * 1.1, gy);
-            ctx.lineTo(x + tw * 1.1, gy);
-            ctx.stroke();
+            const shape = TOMBS[hash32(row * 17 + col, 3) % TOMBS.length];
+            const x = colX(row, col, 0);
+            drawSprite(ctx, shape, x - (shape.w >> 1), gy - shape.h - 2, [null, ink.stone, ink.stoneDark], {outline: ink.line});
         }
     }
 
-    private drawDancers(ctx: CanvasRenderingContext2D, row: number, cycle: number, flash: number): void {
-        const {vh} = this;
-        const rs = ROWS[row].scale;
-        const width = this.vw * 0.84 / COLS;
-        const scale = vh * 0.2 * rs;
-        const gy = this.groundY(row) - 4 * rs * this.thump;
+    private drawDancers(ctx: CanvasRenderingContext2D, row: number, cycle: number): void {
+        const {ink} = this.pix;
         const list = this.drawList;
         list.length = 0;
         for (const h of this.field.haps) {
@@ -360,60 +212,86 @@ class GraveyardMode implements VizMode {
             list.push(h);
         }
         list.sort((a, b) => (a.col + a.xOff) - (b.col + b.xOff) || a.begin - b.begin);
-        const bone = flash > 0.02 ? lerpRgb(this.flashRgb, this.white, 0.5) : this.bone;
+        const gy = ROW_Y[row];
         for (const h of list) {
-            const x = this.colX(row, h.col) + h.xOff * width;
+            const x = colX(row, h.col, h.xOff);
             if (h.long) {
-                this.drawRisingGhost(ctx, h, x, gy, rs, cycle);
+                this.drawRisingGhost(ctx, h, x, gy, cycle);
                 continue;
             }
             let up: number;
             if (cycle < h.begin) up = smooth((cycle - (h.begin - RISE)) / RISE);
             else if (cycle < h.end) up = 1;
             else up = 1 - smooth((cycle - h.end) / SINK);
+            up *= h.fade;
             if (up <= 0) continue;
-            const sustaining = cycle >= h.begin && cycle < h.end;
-            const intensity = clamp01(h.flash + (sustaining ? 0.5 : 0));
-            const lean = (rand01(hash32(h.seed, 11)) - 0.5) * 0.1;
-            skeletonPose(this.pose, cycle * 4 + h.phaseOff, intensity, h.style, up * h.fade, h.reach);
-            ctx.save();
-            ctx.translate(x, gy);
-            ctx.transform(1, 0, lean, 1, 0, 0);
-            drawSkeleton(ctx, this.pose, 0, 0, scale, bone, this.socket, intensity > 0.3 ? h.team.css : null);
-            ctx.restore();
+            ctx.fillStyle = ink.line;
+            ctx.fillRect(x - 6, gy - 2, 12, 3);
+            const dancing = cycle >= h.begin && cycle < h.end;
+            const frame = dancing ? danceFrame(cycle * 4 + h.phaseOff, h.reach > 0.72 ? 0 : h.style) : 0;
+            const bone = h.flash > 0.4 ? ink.moon : ink.bone;
+            const eye = dancing ? this.colorOf(h.team.rgb) : ink.line;
+            drawDancer(ctx, x, gy, frame, up, bone, eye, ink.line);
         }
     }
 
-    private drawRisingGhost(ctx: CanvasRenderingContext2D, h: Dancer, x: number, gy: number, rs: number, cycle: number): void {
+    private drawRisingGhost(ctx: CanvasRenderingContext2D, h: Dancer, x: number, gy: number, cycle: number): void {
         const t = cycle - h.begin;
         if (t < 0) return;
+        const {ink} = this.pix;
         const dur = h.end - h.begin;
-        const alpha = 0.6 * clamp01(1 - t / (dur + 1)) * clamp01(t / 0.15) * h.fade;
-        const w = this.vh * 0.07 * rs;
-        const y = gy - w * 0.9 - this.vh * 0.18 * rs * t;
-        const sway = Math.sin(TAU * t * 0.6 + h.seed) * w * 0.3;
-        const fill = lerpRgb(h.team.rgb, this.ghostRgb, 0.6);
-        drawGhost(ctx, x + sway, y, w, w * 1.5, alpha, fill, this.socket, cycle * TAU * 0.5 + h.seed);
+        const k = clamp01(t / 0.15) * clamp01(1 - t / (dur + 1)) * h.fade;
+        if (k < 0.08) return;
+        ctx.fillStyle = ink.line;
+        ctx.fillRect(x - 6, gy - 2, 12, 3);
+        const sway = (Math.floor(cycle * 3 + h.seed) & 1) ? 1 : -1;
+        const body = k < 0.35 ? ink.purple : this.colorOf(h.team.rgb);
+        drawGhostAt(ctx, x - 6 + sway, gy - 16 - t * 20, Math.floor(cycle * 6 + h.seed), body, ink.line, ink.ghost, ink.line);
     }
 
     private drawGrass(ctx: CanvasRenderingContext2D, cycle: number): void {
-        const {vw, vh} = this;
-        ctx.strokeStyle = this.grass;
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        for (let i = 0; i < GRASS; i++) {
-            const x = (0.02 + 0.96 * rand01(hash32(i, 51))) * vw;
-            const y = vh * (0.88 + 0.1 * rand01(hash32(i, 53)));
-            const h = vh * (0.02 + 0.025 * rand01(hash32(i, 57)));
-            const sway = Math.sin(TAU * cycle * 0.25 + i * 1.3) * 3;
-            ctx.beginPath();
-            for (let b = -1; b <= 1; b++) {
-                ctx.moveTo(x, y);
-                ctx.quadraticCurveTo(x + b * 4 + sway * 0.5, y - h * 0.6, x + b * 7 + sway, y - h);
-            }
-            ctx.stroke();
+        const sway = Math.floor(cycle * 3) & 1;
+        ctx.fillStyle = this.pix.ink.green;
+        ctx.beginPath();
+        for (let i = 0; i < 26; i++) {
+            const x = 4 + (hash32(i, 51) % (PW - 10));
+            const y = 152 + (hash32(i, 53) % 12);
+            if (y >= HUD_Y - 2) continue;
+            ctx.rect(x, y, 1, 2);
+            ctx.rect(x - 1 + sway, y - 2, 1, 2);
+            ctx.rect(x + 1 + sway, y - 1, 1, 2);
         }
+        ctx.fill();
     }
+
+    private colorOf(rgb: readonly [number, number, number]): string {
+        return nearest(rgb, this.pix.ink.pool, this.colors);
+    }
+}
+
+function colX(row: number, col: number, xOff: number): number {
+    const span = PW - 36;
+    const w = span / COLS;
+    const stagger = row === 0 ? w * 0.45 : 0;
+    return Math.round(18 + stagger + w * (col + 0.5 + xOff));
+}
+
+function drawFence(ctx: CanvasRenderingContext2D, y: number, color: string): void {
+    const gate0 = 148;
+    const gate1 = 174;
+    ctx.fillStyle = color;
+    ctx.fillRect(0, y, gate0, 2);
+    ctx.fillRect(gate1, y, PW - gate1, 2);
+    ctx.fillRect(0, y + 5, gate0, 1);
+    ctx.fillRect(gate1, y + 5, PW - gate1, 1);
+    for (let x = 2; x < PW; x += 12) {
+        if (x > gate0 - 4 && x < gate1) continue;
+        ctx.fillRect(x, y - 3, 2, 11);
+    }
+    ctx.fillRect(gate0 - 3, y - 8, 3, 18);
+    ctx.fillRect(gate1, y - 8, 3, 18);
+    ctx.fillRect(gate0 - 2, y - 11, 1, 3);
+    ctx.fillRect(gate1 + 1, y - 11, 1, 3);
 }
 
 function smooth(t: number): number {
