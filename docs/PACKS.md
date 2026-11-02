@@ -25,7 +25,7 @@ ui/src/viz/packs/<pack>/
   "version": "0.1.0",
   "author": "NaderLabs",
   "license": "AGPL-3.0-or-later",
-  "provenance": "Drawn in code for the Bustin' show, 2026-11-01, by Nader Heidari with AI agents; no borrowed sprites.",
+  "description": "A graveyard, a haunted house, a monster band and a swamp of ghosts, all 8-bit, made for the Bustin' show.",
   "modes": ["graveyard", "haunted-house", "monster-band", "ghost-fog"],
   "palettes": ["pumpkin"]
 }
@@ -34,7 +34,6 @@ ui/src/viz/packs/<pack>/
 `modes` and `palettes` must match what `index.ts` exports; `validatePack`
 (`ui/src/viz/pack.ts`) throws at startup when they don't. Mode ids are what
 show files name (`mode = "graveyard"`), and must be unique across the app.
-`provenance` says who made the pack and how.
 
 ## What a pack may use
 

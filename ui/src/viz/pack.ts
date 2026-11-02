@@ -24,8 +24,8 @@ export interface PackManifest {
     version: string;
     author: string;
     license: string;
-    /** Who made it and how, in a sentence. */
-    provenance: string;
+    /** What's in it, in a sentence. */
+    description: string;
     /** Mode ids the pack registers, as show files name them. */
     modes: string[];
     /** Palette names the pack registers. */
