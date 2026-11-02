@@ -33,6 +33,7 @@ const COMMANDS: &[&str] = &[
     "session_undo",
     "session_redo",
     "get_library_root",
+    "list_viz_packs",
     "set_library_root",
     "list_library",
     "create_library_folder",

@@ -249,35 +249,30 @@ pub struct VizPackSource {
     pub source: String,
 }
 
-/// The built visualizer packs in the library: every `Packs/*/pack.json` whose
-/// `viz` entries point at folders with a `pack.json` and a `dist/index.js`.
-/// Packs without a build are skipped with a log line, not an error.
+/// The built visualizer packs in the library: every pack's `viz` folders that
+/// have a `pack.json` and a `dist/index.js`. A folder without a build is
+/// skipped with a log line, not an error.
 #[tauri::command]
 pub fn list_viz_packs(state: State<'_, AppState>) -> Result<Vec<VizPackSource>, String> {
-    let root = state.library_root().join("Packs");
+    let root = crate::packs::packs_root(&state.library_root());
     let mut out = Vec::new();
-    let Ok(entries) = std::fs::read_dir(&root) else { return Ok(out) };
-    let mut dirs: Vec<PathBuf> = entries.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
-    dirs.sort();
-    for dir in dirs {
-        let manifest = dir.join("pack.json");
-        let Ok(text) = std::fs::read_to_string(&manifest) else { continue };
-        let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
-            tracing::warn!("{}: not valid JSON, skipped", manifest.display());
-            continue;
-        };
-        let Some(viz) = json.get("viz").and_then(|v| v.as_array()) else { continue };
-        for rel in viz.iter().filter_map(|v| v.as_str()) {
-            let viz_dir = dir.join(rel);
-            let viz_manifest = viz_dir.join("pack.json");
-            let Ok(vtext) = std::fs::read_to_string(&viz_manifest) else {
+    for (dir, m) in crate::packs::scan_installed(&root) {
+        for rel in &m.viz {
+            let viz_dir = match crate::packs::safe_rel_path(rel) {
+                Ok(p) => dir.join(p),
+                Err(e) => {
+                    tracing::warn!("{}: viz {e}", dir.display());
+                    continue;
+                }
+            };
+            let Ok(vtext) = std::fs::read_to_string(viz_dir.join("pack.json")) else {
                 tracing::warn!("{}: no pack.json, skipped", viz_dir.display());
                 continue;
             };
             let id = serde_json::from_str::<serde_json::Value>(&vtext)
                 .ok()
                 .and_then(|j| j.get("id").and_then(|v| v.as_str()).map(str::to_string))
-                .unwrap_or_else(|| rel.to_string());
+                .unwrap_or_else(|| rel.clone());
             let built = viz_dir.join("dist").join("index.js");
             match std::fs::read_to_string(&built) {
                 Ok(source) => out.push(VizPackSource { id, path: viz_dir.to_string_lossy().into_owned(), source }),

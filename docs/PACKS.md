@@ -5,8 +5,9 @@ startup, so a pack and the songs and shows made for it can travel together.
 The first one is the Halloween pack in the music library:
 
 ```
-~/Code/strulibrary/Packs/halloween/        a content pack
-  pack.json          id, name, version, author, license, description,
+~/Code/strulibrary/Packs/halloween/        a library pack
+  pack.json          schema 1, id (= the folder name), name, version, authors,
+                     license, description, then any of: banks (samples),
                      viz: ["viz/halloween-8bit"], songs: [...], shows: [...]
   viz/halloween-8bit/                      the visualizer pack it plays on
     pack.json        the viz manifest (below)
@@ -17,6 +18,15 @@ The first one is the Halloween pack in the music library:
     README.md
   songs/  shows/  renders/
 ```
+
+## The library pack manifest
+
+`Packs/*/pack.json` is the same file sample packs use (`src-tauri/src/packs.rs`):
+`schema: 1`, an `id` equal to the folder name, `name`, `version`, `authors`,
+`license` (an SPDX id) and `description`. A pack carries whichever sections it
+has: `banks` of samples (with a `license_file`), `viz` folders, `songs` and
+`shows`. The sample manager lists packs with banks; the visualizer loader reads
+`viz`.
 
 ## The viz manifest
 

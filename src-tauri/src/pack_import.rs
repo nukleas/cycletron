@@ -660,6 +660,9 @@ pub fn commit_pack_import(
         source: Some(source.clone()),
         tags: vec!["user".into(), "imported".into()],
         banks: manifest_banks,
+        viz: Vec::new(),
+        songs: Vec::new(),
+        shows: Vec::new(),
     };
     let json = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())? + "\n";
     fs::write(dest.join(MANIFEST), json).map_err(|e| format!("write pack.json: {e}"))?;

@@ -56,6 +56,7 @@
     "allow-session-undo",
     "allow-session-redo",
     "allow-get-library-root",
+    "allow-list-viz-packs",
     "allow-set-library-root",
     "allow-list-library",
     "allow-create-library-folder",

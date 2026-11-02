@@ -1,9 +1,9 @@
-//! Optional sample packs under `{library_root}/Packs/`.
-//!
-//! Each pack is a directory with `pack.json`, a license file, and audio under
-//! relative paths listed in the manifest. Enabled packs are listed in
-//! `Packs/enabled.json` and loaded at startup by the frontend (same decode
-//! path as "Load Sample Folder…").
+//! Packs under `{library_root}/Packs/`: a directory with `pack.json` and
+//! some of: sample `banks` (audio under relative paths, plus a license
+//! file), `viz` folders (built visualizer packs, see ui/src/viz/pack-loader.ts),
+//! `songs` and `shows`. Enabled sample packs are listed in `Packs/enabled.json`
+//! and loaded at startup by the frontend (same decode path as "Load Sample
+//! Folder…"); viz packs load at startup too, from `list_viz_packs`.
 
 use crate::library;
 use crate::sounds::{DEFAULT_DRUMS, MACHINE_KITS, PERCUSSION};
@@ -41,6 +41,8 @@ pub struct PackManifest {
     /// SPDX identifier (preferred).
     #[serde(default, alias = "license")]
     pub spdx: String,
+    /// Required when the pack has sample banks.
+    #[serde(default)]
     pub license_file: String,
     #[serde(default)]
     pub authors: Vec<String>,
@@ -48,7 +50,15 @@ pub struct PackManifest {
     pub source: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
     pub banks: Vec<PackBank>,
+    /// Visualizer packs, as folders relative to the pack, each with its own `pack.json` and `dist/index.js`.
+    #[serde(default)]
+    pub viz: Vec<String>,
+    #[serde(default)]
+    pub songs: Vec<String>,
+    #[serde(default)]
+    pub shows: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -263,7 +273,7 @@ fn validate_for_enable(dir: &Path, m: &PackManifest) -> Result<(), String> {
     Ok(())
 }
 
-fn scan_installed(packs: &Path) -> Vec<(PathBuf, PackManifest)> {
+pub(crate) fn scan_installed(packs: &Path) -> Vec<(PathBuf, PackManifest)> {
     let Ok(rd) = fs::read_dir(packs) else {
         return Vec::new();
     };
@@ -326,6 +336,10 @@ pub fn list_packs(state: State<'_, AppState>) -> Result<Vec<PackSummary>, String
     let enabled: HashSet<String> = read_enabled(&packs).enabled.into_iter().collect();
     let mut out = Vec::new();
     for (dir, m) in scan_installed(&packs) {
+        // The sample manager lists packs with banks; a content-only pack has nothing to enable.
+        if m.banks.is_empty() {
+            continue;
+        }
         out.push(PackSummary {
             id: m.id.clone(),
             name: m.name,
@@ -757,6 +771,9 @@ mod tests {
             source: None,
             tags: vec![],
             banks: manifest_banks,
+            viz: Vec::new(),
+            songs: Vec::new(),
+            shows: Vec::new(),
         };
         fs::write(
             dest.join("pack.json"),
