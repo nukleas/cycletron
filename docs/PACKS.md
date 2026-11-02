@@ -44,6 +44,10 @@ has: `banks` of samples (with a `license_file`), `viz` folders, `songs` and
 }
 ```
 
+The two manifests have different ids on purpose: the library pack's `id` is
+its folder name (`halloween`), the viz pack's is `author/name`
+(`naderlabs/halloween-8bit`), the name the loader and its errors use.
+
 `sdk` is the sdk range the pack was built for (`^1`); the loader refuses a
 pack whose range this Cycletron's `SDK_VERSION` doesn't satisfy. `modes` and
 `palettes` must match what `src/index.ts` exports; `validatePack`
@@ -68,9 +72,19 @@ it as an external import that the page's import map resolves.
 cd ui && node scripts/pack-build.mjs ~/Code/strulibrary/Packs/halloween/viz/halloween-8bit
 ```
 
-Bundles `src/index.ts` into `dist/index.js`, one ES module with the sdk left
-external. The show renderer does this itself when `src/` is newer than the
-build.
+Type-checks `src/` against the sdk with the repo's settings (a pack needs no
+tsconfig; `--no-check` skips it), then bundles `src/index.ts` into
+`dist/index.js`, one ES module with the sdk left external. The show renderer
+does this itself when `src/` is newer than the build.
+
+To check a pack's determinism, run the seam test on its build:
+
+```sh
+VIZ_PACK=<viz pack folder> npm run test:render
+```
+
+Author a pack outside `Packs/` (a `_` folder in the library is fine) and
+install it; a folder dropped straight into `Packs/` skips the install checks.
 
 ## Loading
 
@@ -91,11 +105,14 @@ build.
 ## Installing and enabling
 
 A pack arrives as a folder or a `.zip` with `pack.json` at its root (or one
-folder down). Drop it on the window, or use Install from Folder… / Install
-from Zip… in the Samples panel. The dialog shows the pack's name, author,
-license and what it carries; a pack with visualizer code says so, since that
-code runs inside the app with the app's permissions. Install copies the
-folder to `Packs/<id>/` and enables it.
+folder down). Drop it on the window, or open the Samples panel (the command
+palette's "Samples… (sets & packs)", or Manage in the Sounds panel) and use
+Install from Folder… / Install from Zip…. A zip with a `pack.json` is staged
+whole, code and all; one without is treated as samples and only its audio is
+read. The dialog shows the pack's name, author, license and what it carries; a
+pack with visualizer code says so, since that code runs inside the app with
+the app's permissions. Install copies the folder to `Packs/<id>/` and enables
+it, and its visualizers load right away.
 
 Only enabled packs load. `Packs/enabled.json` lists them; the Samples panel
 toggles any installed pack, with or without sample banks. A pack copied into
@@ -121,6 +138,7 @@ effect at the next launch.
   the library. A worker with an offscreen canvas is the next step.
 - Sprite assets (PNG sheets). The renderer must have them decoded before frame
   0, so assets load before a render starts.
-- A `pack check` command: type check, the seam test and a frame-budget probe
-  on one pack.
+- A `pack check` command: the seam test and a frame-budget probe on one pack
+  in one step (the type check runs in the build; the seam test is a `VIZ_PACK`
+  run of `npm run test:render`).
 - Installing from a URL, and a community index to pick from.

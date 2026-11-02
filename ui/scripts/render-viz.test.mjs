@@ -141,12 +141,22 @@ test('every mode matches the continuous render across a chunk seam', async () =>
     assert.deepEqual(failing, {});
 });
 
-// A pack loaded at runtime must be as deterministic as a built-in mode. The
-// Halloween pack lives in the user's library; this runs when it's built there.
-const PACK = `${process.env.HOME}/Code/strulibrary/Packs/halloween/viz/halloween-8bit/dist/index.js`;
+// A pack loaded at runtime must be as deterministic as a built-in mode. This
+// runs on the viz pack folder VIZ_PACK names, or on the Halloween pack in the
+// user's library, when its build exists. With VIZ_PACK set and the Halloween
+// build present, both load, so two packs registering together is covered too.
+const HALLOWEEN = `${process.env.HOME}/Code/strulibrary/Packs/halloween/viz/halloween-8bit`;
+const PACK_DIR = process.env.VIZ_PACK ?? HALLOWEEN;
+const PACK = `${PACK_DIR}/dist/index.js`;
 const {existsSync} = await import('node:fs');
+const packModes = (dir) => JSON.parse(readFileSync(`${dir}/pack.json`, 'utf8')).modes;
 test('a pack loaded from its built module matches across a chunk seam', {skip: !existsSync(PACK)}, async () => {
-    const source = readFileSync(PACK, 'utf8');
+    const sources = [readFileSync(PACK, 'utf8')];
+    const modes = packModes(PACK_DIR);
+    if (PACK_DIR !== HALLOWEEN && existsSync(`${HALLOWEEN}/dist/index.js`)) {
+        sources.push(readFileSync(`${HALLOWEEN}/dist/index.js`, 'utf8'));
+        modes.push(packModes(HALLOWEEN)[0]);
+    }
     const renderWithPack = async (startFrame, count) => {
         const browser = await chromium.launch();
         try {
@@ -155,8 +165,8 @@ test('a pack loaded from its built module matches across a chunk seam', {skip: !
             await page.goto(url);
             await page.waitForFunction(() => 'vizRender' in window);
             await page.evaluate((opts) => window.vizRender.setup(opts), {
-                code: CODE, bpm: BPM, cues: cues('graveyard', 'monster-band'), song: {passes: 1, fade: {in: 0, out: 0}},
-                width: 480, height: 270, fps: FPS, startFrame, sensitivity: 1, audio: '/__render/mix.wav', packs: [source],
+                code: CODE, bpm: BPM, cues: cues(modes[0], modes[modes.length - 1]), song: {passes: 1, fade: {in: 0, out: 0}},
+                width: 480, height: 270, fps: FPS, startFrame, sensitivity: 1, audio: '/__render/mix.wav', packs: sources,
             });
             const hashes = [];
             for (let i = 0; i < count; i++) hashes.push(createHash('sha1').update(await page.evaluate(() => window.vizRender.frame())).digest('hex'));
