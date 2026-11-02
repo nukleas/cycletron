@@ -220,11 +220,13 @@ fn load_manifest(dir: &Path) -> Result<PackManifest, String> {
     if m.spdx.is_empty() {
         return Err(format!("pack {} missing spdx/license", m.id));
     }
-    if m.license_file.is_empty() {
+    // Sample banks need a license file beside them; a pack of visualizers,
+    // songs or shows carries its license in the manifest.
+    if !m.banks.is_empty() && m.license_file.is_empty() {
         return Err(format!("pack {} missing license_file", m.id));
     }
-    if m.banks.is_empty() {
-        return Err(format!("pack {} has no banks", m.id));
+    if m.banks.is_empty() && m.viz.is_empty() && m.songs.is_empty() && m.shows.is_empty() {
+        return Err(format!("pack {} has no banks, viz, songs or shows", m.id));
     }
     for bank in &m.banks {
         if bank.name.is_empty() || bank.name.len() > 31 {

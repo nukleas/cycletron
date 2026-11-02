@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-viz-packs"
+description = "Enables the list_viz_packs command without any pre-configured scope."
+commands.allow = ["list_viz_packs"]
+
+[[permission]]
+identifier = "deny-list-viz-packs"
+description = "Denies the list_viz_packs command without any pre-configured scope."
+commands.deny = ["list_viz_packs"]
