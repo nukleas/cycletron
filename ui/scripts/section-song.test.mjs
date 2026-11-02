@@ -111,3 +111,9 @@ test('sectionSong refuses sections that do not cover the song', () => {
     const song = parseSong(FLAT);
     assert.throws(() => sectionSong(song, parseSections('a:0-5')), /sections end at bar 5; the song has 6/);
 });
+
+test('parseSong takes `// Track N (key)` comments and a drum track with none', () => {
+    const song = parseSong('---\nname: x\n---\nsetcpm(30)\n\n// Track 1 (D:major)\n$: note(`<a b>`).sound("gm_piano")\n\n$: s(`<bd sd>`).gain(0.4)\n');
+    assert.deepEqual(song.tracks.map((t) => t.comment), ['Track 1 (D:major)', 'Track 2: drums']);
+    assert.deepEqual(song.tracks.map((t) => t.fn), ['note', 's']);
+});

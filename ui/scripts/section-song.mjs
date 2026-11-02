@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Section a flat MIDI import into a `pickRestart` form, so a show file can
-// cue it. Reads a song as the MIDI Lab writes it (frontmatter, `setcpm`, one
-// `// Track N: name` comment and one `$: note(`<…>`)…` or `$: s(`<…>`)…`
-// per track, every top-level step one bar, `step@N` an N-bar phrase) and
+// cue it. Reads a song as the MIDI Lab writes it (frontmatter, `setcpm`, a
+// `// Track N: name` or `// Track N (key)` comment where it writes one, and one
+// `$: note(`<…>`)…` or `$: s(`<…>`)…` per track, every top-level step one
+// bar, `step@N` an N-bar phrase) and
 // writes the same music as
 //
 //   "<intro@5 verse@8 …>".slow(1).pickRestart({ intro: stack(…), … })
@@ -39,11 +40,13 @@ export function parseSong(src) {
     const frontmatter = fm ? fm[1].split('\n') : [];
     const setcpm = /^setcpm\([^)]*\)/m.exec(src)?.[0] ?? null;
     const tracks = [];
-    const re = /\/\/ (Track \d+: [^\n]+)\n\$: (note|s)\(`<([\s\S]*?)>`\)([^\n]*)/g;
+    // The import writes `// Track N: name` or `// Track N (key)` above a track, and nothing above drums.
+    const re = /(?:\/\/ (Track [^\n]+)\n)?\$: (note|s)\(`<([\s\S]*?)>`\)([^\n]*)/g;
     for (let m; (m = re.exec(src));) {
-        tracks.push({comment: m[1], fn: m[2], steps: tokenize(m[3]), chain: m[4].trim()});
+        const comment = m[1] ?? (m[2] === 's' ? `Track ${tracks.length + 1}: drums` : `Track ${tracks.length + 1}`);
+        tracks.push({comment, fn: m[2], steps: tokenize(m[3]), chain: m[4].trim()});
     }
-    if (!tracks.length) throw new Error('no `// Track N: …` + `$: note(`<…>`)` tracks found');
+    if (!tracks.length) throw new Error('no `$: note(`<…>`)` or `$: s(`<…>`)` tracks found');
     return {frontmatter, setcpm, tracks};
 }
 
