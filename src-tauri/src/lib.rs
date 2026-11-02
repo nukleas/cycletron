@@ -398,6 +398,7 @@ pub fn run() {
             packs::packs_dir,
             pack_import::preview_pack_import,
             pack_import::commit_pack_import,
+            pack_import::commit_pack_install,
             pack_import::cancel_pack_import,
             midi_input::list_midi_input_devices,
             midi_input::start_midi_input_listening,

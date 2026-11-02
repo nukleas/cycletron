@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-commit-pack-install"
+description = "Enables the commit_pack_install command without any pre-configured scope."
+commands.allow = ["commit_pack_install"]
+
+[[permission]]
+identifier = "deny-commit-pack-install"
+description = "Denies the commit_pack_install command without any pre-configured scope."
+commands.deny = ["commit_pack_install"]

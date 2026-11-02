@@ -110,6 +110,7 @@
     "allow-packs-dir",
     "allow-preview-pack-import",
     "allow-commit-pack-import",
+    "allow-commit-pack-install",
     "allow-cancel-pack-import",
     "allow-list-sample-sets",
     "allow-download-sample-set",

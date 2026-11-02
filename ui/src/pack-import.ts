@@ -16,7 +16,8 @@ import {invoke, isTauri} from './tauri.js';
 import {dismissibleModal} from './modal-utils.js';
 import {escapeHtml} from './html.js';
 import {notify} from './notifications.js';
-import {errorDialog, openPathDialog} from './dialog.js';
+import {confirmDialog, errorDialog, openPathDialog} from './dialog.js';
+import {loadLibraryPacks} from './viz/pack-loader.js';
 import {VirtualList, readRowHeight} from './virtual-list.js';
 import {auditionSample, stopAudition} from './audition.js';
 
@@ -44,6 +45,20 @@ interface PackImportPreview {
     overCap: boolean;
     warnings: string[];
     banks: ProposedBank[];
+    /** Set when the source is already a pack: it installs as is. */
+    pack: ReadyPack | null;
+}
+interface ReadyPack {
+    id: string;
+    name: string;
+    version: string;
+    authors: string[];
+    license: string;
+    description: string;
+    banks: string[];
+    viz: Array<{id: string; dir: string; built: boolean; modes: string[]; palettes: string[]; sdk: string | null}>;
+    songs: string[];
+    shows: string[];
 }
 
 /** What each grouping outcome means, in the user's terms. */
@@ -132,9 +147,51 @@ export class PackImport {
         try {
             void notify('Reading samples…', 'Working out the bank layout');
             const preview = await invoke<PackImportPreview>('preview_pack_import', {source, id: null});
-            this.show(preview);
+            if (preview.pack) await this.installReady(preview, preview.pack);
+            else this.show(preview);
         } catch (e) {
             await errorDialog(`Could not read that pack:\n${e}`);
+        }
+    }
+
+    /** A built pack: show what it holds, say when it carries code, and copy it in. */
+    private async installReady(preview: PackImportPreview, pack: ReadyPack): Promise<void> {
+        const lines = [
+            `${pack.name} v${pack.version}`,
+            `${pack.id}${pack.authors.length ? ` · ${pack.authors.join(', ')}` : ''} · ${pack.license}`,
+        ];
+        if (pack.description) lines.push('', pack.description);
+        lines.push('');
+        if (pack.banks.length) lines.push(`Samples: ${pack.banks.join(', ')}`);
+        for (const v of pack.viz) lines.push(`Visualizers: ${v.modes.join(', ')}${v.palettes.length ? ` · palettes ${v.palettes.join(', ')}` : ''}`);
+        if (pack.songs.length) lines.push(`Songs: ${pack.songs.length}`);
+        if (pack.shows.length) lines.push(`Shows: ${pack.shows.length}`);
+        if (preview.warnings.length) lines.push('', ...preview.warnings.map((w) => `Warning: ${w}`));
+        if (pack.viz.length) {
+            lines.push('', 'This pack includes visualizer code that runs inside Cycletron with the app\'s own permissions. Install it only if you trust where it came from.');
+        }
+        const ok = await confirmDialog(lines.join('\n'), {title: 'Install pack', okLabel: 'Install', cancelLabel: 'Cancel', kind: pack.viz.length ? 'warning' : 'info'});
+        if (!ok) {
+            if (preview.staged && preview.token) void invoke('cancel_pack_import', {token: preview.token}).catch(() => {});
+            return;
+        }
+        try {
+            const result = await invoke<{id: string; name: string; viz: string[]; banks: string[]; file_count: number;
+                load: {banks: Array<{name: string; files: string[]}>} | null}>('commit_pack_install', {
+                request: {token: preview.token, root: preview.root, enable: true},
+            });
+            let loaded = 0;
+            if (result.load?.banks?.length) {
+                loaded = (await window.strudelApp?.loadPackBanks?.(result.load.banks)) ?? 0;
+            }
+            const vizLoaded = await loadLibraryPacks((id, message) => notify(`Visualizer pack ${id} failed to load: ${message}`, 'error'));
+            const parts = [`${result.file_count} files`];
+            if (result.banks.length) parts.push(`${result.banks.length} banks, ${loaded} samples loaded`);
+            if (vizLoaded.length) parts.push(`visualizers ${vizLoaded.join(', ')} ready`);
+            void notify('Pack installed', `${result.name}: ${parts.join(' · ')}`);
+            document.dispatchEvent(new CustomEvent('sounds:changed'));
+        } catch (e) {
+            await errorDialog(`Install failed:\n${e}`);
         }
     }
 

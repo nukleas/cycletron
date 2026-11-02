@@ -1,7 +1,9 @@
 # Sample packs
 
 Optional sample libraries under `{library_root}/Packs/`. The app bundle keeps a
-small core kit; everything else is installed and enabled by the user.
+small core kit; everything else is installed and enabled by the user. The same
+`pack.json` can also carry visualizers, songs and shows; see
+[PACKS.md](PACKS.md).
 
 See also [ATTRIBUTION.md](../ATTRIBUTION.md) for bundled (core) audio.
 

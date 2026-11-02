@@ -14,6 +14,7 @@
  */
 
 import {invoke, isTauri, listen} from './tauri.js';
+import {loadLibraryPacks} from './viz/pack-loader.js';
 import {dismissibleModal} from './modal-utils.js';
 import {escapeHtml} from './html.js';
 import {notify} from './notifications.js';
@@ -29,6 +30,9 @@ interface PackBankSummary {
 }
 
 interface PackSummary {
+    viz: Array<{id: string; built: boolean; modes: string[]; palettes: string[]}>;
+    songs: string[];
+    shows: string[];
     id: string;
     name: string;
     version: string;
@@ -352,9 +356,14 @@ export class SamplesModal {
                 .map((p) => {
                     const samples = p.banks.reduce((n, b) => n + b.files.length, 0);
                     const names = p.banks.map((b) => escapeHtml(b.name)).join(', ');
-                    const banks = p.banks.length
-                        ? `${p.banks.length} banks · ${samples} samples — ${names}`
-                        : '';
+                    const sections: string[] = [];
+                    if (p.banks.length) sections.push(`${p.banks.length} banks · ${samples} samples — ${names}`);
+                    for (const v of p.viz ?? []) {
+                        sections.push(`visualizers — ${v.modes.map(escapeHtml).join(', ')}${v.built ? '' : ' (not built)'}`);
+                    }
+                    if (p.songs?.length) sections.push(`${p.songs.length} song${p.songs.length === 1 ? '' : 's'}`);
+                    if (p.shows?.length) sections.push(`${p.shows.length} show${p.shows.length === 1 ? '' : 's'}`);
+                    const banks = sections.join(' · ');
                     const checked = p.enabled ? 'checked' : '';
                     return `<label class="packs-row">
                         <input type="checkbox" data-pack-id="${escapeHtml(p.id)}" ${checked} />
@@ -390,16 +399,19 @@ export class SamplesModal {
                     banks: Array<{name: string; files: string[]}>;
                     skipped: string[];
                 }>('enable_pack', {id});
-                const n = await window.strudelApp?.loadPackBanks?.(result.banks);
+                const n = result.banks.length ? await window.strudelApp?.loadPackBanks?.(result.banks) : 0;
                 if (result.skipped.length) {
                     console.warn('[samples] skipped core collisions:', result.skipped);
                 }
-                void notify('Pack enabled', `${id}: ${n ?? 0} samples`);
+                const viz = await loadLibraryPacks((pid, message) => notify(`Visualizer pack ${pid} failed to load: ${message}`, 'error'));
+                const parts = [`${n ?? 0} samples`];
+                if (viz.length) parts.push(`visualizers ${viz.join(', ')} ready`);
+                void notify('Pack enabled', `${id}: ${parts.join(' · ')}`);
             } else {
                 await invoke('disable_pack', {id});
                 void notify(
                     'Pack disabled',
-                    `${id} will not load on next launch. Restart to unload banks.`,
+                    `${id} will not load on next launch. Restart to unload its banks and visualizers.`,
                 );
             }
             document.dispatchEvent(new CustomEvent('sounds:changed'));

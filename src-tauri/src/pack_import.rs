@@ -83,6 +83,34 @@ pub struct PackImportPreview {
     pub over_cap: bool,
     pub warnings: Vec<String>,
     pub banks: Vec<ProposedBank>,
+    /// Set when the source is already a pack (it has a `pack.json`): it installs
+    /// as is, and `banks` is empty.
+    pub pack: Option<ReadyPack>,
+}
+
+/// A pack that arrives built: what the install dialog shows before copying.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadyPack {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub authors: Vec<String>,
+    pub license: String,
+    pub description: String,
+    pub banks: Vec<String>,
+    pub viz: Vec<packs::VizEntry>,
+    pub songs: Vec<String>,
+    pub shows: Vec<String>,
+}
+
+/// Install a ready pack previewed by `preview_pack_import`.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallRequest {
+    pub token: String,
+    pub root: String,
+    pub enable: Option<bool>,
 }
 
 /// The reviewed mapping, as approved in the import UI.
@@ -403,6 +431,59 @@ pub fn preview_pack_import(
         (String::new(), src.clone(), false, Vec::new(), 0, 0)
     };
 
+    // A folder with a pack.json is a pack already; it installs whole.
+    if root.join(packs::MANIFEST).is_file() {
+        let manifest = match packs::parse_manifest(&root) {
+            Ok(m) => m,
+            Err(e) => {
+                if staged {
+                    let _ = fs::remove_dir_all(stage_dir(&app_handle, &token)?);
+                }
+                return Err(e);
+            }
+        };
+        let viz = packs::viz_entries(&root, &manifest);
+        for v in &viz {
+            if !v.built {
+                warnings.push(format!("visualizer pack {} is not built (no dist/index.js); it won't load", v.id));
+            }
+        }
+        if !staged {
+            for entry in walkdir_count(&root) {
+                file_count += 1;
+                bytes += entry;
+            }
+        }
+        let ready = ReadyPack {
+            id: manifest.id.clone(),
+            name: manifest.name.clone(),
+            version: manifest.version.clone(),
+            authors: manifest.authors.clone(),
+            license: manifest.spdx.clone(),
+            description: manifest.description.clone(),
+            banks: manifest.banks.iter().map(|b| b.name.clone()).collect(),
+            viz,
+            songs: manifest.songs.clone(),
+            shows: manifest.shows.clone(),
+        };
+        return Ok(PackImportPreview {
+            token,
+            source,
+            root: root.to_string_lossy().into_owned(),
+            staged,
+            suggested_id: manifest.id,
+            suggested_name: manifest.name,
+            strategy: GroupStrategy::SingleBank,
+            folder_shaped: false,
+            file_count,
+            bytes,
+            over_cap: false,
+            warnings,
+            banks: Vec::new(),
+            pack: Some(ready),
+        });
+    }
+
     let folder_shaped = is_folder_shaped(&root);
     let (strategy, scanned) = sounds::scan_folder_banks_detailed(&root)?;
     if scanned.is_empty() {
@@ -475,6 +556,7 @@ pub fn preview_pack_import(
         over_cap,
         warnings,
         banks,
+        pack: None,
     })
 }
 
@@ -692,6 +774,90 @@ pub fn commit_pack_import(
         file_count,
         bytes,
         load,
+        viz: Vec::new(),
+    })
+}
+
+/// Sizes of the files under `root`, for the preview.
+fn walkdir_count(root: &Path) -> Vec<u64> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(rd) = fs::read_dir(&dir) else { continue };
+        for entry in rd.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if let Ok(md) = p.metadata() {
+                out.push(md.len());
+            }
+        }
+    }
+    out
+}
+
+/// Copy a previewed pack into `Packs/<id>/` as it is, and enable it.
+#[tauri::command]
+pub fn commit_pack_install(
+    request: InstallRequest,
+    state: State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<PackInstallResult, String> {
+    let InstallRequest { token, root, enable } = request;
+    let root = PathBuf::from(&root);
+    if !token.is_empty() {
+        let stage = stage_dir(&app_handle, &token)?;
+        if !library::within(&stage, &root) {
+            return Err("import root escapes its staging directory".into());
+        }
+    }
+    if !root.is_dir() {
+        return Err("import source is gone — start the import again".into());
+    }
+    let manifest = packs::parse_manifest(&root)?;
+    let viz = packs::viz_entries(&root, &manifest);
+    if let Some(v) = viz.iter().find(|v| !v.built) {
+        return Err(format!("visualizer pack {} is not built (no dist/index.js)", v.id));
+    }
+    let packs_dir = packs::ensured_packs_root(&state);
+    let dest = packs_dir.join(&manifest.id);
+    if dest.exists() {
+        return Err(format!(
+            "pack {} already exists — remove it or pick another id",
+            manifest.id
+        ));
+    }
+    let (file_count, bytes) = match packs::copy_dir_all(&root, &dest) {
+        Ok(n) => n,
+        Err(e) => {
+            let _ = fs::remove_dir_all(&dest);
+            return Err(e);
+        }
+    };
+    let load = if enable.unwrap_or(true) {
+        match packs::enable_pack_inner(&packs_dir, &manifest.id) {
+            Ok(r) => Some(r),
+            Err(e) => {
+                tracing::warn!("installed {} but could not enable it: {e}", manifest.id);
+                None
+            }
+        }
+    } else {
+        None
+    };
+    if !token.is_empty() {
+        let _ = fs::remove_dir_all(stage_dir(&app_handle, &token)?);
+    }
+    Ok(PackInstallResult {
+        id: manifest.id.clone(),
+        name: manifest.name,
+        path: dest.to_string_lossy().into_owned(),
+        banks: manifest.banks.iter().map(|b| b.name.clone()).collect(),
+        renamed: Vec::new(),
+        file_count,
+        bytes,
+        load,
+        viz: viz.into_iter().map(|v| v.id).collect(),
     })
 }
 

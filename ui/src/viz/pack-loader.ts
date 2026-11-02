@@ -8,6 +8,11 @@
 import {sdkSatisfies, validatePack, type VizPack} from './pack.js';
 import {SDK_VERSION} from './sdk.js';
 import {registerPack} from './registry.js';
+import {invoke, isTauri} from '../tauri.js';
+import type {VizPackSource} from '../types/tauri-commands.js';
+
+/** Ids of the packs loaded so far, so a pack enabled later isn't loaded twice. */
+export const LOADED_PACKS = new Set<string>();
 
 /** Import a pack's built module from its source text and register it. */
 export async function loadPackSource(source: string, from = 'a pack'): Promise<VizPack> {
@@ -25,7 +30,36 @@ export async function loadPackSource(source: string, from = 'a pack'): Promise<V
         throw new Error(`${pack.manifest.id} needs sdk ${pack.manifest.sdk}; this Cycletron has ${SDK_VERSION}`);
     }
     registerPack(pack);
+    LOADED_PACKS.add(pack.manifest.id);
     return pack;
+}
+
+/**
+ * Load the library's enabled visualizer packs that aren't loaded yet. Returns
+ * the ids loaded now; a pack that fails is reported through `onError` and
+ * skipped.
+ */
+export async function loadLibraryPacks(onError: (id: string, message: string) => void): Promise<string[]> {
+    if (!isTauri) return [];
+    let packs: VizPackSource[];
+    try {
+        packs = await invoke<VizPackSource[]>('list_viz_packs');
+    } catch (e) {
+        console.warn(`viz packs: couldn't list: ${String(e)}`);
+        return [];
+    }
+    const loaded: string[] = [];
+    for (const p of packs) {
+        if (LOADED_PACKS.has(p.id)) continue;
+        try {
+            await loadPackSource(p.source, p.id);
+            console.info(`viz packs: loaded ${p.id} from ${p.path}`);
+            loaded.push(p.id);
+        } catch (e) {
+            onError(p.id, e instanceof Error ? e.message : String(e));
+        }
+    }
+    return loaded;
 }
 
 function isPack(v: unknown): v is VizPack {

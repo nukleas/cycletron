@@ -68,9 +68,9 @@ pub struct PackBank {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct EnabledFile {
+pub(crate) struct EnabledFile {
     #[serde(default)]
-    enabled: Vec<String>,
+    pub(crate) enabled: Vec<String>,
 }
 
 // --- IPC shapes -----------------------------------------------------------
@@ -84,6 +84,9 @@ pub struct PackSummary {
     pub description: String,
     pub tags: Vec<String>,
     pub banks: Vec<PackBankSummary>,
+    pub viz: Vec<VizEntry>,
+    pub songs: Vec<String>,
+    pub shows: Vec<String>,
     pub enabled: bool,
     pub path: String,
 }
@@ -135,7 +138,7 @@ pub(crate) fn ensured_packs_root(state: &State<'_, AppState>) -> PathBuf {
     packs_root(&lib)
 }
 
-fn read_enabled(packs: &Path) -> EnabledFile {
+pub(crate) fn read_enabled(packs: &Path) -> EnabledFile {
     let path = packs.join(ENABLED_FILE);
     let Ok(s) = fs::read_to_string(&path) else {
         return EnabledFile::default();
@@ -195,7 +198,8 @@ pub(crate) fn core_bank_names() -> HashSet<String> {
     set
 }
 
-fn load_manifest(dir: &Path) -> Result<PackManifest, String> {
+/// Read and check a manifest wherever it sits (a staged import, say).
+pub(crate) fn parse_manifest(dir: &Path) -> Result<PackManifest, String> {
     let path = dir.join(MANIFEST);
     let s = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
     let m: PackManifest =
@@ -209,13 +213,6 @@ fn load_manifest(dir: &Path) -> Result<PackManifest, String> {
     }
     if !is_valid_pack_id(&m.id) {
         return Err(format!("invalid pack id {:?}", m.id));
-    }
-    let dir_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    if dir_name != m.id {
-        return Err(format!(
-            "pack id {:?} does not match folder name {:?}",
-            m.id, dir_name
-        ));
     }
     if m.spdx.is_empty() {
         return Err(format!("pack {} missing spdx/license", m.id));
@@ -240,6 +237,90 @@ fn load_manifest(dir: &Path) -> Result<PackManifest, String> {
         }
     }
     Ok(m)
+}
+
+/// An installed pack's manifest: its folder must be named after its id.
+fn load_manifest(dir: &Path) -> Result<PackManifest, String> {
+    let m = parse_manifest(dir)?;
+    let dir_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    if dir_name != m.id {
+        return Err(format!(
+            "pack id {:?} does not match folder name {:?}",
+            m.id, dir_name
+        ));
+    }
+    Ok(m)
+}
+
+/// A pack's visualizer folders, as the loader sees them.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VizEntry {
+    pub id: String,
+    pub dir: String,
+    /// `dist/index.js` exists.
+    pub built: bool,
+    pub modes: Vec<String>,
+    pub palettes: Vec<String>,
+    pub sdk: Option<String>,
+}
+
+pub(crate) fn viz_entries(dir: &Path, m: &PackManifest) -> Vec<VizEntry> {
+    let strings = |v: Option<&serde_json::Value>| -> Vec<String> {
+        v.and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+            .unwrap_or_default()
+    };
+    let mut out = Vec::new();
+    for rel in &m.viz {
+        let Ok(rel_path) = safe_rel_path(rel) else {
+            tracing::warn!("pack {}: viz path {rel:?} is not a relative path", m.id);
+            continue;
+        };
+        let viz_dir = dir.join(rel_path);
+        let json = fs::read_to_string(viz_dir.join(MANIFEST))
+            .ok()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
+        let Some(json) = json else {
+            tracing::warn!("pack {}: {} has no readable pack.json", m.id, viz_dir.display());
+            continue;
+        };
+        out.push(VizEntry {
+            id: json.get("id").and_then(|v| v.as_str()).unwrap_or(rel).to_string(),
+            dir: viz_dir.to_string_lossy().into_owned(),
+            built: viz_dir.join("dist").join("index.js").is_file(),
+            modes: strings(json.get("modes")),
+            palettes: strings(json.get("palettes")),
+            sdk: json.get("sdk").and_then(|v| v.as_str()).map(str::to_string),
+        });
+    }
+    out
+}
+
+/// Copy a folder, skipping dot files. Returns files and bytes copied.
+pub(crate) fn copy_dir_all(src: &Path, dest: &Path) -> Result<(usize, u64), String> {
+    fs::create_dir_all(dest).map_err(|e| format!("create {}: {e}", dest.display()))?;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let rd = fs::read_dir(src).map_err(|e| format!("read {}: {e}", src.display()))?;
+    for entry in rd {
+        let entry = entry.map_err(|e| format!("read {}: {e}", src.display()))?;
+        let name = entry.file_name();
+        if name.to_string_lossy().starts_with('.') {
+            continue;
+        }
+        let from = entry.path();
+        let to = dest.join(&name);
+        if from.is_dir() {
+            let (f, b) = copy_dir_all(&from, &to)?;
+            files += f;
+            bytes += b;
+        } else {
+            bytes += fs::copy(&from, &to).map_err(|e| format!("copy {} → {}: {e}", from.display(), to.display()))?;
+            files += 1;
+        }
+    }
+    Ok((files, bytes))
 }
 
 fn validate_for_enable(dir: &Path, m: &PackManifest) -> Result<(), String> {
@@ -338,10 +419,7 @@ pub fn list_packs(state: State<'_, AppState>) -> Result<Vec<PackSummary>, String
     let enabled: HashSet<String> = read_enabled(&packs).enabled.into_iter().collect();
     let mut out = Vec::new();
     for (dir, m) in scan_installed(&packs) {
-        // The sample manager lists packs with banks; a content-only pack has nothing to enable.
-        if m.banks.is_empty() {
-            continue;
-        }
+        let viz = viz_entries(&dir, &m);
         out.push(PackSummary {
             id: m.id.clone(),
             name: m.name,
@@ -365,6 +443,9 @@ pub fn list_packs(state: State<'_, AppState>) -> Result<Vec<PackSummary>, String
                         .collect(),
                 })
                 .collect(),
+            viz,
+            songs: m.songs,
+            shows: m.shows,
             enabled: enabled.contains(&m.id),
             path: dir.to_string_lossy().into_owned(),
         });
@@ -412,8 +493,12 @@ pub fn load_enabled_packs(state: State<'_, AppState>) -> Result<Vec<PackLoadResu
             tracing::warn!("enabled pack {id} is not installed, skipping");
             continue;
         }
-        match load_manifest(&dir).and_then(|m| resolve_load(&dir, &m)) {
-            Ok(r) => out.push(r),
+        match load_manifest(&dir) {
+            Ok(m) if m.banks.is_empty() => {}
+            Ok(m) => match resolve_load(&dir, &m) {
+                Ok(r) => out.push(r),
+                Err(e) => tracing::warn!("enabled pack {id}: {e}"),
+            },
             Err(e) => tracing::warn!("enabled pack {id}: {e}"),
         }
     }
@@ -446,6 +531,8 @@ pub struct PackInstallResult {
     pub bytes: u64,
     /// Present when `enable` was true and load succeeded.
     pub load: Option<PackLoadResult>,
+    /// Visualizer pack ids the pack carries.
+    pub viz: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -549,7 +636,12 @@ pub(crate) fn enable_pack_inner(packs: &Path, id: &str) -> Result<PackLoadResult
         return Err(format!("pack not installed: {id}"));
     }
     let m = load_manifest(&dir)?;
-    let load = resolve_load(&dir, &m)?;
+    // A pack without sample banks enables as a unit of visualizers, songs and shows.
+    let load = if m.banks.is_empty() {
+        PackLoadResult { id: id.to_string(), banks: Vec::new(), skipped: Vec::new() }
+    } else {
+        resolve_load(&dir, &m)?
+    };
     let mut en = read_enabled(packs);
     if !en.enabled.iter().any(|e| e == id) {
         en.enabled.push(id.to_string());
@@ -609,6 +701,41 @@ mod tests {
         assert!(safe_rel_path("../etc/passwd").is_err());
         assert!(safe_rel_path("/abs").is_err());
         assert!(safe_rel_path("banks/ok.wav").is_ok());
+    }
+
+    #[test]
+    fn a_content_pack_parses_and_enables_without_banks() {
+        let tmp = tempfile::tempdir().unwrap();
+        let packs = tmp.path();
+        let dir = packs.join("halloween");
+        fs::create_dir_all(dir.join("viz/halloween-8bit/dist")).unwrap();
+        fs::write(dir.join("pack.json"), r#"{
+            "schema": 1, "id": "halloween", "name": "Halloween", "version": "0.1.0",
+            "authors": ["NaderLabs"], "license": "AGPL-3.0-or-later",
+            "viz": ["viz/halloween-8bit"], "songs": ["songs/a.strudel"], "shows": ["shows/a.show.toml"]
+        }"#).unwrap();
+        fs::write(dir.join("viz/halloween-8bit/pack.json"), r#"{"id": "naderlabs/halloween-8bit", "modes": ["graveyard"], "palettes": ["pumpkin"], "sdk": "^1"}"#).unwrap();
+        fs::write(dir.join("viz/halloween-8bit/dist/index.js"), "export default {}").unwrap();
+
+        let m = load_manifest(&dir).expect("a pack without banks or a license file is valid");
+        assert!(m.banks.is_empty());
+        assert_eq!(m.viz, vec!["viz/halloween-8bit"]);
+        let viz = viz_entries(&dir, &m);
+        assert_eq!(viz.len(), 1);
+        assert_eq!(viz[0].id, "naderlabs/halloween-8bit");
+        assert!(viz[0].built);
+        assert_eq!(viz[0].modes, vec!["graveyard"]);
+        assert_eq!(viz[0].sdk.as_deref(), Some("^1"));
+
+        let load = enable_pack_inner(packs, "halloween").expect("enables with no banks");
+        assert!(load.banks.is_empty());
+        assert_eq!(read_enabled(packs).enabled, vec!["halloween"]);
+
+        // A pack with nothing in it is refused.
+        let empty = packs.join("empty");
+        fs::create_dir_all(&empty).unwrap();
+        fs::write(empty.join("pack.json"), r#"{"schema": 1, "id": "empty", "name": "E", "version": "1", "license": "MIT"}"#).unwrap();
+        assert!(load_manifest(&empty).unwrap_err().contains("no banks, viz, songs or shows"));
     }
 
     #[test]

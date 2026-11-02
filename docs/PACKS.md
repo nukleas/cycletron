@@ -88,6 +88,20 @@ build.
   files, the show pane's suggestions and the Visuals menu see them with no
   other change.
 
+## Installing and enabling
+
+A pack arrives as a folder or a `.zip` with `pack.json` at its root (or one
+folder down). Drop it on the window, or use Install from Folder… / Install
+from Zip… in the Samples panel. The dialog shows the pack's name, author,
+license and what it carries; a pack with visualizer code says so, since that
+code runs inside the app with the app's permissions. Install copies the
+folder to `Packs/<id>/` and enables it.
+
+Only enabled packs load. `Packs/enabled.json` lists them; the Samples panel
+toggles any installed pack, with or without sample banks. A pack copied into
+`Packs/` by hand shows up there disabled until you enable it. Disabling takes
+effect at the next launch.
+
 ## Rules every mode keeps
 
 - **Deterministic.** The renderer draws the same frame from a cold start and
@@ -109,4 +123,4 @@ build.
   0, so assets load before a render starts.
 - A `pack check` command: type check, the seam test and a frame-budget probe
   on one pack.
-- Installing a pack from a zip or URL; today a pack is a folder in `Packs/`.
+- Installing from a URL, and a community index to pick from.

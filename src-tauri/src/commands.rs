@@ -249,34 +249,27 @@ pub struct VizPackSource {
     pub source: String,
 }
 
-/// The built visualizer packs in the library: every pack's `viz` folders that
-/// have a `pack.json` and a `dist/index.js`. A folder without a build is
+/// The built visualizer packs in the library's enabled packs: every `viz`
+/// folder with a `pack.json` and a `dist/index.js`. An unbuilt folder is
 /// skipped with a log line, not an error.
 #[tauri::command]
 pub fn list_viz_packs(state: State<'_, AppState>) -> Result<Vec<VizPackSource>, String> {
     let root = crate::packs::packs_root(&state.library_root());
+    let enabled = crate::packs::read_enabled(&root).enabled;
     let mut out = Vec::new();
     for (dir, m) in crate::packs::scan_installed(&root) {
-        for rel in &m.viz {
-            let viz_dir = match crate::packs::safe_rel_path(rel) {
-                Ok(p) => dir.join(p),
-                Err(e) => {
-                    tracing::warn!("{}: viz {e}", dir.display());
-                    continue;
-                }
-            };
-            let Ok(vtext) = std::fs::read_to_string(viz_dir.join("pack.json")) else {
-                tracing::warn!("{}: no pack.json, skipped", viz_dir.display());
+        if !enabled.iter().any(|e| e == &m.id) {
+            continue;
+        }
+        for v in crate::packs::viz_entries(&dir, &m) {
+            if !v.built {
+                tracing::warn!("{}: not built (no dist/index.js), skipped", v.dir);
                 continue;
-            };
-            let id = serde_json::from_str::<serde_json::Value>(&vtext)
-                .ok()
-                .and_then(|j| j.get("id").and_then(|v| v.as_str()).map(str::to_string))
-                .unwrap_or_else(|| rel.clone());
-            let built = viz_dir.join("dist").join("index.js");
+            }
+            let built = std::path::Path::new(&v.dir).join("dist").join("index.js");
             match std::fs::read_to_string(&built) {
-                Ok(source) => out.push(VizPackSource { id, path: viz_dir.to_string_lossy().into_owned(), source }),
-                Err(_) => tracing::warn!("{}: not built (no dist/index.js), skipped", viz_dir.display()),
+                Ok(source) => out.push(VizPackSource { id: v.id, path: v.dir, source }),
+                Err(e) => tracing::warn!("{}: {e}", built.display()),
             }
         }
     }

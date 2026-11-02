@@ -87,6 +87,7 @@ const COMMANDS: &[&str] = &[
     "packs_dir",
     "preview_pack_import",
     "commit_pack_import",
+    "commit_pack_install",
     "cancel_pack_import",
     "list_sample_sets",
     "download_sample_set",
