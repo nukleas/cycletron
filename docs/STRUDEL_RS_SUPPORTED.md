@@ -278,7 +278,7 @@ saturate.
 `fmrelease(t)` (`fmr`), `fmenv(amount)` (`fme`),
 `vib(rate)` (`vibrato`), `vibmod(depth)` (`vmod`),
 `tremolo(rate)` (`trem`), `tremolodepth(depth)` (`tremdepth`),
-`tremoloshape(s)` (`tremshape`), `detune(cents)` (`det`).
+`tremoloshape(s)` (`tremshape`), `detune(semitones)` (`det`; the engine scales by 2^(v/12), so 0.12 is 12 cents).
 
 ### Pulse width / PWM
 
