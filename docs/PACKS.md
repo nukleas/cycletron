@@ -116,7 +116,9 @@ checked out beside the library. A pack with its own `package.json` can depend
 on the package instead (`"@cycletron/viz-sdk": "file:../cycletron/ui/packages/viz-sdk"`)
 and drop the mapping.
 
-To check a pack's determinism, run the seam test on its build:
+To check a pack's determinism, run the seam test on its build. `VIZ_PACK`
+lists built viz pack folders separated like `PATH`; two folders also cover two
+packs registering together. Without it the pack test is skipped.
 
 ```sh
 VIZ_PACK=<viz pack folder> npm run test:render

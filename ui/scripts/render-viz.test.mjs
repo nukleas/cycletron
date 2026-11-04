@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import path from 'node:path';
 import {readFileSync} from 'node:fs';
 import {after, before, test} from 'node:test';
 import {fileURLToPath} from 'node:url';
@@ -141,22 +142,16 @@ test('every mode matches the continuous render across a chunk seam', async () =>
     assert.deepEqual(failing, {});
 });
 
-// A pack loaded at runtime must be as deterministic as a built-in mode. This
-// runs on the viz pack folder VIZ_PACK names, or on the Halloween pack in the
-// user's library, when its build exists. With VIZ_PACK set and the Halloween
-// build present, both load, so two packs registering together is covered too.
-const HALLOWEEN = `${process.env.HOME}/Code/strulibrary/Packs/halloween/viz/halloween-8bit`;
-const PACK_DIR = process.env.VIZ_PACK ?? HALLOWEEN;
-const PACK = `${PACK_DIR}/dist/index.js`;
-const {existsSync} = await import('node:fs');
+// A pack loaded at runtime must be as deterministic as a built-in mode. VIZ_PACK
+// names the viz pack folders to load (built, `dist/index.js` present), separated
+// like PATH; with two folders, two packs registering together is covered too.
+// Without VIZ_PACK the test is skipped.
+const PACK_DIRS = (process.env.VIZ_PACK ?? '').split(path.delimiter).filter(Boolean);
 const packModes = (dir) => JSON.parse(readFileSync(`${dir}/pack.json`, 'utf8')).modes;
-test('every mode of a pack loaded from its built module matches across a chunk seam', {skip: !existsSync(PACK)}, async () => {
-    const sources = [readFileSync(PACK, 'utf8')];
-    const modes = packModes(PACK_DIR);
-    if (PACK_DIR !== HALLOWEEN && existsSync(`${HALLOWEEN}/dist/index.js`)) {
-        sources.push(readFileSync(`${HALLOWEEN}/dist/index.js`, 'utf8'));
-        modes.push(packModes(HALLOWEEN)[0]);
-    }
+test('every mode of a pack loaded from its built module matches across a chunk seam', {skip: PACK_DIRS.length === 0}, async () => {
+    const sources = PACK_DIRS.map((dir) => readFileSync(`${dir}/dist/index.js`, 'utf8'));
+    // Every mode of the first pack; one of each other pack, so the seam check stays short.
+    const modes = PACK_DIRS.flatMap((dir, i) => (i === 0 ? packModes(dir) : packModes(dir).slice(0, 1)));
     const renderWithPack = async (startFrame, count, one, two) => {
         const browser = await chromium.launch();
         try {
