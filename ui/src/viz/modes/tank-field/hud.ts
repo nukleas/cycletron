@@ -1,5 +1,5 @@
 /** Tactical instruments: quiet plates, fine reticle brackets and track-colored signals. */
-import {MONO_FONT} from '../../util.js';
+import {MONO_FONT} from '@cycletron/viz-sdk';
 import {hudHeader, hudPanel, hudText, INK, MUTED, EDGE, type DriveHudLayout} from '../drive-hud.js';
 import type {Camera} from './scene.js';
 

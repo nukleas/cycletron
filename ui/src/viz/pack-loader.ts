@@ -5,8 +5,7 @@
  * Blob URL, so nothing depends on where the file came from.
  */
 
-import {sdkSatisfies, validatePack, type VizPack} from './pack.js';
-import {SDK_VERSION} from './sdk.js';
+import {sdkSatisfies, validatePack, SDK_VERSION, type VizPack} from '@cycletron/viz-sdk';
 import {registerPack} from './registry.js';
 import {invoke, isTauri} from '../tauri.js';
 import {diag} from '../diagnostics.js';

@@ -83,9 +83,10 @@ function noPrivatePublicDirsPlugin(): Plugin {
     };
 }
 
-// Visualizer packs import the sdk as `@cycletron/viz-sdk`. In the app that
-// resolves to the source; a pack loaded at runtime resolves it through the
-// import map in index.html, which this plugin points at the built sdk chunk.
+// Visualizer packs import the sdk as `@cycletron/viz-sdk`, the workspace
+// package in packages/viz-sdk. In the app that resolves to its source; a pack
+// loaded at runtime resolves it through the import map in index.html, which
+// this plugin points at the built sdk chunk.
 // The chunk is emitted here, not as an input, so its exports keep their names:
 // vite builds app entries with preserveEntrySignatures off, which would mangle them.
 function vizSdkPlugin(): Plugin {
@@ -95,13 +96,13 @@ function vizSdkPlugin(): Plugin {
         buildStart() {
             this.emitFile({
                 type: 'chunk',
-                id: resolve(import.meta.dirname, 'src/viz/sdk.ts'),
+                id: resolve(import.meta.dirname, 'packages/viz-sdk/src/index.ts'),
                 fileName: 'viz-sdk.js',
                 preserveSignature: 'strict',
             });
         },
         transformIndexHtml(html) {
-            return html.replace('"@cycletron/viz-sdk": "/src/viz/sdk.ts"', '"@cycletron/viz-sdk": "/viz-sdk.js"');
+            return html.replace('"@cycletron/viz-sdk": "/packages/viz-sdk/src/index.ts"', '"@cycletron/viz-sdk": "/viz-sdk.js"');
         },
         generateBundle(_options, bundle) {
             const sdk = bundle['viz-sdk.js'];
@@ -115,9 +116,6 @@ function vizSdkPlugin(): Plugin {
 export default defineConfig(({mode}) => ({
     // No base path — served from Tauri webview root
     clearScreen: false,
-    resolve: {
-        alias: {'@cycletron/viz-sdk': resolve(import.meta.dirname, 'src/viz/sdk.ts')},
-    },
     build: {
         outDir: 'dist',
         assetsDir: 'assets',

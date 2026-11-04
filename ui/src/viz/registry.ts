@@ -6,7 +6,7 @@
  * (`viz/packs/`). The end card stays last.
  */
 
-import type {VizModeDef} from './types.js';
+import type {VizModeDef, VizPack} from '@cycletron/viz-sdk';
 import {neonCircuitDef} from './modes/neon-circuit.js';
 import {marbleCoreDef} from './modes/marble-core.js';
 import {marbleDropDef} from './modes/marble-drop.js';
@@ -28,7 +28,6 @@ import {cockpitDef} from './modes/cockpit.js';
 import {tankFieldDef} from './modes/tank-field.js';
 import {starRoadDef} from './modes/star-road.js';
 import {logoDef} from './modes/logo.js';
-import type {VizPack} from './pack.js';
 import {PACKS} from './packs/index.js';
 import {registerPalettes} from './palettes.js';
 

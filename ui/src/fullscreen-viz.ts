@@ -24,7 +24,7 @@ import type {View} from './viz/edit.js';
 import {applyFinish, type Finish, wash} from './viz/finish.js';
 import {paletteTheme} from './viz/palettes.js';
 import {type Entering, Transitions} from './viz/transitions.js';
-import type {PatternSource, VizLayer, VizMode, VizServices} from './viz/types.js';
+import type {PatternSource, VizLayer, VizMode, VizServices} from '@cycletron/viz-sdk';
 
 type MutableServices = { -readonly [K in keyof VizServices]: VizServices[K] };
 

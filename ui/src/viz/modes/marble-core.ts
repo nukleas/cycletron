@@ -16,9 +16,24 @@
  * Flat fills and fine outlines; every radius is a fraction of min(w, h).
  */
 
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {MAX_EVENTS_PER_TRACK, TrackModel, instrumentFamily, type VizTrack} from '../tracks.js';
-import {TAU, alphaRamp, beatEnv, clamp01, drawLabel, follow, rampAt, rgbOf} from '../util.js';
+import {
+    MAX_EVENTS_PER_TRACK,
+    TrackModel,
+    instrumentFamily,
+    TAU,
+    alphaRamp,
+    beatEnv,
+    clamp01,
+    drawLabel,
+    follow,
+    rampAt,
+    rgbOf,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+    type VizTrack,
+} from '@cycletron/viz-sdk';
 
 const RINGS = 5;
 const TOP = -Math.PI / 2;

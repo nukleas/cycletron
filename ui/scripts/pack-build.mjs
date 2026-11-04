@@ -7,9 +7,10 @@
 // Usage:
 //   node scripts/pack-build.mjs <pack-dir> [--no-check]
 //
-// The pack dir holds pack.json and src/. The type check runs tsc with the
-// repo's settings and the sdk path mapped, so a pack needs no tsconfig of its
-// own; --no-check skips it.
+// The pack dir holds pack.json and src/. The type check runs tsc on the
+// pack's own tsconfig.json when it has one (the editor then sees the same
+// settings), otherwise on the repo's settings with the sdk path mapped;
+// --no-check skips it.
 
 import {spawnSync} from 'node:child_process';
 import {existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
@@ -19,11 +20,16 @@ import {fileURLToPath} from 'node:url';
 import {build} from 'vite';
 
 const UI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SDK = path.join(UI, 'src/viz/sdk.ts');
+const SDK = path.join(UI, 'packages/viz-sdk/src/index.ts');
 
 /** Type-check a pack's src/ against the sdk. Throws with tsc's output on errors. */
 export function checkPack(dir) {
     const root = path.resolve(dir);
+    const own = path.join(root, 'tsconfig.json');
+    if (existsSync(own)) {
+        runTsc(root, own);
+        return;
+    }
     const tmp = mkdtempSync(path.join(os.tmpdir(), 'pack-check-'));
     try {
         const config = path.join(tmp, 'tsconfig.json');
@@ -36,13 +42,17 @@ export function checkPack(dir) {
             },
             include: [path.join(root, 'src')],
         }));
-        const tsc = path.join(UI, 'node_modules', '.bin', 'tsc');
-        const run = spawnSync(tsc, ['-p', config, '--pretty', 'false'], {encoding: 'utf8'});
-        if (run.status !== 0) {
-            throw new Error(`${root}: type errors\n${(run.stdout + run.stderr).trim()}`);
-        }
+        runTsc(root, config);
     } finally {
         rmSync(tmp, {recursive: true, force: true});
+    }
+}
+
+function runTsc(root, config) {
+    const tsc = path.join(UI, 'node_modules', '.bin', 'tsc');
+    const run = spawnSync(tsc, ['-p', config, '--pretty', 'false'], {encoding: 'utf8'});
+    if (run.status !== 0) {
+        throw new Error(`${root}: type errors\n${(run.stdout + run.stderr).trim()}`);
     }
 }
 

@@ -4,6 +4,6 @@
  * dist/index.js), see `viz/pack-loader.ts` and docs/PACKS.md.
  */
 
-import type {VizPack} from '../pack.js';
+import type {VizPack} from '@cycletron/viz-sdk';
 
 export const PACKS: readonly VizPack[] = [];

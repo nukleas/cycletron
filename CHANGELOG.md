@@ -4,6 +4,8 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+- Visualizer sdk 1.2: `@cycletron/viz-sdk` is a workspace package (`ui/packages/viz-sdk`) the app and packs both import; packs see `PatternQuery` instead of the engine's pattern handle, and the label font, hue helpers, `PatternTimeline`, `drumOnsets` and the cycle-view constants are exported.
+
 ## 0.1.0-alpha.26 (2026-10-26)
 
 Bundled 909, 606 and 727 kits, Ableton Link and OSC output that work, and What's New after updates.

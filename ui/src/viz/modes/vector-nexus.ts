@@ -1,6 +1,5 @@
 /** VECTOR NEXUS — bounded, batched vector geometry; no particles, blur, or readbacks. */
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {TAU} from '../util.js';
+import {TAU, type VizMode, type VizModeDef, type VizServices} from '@cycletron/viz-sdk';
 
 const BANDS = 96;
 const VERTICES = 12;

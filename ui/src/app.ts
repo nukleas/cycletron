@@ -16,7 +16,7 @@ import {PlaybackState} from "./types/app.js";
 import {StrudelEditor} from './editor.js';
 import {PatternVisualizer, ScopeVisualizer, VizMode} from './visualizer.js';
 import {ambientViz} from './ambient-viz.js';
-import type {PatternSource} from './viz/types.js';
+import type {PatternSource} from '@cycletron/viz-sdk';
 import {stage} from './stage.js';
 import {audioRecorder} from './audio-recorder.js';
 import {visualsMenu} from './visuals-menu.js';

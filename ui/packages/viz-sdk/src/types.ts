@@ -9,24 +9,36 @@
  * they need through the read-only {@link VizServices} snapshot passed to each
  * lifecycle call.
  *
- * Adding a mode:
- *   1. Create `viz/modes/<id>.ts` exporting a `VizModeDef`.
- *   2. Add it to the ordered list in `viz/registry.ts`.
- * That's the whole surface — the menu, HUD, keyboard cycling, auto-cycle, and
- * persistence all derive from the registry.
+ * Adding a mode to the app: create `viz/modes/<id>.ts` exporting a
+ * `VizModeDef` and add it to the ordered list in `viz/registry.ts`; the menu,
+ * HUD, keyboard cycling, auto-cycle and persistence all derive from the
+ * registry. A pack exports its defs from its `src/index.ts` instead
+ * (docs/PACKS.md).
  */
 
-import type {PatternHandle} from '../../pkg';
+/**
+ * The slice of the engine's pattern handle the sdk reads. The app's
+ * `PatternHandle` (strudel-audio-wasm) satisfies it; the sdk names only
+ * what it calls so a pack never sees the engine's types.
+ */
+export interface PatternQuery {
+    /** Resolve a track ID to its `.color()` hint, if the pattern set one. */
+    getTrackColor(id: number): string | undefined;
+    /** Resolve a track ID (from `queryCycleViewData`) to its name. */
+    getTrackName(id: number): string | undefined;
+    /** Pack the haps of `cycles` bars from `startCycle` into the cycle-view buffer. */
+    queryCycleViewData(startCycle: number, cycles: number): void;
+}
 
 /**
  * Read access to the scheduled-pattern data for modes that visualize musical
  * structure (ISO CITY, LENS BENCH, SPOT FIELD) rather than just the audio
- * signal. The `PatternHandle` must never be retained across frames — it's
- * freed on stop/re-evaluate, so read it fresh from the scheduler inside each
+ * signal. The pattern must never be retained across frames — it's freed on
+ * stop/re-evaluate, so read it fresh from the scheduler inside each
  * synchronous use.
  */
 export interface PatternSource {
-    scheduler: { pattern: PatternHandle | null };
+    scheduler: { pattern: PatternQuery | null };
     memory: WebAssembly.Memory;
     cycleViewPtr: number;
 }

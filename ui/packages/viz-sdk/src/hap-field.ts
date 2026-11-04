@@ -15,8 +15,7 @@
  * call that can grow WASM memory.
  */
 
-import type {PatternHandle} from '../../pkg';
-import type {PatternSource, Theme, VizServices} from './types.js';
+import type {PatternQuery, PatternSource, Theme, VizServices} from './types.js';
 import {MAX_TRACKS, VIEW_CAPACITY, instrumentFamily, type InstrumentFamily} from './tracks.js';
 import {hash32, rgbOf} from './util.js';
 
@@ -83,7 +82,7 @@ export class HapField<T extends FieldTeam, H extends FieldHap<T>> {
 
     private sane = false;
     private lastBar = -1;
-    private lastPattern: PatternHandle | null = null;
+    private lastPattern: PatternQuery | null = null;
     private registryVersion = -1;
     private themeKey = '';
     private nextSlot = 0;
@@ -173,7 +172,7 @@ export class HapField<T extends FieldTeam, H extends FieldHap<T>> {
         return this.sane && h.seen && !h.done && h.begin > this.prevCycle && h.begin <= this.cycle;
     }
 
-    private rebuild(pattern: PatternHandle, source: PatternSource, bar: number, theme: Theme, crossedBar: boolean): void {
+    private rebuild(pattern: PatternQuery, source: PatternSource, bar: number, theme: Theme, crossedBar: boolean): void {
         const {config} = this;
         pattern.queryCycleViewData(bar, config.lookahead);
         const view = () => new Float32Array(source.memory.buffer, source.cycleViewPtr, VIEW_CAPACITY);

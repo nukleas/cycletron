@@ -16,7 +16,7 @@ const server = await createServer({
     optimizeDeps: {noDiscovery: true, include: []},
 });
 after(() => server.close());
-const {TrackModel, MAX_EVENTS_PER_TRACK} = await server.ssrLoadModule('/src/viz/tracks.ts');
+const {TrackModel, MAX_EVENTS_PER_TRACK} = await server.ssrLoadModule('/packages/viz-sdk/src/tracks.ts');
 const {defaultTheme} = await server.ssrLoadModule('/src/viz/theme.ts');
 const {isoCityDef} = await server.ssrLoadModule('/src/viz/modes/iso-city.ts');
 const {neonCircuitDef} = await server.ssrLoadModule('/src/viz/modes/neon-circuit.ts');
@@ -285,7 +285,7 @@ test('graveFor takes the pitch column, then the nearest free one, stepping from 
 });
 
 test('validatePack holds a manifest to what the code exports', async () => {
-    const {validatePack} = await server.ssrLoadModule('/src/viz/pack.ts');
+    const {validatePack} = await server.ssrLoadModule('/packages/viz-sdk/src/pack.ts');
     const mode = (id) => ({id, name: id.toUpperCase(), create: () => ({layout() {}, update() {}, render() {}})});
     const swatch = {bg: '#000', neon: '#fff', secondary: '#f0f', active: '#ff0', violet: '#808', red: '#f00', more: ['#111', '#222', '#333']};
     const manifest = {id: 'a/b', name: 'B', version: '0.0.1', author: 'a', license: 'MIT', sdk: '^1', description: '', modes: ['x'], palettes: ['p']};
@@ -296,7 +296,7 @@ test('validatePack holds a manifest to what the code exports', async () => {
 });
 
 test('sdkSatisfies matches majors and a minimum minor', async () => {
-    const {sdkSatisfies} = await server.ssrLoadModule('/src/viz/pack.ts');
+    const {sdkSatisfies} = await server.ssrLoadModule('/packages/viz-sdk/src/pack.ts');
     assert.equal(sdkSatisfies('^1', '1.0.0'), true);
     assert.equal(sdkSatisfies('^1', '1.4.2'), true);
     assert.equal(sdkSatisfies('^1.2', '1.1.0'), false);

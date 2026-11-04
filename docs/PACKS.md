@@ -58,15 +58,20 @@ exports the `VizPack` as its default export.
 ## What a pack may use
 
 Pack code imports `@cycletron/viz-sdk` and nothing else from the app. That is
-`ui/src/viz/sdk.ts`: the mode contract (`VizModeDef`, `VizMode`,
-`VizServices`, `Theme`), `HapField` for modes that turn scheduled notes into
-persistent objects, `TrackModel` for one-bar views, `instrumentFamily`, the
+the workspace package `ui/packages/viz-sdk` (its `src/index.ts` is the one
+list): the mode contract (`VizModeDef`, `VizMode`, `VizServices`, `Theme`),
+`PatternQuery` (the slice of the engine's pattern handle a mode may call),
+`HapField` for modes that turn scheduled notes into persistent objects,
+`TrackModel` and `PatternTimeline` for one-bar views, `instrumentFamily`, the
 drawing and math helpers (`hash32`, `rand01`, `SeededRandom`, `alphaRamp`,
-`lerpRgb`, and so on), the 320×180 pixel screen for 8-bit modes (`PxScreen`,
-`spr` bitmaps, `drawSprite`, `frameRect`, `fillTri`, `nearest`; sdk 1.1), and
-`validatePack`. Inside the repo the name resolves
-to the source (`tsconfig.json` paths and the vite alias); a built pack keeps
-it as an external import that the page's import map resolves.
+`lerpRgb`, `MONO_FONT`, `drawLabel`, and so on), the 320×180 pixel screen for
+8-bit modes (`PxScreen`, `spr` bitmaps, `drawSprite`, `frameRect`, `fillTri`,
+`nearest`; sdk 1.1), and `validatePack`. The app's own modes import the same
+package. The package version is the sdk version (`SDK_VERSION`); sdk 1.2 added
+`MONO_FONT`, `hueOf`, `barHue`, `PatternTimeline`, `drumOnsets`, the
+cycle-view constants and `PatternQuery`. Inside the repo the name resolves
+through the npm workspace to the package source; a built pack keeps it as an
+external import that the page's import map resolves.
 
 ## Building
 
@@ -74,10 +79,42 @@ it as an external import that the page's import map resolves.
 cd ui && node scripts/pack-build.mjs ~/Code/strulibrary/Packs/halloween/viz/halloween-8bit
 ```
 
-Type-checks `src/` against the sdk with the repo's settings (a pack needs no
-tsconfig; `--no-check` skips it), then bundles `src/index.ts` into
+Type-checks `src/` against the sdk, then bundles `src/index.ts` into
 `dist/index.js`, one ES module with the sdk left external. The show renderer
-does this itself when `src/` is newer than the build.
+does this itself when `src/` is newer than the build. `--no-check` skips the
+type check.
+
+Give the pack a `tsconfig.json` next to `pack.json` so the editor checks the
+sources the same way the build does; the build uses it when it is there, and
+falls back to the repo's settings when it is not:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "useDefineForClassFields": false,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": [],
+    "paths": { "@cycletron/viz-sdk": ["../../../../../cycletron/ui/packages/viz-sdk/src/index.ts"] }
+  },
+  "include": ["src"]
+}
+```
+
+The `paths` entry points at the package's `src/index.ts` in the repo; the one
+above is for a pack at `<library>/Packs/<pack>/viz/<viz>/` with the repo
+checked out beside the library. A pack with its own `package.json` can depend
+on the package instead (`"@cycletron/viz-sdk": "file:../cycletron/ui/packages/viz-sdk"`)
+and drop the mapping.
 
 To check a pack's determinism, run the seam test on its build:
 

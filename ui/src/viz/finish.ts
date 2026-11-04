@@ -4,7 +4,7 @@
  * looks the same however it's reached.
  */
 
-import {hash32, rand01} from './util.js';
+import {hash32, rand01} from '@cycletron/viz-sdk';
 
 export interface Finish {
     /** Frame aspect the letterbox crops to (2.39 for scope), or null for none. */

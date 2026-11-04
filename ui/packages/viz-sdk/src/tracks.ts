@@ -10,8 +10,7 @@
  * detaches cached views).
  */
 
-import type {PatternHandle} from '../../pkg';
-import type {PatternSource, Theme} from './types.js';
+import type {PatternQuery, PatternSource, Theme} from './types.js';
 import {rgbOf} from './util.js';
 
 /** Must match CYCLE_VIEW_CAPACITY in strudel-audio-wasm — bounds all reads. */
@@ -59,7 +58,7 @@ export function instrumentFamily(name: string): InstrumentFamily {
 export type OnsetHandler = (track: VizTrack, e: number) => void;
 
 export interface TrackSync {
-    pattern: PatternHandle | null;
+    pattern: PatternQuery | null;
     bar: number;
     /** Query again on a new pattern handle or bar. */
     rebuild: boolean;
@@ -71,11 +70,11 @@ export interface TrackSync {
 /** Shared onset window for flat tracks and modes with their own spatial model. */
 export class PatternTimeline {
     // Handles are retained for identity only; never call methods on them here.
-    private lastPattern: PatternHandle | null = null;
+    private lastPattern: PatternQuery | null = null;
     private lastBar = -1;
     private prevPhase = 0;
 
-    sync(pattern: PatternHandle | null, cycle: number): TrackSync {
+    sync(pattern: PatternQuery | null, cycle: number): TrackSync {
         const bar = Math.floor(cycle);
         const phase = cycle - bar;
         const rebuild = pattern !== null && (pattern !== this.lastPattern || bar !== this.lastBar);
@@ -150,13 +149,13 @@ export class TrackModel {
         for (const t of this.tracks) t.activity *= k;
     }
 
-    private queryData(pattern: PatternHandle, source: PatternSource, bar: number, span: number): Float32Array {
+    private queryData(pattern: PatternQuery, source: PatternSource, bar: number, span: number): Float32Array {
         pattern.queryCycleViewData(bar, span);
         // Fresh view per query — WASM memory growth detaches cached views.
         return new Float32Array(source.memory.buffer, source.cycleViewPtr, VIEW_CAPACITY);
     }
 
-    private rebuild(pattern: PatternHandle, source: PatternSource, bar: number, theme: Theme): void {
+    private rebuild(pattern: PatternQuery, source: PatternSource, bar: number, theme: Theme): void {
         let span = this.bars;
         let data = this.queryData(pattern, source, bar, span);
         if (span > 1) {
@@ -267,7 +266,7 @@ export class TrackModel {
  * snares) over bars [0, `bars`), in cycles, ascending. Queries bar by bar, so
  * a long form never fills the shared buffer.
  */
-export function drumOnsets(pattern: PatternHandle, source: PatternSource, bars: number, family: InstrumentFamily): number[] {
+export function drumOnsets(pattern: PatternQuery, source: PatternSource, bars: number, family: InstrumentFamily): number[] {
     const view = () => new Float32Array(source.memory.buffer, source.cycleViewPtr, VIEW_CAPACITY);
     const onsets = new Set<number>();
     const isFamily = new Map<number, boolean>();

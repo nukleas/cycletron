@@ -16,11 +16,23 @@
  * fringe at these alphas.
  */
 
-import {TrackModel, instrumentFamily, type VizTrack} from '../tracks.js';
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
 import {
-    MONO_FONT, SeededRandom, TAU, TransientDetector, alphaRamp, beatEnv, rampAt, rgbOf,
-} from '../util.js';
+    TrackModel,
+    instrumentFamily,
+    MONO_FONT,
+    SeededRandom,
+    TAU,
+    TransientDetector,
+    alphaRamp,
+    beatEnv,
+    rampAt,
+    rgbOf,
+    type VizTrack,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 
 const SPOT_POINTS = 140;
 const MAX_CLOUDS = 6;

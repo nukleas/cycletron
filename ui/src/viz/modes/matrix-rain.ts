@@ -21,11 +21,24 @@
  * the rain. Layer lives in device pixels.
  */
 
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {TrackModel, instrumentFamily, type VizTrack} from '../tracks.js';
 import {
-    MONO_FONT, SeededRandom, TransientDetector, alphaRamp, clamp01, drawLabel, hash32, mixRgb, rampAt, rand01,
-} from '../util.js';
+    TrackModel,
+    instrumentFamily,
+    MONO_FONT,
+    SeededRandom,
+    TransientDetector,
+    alphaRamp,
+    clamp01,
+    drawLabel,
+    hash32,
+    mixRgb,
+    rampAt,
+    rand01,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+    type VizTrack,
+} from '@cycletron/viz-sdk';
 
 /** Glyph pool — katakana + digits + latin, pre-split so picking never slices. */
 const RAIN_GLYPHS = Array.from(

@@ -4,9 +4,7 @@
  * mode. `neon` is the app's own theme, as read from its CSS.
  */
 
-import type {Swatch} from './pack.js';
-import type {Theme} from './types.js';
-import {hueOf, rgbOf} from './util.js';
+import {hueOf, rgbOf, type Swatch, type Theme} from '@cycletron/viz-sdk';
 
 type Rgb = [number, number, number];
 

@@ -1,6 +1,5 @@
 /** Shared instrument surfaces for the two chase-camera modes. */
-import type {Theme} from '../types.js';
-import {MONO_FONT} from '../util.js';
+import {MONO_FONT, type Theme} from '@cycletron/viz-sdk';
 
 export interface DriveHudLayout {
     vw: number;

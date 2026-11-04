@@ -15,7 +15,7 @@
 
 import {FullscreenVisualizer, type Shot} from './fullscreen-viz.js';
 import {VIZ_MODES, modeIndexById} from './viz/registry.js';
-import type {PatternSource} from './viz/types.js';
+import type {PatternSource} from '@cycletron/viz-sdk';
 import {currentBpm} from './bpm.js';
 
 const AUTO_CYCLE_KEY = 'viz-auto-cycle';

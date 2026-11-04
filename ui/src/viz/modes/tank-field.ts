@@ -18,10 +18,24 @@
  * held notes keep their identity across bar lines.
  */
 
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import type {InstrumentFamily} from '../tracks.js';
-import {HapField, type FieldHap, type FieldTeam, type Rgb} from '../hap-field.js';
-import {TAU, clamp01, follow, hash32, lerpRgb, rand01, rgbOf} from '../util.js';
+import {
+    HapField,
+    TAU,
+    clamp01,
+    follow,
+    hash32,
+    lerpRgb,
+    rand01,
+    rgbOf,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+    type InstrumentFamily,
+    type FieldHap,
+    type FieldTeam,
+    type Rgb,
+} from '@cycletron/viz-sdk';
 import {Camera, NEAR, TANK_PARTS, TANK_PART_TONE, boxSolid, drawPyramid, drawSolid, placeTank} from './tank-field/scene.js';
 import {
     RADAR_BUILDING, drawConsole, drawRadar, drawReticle, drawScoreboard, drawStatusLine,

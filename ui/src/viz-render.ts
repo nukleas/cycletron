@@ -22,7 +22,7 @@ import {loadPackSource} from './viz/pack-loader.js';
 import {VIZ_MODES} from './viz/registry.js';
 import {DEFAULT_FONT_PX, StageCodeLayer} from './viz/stage/code-layer.js';
 import {readTheme} from './viz/theme.js';
-import type {Theme, VizLayer, VizMode, VizModeDef, VizServices} from './viz/types.js';
+import type {Theme, VizLayer, VizMode, VizModeDef, VizServices} from '@cycletron/viz-sdk';
 
 type MutableServices = { -readonly [K in keyof VizServices]: VizServices[K] };
 

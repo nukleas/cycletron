@@ -17,9 +17,19 @@
  *                   silence is never a centre dot.
  */
 
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {TrackModel} from '../tracks.js';
-import {TAU, TransientDetector, alphaRamp, drawLabel, follow, rampAt, rgbOf} from '../util.js';
+import {
+    TrackModel,
+    TAU,
+    TransientDetector,
+    alphaRamp,
+    drawLabel,
+    follow,
+    rampAt,
+    rgbOf,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 import {ScopeSignal} from './scope/signal.js';
 
 /** Delays (samples) per beat when nothing pitched plays; odd bars use row 2. */

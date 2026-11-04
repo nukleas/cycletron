@@ -10,9 +10,18 @@
  * the off-axis bundles, and splits the trace chromatically.
  */
 
-import {TrackModel} from '../tracks.js';
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {TAU, TransientDetector, beatEnv, hash32, rand01, rgbOf} from '../util.js';
+import {
+    TrackModel,
+    TAU,
+    TransientDetector,
+    beatEnv,
+    hash32,
+    rand01,
+    rgbOf,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 import {
     AXIS, CHIEF, DESIGN_OPTICS, FIELDS, FIELD_FRAC, LANES, LENS_DESIGNS, MAX_PTS, RAYS,
     aimField, fieldFocus, rayIndex, sagZ, traceRay, yAtZ,

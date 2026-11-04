@@ -5,8 +5,7 @@
  * the structure from a performance export, a live show from the song's form.
  */
 
-import type {VizLayer, VizServices} from './types.js';
-import {MONO_FONT, clamp01, hash32, rand01} from './util.js';
+import {MONO_FONT, clamp01, hash32, rand01, type VizLayer, type VizServices} from '@cycletron/viz-sdk';
 
 export interface Section {
     label: string;
