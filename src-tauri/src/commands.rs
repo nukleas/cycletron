@@ -268,7 +268,11 @@ pub fn list_viz_packs(state: State<'_, AppState>) -> Result<Vec<VizPackSource>, 
             }
             let built = std::path::Path::new(&v.dir).join("dist").join("index.js");
             match std::fs::read_to_string(&built) {
-                Ok(source) => out.push(VizPackSource { id: v.id, path: v.dir, source }),
+                Ok(source) => out.push(VizPackSource {
+                    id: v.id,
+                    path: v.dir,
+                    source,
+                }),
                 Err(e) => tracing::warn!("{}: {e}", built.display()),
             }
         }

@@ -268,7 +268,11 @@ pub struct VizEntry {
 pub(crate) fn viz_entries(dir: &Path, m: &PackManifest) -> Vec<VizEntry> {
     let strings = |v: Option<&serde_json::Value>| -> Vec<String> {
         v.and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| x.as_str().map(str::to_string))
+                    .collect()
+            })
             .unwrap_or_default()
     };
     let mut out = Vec::new();
@@ -282,11 +286,19 @@ pub(crate) fn viz_entries(dir: &Path, m: &PackManifest) -> Vec<VizEntry> {
             .ok()
             .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
         let Some(json) = json else {
-            tracing::warn!("pack {}: {} has no readable pack.json", m.id, viz_dir.display());
+            tracing::warn!(
+                "pack {}: {} has no readable pack.json",
+                m.id,
+                viz_dir.display()
+            );
             continue;
         };
         out.push(VizEntry {
-            id: json.get("id").and_then(|v| v.as_str()).unwrap_or(rel).to_string(),
+            id: json
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or(rel)
+                .to_string(),
             dir: viz_dir.to_string_lossy().into_owned(),
             built: viz_dir.join("dist").join("index.js").is_file(),
             modes: strings(json.get("modes")),
@@ -316,7 +328,8 @@ pub(crate) fn copy_dir_all(src: &Path, dest: &Path) -> Result<(usize, u64), Stri
             files += f;
             bytes += b;
         } else {
-            bytes += fs::copy(&from, &to).map_err(|e| format!("copy {} → {}: {e}", from.display(), to.display()))?;
+            bytes += fs::copy(&from, &to)
+                .map_err(|e| format!("copy {} → {}: {e}", from.display(), to.display()))?;
             files += 1;
         }
     }
@@ -638,7 +651,11 @@ pub(crate) fn enable_pack_inner(packs: &Path, id: &str) -> Result<PackLoadResult
     let m = load_manifest(&dir)?;
     // A pack without sample banks enables as a unit of visualizers, songs and shows.
     let load = if m.banks.is_empty() {
-        PackLoadResult { id: id.to_string(), banks: Vec::new(), skipped: Vec::new() }
+        PackLoadResult {
+            id: id.to_string(),
+            banks: Vec::new(),
+            skipped: Vec::new(),
+        }
     } else {
         resolve_load(&dir, &m)?
     };
@@ -715,7 +732,11 @@ mod tests {
             "viz": ["viz/halloween-8bit"], "songs": ["songs/a.strudel"], "shows": ["shows/a.show.toml"]
         }"#).unwrap();
         fs::write(dir.join("viz/halloween-8bit/pack.json"), r#"{"id": "naderlabs/halloween-8bit", "modes": ["graveyard"], "palettes": ["pumpkin"], "sdk": "^1"}"#).unwrap();
-        fs::write(dir.join("viz/halloween-8bit/dist/index.js"), "export default {}").unwrap();
+        fs::write(
+            dir.join("viz/halloween-8bit/dist/index.js"),
+            "export default {}",
+        )
+        .unwrap();
 
         let m = load_manifest(&dir).expect("a pack without banks or a license file is valid");
         assert!(m.banks.is_empty());
@@ -734,8 +755,16 @@ mod tests {
         // A pack with nothing in it is refused.
         let empty = packs.join("empty");
         fs::create_dir_all(&empty).unwrap();
-        fs::write(empty.join("pack.json"), r#"{"schema": 1, "id": "empty", "name": "E", "version": "1", "license": "MIT"}"#).unwrap();
-        assert!(load_manifest(&empty).unwrap_err().contains("no banks, viz, songs or shows"));
+        fs::write(
+            empty.join("pack.json"),
+            r#"{"schema": 1, "id": "empty", "name": "E", "version": "1", "license": "MIT"}"#,
+        )
+        .unwrap();
+        assert!(
+            load_manifest(&empty)
+                .unwrap_err()
+                .contains("no banks, viz, songs or shows")
+        );
     }
 
     #[test]

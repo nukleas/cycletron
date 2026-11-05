@@ -465,7 +465,10 @@ pub fn preview_pack_import(
         let viz = packs::viz_entries(&root, &manifest);
         for v in &viz {
             if !v.built {
-                warnings.push(format!("visualizer pack {} is not built (no dist/index.js); it won't load", v.id));
+                warnings.push(format!(
+                    "visualizer pack {} is not built (no dist/index.js); it won't load",
+                    v.id
+                ));
             }
         }
         if !staged {
@@ -823,7 +826,12 @@ pub fn commit_pack_install(
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<PackInstallResult, String> {
-    let InstallRequest { token, root, enable, replace } = request;
+    let InstallRequest {
+        token,
+        root,
+        enable,
+        replace,
+    } = request;
     let root = PathBuf::from(&root);
     if !token.is_empty() {
         let stage = stage_dir(&app_handle, &token)?;
@@ -837,7 +845,10 @@ pub fn commit_pack_install(
     let manifest = packs::parse_manifest(&root)?;
     let viz = packs::viz_entries(&root, &manifest);
     if let Some(v) = viz.iter().find(|v| !v.built) {
-        return Err(format!("visualizer pack {} is not built (no dist/index.js)", v.id));
+        return Err(format!(
+            "visualizer pack {} is not built (no dist/index.js)",
+            v.id
+        ));
     }
     let packs_dir = packs::ensured_packs_root(&state);
     let was_enabled = packs::read_enabled(&packs_dir)
@@ -846,7 +857,11 @@ pub fn commit_pack_install(
         .any(|id| id == &manifest.id);
     let (dest, file_count, bytes, existed) =
         place_pack(&root, &packs_dir, &manifest.id, replace.unwrap_or(false))?;
-    let want_enabled = if existed { was_enabled } else { enable.unwrap_or(true) };
+    let want_enabled = if existed {
+        was_enabled
+    } else {
+        enable.unwrap_or(true)
+    };
     let load = if want_enabled {
         match packs::enable_pack_inner(&packs_dir, &manifest.id) {
             Ok(r) => Some(r),
@@ -986,7 +1001,10 @@ mod tests {
         assert_eq!(files, 7, "every file but the dot file is staged");
         assert!(warnings.is_empty(), "{warnings:?}");
         let root = unwrap_single_root(&stage);
-        assert!(root.join(MANIFEST).is_file(), "the pack roots at its folder");
+        assert!(
+            root.join(MANIFEST).is_file(),
+            "the pack roots at its folder"
+        );
         let m = packs::parse_manifest(&root).unwrap();
         assert_eq!(m.id, "christmas");
         let viz = packs::viz_entries(&root, &m);
@@ -1015,14 +1033,20 @@ mod tests {
         let (dest, files, _, existed) = place_pack(&v1, &packs, "demo", false).unwrap();
         assert!(!existed);
         assert_eq!(files, 2);
-        assert!(place_pack(&v2, &packs, "demo", false).is_err(), "no replace, no overwrite");
+        assert!(
+            place_pack(&v2, &packs, "demo", false).is_err(),
+            "no replace, no overwrite"
+        );
         assert!(dest.join("old.txt").exists());
 
         let (dest2, files2, _, existed2) = place_pack(&v2, &packs, "demo", true).unwrap();
         assert!(existed2);
         assert_eq!(files2, 1);
         assert_eq!(dest, dest2);
-        assert!(!dest.join("old.txt").exists(), "the old folder is gone, not merged");
+        assert!(
+            !dest.join("old.txt").exists(),
+            "the old folder is gone, not merged"
+        );
         assert_eq!(fs::read_to_string(dest.join("pack.json")).unwrap(), "2");
         assert!(!packs.join(".demo.installing").exists());
         let _ = fs::remove_dir_all(&dir);
