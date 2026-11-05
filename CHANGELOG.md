@@ -4,6 +4,8 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+## 0.1.0-alpha.27 (2026-11-05)
+
 ### Visualizer packs
 - **Visualizers can come in packs.** A pack is a folder with a `pack.json`, its built visualizer modes and palettes, and any songs and shows made for them. Enabled packs load when Cycletron starts; their modes show up in the Visuals menu, in show files and in the show pane's suggestions.
 - **Install from Folder and Install from Zip** in the Samples panel, or drop the folder or zip on the window. The dialog says what the pack carries and that its visualizer code runs in the app. Installing a pack that is already installed offers to replace it.
