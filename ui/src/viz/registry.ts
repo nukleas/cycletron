@@ -28,7 +28,6 @@ import {cockpitDef} from './modes/cockpit.js';
 import {tankFieldDef} from './modes/tank-field.js';
 import {starRoadDef} from './modes/star-road.js';
 import {logoDef} from './modes/logo.js';
-import {PACKS} from './packs/index.js';
 import {registerPalettes} from './palettes.js';
 
 const modes: VizModeDef[] = [
@@ -66,8 +65,6 @@ export function registerPack(pack: VizPack): void {
     registerPalettes(pack.manifest.id, pack.palettes);
     modes.splice(modes.length - 1, 0, ...pack.modes);
 }
-
-for (const pack of PACKS) registerPack(pack);
 
 /** Resolve a persisted mode id to its registry index; unknown ids → 0. */
 export function modeIndexById(id: string | null): number {

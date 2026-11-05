@@ -1,7 +1,7 @@
 /**
- * A visualizer pack: modes and palettes that register as a unit. Today packs
- * are compiled in (see `packs/index.ts`); the manifest is what a downloaded
- * pack will carry.
+ * A visualizer pack: modes and palettes that register as a unit. A pack's
+ * `src/index.ts` exports one; the app loads it from the pack's build
+ * (`ui/src/viz/pack-loader.ts`).
  */
 
 import type {VizModeDef} from './types.js';

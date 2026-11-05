@@ -24,7 +24,7 @@ cycletron-packs/packs/halloween/           a library pack
 ```
 
 Installed, it is `<library>/Packs/halloween/` with the same files minus
-`src/` and `probe/`: the app loads `dist/index.js` and nothing else.
+`src/`, `test/` and `probe/`: the app loads `dist/index.js` and nothing else.
 
 ## The library pack manifest
 
@@ -58,7 +58,7 @@ its folder name (`halloween`), the viz pack's is `author/name`
 `sdk` is the sdk range the pack was built for (`^1`); the loader refuses a
 pack whose range this Cycletron's `SDK_VERSION` doesn't satisfy. `modes` and
 `palettes` must match what `src/index.ts` exports; `validatePack`
-(`ui/src/viz/pack.ts`) throws when they don't. Mode ids are what show files
+(`ui/packages/viz-sdk/src/pack.ts`) throws when they don't. Mode ids are what show files
 name (`mode = "graveyard"`) and must be unique across the app. `src/index.ts`
 exports the `VizPack` as its default export.
 
@@ -89,7 +89,7 @@ cd ui && node scripts/pack-build.mjs <pack>/viz/<viz>
 Type-checks `src/` against the sdk, then bundles `src/index.ts` into
 `dist/index.js`, one ES module with the sdk left external. Every other import
 is bundled in, so a pack may use npm packages (and the packs repo's shared
-`@naderlabs/pixel-kit`) and still installs as one file. The show renderer
+`@naderlabs/kit`) and still installs as one file. The show renderer
 does this itself when `src/` is newer than the build. `--no-check` skips the
 type check.
 
