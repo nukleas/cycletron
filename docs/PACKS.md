@@ -2,22 +2,29 @@
 
 A pack is a folder of visualizer modes and palettes that the app loads at
 startup, so a pack and the songs and shows made for it can travel together.
-The first one is the Halloween pack in the music library:
+The app's own modes are its cyberpunk core; the seasonal and one-off packs
+(Halloween, Christmas) are written in the
+[cycletron-packs](https://github.com/nukleas/cycletron-packs) repo, checked out
+beside this one, and installed into the library as zips. A pack there:
 
 ```
-~/Code/strulibrary/Packs/halloween/        a library pack
+cycletron-packs/packs/halloween/           a library pack
   pack.json          schema 1, id (= the folder name), name, version, authors,
                      license, description, then any of: banks (samples),
                      viz: ["viz/halloween-8bit"], songs: [...], shows: [...]
   viz/halloween-8bit/                      the visualizer pack it plays on
     pack.json        the viz manifest (below)
     src/index.ts     exports the VizPack: manifest, mode defs, palettes
-    src/<mode>.ts    one file per mode, exporting a VizModeDef
-    src/lib/         code the modes share
+    src/modes/<mode>/  one folder per mode; its index.ts exports the VizModeDef
+    src/lib/         code two or more modes share
     dist/index.js    the build the app loads
     README.md
-  songs/  shows/  renders/
+  songs/  shows/
+  probe/             a show that plays every mode, for `cycpack probe`
 ```
+
+Installed, it is `<library>/Packs/halloween/` with the same files minus
+`src/` and `probe/`: the app loads `dist/index.js` and nothing else.
 
 ## The library pack manifest
 
@@ -76,13 +83,21 @@ external import that the page's import map resolves.
 ## Building
 
 ```sh
-cd ui && node scripts/pack-build.mjs ~/Code/strulibrary/Packs/halloween/viz/halloween-8bit
+cd ui && node scripts/pack-build.mjs <pack>/viz/<viz>
 ```
 
 Type-checks `src/` against the sdk, then bundles `src/index.ts` into
-`dist/index.js`, one ES module with the sdk left external. The show renderer
+`dist/index.js`, one ES module with the sdk left external. Every other import
+is bundled in, so a pack may use npm packages (and the packs repo's shared
+`@naderlabs/pixel-kit`) and still installs as one file. The show renderer
 does this itself when `src/` is newer than the build. `--no-check` skips the
 type check.
+
+In the packs repo, `cycpack` wraps this and the other steps (its README has
+the details): `check` (tsc and oxlint), `build`, `zip` (the installable zip,
+without `src/`), `render`, `seam` (the test below) and `probe`, which renders
+a show of every mode on one job and compares a digest of the frames with the
+last run, so a refactor can prove it changed nothing.
 
 Give the pack a `tsconfig.json` next to `pack.json` so the editor checks the
 sources the same way the build does; the build uses it when it is there, and
@@ -112,9 +127,10 @@ falls back to the repo's settings when it is not:
 
 The `paths` entry points at the package's `src/index.ts` in the repo; the one
 above is for a pack at `<library>/Packs/<pack>/viz/<viz>/` with the repo
-checked out beside the library. A pack with its own `package.json` can depend
-on the package instead (`"@cycletron/viz-sdk": "file:../cycletron/ui/packages/viz-sdk"`)
-and drop the mapping.
+checked out beside the library. A pack with a `package.json` can depend on the
+package instead (`"@cycletron/viz-sdk": "file:../cycletron/ui/packages/viz-sdk"`)
+and drop the mapping; the packs repo does this once at its root, and each viz
+folder's `tsconfig.json` extends the repo's `tsconfig.base.json`.
 
 To check a pack's determinism, run the seam test on its build. `VIZ_PACK`
 lists built viz pack folders separated like `PATH`; two folders also cover two
@@ -124,8 +140,9 @@ packs registering together. Without it the pack test is skipped.
 VIZ_PACK=<viz pack folder> npm run test:render
 ```
 
-Author a pack outside `Packs/` (a `_` folder in the library is fine) and
-install it; a folder dropped straight into `Packs/` skips the install checks.
+Author a pack outside `Packs/` (the packs repo, or a `_` folder in the
+library) and install it; a folder dropped straight into `Packs/` skips the
+install checks.
 
 ## Loading
 
@@ -181,7 +198,7 @@ effect at the next launch.
   the library. A worker with an offscreen canvas is the next step.
 - Sprite assets (PNG sheets). The renderer must have them decoded before frame
   0, so assets load before a render starts.
-- A `pack check` command: the seam test and a frame-budget probe on one pack
-  in one step (the type check runs in the build; the seam test is a `VIZ_PACK`
-  run of `npm run test:render`).
+- A frame-budget probe: `cycpack check`, `seam` and `probe` cover types, lint,
+  determinism and regressions, but nothing yet fails a mode for drawing too
+  slowly.
 - Installing from a URL, and a community index to pick from.
