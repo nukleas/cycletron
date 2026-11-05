@@ -18,9 +18,19 @@
  * nearer ridges hide what's behind them.
  */
 
-import {TrackModel, type VizTrack} from '../tracks.js';
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {alphaRamp, follow, mixRgb, rampAt, rgbOf} from '../util.js';
+import {
+    TrackModel,
+    alphaRamp,
+    follow,
+    mixRgb,
+    rampAt,
+    rgbOf,
+    type VizTrack,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 import {SpectrumSampler, onsetAxis} from './flame-graph/spectrum.js';
 
 const ROWS = 48;

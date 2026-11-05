@@ -1,5 +1,5 @@
 /** Racing telemetry in Cycletron's instrument style. */
-import {TAU} from '../../util.js';
+import {TAU} from '@cycletron/viz-sdk';
 import {hudHeader, hudPanel, hudText, INK, MUTED, EDGE, type DriveHudLayout} from '../drive-hud.js';
 import {roadHeading, roadX} from './road.js';
 

@@ -5,8 +5,7 @@
  * frame, which {@link Transitions} keeps while a show uses fades.
  */
 
-import type {VizServices} from './types.js';
-import {hash32, rand01} from './util.js';
+import {hash32, rand01, type VizServices} from '@cycletron/viz-sdk';
 
 export const TRANSITION_KINDS = ['cut', 'flash', 'fade', 'black', 'glitch'] as const;
 export type TransitionKind = typeof TRANSITION_KINDS[number];

@@ -23,9 +23,15 @@
  * sample rate, so delay-in-samples geometry matches the live signal.
  */
 
-import type {VizServices} from '../../types.js';
-import {instrumentFamily, type InstrumentFamily, type VizTrack} from '../../tracks.js';
-import {TAU, hash32, rand01} from '../../util.js';
+import {
+    instrumentFamily,
+    TAU,
+    hash32,
+    rand01,
+    type VizServices,
+    type InstrumentFamily,
+    type VizTrack,
+} from '@cycletron/viz-sdk';
 
 /** Samples in the synthetic signal; live data is truncated to this. */
 export const SIGNAL_CAPACITY = 1024;

@@ -83,6 +83,36 @@ pub struct PackImportPreview {
     pub over_cap: bool,
     pub warnings: Vec<String>,
     pub banks: Vec<ProposedBank>,
+    /// Set when the source is already a pack (it has a `pack.json`): it installs
+    /// as is, and `banks` is empty.
+    pub pack: Option<ReadyPack>,
+}
+
+/// A pack that arrives built: what the install dialog shows before copying.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadyPack {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub authors: Vec<String>,
+    pub license: String,
+    pub description: String,
+    pub banks: Vec<String>,
+    pub viz: Vec<packs::VizEntry>,
+    pub songs: Vec<String>,
+    pub shows: Vec<String>,
+}
+
+/// Install a ready pack previewed by `preview_pack_import`.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallRequest {
+    pub token: String,
+    pub root: String,
+    pub enable: Option<bool>,
+    /// Swap out an installed pack of the same id. It keeps its enabled state.
+    pub replace: Option<bool>,
 }
 
 /// The reviewed mapping, as approved in the import UI.
@@ -192,6 +222,24 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
     let mut unsupported = 0usize;
     let mut unsafe_paths = 0usize;
 
+    // A pack archive (pack.json at the root or one folder down) is staged
+    // whole: its code, songs and shows are the point. Anything else is a bag
+    // of samples, and only the audio comes out.
+    let mut whole = false;
+    for i in 0..zip.len() {
+        let entry = zip
+            .by_index_raw(i)
+            .map_err(|e| format!("zip entry {i}: {e}"))?;
+        if let Some(rel) = entry.enclosed_name()
+            && rel.file_name().and_then(|n| n.to_str()) == Some(MANIFEST)
+            && rel.components().count() <= 2
+        {
+            whole = true;
+        }
+    }
+    let wanted = |rel: &Path| whole || sounds::is_audio(rel);
+    let kind = if whole { "" } else { "audio " };
+
     // Declared sizes first: refuse a bomb before writing a single byte.
     let mut declared_files = 0usize;
     let mut declared_bytes = 0u64;
@@ -206,7 +254,7 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
             unsafe_paths += 1;
             continue;
         };
-        if !sounds::is_audio(&rel) {
+        if !wanted(&rel) {
             continue;
         }
         declared_files += 1;
@@ -214,13 +262,13 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
     }
     if declared_files > MAX_INSTALL_FILES {
         return Err(format!(
-            "archive holds {declared_files} audio files (limit {MAX_INSTALL_FILES}) — \
+            "archive holds {declared_files} {kind}files (limit {MAX_INSTALL_FILES}) — \
              import a subset instead"
         ));
     }
     if declared_bytes > MAX_INSTALL_BYTES {
         return Err(format!(
-            "archive holds {} MB of audio (limit {} MB) — import a subset instead",
+            "archive holds {} MB of {kind}files (limit {} MB) — import a subset instead",
             declared_bytes / (1024 * 1024),
             MAX_INSTALL_BYTES / (1024 * 1024)
         ));
@@ -258,7 +306,7 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
         {
             continue;
         }
-        if !sounds::is_audio(&rel) {
+        if !wanted(&rel) {
             if is_doc_name(&name) && entry.size() <= 64 * 1024 {
                 docs.push(name);
             }
@@ -304,7 +352,7 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
 
     if files == 0 {
         let _ = fs::remove_dir_all(stage);
-        return Err("no audio files in that archive".into());
+        return Err(format!("no {kind}files in that archive"));
     }
     if symlinks > 0 {
         warnings.push(format!("skipped {symlinks} symlink(s)"));
@@ -403,6 +451,62 @@ pub fn preview_pack_import(
         (String::new(), src.clone(), false, Vec::new(), 0, 0)
     };
 
+    // A folder with a pack.json is a pack already; it installs whole.
+    if root.join(packs::MANIFEST).is_file() {
+        let manifest = match packs::parse_manifest(&root) {
+            Ok(m) => m,
+            Err(e) => {
+                if staged {
+                    let _ = fs::remove_dir_all(stage_dir(&app_handle, &token)?);
+                }
+                return Err(e);
+            }
+        };
+        let viz = packs::viz_entries(&root, &manifest);
+        for v in &viz {
+            if !v.built {
+                warnings.push(format!(
+                    "visualizer pack {} is not built (no dist/index.js); it won't load",
+                    v.id
+                ));
+            }
+        }
+        if !staged {
+            for entry in walkdir_count(&root) {
+                file_count += 1;
+                bytes += entry;
+            }
+        }
+        let ready = ReadyPack {
+            id: manifest.id.clone(),
+            name: manifest.name.clone(),
+            version: manifest.version.clone(),
+            authors: manifest.authors.clone(),
+            license: manifest.spdx.clone(),
+            description: manifest.description.clone(),
+            banks: manifest.banks.iter().map(|b| b.name.clone()).collect(),
+            viz,
+            songs: manifest.songs.clone(),
+            shows: manifest.shows.clone(),
+        };
+        return Ok(PackImportPreview {
+            token,
+            source,
+            root: root.to_string_lossy().into_owned(),
+            staged,
+            suggested_id: manifest.id,
+            suggested_name: manifest.name,
+            strategy: GroupStrategy::SingleBank,
+            folder_shaped: false,
+            file_count,
+            bytes,
+            over_cap: false,
+            warnings,
+            banks: Vec::new(),
+            pack: Some(ready),
+        });
+    }
+
     let folder_shaped = is_folder_shaped(&root);
     let (strategy, scanned) = sounds::scan_folder_banks_detailed(&root)?;
     if scanned.is_empty() {
@@ -475,6 +579,7 @@ pub fn preview_pack_import(
         over_cap,
         warnings,
         banks,
+        pack: None,
     })
 }
 
@@ -660,6 +765,9 @@ pub fn commit_pack_import(
         source: Some(source.clone()),
         tags: vec!["user".into(), "imported".into()],
         banks: manifest_banks,
+        viz: Vec::new(),
+        songs: Vec::new(),
+        shows: Vec::new(),
     };
     let json = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())? + "\n";
     fs::write(dest.join(MANIFEST), json).map_err(|e| format!("write pack.json: {e}"))?;
@@ -689,7 +797,129 @@ pub fn commit_pack_import(
         file_count,
         bytes,
         load,
+        viz: Vec::new(),
     })
+}
+
+/// Sizes of the files under `root`, for the preview.
+fn walkdir_count(root: &Path) -> Vec<u64> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(rd) = fs::read_dir(&dir) else { continue };
+        for entry in rd.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if let Ok(md) = p.metadata() {
+                out.push(md.len());
+            }
+        }
+    }
+    out
+}
+
+/// Copy a previewed pack into `Packs/<id>/` as it is, and enable it.
+#[tauri::command]
+pub fn commit_pack_install(
+    request: InstallRequest,
+    state: State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<PackInstallResult, String> {
+    let InstallRequest {
+        token,
+        root,
+        enable,
+        replace,
+    } = request;
+    let root = PathBuf::from(&root);
+    if !token.is_empty() {
+        let stage = stage_dir(&app_handle, &token)?;
+        if !library::within(&stage, &root) {
+            return Err("import root escapes its staging directory".into());
+        }
+    }
+    if !root.is_dir() {
+        return Err("import source is gone — start the import again".into());
+    }
+    let manifest = packs::parse_manifest(&root)?;
+    let viz = packs::viz_entries(&root, &manifest);
+    if let Some(v) = viz.iter().find(|v| !v.built) {
+        return Err(format!(
+            "visualizer pack {} is not built (no dist/index.js)",
+            v.id
+        ));
+    }
+    let packs_dir = packs::ensured_packs_root(&state);
+    let was_enabled = packs::read_enabled(&packs_dir)
+        .enabled
+        .iter()
+        .any(|id| id == &manifest.id);
+    let (dest, file_count, bytes, existed) =
+        place_pack(&root, &packs_dir, &manifest.id, replace.unwrap_or(false))?;
+    let want_enabled = if existed {
+        was_enabled
+    } else {
+        enable.unwrap_or(true)
+    };
+    let load = if want_enabled {
+        match packs::enable_pack_inner(&packs_dir, &manifest.id) {
+            Ok(r) => Some(r),
+            Err(e) => {
+                tracing::warn!("installed {} but could not enable it: {e}", manifest.id);
+                None
+            }
+        }
+    } else {
+        None
+    };
+    if !token.is_empty() {
+        let _ = fs::remove_dir_all(stage_dir(&app_handle, &token)?);
+    }
+    Ok(PackInstallResult {
+        id: manifest.id.clone(),
+        name: manifest.name,
+        path: dest.to_string_lossy().into_owned(),
+        banks: manifest.banks.iter().map(|b| b.name.clone()).collect(),
+        renamed: Vec::new(),
+        file_count,
+        bytes,
+        load,
+        viz: viz.into_iter().map(|v| v.id).collect(),
+    })
+}
+
+/// Copy a pack folder into `Packs/<id>` through a temp folder, so a failed
+/// copy never touches what is installed. With `replace`, an installed pack of
+/// the same id is swapped out. Returns the destination, files, bytes, and
+/// whether a pack was there before.
+fn place_pack(
+    root: &Path,
+    packs_dir: &Path,
+    id: &str,
+    replace: bool,
+) -> Result<(PathBuf, usize, u64, bool), String> {
+    let dest = packs_dir.join(id);
+    let existed = dest.exists();
+    if existed && !replace {
+        return Err(format!(
+            "pack {id} already exists — remove it or pick another id"
+        ));
+    }
+    let tmp = packs_dir.join(format!(".{id}.installing"));
+    let _ = fs::remove_dir_all(&tmp);
+    let (files, bytes) = match packs::copy_dir_all(root, &tmp) {
+        Ok(n) => n,
+        Err(e) => {
+            let _ = fs::remove_dir_all(&tmp);
+            return Err(e);
+        }
+    };
+    if existed {
+        fs::remove_dir_all(&dest).map_err(|e| format!("remove {}: {e}", dest.display()))?;
+    }
+    fs::rename(&tmp, &dest).map_err(|e| format!("place {}: {e}", dest.display()))?;
+    Ok((dest, files, bytes, existed))
 }
 
 #[cfg(test)]
@@ -740,6 +970,85 @@ mod tests {
         assert_eq!(files, 2, "only the audio should be extracted");
         assert!(bytes > 0);
         assert!(!stage.join("notes.txt").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_pack_archive_is_staged_whole_and_reads_as_a_ready_pack() {
+        let dir = tmp("packzip");
+        fs::create_dir_all(&dir).unwrap();
+        let zip_path = dir.join("christmas.zip");
+        let manifest = br#"{"schema":1,"id":"christmas","name":"Christmas","version":"0.1.0",
+            "authors":["x"],"license":"MIT","description":"d",
+            "viz":["viz/snow"],"songs":["songs/a.strudel"],"shows":["shows/a.show.toml"]}"#;
+        let viz = br#"{"id":"x/snow","name":"Snow","version":"0.1.0","author":"x","license":"MIT",
+            "sdk":"^1","description":"d","modes":["snowfall"],"palettes":["evergreen"]}"#;
+        make_zip(
+            &zip_path,
+            &[
+                ("christmas/pack.json", manifest),
+                ("christmas/README.md", b"a pack"),
+                ("christmas/viz/snow/pack.json", viz),
+                ("christmas/viz/snow/src/index.ts", b"export default 1;"),
+                ("christmas/viz/snow/dist/index.js", b"export default {};"),
+                ("christmas/songs/a.strudel", b"s(\"bd\")"),
+                ("christmas/shows/a.show.toml", b"[show]\n"),
+                ("christmas/.DS_Store", b"junk"),
+            ],
+        );
+        let stage = dir.join("stage");
+        let (files, _, warnings) = stage_zip(&zip_path, &stage).unwrap();
+        assert_eq!(files, 7, "every file but the dot file is staged");
+        assert!(warnings.is_empty(), "{warnings:?}");
+        let root = unwrap_single_root(&stage);
+        assert!(
+            root.join(MANIFEST).is_file(),
+            "the pack roots at its folder"
+        );
+        let m = packs::parse_manifest(&root).unwrap();
+        assert_eq!(m.id, "christmas");
+        let viz = packs::viz_entries(&root, &m);
+        assert_eq!(viz.len(), 1);
+        assert!(viz[0].built);
+        assert_eq!(viz[0].modes, vec!["snowfall"]);
+        assert!(root.join("songs/a.strudel").is_file());
+        assert!(root.join("shows/a.show.toml").is_file());
+        assert!(root.join("viz/snow/src/index.ts").is_file());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn replacing_an_installed_pack_swaps_the_folder() {
+        let dir = tmp("replace");
+        let packs = dir.join("Packs");
+        fs::create_dir_all(&packs).unwrap();
+        let v1 = dir.join("v1");
+        fs::create_dir_all(&v1).unwrap();
+        fs::write(v1.join("pack.json"), "1").unwrap();
+        fs::write(v1.join("old.txt"), "x").unwrap();
+        let v2 = dir.join("v2");
+        fs::create_dir_all(&v2).unwrap();
+        fs::write(v2.join("pack.json"), "2").unwrap();
+
+        let (dest, files, _, existed) = place_pack(&v1, &packs, "demo", false).unwrap();
+        assert!(!existed);
+        assert_eq!(files, 2);
+        assert!(
+            place_pack(&v2, &packs, "demo", false).is_err(),
+            "no replace, no overwrite"
+        );
+        assert!(dest.join("old.txt").exists());
+
+        let (dest2, files2, _, existed2) = place_pack(&v2, &packs, "demo", true).unwrap();
+        assert!(existed2);
+        assert_eq!(files2, 1);
+        assert_eq!(dest, dest2);
+        assert!(
+            !dest.join("old.txt").exists(),
+            "the old folder is gone, not merged"
+        );
+        assert_eq!(fs::read_to_string(dest.join("pack.json")).unwrap(), "2");
+        assert!(!packs.join(".demo.installing").exists());
         let _ = fs::remove_dir_all(&dir);
     }
 

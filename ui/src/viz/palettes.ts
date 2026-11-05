@@ -4,21 +4,9 @@
  * mode. `neon` is the app's own theme, as read from its CSS.
  */
 
-import type {Theme} from './types.js';
-import {hueOf, rgbOf} from './util.js';
+import {hueOf, rgbOf, type Swatch, type Theme} from '@cycletron/viz-sdk';
 
 type Rgb = [number, number, number];
-
-interface Swatch {
-    bg: string;
-    /** Primary, secondary and highlight accents, then four more for track colors. */
-    neon: string;
-    secondary: string;
-    active: string;
-    violet: string;
-    red: string;
-    more: [string, string, string];
-}
 
 const SWATCHES = {
     amber: {bg: '#0a0603', neon: '#ffb000', secondary: '#ff5e1a', active: '#fff1c1', violet: '#c7792b', red: '#ff3d2e',
@@ -35,7 +23,19 @@ const SWATCHES = {
         more: ['#1ec74a', '#f0ff6b', '#9dff7a']},
 } satisfies Record<string, Swatch>;
 
-export const PALETTES = ['neon', ...Object.keys(SWATCHES)] as readonly string[];
+const ALL: Record<string, Swatch> = {...SWATCHES};
+
+/** Palette names, `neon` first. Packs push theirs on; the array is mutated in place. */
+export const PALETTES: readonly string[] = ['neon', ...Object.keys(ALL)];
+
+/** Add a pack's palettes. Throws on a name already taken. */
+export function registerPalettes(packId: string, swatches: Readonly<Record<string, Swatch>>): void {
+    for (const [name, swatch] of Object.entries(swatches)) {
+        if (name in ALL || name === 'neon') throw new Error(`pack ${packId} redefines palette '${name}'`);
+        ALL[name] = swatch;
+        (PALETTES as string[]).push(name);
+    }
+}
 
 const themes = new Map<string, Theme>();
 
@@ -44,7 +44,7 @@ export function paletteTheme(name: string, base: Theme): Theme {
     if (name === 'neon') return base;
     let theme = themes.get(name);
     if (!theme) {
-        const swatch = (SWATCHES as Record<string, Swatch>)[name];
+        const swatch = ALL[name];
         if (!swatch) throw new Error(`no palette '${name}' (have: ${PALETTES.join(', ')})`);
         theme = themeOf(swatch);
         themes.set(name, theme);

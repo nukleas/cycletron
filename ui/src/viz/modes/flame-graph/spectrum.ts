@@ -4,9 +4,7 @@
  * the track markers, so a bass note's marker sits on the bass's hump.
  */
 
-import type {VizTrack} from '../../tracks.js';
-import {instrumentFamily} from '../../tracks.js';
-import {clamp01} from '../../util.js';
+import {instrumentFamily, clamp01, type VizTrack} from '@cycletron/viz-sdk';
 
 const F_LO = 40;
 const F_HI = 12000;

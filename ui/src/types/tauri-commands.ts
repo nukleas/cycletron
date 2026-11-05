@@ -339,3 +339,10 @@ export interface ImportMidiOptions {
     snapPerBar?: number;
     velocityMode?: 'off' | 'moderate' | 'strong';
 }
+
+/** Mirror of Rust `VizPackSource`: a built visualizer pack found in the library. */
+export interface VizPackSource {
+    id: string;
+    path: string;
+    source: string;
+}

@@ -341,7 +341,7 @@ export const DSL_SYMBOLS: DslSymbol[] = [
     },
     {
         "label": "detune",
-        "detail": "detune(cents)",
+        "detail": "detune(semitones)",
         "info": "Pitch modulation / FM",
         "kind": "method"
     },

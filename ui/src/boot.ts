@@ -42,6 +42,7 @@ import {editorEmptyState} from './editor-empty-state.js';
 import {basename} from './paths.js';
 import {currentBpm} from './bpm.js';
 import {toolRowFromTrace} from './ai-tool-row.js';
+import {loadLibraryPacks} from './viz/pack-loader.js';
 import type {CurrentFile, SessionSnapshot, UserSettings, WhatsNew} from './types/tauri-commands.js';
 
 
@@ -142,6 +143,7 @@ function setupAppShortcuts(): void {
 }
 
 async function boot(): Promise<void> {
+    await loadVizPacks();
     if (!isTauri) {
         console.log('[boot] not running in Tauri — file management disabled');
         return;
@@ -407,4 +409,9 @@ function setupAutosave(): void {
 
     // Autosave on window blur so the most recent state is always on disk.
     window.addEventListener('blur', trigger);
+}
+
+/** Register the library's enabled visualizer packs before anything draws. A broken pack is reported, not fatal. */
+async function loadVizPacks(): Promise<void> {
+    await loadLibraryPacks((id, message) => notify(`Visualizer pack ${id} failed to load: ${message}`, 'error'));
 }

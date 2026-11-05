@@ -70,7 +70,9 @@ A section's length in bars is its weight times the `slow` factor. Here
 `intro@2` under `.slow(4)` is 8 bars, and `outro` is 4. The labels (`intro`,
 `drop`, …) are what `[song.sections]` refers to. To list a song's sections
 with their bars, run `cargo run -p song-check -- song.strudel` from the
-Cycletron repo.
+Cycletron repo. A flat MIDI import (one `$:` track per instrument) gets a form
+from `node ui/scripts/section-song.mjs song.strudel --sections intro:0-5,…`,
+which slices every track at the bars you name.
 
 ### Bars
 
@@ -199,6 +201,10 @@ uses the section's `transition`.
 | `neon-circuit` | The pattern as a circuit board in the same isometric view: traces, vias and lit chips. | the pattern |
 | `cockpit` | A vector flight display. Kicks are armored targets, snares winged craft, notes diamonds, intercepted on their onsets. | the pattern |
 | `forest-drive` | A country road at dusk. Every tree on the verge is a note, reaching the windshield on its beat. | the pattern |
+| `graveyard` | From the Halloween pack. An 8-bit graveyard at night. Every note is a skeleton rising from its grave to dance; kicks thump the ground, snares strike lightning, hats send bats across the moon, held notes rise as ghosts. | the pattern |
+| `haunted-house` | From the Halloween pack. An 8-bit haunted house. Notes light windows by floor and pitch with a dancer inside; kicks swing the front door, hats flare the porch lanterns, held notes puff ghosts from the chimney, snares strike lightning behind it. | the pattern |
+| `monster-band` | From the Halloween pack. An 8-bit stage where every track is a monster playing its instrument: a skeleton drummer whose kit fires per drum, Frankenstein on bass, a werewolf on guitar, a mummy on horn, a vampire at the organ, a witch on the synth, Boos for the rest. Each plays on its own track's notes. | the pattern |
+| `ghost-fog` | From the Halloween pack. 8-bit ghosts drifting over a swamp, one per note, in their track's colour, with will-o'-wisps on the hats. Calm; for intros and outros. | the pattern |
 | `tunnel` | Octagonal rings flying at you, one per beat, each reaching the gate on time. | the pattern |
 | `marble-core` | Concentric rings, one per track, with a playhead arm sweeping once per bar. | the pattern |
 | `marble-drop` | A Galton board: every hit drops a marble that fills a histogram. | the pattern |
@@ -231,6 +237,7 @@ you see is the code. The others react to the sound.
 | `amber` | Orange phosphor terminal. |
 | `blood` | Reds on near-black. |
 | `toxic` | Acid green and yellow. |
+| `pumpkin` | From the Halloween pack. Pumpkin orange, violet and moon yellow on purple-black, with slime green and bone. |
 
 A palette recolors the mode, and the code overlay with it. Give each shot its
 own for a color change on every cut.

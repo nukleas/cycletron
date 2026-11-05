@@ -241,6 +241,45 @@ pub fn read_text(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("read {path}: {e}"))
 }
 
+/// A built visualizer pack found in the library, ready to load.
+#[derive(serde::Serialize)]
+pub struct VizPackSource {
+    pub id: String,
+    pub path: String,
+    pub source: String,
+}
+
+/// The built visualizer packs in the library's enabled packs: every `viz`
+/// folder with a `pack.json` and a `dist/index.js`. An unbuilt folder is
+/// skipped with a log line, not an error.
+#[tauri::command]
+pub fn list_viz_packs(state: State<'_, AppState>) -> Result<Vec<VizPackSource>, String> {
+    let root = crate::packs::packs_root(&state.library_root());
+    let enabled = crate::packs::read_enabled(&root).enabled;
+    let mut out = Vec::new();
+    for (dir, m) in crate::packs::scan_installed(&root) {
+        if !enabled.iter().any(|e| e == &m.id) {
+            continue;
+        }
+        for v in crate::packs::viz_entries(&dir, &m) {
+            if !v.built {
+                tracing::warn!("{}: not built (no dist/index.js), skipped", v.dir);
+                continue;
+            }
+            let built = std::path::Path::new(&v.dir).join("dist").join("index.js");
+            match std::fs::read_to_string(&built) {
+                Ok(source) => out.push(VizPackSource {
+                    id: v.id,
+                    path: v.dir,
+                    source,
+                }),
+                Err(e) => tracing::warn!("{}: {e}", built.display()),
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// Write a show file as is: no frontmatter, unlike a song.
 #[tauri::command]
 pub fn write_text(path: String, text: String) -> Result<(), String> {

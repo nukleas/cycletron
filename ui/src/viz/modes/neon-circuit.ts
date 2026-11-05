@@ -32,11 +32,25 @@
  * from the schedule. Outgoing pulses live in fixed pools.
  */
 
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {TrackModel, instrumentFamily, type TrackSync, type VizTrack} from '../tracks.js';
 import {
-    TransientDetector, alphaRamp, clamp01, drawLabel, follow, lerpRgb, mixRgb, rampAt, rgbOf,
-} from '../util.js';
+    TrackModel,
+    instrumentFamily,
+    TransientDetector,
+    alphaRamp,
+    clamp01,
+    drawLabel,
+    follow,
+    lerpRgb,
+    mixRgb,
+    rampAt,
+    rgbOf,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+    type TrackSync,
+    type VizTrack,
+} from '@cycletron/viz-sdk';
 
 const MAX_LIVE = 8;
 /** Live parts plus ones still fading out. */

@@ -6,7 +6,7 @@
  */
 
 import type {View} from './edit.js';
-import type {VizLayer, VizMode, VizModeDef, VizServices} from './types.js';
+import type {VizLayer, VizMode, VizModeDef, VizServices} from '@cycletron/viz-sdk';
 
 /** Scanline drift, px per second. */
 const SCANLINE_SPEED = 18;

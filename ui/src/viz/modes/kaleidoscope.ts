@@ -18,11 +18,24 @@
  * as fractions of the disc radius, so a resize rescales without restarting.
  */
 
-import {TrackModel, instrumentFamily, type VizTrack} from '../tracks.js';
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
 import {
-    TAU, TransientDetector, alphaRamp, clamp01, follow, hash32, rampAt, rand01, rgbOf,
-} from '../util.js';
+    TrackModel,
+    instrumentFamily,
+    TAU,
+    TransientDetector,
+    alphaRamp,
+    clamp01,
+    follow,
+    hash32,
+    rampAt,
+    rand01,
+    rgbOf,
+    type VizTrack,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 
 const SLICES = 8;
 const WEDGE = TAU / SLICES;

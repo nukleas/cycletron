@@ -16,9 +16,20 @@
  * sprites come from an atlas, one row per colour.
  */
 
-import {TrackModel, instrumentFamily, type VizTrack} from '../tracks.js';
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {MONO_FONT, follow, hash32, mixRgb, rand01, rgbOf} from '../util.js';
+import {
+    TrackModel,
+    instrumentFamily,
+    MONO_FONT,
+    follow,
+    hash32,
+    mixRgb,
+    rand01,
+    rgbOf,
+    type VizTrack,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 import {SpectrumSampler} from './flame-graph/spectrum.js';
 
 const GLYPHS = [' ', '.', ':', '-', '=', '+', '|', '/', '\\', 'x', 'X', '$', '&', '#', '@', 'o', '*'] as const;

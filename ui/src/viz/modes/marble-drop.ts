@@ -18,9 +18,22 @@
  * in 2–4 substeps per frame so fast marbles can't tunnel through pegs.
  */
 
-import {TrackModel, instrumentFamily, type VizTrack} from '../tracks.js';
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {SeededRandom, TAU, TransientDetector, alphaRamp, clamp01, drawLabel, rampAt} from '../util.js';
+import {
+    TrackModel,
+    instrumentFamily,
+    SeededRandom,
+    TAU,
+    TransientDetector,
+    alphaRamp,
+    clamp01,
+    drawLabel,
+    rampAt,
+    type VizTrack,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 
 const POOL = 192;
 /** Past this many falling marbles the oldest starts fading out. */

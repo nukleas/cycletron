@@ -10,8 +10,7 @@
  * proper sweeping curves without a full rotation per point.
  */
 
-import type {Theme} from '../../types.js';
-import {TAU, hash32, rand01, lerpRgb} from '../../util.js';
+import {TAU, hash32, rand01, lerpRgb, type Theme} from '@cycletron/viz-sdk';
 
 export type Rgb = [number, number, number];
 

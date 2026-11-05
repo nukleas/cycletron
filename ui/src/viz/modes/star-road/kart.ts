@@ -5,7 +5,7 @@
  * boost flame are pure functions of time, so a render replays exactly.
  */
 
-import {TAU, hash32, rand01} from '../../util.js';
+import {TAU, hash32, rand01} from '@cycletron/viz-sdk';
 
 export interface KartLook {
     /** Body color. */

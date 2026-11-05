@@ -22,10 +22,25 @@
  * every call.
  */
 
-import type {PatternHandle} from '../../../pkg';
-import type {PatternSource, Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {MAX_TRACKS, VIEW_CAPACITY, instrumentFamily, type InstrumentFamily} from '../tracks.js';
-import {TAU, TransientDetector, hash32, lerpRgb, mixRgb, rand01, rgbOf} from '../util.js';
+import {
+    MAX_TRACKS,
+    VIEW_CAPACITY,
+    instrumentFamily,
+    TAU,
+    TransientDetector,
+    hash32,
+    lerpRgb,
+    mixRgb,
+    rand01,
+    rgbOf,
+    type PatternSource,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+    type InstrumentFamily,
+    type PatternQuery,
+} from '@cycletron/viz-sdk';
 
 /** Metres of road per cycle. With 1 cycle = 1 bar this sets the driving speed. */
 const Z_PER_CYCLE = 52;
@@ -122,7 +137,7 @@ class ForestDriveMode implements VizMode {
 
     // --- schedule ---------------------------------------------------------
     private lastBar = -1;
-    private lastPattern: PatternHandle | null = null;
+    private lastPattern: PatternQuery | null = null;
     private registryVersion = -1;
     private readonly trackNames: (string | undefined)[] = new Array(MAX_TRACKS).fill(undefined);
     private readonly trackSlots = new Map<string, number>();
@@ -254,7 +269,7 @@ class ForestDriveMode implements VizMode {
      * are keyed by absolute onset, so the same hap seen from two different bars
      * is the same tree and keeps its shape, side and flash.
      */
-    private rebuild(pattern: PatternHandle, source: PatternSource, bar: number, theme: Theme): void {
+    private rebuild(pattern: PatternQuery, source: PatternSource, bar: number, theme: Theme): void {
         pattern.queryCycleViewData(bar, LOOKAHEAD);
         // Fresh view per query — WASM memory growth detaches cached views.
         const data = new Float32Array(source.memory.buffer, source.cycleViewPtr, VIEW_CAPACITY);

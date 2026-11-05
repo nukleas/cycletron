@@ -18,10 +18,24 @@
  * query (two bars ahead), recreating the memory view after every query.
  */
 
-import type {PatternHandle} from '../../../pkg';
-import type {PatternSource, Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {MAX_TRACKS, VIEW_CAPACITY, instrumentFamily} from '../tracks.js';
-import {MONO_FONT, TAU, TransientDetector, clamp01, hash32, rand01, rgbOf} from '../util.js';
+import {
+    MAX_TRACKS,
+    VIEW_CAPACITY,
+    instrumentFamily,
+    MONO_FONT,
+    TAU,
+    TransientDetector,
+    clamp01,
+    hash32,
+    rand01,
+    rgbOf,
+    type PatternSource,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+    type PatternQuery,
+} from '@cycletron/viz-sdk';
 
 /** World units per cycle. FOREST DRIVE uses 52 m of road; space is faster. */
 const Z_PER_CYCLE = 80;
@@ -202,7 +216,7 @@ class CockpitMode implements VizMode {
 
     // --- schedule ---------------------------------------------------------
     private lastBar = -1;
-    private lastPattern: PatternHandle | null = null;
+    private lastPattern: PatternQuery | null = null;
     private registryVersion = -1;
     private readonly trackNames: (string | undefined)[] = new Array(MAX_TRACKS).fill(undefined);
     private nextSlot = 0;
@@ -420,7 +434,7 @@ class CockpitMode implements VizMode {
      * line — and a live edit re-uses what is already in flight rather than
      * respawning the universe.
      */
-    private rebuild(pattern: PatternHandle, source: PatternSource, bar: number, theme: Theme, crossedBar: boolean): void {
+    private rebuild(pattern: PatternQuery, source: PatternSource, bar: number, theme: Theme, crossedBar: boolean): void {
         pattern.queryCycleViewData(bar, LOOKAHEAD);
         // Fresh view per query — WASM memory growth detaches cached views.
         const data = new Float32Array(source.memory.buffer, source.cycleViewPtr, VIEW_CAPACITY);

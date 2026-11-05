@@ -4,6 +4,16 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+### Visualizer packs
+- **Visualizers can come in packs.** A pack is a folder with a `pack.json`, its built visualizer modes and palettes, and any songs and shows made for them. Enabled packs load when Cycletron starts; their modes show up in the Visuals menu, in show files and in the show pane's suggestions.
+- **Install from Folder and Install from Zip** in the Samples panel, or drop the folder or zip on the window. The dialog says what the pack carries and that its visualizer code runs in the app. Installing a pack that is already installed offers to replace it.
+- **Enable and disable** any installed pack in the Samples panel. Visualizer code loads at the next launch.
+- **For authors:** `@cycletron/viz-sdk` is the one package a pack imports, and the manifest names the sdk range it was built for; `docs/PACKS.md` has the format, the build and the determinism test. The seasonal packs live in the cycletron-packs repo.
+- The Halloween modes (graveyard, haunted house, monster band, ghost fog) moved out of the app into the first pack.
+
+### Other
+- Visualizer sdk 1.2: `@cycletron/viz-sdk` is a workspace package (`ui/packages/viz-sdk`) the app and packs both import; packs see `PatternQuery` instead of the engine's pattern handle, and the label font, hue helpers, `PatternTimeline`, `drumOnsets` and the cycle-view constants are exported.
+
 ## 0.1.0-alpha.26 (2026-10-26)
 
 Bundled 909, 606 and 727 kits, Ableton Link and OSC output that work, and What's New after updates.

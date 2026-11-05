@@ -14,11 +14,24 @@
  *                     with the smoothed low / mid / high bands
  */
 
-import {TrackModel, instrumentFamily, type VizTrack} from '../tracks.js';
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
 import {
-    TAU, drawLabel, follow, hash32, mixRgb, rampAt, alphaRamp, rand01, rgbOf,
-} from '../util.js';
+    TrackModel,
+    instrumentFamily,
+    TAU,
+    drawLabel,
+    follow,
+    hash32,
+    mixRgb,
+    rampAt,
+    alphaRamp,
+    rand01,
+    rgbOf,
+    type VizTrack,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 
 const MAX_BALLS = 8;
 /** Grid node budget — cols × rows ≈ this, shaped to the canvas aspect. */

@@ -21,11 +21,21 @@
  */
 
 import artRaw from '../../assets/art.txt?raw';
-import type {VizMode, VizModeDef, VizServices} from '../types.js';
-import {TrackModel} from '../tracks.js';
 import {
-    MONO_FONT, TAU, TransientDetector, alphaRamp, drawLabel, follow, mixRgb, rampAt, rgbOf,
-} from '../util.js';
+    TrackModel,
+    MONO_FONT,
+    TAU,
+    TransientDetector,
+    alphaRamp,
+    drawLabel,
+    follow,
+    mixRgb,
+    rampAt,
+    rgbOf,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 import {ScopeSignal} from './scope/signal.js';
 
 /**

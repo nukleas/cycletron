@@ -12,9 +12,17 @@
  *   silence         → a low pilot flame that still flickers
  */
 
-import {TrackModel, type VizTrack} from '../tracks.js';
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {SeededRandom, follow, rgbOf} from '../util.js';
+import {
+    TrackModel,
+    SeededRandom,
+    follow,
+    rgbOf,
+    type VizTrack,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 import {SpectrumSampler, onsetAxis} from './flame-graph/spectrum.js';
 
 const BANDS = 64;

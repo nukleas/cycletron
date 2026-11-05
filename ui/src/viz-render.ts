@@ -18,10 +18,11 @@ import {OfflineAnalyser} from './viz/offline-analyser.js';
 import {applyFinish, wash} from './viz/finish.js';
 import {paletteTheme} from './viz/palettes.js';
 import {Transitions} from './viz/transitions.js';
+import {loadPackSource} from './viz/pack-loader.js';
 import {VIZ_MODES} from './viz/registry.js';
 import {DEFAULT_FONT_PX, StageCodeLayer} from './viz/stage/code-layer.js';
 import {readTheme} from './viz/theme.js';
-import type {Theme, VizLayer, VizMode, VizModeDef, VizServices} from './viz/types.js';
+import type {Theme, VizLayer, VizMode, VizModeDef, VizServices} from '@cycletron/viz-sdk';
 
 type MutableServices = { -readonly [K in keyof VizServices]: VizServices[K] };
 
@@ -45,6 +46,8 @@ export interface RenderSetup {
     /** Song frame (at `fps`) this render starts on. Earlier frames still run to warm up state. */
     startFrame: number;
     sensitivity: number;
+    /** Built visualizer packs (their `dist/index.js` text) to load before the modes resolve. */
+    packs?: string[];
     /** URL of the song's mix. */
     audio: string;
 }
@@ -87,6 +90,7 @@ class OfflineRender {
         const audio = await new OfflineAudioContext(2, 1, 44_100).decodeAudioData(bytes);
         this.analyser = new OfflineAnalyser(audio);
 
+        for (const src of opts.packs ?? []) await loadPackSource(src, 'a show pack');
         this.tracks = new Map();
         for (const id of opts.cues.flatMap(({look}) => [look.mode, ...(look.shots ?? []).map((shot) => shot.mode)])) {
             if (this.tracks.has(id)) continue;

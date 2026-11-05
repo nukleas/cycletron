@@ -17,9 +17,23 @@
  * so offline renders replay exactly.
  */
 
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {HapField, type FieldHap, type FieldTeam, type Rgb} from '../hap-field.js';
-import {MONO_FONT, TAU, clamp01, follow, hash32, rand01, rgbOf} from '../util.js';
+import {
+    HapField,
+    MONO_FONT,
+    TAU,
+    clamp01,
+    follow,
+    hash32,
+    rand01,
+    rgbOf,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+    type FieldHap,
+    type FieldTeam,
+    type Rgb,
+} from '@cycletron/viz-sdk';
 import {
     BAND_RGB, HALF_WIDTH, RoadCamera, drawRails, drawRoad, drawSigns, drawSpace,
     roadCurve, roadHeading, roadX, roadY, starPath,

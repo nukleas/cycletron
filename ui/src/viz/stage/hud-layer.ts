@@ -10,8 +10,7 @@
  */
 
 import {VIZ_MODES} from '../registry.js';
-import type {VizLayer, VizServices} from '../types.js';
-import {MONO_FONT} from '../util.js';
+import {MONO_FONT, type VizLayer, type VizServices} from '@cycletron/viz-sdk';
 
 const REFERENCE_HEIGHT = 1080;
 const MARGIN = 0.055;

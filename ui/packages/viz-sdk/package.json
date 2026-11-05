@@ -1,0 +1,19 @@
+{
+  "name": "@cycletron/viz-sdk",
+  "version": "1.2.0",
+  "description": "The surface a Cycletron visualizer pack builds against: the mode contract, HapField and TrackModel over the scheduled pattern, the 320x180 pixel screen and the drawing helpers.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["src", "README.md"],
+  "scripts": {
+    "check": "tsc -p tsconfig.json"
+  },
+  "sideEffects": false
+}

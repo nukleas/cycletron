@@ -7,8 +7,7 @@
  */
 
 import {drawCard, outline} from './edit.js';
-import type {VizLayer, VizServices} from './types.js';
-import {MONO_FONT, clamp01} from './util.js';
+import {MONO_FONT, clamp01, type VizLayer, type VizServices} from '@cycletron/viz-sdk';
 
 export interface CaptionLine {
     say: string;

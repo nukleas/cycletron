@@ -1,7 +1,6 @@
 /** Read the app's CSS-variable palette into a canvas-friendly Theme. */
 
-import type {Theme} from './types.js';
-import {hueOf, rgbOf} from './util.js';
+import {hueOf, rgbOf, type Theme} from '@cycletron/viz-sdk';
 
 export function readTheme(): Theme {
     const style = getComputedStyle(document.documentElement);

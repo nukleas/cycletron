@@ -15,9 +15,23 @@
  * on creation — no spike out of the origin on entry.
  */
 
-import {TrackModel, instrumentFamily} from '../tracks.js';
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {TAU, alphaRamp, drawLabel, follow, hash32, mixRgb, rampAt, rand01, rgbOf} from '../util.js';
+import {
+    TrackModel,
+    instrumentFamily,
+    TAU,
+    alphaRamp,
+    drawLabel,
+    follow,
+    hash32,
+    mixRgb,
+    rampAt,
+    rand01,
+    rgbOf,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+} from '@cycletron/viz-sdk';
 
 const TRAIL_CAP = 1800;
 /** Integration step in Lorenz time, and Lorenz time per second of wall time. */

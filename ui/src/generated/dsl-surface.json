@@ -325,7 +325,7 @@
   },
   {
     "label": "detune",
-    "detail": "detune(cents)",
+    "detail": "detune(semitones)",
     "info": "Pitch modulation / FM",
     "kind": "method"
   },

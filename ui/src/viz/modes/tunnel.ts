@@ -22,11 +22,24 @@
  * landed events live in a fixed pool.
  */
 
-import type {Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {TrackModel, instrumentFamily, type VizTrack} from '../tracks.js';
 import {
-    TAU, TransientDetector, alphaRamp, clamp01, drawLabel, follow, hash32, rampAt, rgbOf,
-} from '../util.js';
+    TrackModel,
+    instrumentFamily,
+    TAU,
+    TransientDetector,
+    alphaRamp,
+    clamp01,
+    drawLabel,
+    follow,
+    hash32,
+    rampAt,
+    rgbOf,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+    type VizTrack,
+} from '@cycletron/viz-sdk';
 
 const BEATS = 4;           // rings per bar
 const SIDES = 8;

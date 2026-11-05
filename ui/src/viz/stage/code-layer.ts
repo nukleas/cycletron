@@ -23,7 +23,7 @@ import {parser} from '@lezer/javascript';
 import {highlightTree, tagHighlighter} from '@lezer/highlight';
 import {DEFAULT_TOKEN_KEY, resolveSyntaxColors, syntaxTagMap} from '../../syntax-palette.js';
 import type {EditorSnapshot} from '../../editor.js';
-import type {VizLayer, VizServices} from '../types.js';
+import type {VizLayer, VizServices} from '@cycletron/viz-sdk';
 import {parseForms, topLevelStatements, type Branch, type Form, type Range} from './form-map.js';
 
 /**

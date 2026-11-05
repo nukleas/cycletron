@@ -9,12 +9,10 @@
 import {Captions} from '../viz/captions.js';
 import {type CameraStyle, MusicCamera, TitleCards, type View} from '../viz/edit.js';
 import type {Finish} from '../viz/finish.js';
-import {drumOnsets} from '../viz/tracks.js';
+import {drumOnsets, clamp01, type PatternSource, type VizLayer, type VizServices} from '@cycletron/viz-sdk';
 import type {Entering, Transition} from '../viz/transitions.js';
-import type {PatternSource, VizLayer, VizServices} from '../viz/types.js';
 import type {PatternHandle} from '../../pkg';
 import type {StageCodeLayer} from '../viz/stage/code-layer.js';
-import {clamp01} from '../viz/util.js';
 import {type CodeLook, type Cue, formLength, type ShowSong, type Strobe} from './show.js';
 
 /** Drum onsets within one pass of the form, in cycles, ascending. */

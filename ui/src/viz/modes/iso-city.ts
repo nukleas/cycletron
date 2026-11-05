@@ -19,12 +19,28 @@
  * view each call.
  */
 
-import type {PatternHandle} from '../../../pkg';
-import type {PatternSource, Theme, VizMode, VizModeDef, VizServices} from '../types.js';
-import {MAX_TRACKS, VIEW_CAPACITY, PatternTimeline, instrumentFamily} from '../tracks.js';
 import {
-    MONO_FONT, SeededRandom, TAU, TransientDetector, alphaRamp, beatEnv, lerpRgb, mixRgb, rampAt, rgbOf,
-} from '../util.js';
+    MAX_TRACKS,
+    VIEW_CAPACITY,
+    PatternTimeline,
+    instrumentFamily,
+    MONO_FONT,
+    SeededRandom,
+    TAU,
+    TransientDetector,
+    alphaRamp,
+    beatEnv,
+    lerpRgb,
+    mixRgb,
+    rampAt,
+    rgbOf,
+    type PatternSource,
+    type Theme,
+    type VizMode,
+    type VizModeDef,
+    type VizServices,
+    type PatternQuery,
+} from '@cycletron/viz-sdk';
 
 const ISO_W = 36;   // px per unit along (i - j)
 const ISO_H = 18;   // px per unit along (i + j)
@@ -386,7 +402,7 @@ class IsoCityMode implements VizMode {
      * cycle-view buffer is parsed synchronously, immediately after our own
      * query — never between another caller's query and its reads.
      */
-    private rebuild(pattern: PatternHandle, source: PatternSource, bar: number, theme: Theme): void {
+    private rebuild(pattern: PatternQuery, source: PatternSource, bar: number, theme: Theme): void {
         pattern.queryCycleViewData(bar, 1);
         // Fresh view per query — WASM memory growth detaches cached views.
         const data = new Float32Array(source.memory.buffer, source.cycleViewPtr, VIEW_CAPACITY);

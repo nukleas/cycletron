@@ -5,6 +5,8 @@
  */
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import path from 'node:path';
+import {readFileSync} from 'node:fs';
 import {after, before, test} from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
@@ -138,4 +140,44 @@ test('every mode matches the continuous render across a chunk seam', async () =>
         }));
     }
     assert.deepEqual(failing, {});
+});
+
+// A pack loaded at runtime must be as deterministic as a built-in mode. VIZ_PACK
+// names the viz pack folders to load (built, `dist/index.js` present), separated
+// like PATH; with two folders, two packs registering together is covered too.
+// Without VIZ_PACK the test is skipped.
+const PACK_DIRS = (process.env.VIZ_PACK ?? '').split(path.delimiter).filter(Boolean);
+const packModes = (dir) => JSON.parse(readFileSync(`${dir}/pack.json`, 'utf8')).modes;
+test('every mode of a pack loaded from its built module matches across a chunk seam', {skip: PACK_DIRS.length === 0}, async () => {
+    const sources = PACK_DIRS.map((dir) => readFileSync(`${dir}/dist/index.js`, 'utf8'));
+    // Every mode of the first pack; one of each other pack, so the seam check stays short.
+    const modes = PACK_DIRS.flatMap((dir, i) => (i === 0 ? packModes(dir) : packModes(dir).slice(0, 1)));
+    const renderWithPack = async (startFrame, count, one, two) => {
+        const browser = await chromium.launch();
+        try {
+            const page = await browser.newPage({viewport: {width: 480, height: 270}, deviceScaleFactor: 1});
+            await page.route('**/__render/mix.wav', (route) => route.fulfill({body: WAV, contentType: 'audio/wav'}));
+            await page.goto(url);
+            await page.waitForFunction(() => 'vizRender' in window);
+            await page.evaluate((opts) => window.vizRender.setup(opts), {
+                code: CODE, bpm: BPM, cues: cues(one, two), song: {passes: 1, fade: {in: 0, out: 0}},
+                width: 480, height: 270, fps: FPS, startFrame, sensitivity: 1, audio: '/__render/mix.wav', packs: sources,
+            });
+            const hashes = [];
+            for (let i = 0; i < count; i++) hashes.push(createHash('sha1').update(await page.evaluate(() => window.vizRender.frame())).digest('hex'));
+            return hashes;
+        } finally {
+            await browser.close();
+        }
+    };
+    const total = SECONDS * FPS;
+    const from = 4 * FPS;
+    // Each mode cut in after the one before it (the first after the last), so
+    // every mode is the one drawn at the seam once.
+    const pairs = modes.map((m, i) => [modes[(i + modes.length - 1) % modes.length], m]);
+    for (const [one, two] of pairs) {
+        const [whole, chunk] = await Promise.all([renderWithPack(0, total, one, two), renderWithPack(from, total - from, one, two)]);
+        const differing = chunk.flatMap((h, i) => (h === whole[from + i] ? [] : [from + i]));
+        assert.deepEqual(differing, [], `${one} → ${two}: frames that differ from the continuous render`);
+    }
 });
