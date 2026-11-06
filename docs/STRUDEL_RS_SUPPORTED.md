@@ -27,9 +27,13 @@ NOT `setbpm 120`.
 | Directive | Effect |
 | --- | --- |
 | `setbpm(N);` | Beats per minute. Conversion: `cps = bpm / 240`. Assumes 4 beats per cycle. |
-| `setcpm(N);` | Cycles per minute. `cps = cpm / 60`. |
-| `setcps(N);` | Cycles per second, raw. |
+| `setcpm(N);` | Cycles per minute. `cps = cpm / 60`. Same as web Strudel. |
 | `hush` | Silence everything. |
+
+`setcps(...)` is **not** accepted by the pinned engine (it lands in a later strudel-rs).
+`setbpm` is a Cycletron extra; web Strudel only has `setcpm`/`setcps`. A `.bpm(n)` or
+`.cpm(n)` call on a pattern chain sets the **song** tempo too (same effect as the
+directive), it does not scale that one pattern the way web Strudel's `.cpm()` does.
 
 For multi-track `.strudel` files, prefix each track with `$:`:
 
@@ -60,7 +64,7 @@ Inside `"..."` strings. The lexer is `crates/strudel-mini/src/lexer.rs`.
 | `< >` | `<bd sd cp>` | Slowcat — one element per cycle. |
 | `{ }` | `{bd sd, hh cp}` | Polymeter — comma-separated patterns aligned by step count. |
 | `{ } % N` | `{bd sd hh}%4` | Polymeter with explicit step count. |
-| `,` | `[bd, sd, hh]` | Stack (parallel) — inside `[ ]` or `{ }`. |
+| `,` | `[bd, sd, hh]` | Stack (parallel) — inside `[ ]` or `{ }` or at the top level. **Inside `< >` this engine splits the groups into alternating slots instead of stacking them** (web Strudel stacks; engine fix tracked). |
 | `*N` | `bd*4` | Repeat N times in the slot (speed up). |
 | `/N` | `bd/2` | Slow by N (one event every N cycles). |
 | `@N` | `bd@2 sd` | Weighted slot — `bd` gets 2 units of time, `sd` gets 1. |
@@ -68,9 +72,9 @@ Inside `"..."` strings. The lexer is `crates/strudel-mini/src/lexer.rs`.
 | `!N` | `bd!3` | Replicate event N times in-place. |
 | `?` / `?P` | `bd?` `bd?0.3` | Degrade — 50% drop by default, or probability P. |
 | `:N` | `bd:2` | Sample variant index (2nd sample in the `bd` bank). |
-| `..` | `0 .. 7` | Numeric range expansion → `0 1 2 3 4 5 6 7`. |
-| `(p,s)` / `(p,s,r)` | `bd(3,8)` `bd(3,8,2)` | Bjorklund / Euclidean: `p` pulses over `s` steps, optional rotation `r`. |
-| `\|` | `bd \| sd \| cp` | Random choice per cycle (seeded → deterministic). **Only at the top level of `[ ]` / `{ }`; not allowed inside `< >`.** |
+| `..` | `0 .. 7` | Numeric range expansion → `0 1 2 3 4 5 6 7`. Bounds must be literal numbers on this engine. |
+| `(p,s)` / `(p,s,r)` | `bd(3,8)` `bd(3,8,2)` | Bjorklund / Euclidean: `p` pulses over `s` steps, optional rotation `r`. All three must be literal numbers on this engine (web Strudel takes patterns). |
+| `\|` | `bd \| sd \| cp` | Random choice per cycle (seeded → deterministic). **Only inside `[ ]` / `{ }` or at the top level; not inside `< >`** (same as web Strudel's grammar). |
 | `.` | `bd sd . hh cp` | "Feet" — split cycle into equal-time chunks per `.`-segment. |
 | `^` | `bd^ sd` | Step-count marker for polymeter alignment. |
 | `~` or `-` | `bd ~ sd ~` | Rest / silence. |
@@ -98,19 +102,20 @@ receiver.
 | `sound(pat)` | `s` | Reinterpret values as sound names. |
 | `chord(pat)` | — | Expand chord symbols (e.g. `"Cm7"` → constituent notes). |
 | `mini(str)` | `m` | Parse a string as mini-notation (rarely needed; string literals already parse). |
+| `binary(n)` | — | The bits of `n` as a `1 0 …` sequence, one cycle. |
+| `binaryN(n, bits)` | — | Same, padded or cut to `bits` steps. |
 
 ### Combinators (variadic)
 
 | Function | Aliases | Semantics |
 | --- | --- | --- |
-| `fastcat(...)` | `cat`, `sequence`, `seq` | Concatenate, one cycle total. |
-| `slowcat(...)` | `cat` (in some contexts) | One pattern per cycle. |
+| `fastcat(...)` | `sequence`, `seq` | Concatenate, one cycle total. |
+| `slowcat(...)` | `cat` | One pattern per cycle. `cat` is slowcat here as in web Strudel. |
+| `randcat(...)` | — | One of the patterns per cycle, chosen at random (seeded). |
+| `wrandcat([pat, weight], …)` | — | Weighted `randcat`. |
 | `stack(...)` | `polyrhythm` | Play patterns simultaneously. |
 | `polymeter(...)` | `pm` | Stack with LCM step alignment. |
 | `arrange(...)` | — | Section combinator: `arrange([bars, pat], …)` plays each pattern for `bars` cycles at its native rate, then loops. |
-
-> Note: the alias `cat` overlaps between `fastcat` and `slowcat` in the source.
-> Prefer the explicit `fastcat` / `slowcat` to avoid ambiguity.
 
 ### Continuous signal generators (0..1)
 
@@ -124,6 +129,7 @@ All return a `Pattern<f64>` that varies continuously across the cycle.
 | `tri`, `tri2` | Triangle. |
 | `square`, `square2` | Square wave. |
 | `rand` | Uniform random 0..1, deterministic per cycle. |
+| `perlin` | Smooth 0..1 noise across cycles. |
 | `irand(n)` | Integer random in `[0, n)`. |
 | `run(n)` | Integer ramp `0..n` across the cycle. |
 
@@ -149,6 +155,25 @@ Aliases inside `()`.
 | `beat(positions, div)` | Place the source at the given slots of a cycle divided into div: `beat("0 4", 8)`. Positions wrap modulo div; div is a plain number. |
 | `press` | Push every event into the second half of its own span. |
 | `pressBy(r)` | Shift each event r of the way into its span (r may be a pattern). 0 is identity; outside 0–1 is silence. |
+| `iter(n)` / `iterBack(n)` | Each cycle, start the pattern one `n`th later (or earlier). |
+| `chunk(n, fn)` / `chunkBack(n, fn)` / `fastChunk(n, fn)` | Apply `fn` to one `n`th of the cycle, moving to the next chunk each cycle (backwards / every chunk per cycle). |
+| `swingBy(x, n)` / `swing(n)` | Delay every second of `n` subdivisions by `x` (swing uses a third). |
+| `brak` | Every other cycle, squash the pattern into half a cycle and shift it a quarter later (breakbeat feel). |
+| `shuffle(n)` / `scramble(n)` | Cut the cycle into `n` slices and play them in random order (shuffle: each once; scramble: with repeats). |
+| `striate(n)` | Play the `n`th slice of every sample, moving through the slices across the cycle. |
+| `bite(n, "idx")` | Cut the cycle into `n` slices and sequence them by the index pattern: `bite(4, "0 2 1 3")`. |
+
+### Patterned arguments
+
+Controls (`lpf`, `gain`, `pan`, `n`, `speed`, …) take a pattern or a signal everywhere, as in
+web Strudel, and so do `fast`, `slow`, `ply`, `late`, `early`, `pressBy` and pickRestart
+selectors. For the other time and conditional methods this engine is stricter and wants a
+plain number: every, lastOf, sometimesBy, degradeBy, euclid, iter, chunk, hurry, linger,
+segment, striate, chop, swingBy, add, sub, mul, div, range, off.
+
+`s("bd sd").every("<2 3>", …)` or `.add("<0 12>")` is rejected with "1st argument must be
+a number". The next strudel-rs lifts this for `add`, `mul`, `off`, `segment`, `range`; the
+rest are tracked.
 
 ### Stepwise
 
@@ -165,7 +190,8 @@ Arguments are plain numbers, not patterns (no `stepcat` in this port yet).
 
 `every(n, fn)` (`firstOf`), `lastOf(n, fn)`, `when(cond, fn)`, `always(fn)`,
 `never`, `sometimes(fn)`, `sometimesBy(prob, fn)`, `often(fn)`, `rarely(fn)`,
-`almostAlways(fn)`, `almostNever(fn)`.
+`almostAlways(fn)`, `almostNever(fn)`, `someCycles(fn)`, `someCyclesBy(prob, fn)`
+(whole cycles instead of single events).
 
 ### Degradation
 
@@ -223,19 +249,19 @@ chains.
 
 ### Low-pass filter
 
-`cutoff(hz)` (`lpf`, `lp`, `ctf`), `resonance(q)` (`lpq`, `q`),
+`cutoff(hz)` (`lpf`, `lp`, `ctf`), `resonance(q)` (`lpq`),
 `lpenv(amount)` (`lpe`), `lpattack(t)` (`lpatt`), `lpdecay(t)` (`lpdec`),
 `lpsustain(level)` (`lpsus`), `lprelease(t)` (`lprel`).
 
 ### High-pass filter
 
-`hpf(hz)` (`hp`), `hresonance(q)` (`hpq`),
+`hpf(hz)` (`hp`, `hcutoff`), `hresonance(q)` (`hpq`),
 `hpenv(amount)` (`hpe`), `hpattack(t)` (`hpatt`), `hpdecay(t)` (`hpdec`),
 `hpsustain(level)` (`hpsus`), `hprelease(t)` (`hprel`).
 
 ### Band-pass filter
 
-`bpf(hz)` (`bp`), `bandq(q)` (`bpq`),
+`bpf(hz)` (`bp`, `bandf`), `bandq(q)` (`bpq`),
 `bpenv(amount)` (`bpe`), `bpattack(t)` (`bpatt`), `bpdecay(t)` (`bpdec`),
 `bpsustain(level)` (`bpsus`), `bprelease(t)` (`bprel`).
 
@@ -246,12 +272,13 @@ chains.
 
 ### Delay
 
-`delay(amount)`, `delaytime(t)` (`delayt`),
-`delayfeedback(amount)` (`delayfb`).
+`delay(amount)`, `delaytime(t)` (`delayt`, `dt`),
+`delayfeedback(amount)` (`delayfb`, `dfb`). Colon form: `delay(".5:.125:.6")` sets all three.
 
 ### Reverb / room
 
-`room(amount)`, `roomsize(size)` (`size`), `roomdamp(amount)` (`verbdamp`).
+`room(amount)`, `roomsize(size)` (`size`, `sz`, `rsize`), `roomdamp(amount)` (`verbdamp`).
+Colon form: `room(".5:.9")` sets amount and size.
 
 ### Distortion & shaping
 
@@ -304,7 +331,8 @@ colon notation `chorus("0.5:1.2")`.
 ### Vowel filter
 
 `vowel(v)` — three parallel bandpass filters approximating vocal formants.
-`v` is 0=A, 1=E, 2=I, 3=O, 4=U (or a pattern cycling through them).
+`v` is 0=A, 1=E, 2=I, 3=O, 4=U (or a pattern cycling through them). **Numbers only:** web
+Strudel's `vowel("a e i")` letters are dropped without an error on this engine.
 
 ### Granular synthesis
 
@@ -332,25 +360,28 @@ Compact index of the timbre/space effects above (see subsections for detail):
 
 ### Sample playback
 
-`speed(v)`, `begin(0..1)`, `end(0..1)`, `cut(group)`, `bank(name)`, `loop(v)`,
-`orbit(v)`, `duration(v)` (`dur`).
+`speed(v)`, `begin(0..1)` (`sampleBegin`), `end(0..1)` (`sampleEnd`), `cut(group)`,
+`bank(name)`, `loop(v)`, `orbit(v)` (`o`), `duration(v)` (`dur`).
 
 ### Ducking / sidechain
 
-`duck(v)`, `duckatt(t)` (`duckattack`), `duckdepth(v)`,
-`duckons(v)` (`duckonset`), `duckrel(t)` (`duckrelease`), `duckorbit(v)`.
+`duck(v)`, `duckatt(t)` (`duckattack`, `datt`), `duckdepth(v)`,
+`duckons(v)` (`duckonset`), `duckorbit(v)`. There is no duck release control.
 
 ### Metadata (no audio effect)
 
-`color(hex)`, `anchor(pos)`, `unit(name)`.
+`color(hex)` (`colour`), `anchor(pos)`, `unit(name)`. Web Strudel's visualiser calls
+`pianoroll`, `punchcard`, `scope`, `spiral`, `log` are accepted as no-ops so pasted code
+validates.
 
 (Note: add_context, add_control, set_context, strip_context, filter_haps,
 filter_values, onsets_only, discrete_only are Rust-only Pattern API — they are
 **not** registered as DSL methods and cannot be called from a .strudel chain.)
 
-### Per-pattern tempo
+### Tempo from a chain
 
-`bpm(n)`, `cpm(n)` — local tempo overrides on a pattern.
+`bpm(n)`, `cpm(n)` — set the song tempo from inside a chain (see §1). Not a per-pattern
+speed change.
 
 ## 5. Synth names (the `s("…")` registry)
 
@@ -464,11 +495,19 @@ Common JS-strudel idioms that **don't** survive the strudel-rs parser:
 
 - `setbpm 120` (no parens) — must be `setbpm(120);` with parens and a semicolon.
 - `<a | b | c>` — `|` (random choice) doesn't compose inside `< >` slowcat
-  brackets. Use space-separated `<a b c>` for per-cycle alternation, or move
-  the choice outside the angle brackets.
-- `bd(3,8,<0 1 2>)` — the Euclidean rotation argument must be a static number;
+  brackets, here or in web Strudel. Use space-separated `<a b c>` for per-cycle
+  alternation, or move the choice outside the angle brackets.
+- `bd(3,8,<0 1 2>)` — the Euclidean arguments must be static numbers;
   a pattern there is rejected. Slowcat pre-rotated variants instead:
   `<bd(3,8) bd(3,8,1) bd(3,8,2)>`.
+- `note("<c2, g2>")` — a comma inside `< >` splits the groups into alternating slots
+  instead of stacking them. Write `note("<[c2,g2] …>")` or use `stack()`.
+- `.scale("minor")` — no root, no effect (web Strudel defaults to C). Write
+  `.scale("C4:minor")`.
+- `.every("<2 3>", fn)`, `.degradeBy("<.2 .8>")`, `.add("<0 12>")` — these take a plain
+  number here; see "Patterned arguments" in §4.
+- `.vowel("a")` — letters are dropped; use `0..4`.
+- `setcps(0.5);` — not accepted; use `setcpm` or `setbpm`.
 
 (Both arrow forms — bare `x => x.fast(2)` and parenthesised `(x) => x.fast(2)` —
 now parse and behave identically; the parens are no longer rejected. Verified by
@@ -480,18 +519,35 @@ not rejected.)
 
 ## 9. Known gaps vs. web-strudel
 
-Things that exist in JS-strudel but **don't** in strudel-rs (per source
-inspection — re-check when upgrading):
+Most of web Strudel's mini-notation and pattern API works unchanged. What does not, on
+the pinned engine (re-check when bumping):
 
-- No inline JavaScript / arbitrary expressions inside patterns.
-- Spectral effects not implemented.
-- No MIDI input (MIDI **file** parsing exists via `midi-to-strudel`).
-- Sample registry is host-driven; the engine doesn't fetch samples itself.
+- **Mini-notation:** comma inside `< >` splits instead of stacking; Euclid and `..`
+  arguments must be literals.
+- **Methods that only take numbers** where web Strudel takes patterns: see §4
+  "Patterned arguments".
+- **Missing functions:** `choose`, `chooseCycles`, `wchoose` (use `randcat` /
+  `wrandcat` / `pick`); `loopAt`, `fit`, `slice`, `splice`, `scrub` (use `chop`,
+  `striate`, `bite`, `speed`); `stepcat`/`timeCat` (use `arrange` or `@` weights);
+  `squeeze`, `xfade`, `undegradeBy`, `invert`; `chord` as a method
+  (`n("0 2").chord("…").voicing()`), use `chord("…").voicing()` with `arp`; `all()`
+  across `$:` tracks.
+- **Missing controls:** `postgain`, `freq`, `accelerate`, `nudge`, `octave`, `djf`,
+  `compressor`, `unison`/`spread`, `noise`, the `lfo`/`warp`/`wt` families, the midi/osc
+  controls. Short envelope aliases `lpa lpd lps lpr` (and hp/bp) and `fmatt fmdec fmsus
+  fmrel` are missing; the long forms work.
+- **`vowel`** takes `0..4`, not letters.
+- **JavaScript:** `const x = …` bindings, arithmetic in arguments, arrow callbacks and
+  `$:`/`_$:` tracks work. Free-standing arrow helpers (`const f = p => …; f(pat)`),
+  `"a b".s()` string-literal methods and named tracks (`$drums:`) are rejected.
+  No `samples(...)`: sample banks come from the library and the bundled kits.
+- Spectral effects, MIDI input: not implemented.
+- `.bank(...)` **is** supported for the bundled drum-machine kits (RolandTR808/909/707/606/727,
+  LinnDrum, BossDR55), see §6; custom `strudel.json` banks aren't wired yet.
 
-(`$:` multi-track / labelled-section syntax **is** supported — see §1. `.bank(...)`
-**is** supported and resolves in-app for the bundled drum-machine kits
-(RolandTR808/909/707/606/727, LinnDrum, BossDR55) — see §6. Only arbitrary *custom*
-`strudel.json` manifest banks aren't auto-wired yet; the bundled kits are.)
+Out-of-range or malformed values that web Strudel clamps or rejects can be **silent**
+here: pan outside 0..1, `scale` without a root, `vowel` letters, a `.add()` on a bare
+string. `validate_pattern` warns on the first; the rest are listed in `docs/DIALECT.md`.
 
 ## 10. Validation contract
 

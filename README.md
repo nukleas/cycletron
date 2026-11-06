@@ -41,7 +41,7 @@ DSL is a documented subset of web Strudel (see below); issues and patterns are
 welcome.
 
 - **User guide:** [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) (also Help → User Guide in-app)
-- **Dialect footguns:** [`docs/DIALECT.md`](docs/DIALECT.md) (Help → Cycletron Dialect)
+- **Dialect differences:** [`docs/DIALECT.md`](docs/DIALECT.md) (Help → Cycletron Dialect)
 - **Supported DSL:** [`docs/STRUDEL_RS_SUPPORTED.md`](docs/STRUDEL_RS_SUPPORTED.md)
 
 ---

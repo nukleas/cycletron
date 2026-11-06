@@ -183,9 +183,9 @@ pub fn critique_form(ev: &crate::Evaluated) -> Critique {
     if let Some(labels) = &labels {
         match parse_pickrestart_slow(code) {
             None => {
-                // The #1 pickRestart footgun: without .slow(n) every selector
-                // token lasts ONE cycle. Flag it once, clearly, and skip the
-                // per-section checks (they'd all be noise until this is fixed).
+                // Without .slow(n) every selector token lasts one cycle. Flag it
+                // once, clearly, and skip the per-section checks (they'd all be
+                // noise until this is fixed).
                 let secs = d
                     .seconds_per_cycle
                     .map(|s| format!(" (~{s:.1}s each at this tempo)"))

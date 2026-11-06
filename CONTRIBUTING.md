@@ -43,7 +43,7 @@ nightly toolchain or sibling checkout is needed.
 The set of mini-notation operators, functions, and effects strudel-rs accepts
 is **exactly** what `docs/STRUDEL_RS_SUPPORTED.md` says — web-strudel docs
 diverge. Use that file as ground truth for anything you write or validate;
-`docs/DIALECT.md` covers the common footguns.
+`docs/DIALECT.md` lists where the engine differs from web Strudel and what fails silently.
 
 ## Contributing patterns and corpus examples
 

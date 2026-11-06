@@ -2,7 +2,7 @@
 
 Live coding for music on a native Rust engine. Patterns run on **strudel-rs**
 with a Strudel-compatible mini-notation dialect. This guide is the product
-manual; for engine footguns see [DIALECT.md](./DIALECT.md).
+manual; for where the engine differs from web Strudel see [DIALECT.md](./DIALECT.md).
 
 ---
 
@@ -390,7 +390,7 @@ are signed; the app verifies them against its built-in public key.
 | No sound | Press **Play** once to arm audio; check OS mute / sample rate; try Lesson 1. |
 | AI panel does nothing | Enable AI first (AI panel → Enable AI…, or Preferences → AI). |
 | AI fails | Preferences → key status; for local, confirm base URL and that the server is running. |
-| Pattern silent | See [DIALECT.md](./DIALECT.md) (pan, voicing, scale format). Use Help → Dialect. |
+| Pattern silent | See [DIALECT.md](./DIALECT.md) (pan range, scale root, vowel numbers, commas in `< >`). Use Help → Dialect. |
 | Weird errors | Help → Show Logs → copy diagnostic dump into a bug report. |
 | API key prompt every launch (dev) | Export the env var in the shell you use for `cargo tauri dev`. |
 
@@ -401,9 +401,9 @@ are signed; the app verifies them against its built-in public key.
 | Item | Purpose |
 |------|---------|
 | Keyboard Shortcuts… | Full shortcut list |
-| Cycletron Dialect… | strudel-rs vs web-strudel footguns |
+| Cycletron Dialect… | What differs from web Strudel on this engine, and what fails silently |
 | User Guide… | This guide (in-app summary) |
-| Open Strudel Docs (web) | Upstream web-strudel learning (not dialect truth) |
+| Open Strudel Docs (web) | Upstream learning; nearly all of it applies, Dialect lists the exceptions |
 | Check for Updates… | Manual update check |
 | Show Logs… / Show Welcome… / About Cycletron | Support and setup |
 

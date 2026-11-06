@@ -150,8 +150,8 @@ class HelpModal {
 
     private renderDialect(): string {
         let html =
-            '<p class="help-lead">Cycletron runs <strong>strudel-rs</strong>, not browser Strudel. ' +
-            'These are the footguns that cause silence or parse errors most often.</p>';
+            '<p class="help-lead">Cycletron runs <strong>strudel-rs</strong>. Nearly all web Strudel notation works unchanged; ' +
+            'this is what differs on the current engine, and what fails silently. Rows marked (engine) are limitations being removed, not design.</p>';
         for (const rule of DIALECT_RULES) {
             html += `<section class="help-rule">
                 <h4 class="help-h">${escapeHtml(rule.title)}</h4>
@@ -166,7 +166,7 @@ class HelpModal {
         }
         html +=
             '<p class="help-foot">Full surface: <code>docs/STRUDEL_RS_SUPPORTED.md</code> in the repo. ' +
-            'Upstream strudel.cc docs are useful for ideas but not dialect truth.</p>';
+            'The strudel.cc docs are a good guide; where they and this page disagree, this page describes the engine you are running.</p>';
         return html;
     }
 
@@ -199,7 +199,7 @@ class HelpModal {
             `<p>${escapeHtml(PRIVACY_BLURB)}</p>`;
         html +=
             '<h4 class="help-h">No sound?</h4>' +
-            '<p>Press Play once to arm audio, then load Lesson 1. If a pattern is silent after that, open the Dialect tab (pan, voicing, scale).</p>';
+            '<p>Press Play once to arm audio, then load Lesson 1. If a pattern is silent after that, open the Dialect tab (pan range, scale root, commas in < >).</p>';
         html +=
             '<p class="help-foot">Longer write-up in the repo: <code>docs/USER_GUIDE.md</code>.</p>';
         return html;

@@ -4,6 +4,10 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+### Dialect docs
+- **The dialect pages now say what actually differs.** Help → Dialect, `docs/DIALECT.md` and the AI's rules were rewritten around three buckets: engine limitations being removed (commas inside `< >`, scale root, literal Euclid arguments, number-only method arguments, vowel numbers), things that fail silently, and things that are the same as web Strudel (pan range, chord voicing, `|` placement, `setbpm` parentheses, section length from `.slow(n)` or weights). Nearly all web Strudel notation works unchanged.
+- The supported-surface doc gained the engine's undocumented methods (`iter`, `chunk`, `swing`, `brak`, `shuffle`, `scramble`, `striate`, `bite`, `someCycles`, `randcat`, `wrandcat`, `binary`, `perlin`, aliases such as `hcutoff`, `bandf`, `dt`, `sz`, `o`) and dropped `q`, `duckrel` and `setcps`, which the current engine does not accept. Autocomplete and `list_methods` now include aliases listed in the doc's tables (`cat`, `seq`, `pm`).
+
 ## 0.1.0-alpha.27 (2026-11-05)
 
 ### Visualizer packs

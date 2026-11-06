@@ -8,27 +8,31 @@ IMPORTANT: Only use methods and functions listed below. The validate_pattern too
 
 The method/function tables below are a quick reference, not exhaustive. If you are unsure whether a method or effect exists — or want to discover options in a category (filters, delay, reverb, FM, granular…) — call the **list_methods** tool: it returns the exact DSL surface the validator accepts (ground truth), optionally filtered by `kind` or `category`. Use `list_methods` for verbs/effects and `list_sounds` for sound names. Guessing a name and failing at validate time wastes a round-trip.
 
-## Critical constraints (strudel-rs differs from web-strudel)
+## Critical constraints (the strudel-rs engine vs web Strudel)
 
-These are the most common sources of silent or broken output. Read them before writing code.
+Nearly all web Strudel notation works unchanged. The items below are where this engine
+differs today, or where bad input fails silently instead of erroring. Read them before writing code.
 
 **Hard rules — do NOT. Each one causes a parse error or silence:**
 
-- Do NOT use web-strudel named refs like `$drums`. `$:` multi-track lines with `// @id` ARE valid — see "Tracks & sections".
-- Do NOT use negative pan. Pan is 0..1; `.pan(-0.3)` is silent; center is 0.5.
-- Do NOT use `chord("Cm7")` alone. Add `.voicing()`.
-- Do NOT write `.scale("minor")`. Write `.scale("C4:minor")`.
-- Do NOT write `setbpm 120`. Write `setbpm(120);` with parentheses and a semicolon. `setcpm(N);` also works.
-- Do NOT put `|` inside `<...>`. Use spaces: `<a b c>`.
+- Do NOT use named tracks like `$drums:`. `$:` multi-track lines with `// @id` ARE valid — see "Tracks & sections".
+- Do NOT put a comma inside `<...>`. Here it splits the groups into alternating slots instead of stacking them.
+- Do NOT write `.scale("minor")`. This engine needs a root: `.scale("C4:minor")`.
+- Do NOT pass a pattern where this engine wants a number: `.every("<2 3>", …)`, `.add("<0 12>")`, `.degradeBy("<.2 .8>")`, `bd(3,8,<0 2>)` are all rejected. Patterns are fine on controls and on `fast`/`slow`/`ply`/`late`.
+- Do NOT use negative pan. Pan is 0..1 with 0.5 centre (as in web Strudel); here out-of-range is silent instead of clamped.
+- Do NOT use `chord("Cm7")` alone. Add `.voicing()` (same as web Strudel).
+- Do NOT write `setbpm 120`. Write `setbpm(120);` with parentheses and a semicolon. `setcpm(N);` also works; `setcps` does not.
+- Do NOT put `|` inside `<...>`. Use spaces: `<a b c>` (web Strudel rejects it too).
+- Do NOT use `vowel` letters. `vowel` takes `0..4` here (0=a 1=e 2=i 3=o 4=u).
 - Do NOT put a literal `\n` in code. Write real newlines.
 - Do NOT invent method or sound names. Call `list_methods` or `list_sounds` when unsure.
 
 The detail behind the most common of these follows.
 
-**Pan range is 0..1, not -1..1.**
-`0 = full left, 0.5 = center, 1 = full right`. Negative pan values cause sqrt(negative) = NaN
-in the panner → the event is completely silent. Never use `.pan(-0.3)` or `sine.range(-0.3, 0.3)`.
-Correct stereo sweep: `.pan(sine.range(0.2, 0.8))`. Slight left: `.pan(0.3)`.
+**Pan is 0..1.**
+`0 = full left, 0.5 = center, 1 = full right`, the same range web Strudel uses. Web Strudel clamps
+values outside it; this engine does not, and the event is silent. Never use `.pan(-0.3)` or
+`sine.range(-0.3, 0.3)`. Correct stereo sweep: `.pan(sine.range(0.2, 0.8))`. Slight left: `.pan(0.3)`.
 
 **`chord()` does NOT expand to notes by itself — you must call `.voicing()`.**
 `chord("Cm7")` only tags the pattern. Without `.voicing()`, the chord symbol "Cm7" is treated
@@ -36,16 +40,16 @@ as a sample bank name → silence. Always write: `chord("<Cm7 FM7>").voicing().s
 Exception: simple root-only names like `chord("<C G Am F>")` happen to parse as note names
 (C3, G3, etc.) and work without `.voicing()`, but this is accidental — use `.voicing()` always.
 
-**`.scale()` requires "root:mode" format, not just a mode name.**
-`note("0 2 4").scale("minor")` — WRONG, silently does nothing.
+**`.scale()` needs "root:mode" on this engine, not just a mode name.**
+`note("0 2 4").scale("minor")` — silently does nothing here (web Strudel would default to C).
 `note("0 2 4").scale("C4:minor")` — correct.
 `.scale()` only quantizes numeric scale degrees (integers), not absolute note names like c4, eb4.
 
-**`pickRestart` sections last only 1 cycle (~1–2s) unless you add `.slow(n)` to the selector.**
-Without `.slow()`, the selector `"<intro chorus drop>"` cycles through one label per cycle —
-at 140 BPM that's ~1.7 seconds per section. Always add `.slow(n)` to the selector string.
-
-`.slow(8)` is the default sweet spot (~14s per label at 140 BPM). Timing formula:
+**A `< >` slot lasts one cycle, so `.slow(n)` on the pickRestart selector sets section length.**
+`"<intro chorus drop>".pickRestart(...)` gives each label one cycle, ~1.7 seconds at 140 BPM.
+That is how slowcat works everywhere, including web Strudel. Put `.slow(n)` on the selector
+(or `@n` weights on the labels) to give sections their length; song-check and the arrangement
+review read exactly that shape. `.slow(8)` is a good default (~14s per label at 140 BPM):
 `slow_factor = (desired_seconds × BPM) / (60 × 4)`
 
 | Section length | At 140 BPM           |
@@ -55,10 +59,10 @@ at 140 BPM that's ~1.7 seconds per section. Always add `.slow(n)` to the selecto
 | ~27s           | `.slow(16)`          |
 
 ```strudel
-// CORRECT — each label lasts 8 cycles (~14s at 140 BPM)
+// each label lasts 8 cycles (~14s at 140 BPM)
 "<intro chorus drop outro>".slow(8).pickRestart({ intro: ..., chorus: ..., drop: ..., outro: ... })
 
-// WRONG — each label lasts 1 cycle (~1.7s), sections flash by
+// each label lasts 1 cycle (~1.7s), sections flash by
 "<intro chorus drop>".pickRestart({ ... })
 ```
 
@@ -68,9 +72,9 @@ at 140 BPM that's ~1.7 seconds per section. Always add `.slow(n)` to the selecto
 cannot be evaluated directly"). Inline the chain on each voice instead.
 Both `x => …` and `(x) => …` parse in callbacks; prefer the bare form.
 
-**`,` (parallel stack) only works inside `[ ]` or `{ }`, or at the top level of a string.**
-A comma inside `< >` still _parses_, but it does **not** stack — each comma group
-becomes its own slowcat slot, so nothing plays together. Spaces separate items
+**`,` (parallel stack) works inside `[ ]` or `{ }`, or at the top level of a string — not inside `< >` on this engine.**
+Web Strudel stacks comma groups inside `< >`; here a comma there still _parses_, but each
+comma group becomes its own slowcat slot, so nothing plays together. Spaces separate items
 in `< >`. Top-level commas (no surrounding brackets) create a parallel stack.
 
 Do this instead:
@@ -92,16 +96,23 @@ note("<[d2 e2 f2 g2] [a2 b2 c3 d3] [e2 f2 g2 a2] [c2 d2 e2 f2]>")
   .s("gm_acoustic_bass")
 ```
 
-This cycles through 4 bars, each bar plays 4 notes. NO commas anywhere inside `< >`.
+This cycles through 4 bars, each bar plays 4 notes. No commas anywhere inside `< >`.
 Alternative (flat sequence, same result): `note("d2 e2 f2 g2 a2 b2 c3 d3 ...").slow(4)`
 
-**`|` (random choice) only works inside `[ ]` or `{ }`, never inside `< >`.**
+**`|` (random choice) only works inside `[ ]` or `{ }`, never inside `< >`** (same grammar as web Strudel).
 `s("[bd | sd]")` — correct.
 `s("<bd | sd>")` — WRONG: parse error.
 
-**Euclidean rotation must be a literal number, not a pattern.**
+**Euclidean arguments must be literal numbers on this engine, not patterns.**
 `s("bd(3,8,1)")` — correct.
 `s("bd(3,8,<0 1 2>)")` — WRONG: parse error. Use `s("<bd(3,8) bd(3,8,1) bd(3,8,2)>")`.
+
+**Number-only arguments on this engine.** Web Strudel lets every argument be a pattern. Here
+`every`, `lastOf`, `sometimesBy`, `degradeBy`, `euclid`, `iter`, `chunk`, `hurry`, `linger`,
+`segment`, `striate`, `chop`, `swingBy`, `add`, `sub`, `mul`, `div`, `range` and `off` take a
+plain number. To vary one per cycle, alternate whole patterns instead:
+`"<0 1>".pick([pat.add(0), pat.add(12)])` or write the variants into the mini-notation.
+Controls (`lpf`, `gain`, `pan`, `n`, `speed`…) and `fast`/`slow`/`ply`/`late` take patterns as usual.
 
 **Use exact sound names — never invent, abbreviate, or guess.**
 Every sound name must appear verbatim in the Sounds list below.
@@ -127,7 +138,7 @@ bd:2               — sample variant
 bd@2               — stretch over 2 slots
 bd?                — 50% chance
 bd!                — replicate
-,                  — parallel/stack inside [ ] or { } or at top level. Not a stack inside < >.
+,                  — parallel/stack inside [ ] or { } or at top level. Not a stack inside < > on this engine.
 ```
 
 ## Top-level functions
@@ -135,7 +146,7 @@ bd!                — replicate
 ```
 stack(p1, p2, ...)            — layer patterns simultaneously (polyrhythm)
 fastcat(p1, p2, ...) / seq()  — fast concatenation
-slowcat(p1, p2, ...)          — slow concatenation (one per cycle). Prefer this over cat()
+slowcat(p1, p2, ...) / cat()  — slow concatenation (one per cycle)
 polymeter(p1, p2, ...) / pm() — polymetric overlay
 arrange([bars, pat], ...)     — play each pattern for `bars` cycles, then loop
 pure(value)                   — constant pattern
@@ -220,7 +231,7 @@ More verbs (pickOut, pickmodRestart, …) via `list_methods`.
 .sound(pat) / .s(pat)          — set sound/synth name
 .transpose(n) / .trans(n)      — transpose semitones
 .scaleTranspose(n) / .scaleTrans(n) / .strans(n) — transpose in scale
-.scale("root:mode")            — quantize numeric degrees to scale. Format: "C4:minor", "F3:dorian".
+.scale("root:mode")            — quantize numeric degrees to scale. Root required here: "C4:minor", "F3:dorian".
                                  ONLY affects numeric values (0, 1, 2…), NOT absolute note names.
 .voicing()                     — expand chord symbols to voiced notes (required after chord())
 .arp("up")                     — arpeggiate each chord. Orderings: up down updown downup up&down
@@ -234,7 +245,7 @@ More verbs (pickOut, pickmodRestart, …) via `list_methods`.
 .gain(n)                       — volume 0-2 (default ~0.8)
 .amp(n)                        — amplitude
 .velocity(n) / .vel(n)         — MIDI velocity
-.pan(n)                        — stereo pan 0..1 (0=left, 0.5=center, 1=right). NEVER negative.
+.pan(n)                        — stereo pan 0..1 (0=left, 0.5=center, 1=right). Outside 0..1 is silent here.
 .attack(t) / .att(t)           — attack time
 .decay(t) / .dec(t)            — decay time
 .sustain(n) / .sus(n)          — sustain level
@@ -688,7 +699,7 @@ melodic motion. Give the line somewhere to go: write a multi-bar phrase, or vary
 a short motif across cycles. Prefer these over a single repeating bar:
 
 4-bar developing phrase — each `[ ]` group is one bar (same idiom as the walking
-bass, applied to a lead). NO commas inside `< >`:
+bass, applied to a lead). No commas inside `< >` (they split slots on this engine):
 
 ```
 note("<[0 2 4 7] [7 4 2 0] [4 5 7 9] [7 4 2 0]>")
@@ -715,7 +726,7 @@ Walking bass — one note per cycle:
 note("<c2 f2 g2 c2>").s("gm_acoustic_bass").gain(0.7).release(0.5)
 ```
 
-Walking bass — 4 notes per cycle, 4-bar phrase (use [ ] groups inside < >, NO commas in < >):
+Walking bass — 4 notes per cycle, 4-bar phrase (use [ ] groups inside < >, no commas in < >):
 
 ```
 note("<[c2 e2 g2 b2] [f2 a2 c3 e3] [g2 b2 d3 f3] [c2 e2 g2 b2]>")
@@ -729,10 +740,10 @@ note("<[c3,e3,g3] [f3,a3,c4] [g3,b3,d4] [c3,e3,g3]>")
   .s("gm_epiano1").slow(2).gain(0.45).room(0.3)
 ```
 
-Section switching with pickRestart (note the required .slow(n) on the selector):
+Section switching with pickRestart (the selector's .slow(n) sets section length):
 
 ```
-// Each label lasts 8 cycles (~14s at 120 BPM). Omitting .slow() = 1-cycle flash.
+// Each label lasts 8 cycles (~14s at 120 BPM). Without .slow() a label lasts one cycle.
 // Each section plays for 8 cycles, so its melody must DEVELOP across those bars
 // (multi-bar phrase or every()-varied motif) — not loop a single bar 8 times.
 "<intro verse chorus chorus outro>".slow(8).pickRestart({

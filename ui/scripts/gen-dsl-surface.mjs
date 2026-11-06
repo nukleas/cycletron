@@ -83,6 +83,7 @@ const table = new Map();
 
 let kind = null; // current section kind, or null when outside a harvested section
 let h3 = '';     // current ### subheading (used as fallback doc for prose lists)
+let aliasCol = -1; // index of the "Aliases" column in the current table, or -1
 
 function record(sym, info, specific, symbolKind) {
     if (!sym) return;
@@ -132,12 +133,24 @@ for (const raw of lines) {
     if (line.startsWith('|') && !/^\|[\s|:-]+\|?$/.test(line)) {
         const cells = line.split('|').slice(1, -1).map((c) => c.trim());
         if (cells.length < 2) continue;
+        // A header row names the columns; remember where "Aliases" sits so the
+        // rows below contribute their aliases too (`cat`, `seq`, `pm`, …).
+        if (codeSpans(line).length === 0) {
+            aliasCol = cells.findIndex((c) => /^aliases$/i.test(c));
+            continue;
+        }
         const info = cleanDoc(cells[cells.length - 1]);
         for (const span of codeSpans(cells[0])) {
             record(parseSymbol(span), info, true, kind);
         }
+        if (aliasCol > 0 && aliasCol < cells.length - 1) {
+            for (const span of codeSpans(cells[aliasCol])) {
+                record(parseSymbol(span), info, true, kind);
+            }
+        }
         continue;
     }
+    if (!line.startsWith('|')) aliasCol = -1;
 
     // Prose is only a symbol list in the Pattern-methods section (the others are
     // tables). Even there, harvest only *span-dense* lines — the comma-separated
