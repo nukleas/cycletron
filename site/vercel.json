@@ -1,0 +1,16 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "buildCommand": "",
+    "outputDirectory": "dist",
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "headers": [
+        {
+            "source": "/play(/.*)?",
+            "headers": [
+                {"key": "Cross-Origin-Opener-Policy", "value": "same-origin"},
+                {"key": "Cross-Origin-Embedder-Policy", "value": "require-corp"}
+            ]
+        }
+    ]
+}
