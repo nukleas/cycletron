@@ -254,7 +254,7 @@ test('the bundled shows parse and cue against their songs', () => {
         assert.ok(source.startsWith('/demos/Songs/'), source);
         return readFileSync(songs + source.slice('/demos/Songs/'.length), 'utf8');
     };
-    // The form as song-check reads it: `"<a@2 b …>".slow(n)`, a section's bars its weight × n.
+    // The form as `cycletron check` reads it: `"<a@2 b …>".slow(n)`, a section's bars its weight × n.
     const form = (code) => {
         const [, labels, slow] = code.match(/"<([^>]+)>"\.slow\((\d+)\)\.pickRestart/);
         let startCycle = 0;

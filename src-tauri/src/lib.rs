@@ -1,4 +1,5 @@
 mod agent_loop;
+mod cli;
 mod codex_oauth;
 mod commands;
 mod demos;
@@ -21,6 +22,7 @@ mod packs;
 mod persistence;
 mod playback;
 mod recording;
+mod render;
 mod sample_sets;
 mod secrets;
 mod settings;
@@ -43,7 +45,7 @@ use tracing_subscriber::util::SubscriberInitExt as _;
 // so WebKit grants SharedArrayBuffer. Dev builds talk to Vite instead, so we
 // do not require `ui/dist` (or npm install) just to compile `cargo tauri dev`.
 #[cfg(not(debug_assertions))]
-mod production_frontend {
+pub(crate) mod production_frontend {
     use http_body_util::Full;
     use hyper::body::Bytes;
     use hyper::server::conn::http1;
@@ -136,6 +138,13 @@ mod production_frontend {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    // A command line use of the binary runs and exits here, before any window.
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(parsed) = cli::parse(&args) {
+        std::process::exit(cli::run(parsed, context).into());
+    }
+
     // Compose two layers: stderr fmt for dev, and a bounded ring buffer
     // so the in-app Logs modal can show recent activity without reaching
     // out to the OS log facility.
@@ -410,7 +419,7 @@ pub fn run() {
             recording::recording_orphans,
             recording::recording_recover,
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while running tauri application")
         .run(|app, event| {
             if matches!(

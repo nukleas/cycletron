@@ -122,6 +122,8 @@ export default defineConfig(({mode}) => ({
         rollupOptions: {
             input: {
                 main: 'index.html',
+                // The offline render page, opened by `cycletron render` in the installed app.
+                render: 'viz-render.html',
                 // Compile worklet.ts as a separate self-contained script.
                 // audio-manager.ts loads it via addModule('worklet.js') at runtime,
                 // so it must land at the root of the output directory as worklet.js.
@@ -163,7 +165,7 @@ export default defineConfig(({mode}) => ({
         exclude: ['./pkg/strudel_audio_wasm.js']
     },
     plugins: [
-        // The headless renderer (scripts/render-viz.mjs) serves in mode
+        // The render seam test (scripts/render-viz.test.mjs) serves in mode
         // 'render' and needs no type-check watcher.
         ...(mode === 'render' ? [] : [tsc()]),
         InlineEnum.vite(),

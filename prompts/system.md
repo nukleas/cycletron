@@ -48,7 +48,7 @@ Exception: simple root-only names like `chord("<C G Am F>")` happen to parse as 
 **A `< >` slot lasts one cycle, so `.slow(n)` on the pickRestart selector sets section length.**
 `"<intro chorus drop>".pickRestart(...)` gives each label one cycle, ~1.7 seconds at 140 BPM.
 That is how slowcat works everywhere, including web Strudel. Put `.slow(n)` on the selector
-(or `@n` weights on the labels) to give sections their length; song-check and the arrangement
+(or `@n` weights on the labels) to give sections their length; the song review and the arrangement
 review read exactly that shape. `.slow(8)` is a good default (~14s per label at 140 BPM):
 `slow_factor = (desired_seconds × BPM) / (60 × 4)`
 

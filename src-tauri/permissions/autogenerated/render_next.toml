@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-render-next"
+description = "Enables the render_next command without any pre-configured scope."
+commands.allow = ["render_next"]
+
+[[permission]]
+identifier = "deny-render-next"
+description = "Denies the render_next command without any pre-configured scope."
+commands.deny = ["render_next"]

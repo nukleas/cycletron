@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-render-hidden"
+description = "Enables the render_hidden command without any pre-configured scope."
+commands.allow = ["render_hidden"]
+
+[[permission]]
+identifier = "deny-render-hidden"
+description = "Denies the render_hidden command without any pre-configured scope."
+commands.deny = ["render_hidden"]

@@ -6,10 +6,12 @@
 //! - [`SampleSetPaths`] — which sample manifests a render resolves sounds from.
 //! - [`resolve_patterns`] — code → the mix and, optionally, its stems.
 //! - [`render_pcm`] — one pattern → stereo `f32` PCM.
+//! - [`performance::export`] — a song → `mix.wav` + `performance.json` for the video renderer.
 //! - [`hear`] — render the mix and stems, measure them, compare with the
 //!   symbolic spectral estimate.
 
 pub mod hear;
+pub mod performance;
 
 use rustc_hash::FxHashMap;
 use std::path::PathBuf;

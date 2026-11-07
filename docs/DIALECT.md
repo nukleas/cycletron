@@ -111,7 +111,7 @@ Things often listed as Cycletron quirks that are not:
   extra (upstream has `setcpm`, `setcps`).
 - `cat` is slowcat, `seq` is fastcat.
 - A `< >` slot lasts one cycle. Sections get their length from `@n` weights, from
-  `.slow(n)` on the selector, or from `arrange()`. Cycletron's form tools (song-check, the
+  `.slow(n)` on the selector, or from `arrange()`. Cycletron's form tools (`cycletron check`, the
   agent's arrangement review) read the `"<a@2 b@2>".slow(n).pickRestart({…})` shape, so
   that is the house convention, not an engine rule. Rough guide at 140 BPM: `.slow(4)` ≈ 7s
   per slot, `.slow(8)` ≈ 14s, `.slow(16)` ≈ 27s.

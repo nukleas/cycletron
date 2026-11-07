@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-render-chunk-done"
+description = "Enables the render_chunk_done command without any pre-configured scope."
+commands.allow = ["render_chunk_done"]
+
+[[permission]]
+identifier = "deny-render-chunk-done"
+description = "Denies the render_chunk_done command without any pre-configured scope."
+commands.deny = ["render_chunk_done"]

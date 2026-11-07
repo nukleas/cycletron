@@ -1,32 +1,51 @@
 //! Performance export: a `.strudel` song → `mix.wav` + `performance.json`, the
-//! handoff a video renderer (`ui/scripts/render-viz.mjs`) choreographs against.
-//! The JSON carries the song's code, every onset on the audio's exact clock,
-//! and its named sections, so visuals key to musical events the way
-//! narration-driven films key to words. A song without a `pickRestart` form is
-//! one section, `song`.
-//!
-//! Usage:
-//!     performance-export song.strudel <out-dir> [--passes N] [--seconds N] [--samples strudel.json]
-//!
-//! --passes N    times through the pickRestart form (default 1); the sections
-//!               list the first pass
-//! --seconds N   window to render and digest (default: `--passes` times the
-//!               form, else 32 cycles)
-//! --samples P   sample manifest (default: the repo's bundled Cycletron set)
+//! handoff the video renderer (`cycletron render`) choreographs
+//! against. The JSON carries the song's code, every onset on the audio's exact
+//! clock, and its named sections, so visuals key to musical events. A song
+//! without a `pickRestart` form is one section, `song`.
 
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
 
 use cycletron_analysis::{Evaluated, LabeledSection, MAX_ANALYSIS_CYCLES, pickrestart_sections};
 use cycletron_core::text::frontmatter;
-use cycletron_render::{SampleSetPaths, mix_of, render_pcm, resolve_patterns, resolve_tempo};
 use serde::Serialize;
+
+use crate::{SampleSetPaths, mix_of, render_pcm, resolve_patterns, resolve_tempo};
 
 const DEFAULT_CYCLES: usize = 32;
 /// Live playback pins the engine's master gain at unity (`audio-manager.ts`),
 /// and the visualizers are tuned against what that analyser hears.
 const LIVE_MASTER_GAIN: f32 = 1.0;
 const NANOS: f64 = 1e9;
+
+#[derive(Debug, Clone, Copy)]
+pub struct Options {
+    /// Times through the `pickRestart` form; the sections list the first pass.
+    pub passes: usize,
+    /// Window to render and digest. Default: `passes` times the form, else 32 cycles.
+    pub seconds: Option<f64>,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            passes: 1,
+            seconds: None,
+        }
+    }
+}
+
+/// What an export wrote.
+#[derive(Debug, Clone)]
+pub struct Summary {
+    pub title: String,
+    pub seconds: f64,
+    pub bpm: f64,
+    pub events: usize,
+    pub sections: usize,
+    pub clipped: u64,
+    pub dir: PathBuf,
+}
 
 #[derive(Serialize)]
 struct Performance {
@@ -61,51 +80,16 @@ struct Event {
     pan: Option<f64>,
 }
 
-fn main() -> ExitCode {
-    match run() {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("performance-export: {e}");
-            ExitCode::from(1)
-        }
+/// Render `song` and write `mix.wav` and `performance.json` into `out_dir`.
+pub fn export(
+    song: &Path,
+    out_dir: &Path,
+    opts: &Options,
+    samples: &SampleSetPaths,
+) -> Result<Summary, String> {
+    if opts.passes == 0 {
+        return Err("passes must be at least 1".into());
     }
-}
-
-fn run() -> Result<(), String> {
-    let mut seconds: Option<f64> = None;
-    let mut passes: usize = 1;
-    let mut samples: Option<PathBuf> = None;
-    let mut positional: Vec<PathBuf> = Vec::new();
-    let mut args = std::env::args().skip(1);
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--seconds" => {
-                seconds = Some(
-                    args.next()
-                        .and_then(|v| v.parse().ok())
-                        .filter(|s: &f64| *s > 0.0)
-                        .ok_or("--seconds needs a positive number")?,
-                );
-            }
-            "--passes" => {
-                passes = args
-                    .next()
-                    .and_then(|v| v.parse().ok())
-                    .filter(|n: &usize| *n > 0)
-                    .ok_or("--passes needs a positive whole number")?;
-            }
-            "--samples" => samples = Some(args.next().ok_or("--samples needs a path")?.into()),
-            _ if arg.starts_with("--") => return Err(format!("unknown flag {arg}")),
-            _ => positional.push(arg.into()),
-        }
-    }
-    let [song, out_dir] = positional.as_slice() else {
-        return Err(
-            "usage: performance-export <song.strudel> <out-dir> [--passes N] [--seconds N] [--samples P]"
-                .into(),
-        );
-    };
-
     let text =
         std::fs::read_to_string(song).map_err(|e| format!("read {}: {e}", song.display()))?;
     let (yaml, code) = frontmatter::split(&text);
@@ -129,13 +113,16 @@ fn run() -> Result<(), String> {
     let bpm = resolve_tempo(tempo, fm_bpm);
     let cycle_secs = 240.0 / bpm;
     let form = pickrestart_sections(code);
-    let seconds = seconds.unwrap_or_else(|| {
+    let seconds = opts.seconds.unwrap_or_else(|| {
         let cycles = form
             .as_ref()
             .and_then(|f| f.last())
-            .map_or(DEFAULT_CYCLES, |s| (s.end_cycle() + 1) * passes);
+            .map_or(DEFAULT_CYCLES, |s| (s.end_cycle() + 1) * opts.passes);
         cycles as f64 * cycle_secs
     });
+    if seconds <= 0.0 {
+        return Err("seconds must be positive".into());
+    }
     let cycles = (seconds / cycle_secs).ceil() as usize;
     if cycles > MAX_ANALYSIS_CYCLES {
         return Err(format!(
@@ -171,7 +158,7 @@ fn run() -> Result<(), String> {
             cycles,
         }]
     });
-    let sections = form
+    let sections: Vec<Section> = form
         .into_iter()
         .map(
             |LabeledSection {
@@ -187,12 +174,7 @@ fn run() -> Result<(), String> {
         .filter(|s| s.start_ns < duration_ns)
         .collect();
 
-    let samples = SampleSetPaths::Cycletron {
-        manifest: samples.unwrap_or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/public/cycletron.strudel.json")
-        }),
-    };
-    let pcm = render_pcm(&mix_of(&patterns), bpm, LIVE_MASTER_GAIN, seconds, &samples)?;
+    let pcm = render_pcm(&mix_of(&patterns), bpm, LIVE_MASTER_GAIN, seconds, samples)?;
 
     std::fs::create_dir_all(out_dir).map_err(|e| format!("create {}: {e}", out_dir.display()))?;
     pcm.write_wav(&out_dir.join("mix.wav"))?;
@@ -211,14 +193,13 @@ fn run() -> Result<(), String> {
     let json_path = out_dir.join("performance.json");
     std::fs::write(&json_path, json).map_err(|e| format!("write {}: {e}", json_path.display()))?;
 
-    println!(
-        "{}: {:.1}s at {bpm} bpm, {} events, {} sections, {} clipped samples → {}",
-        performance.title,
+    Ok(Summary {
+        title: performance.title,
         seconds,
-        performance.events.len(),
-        performance.sections.len(),
-        pcm.clipped,
-        out_dir.display()
-    );
-    Ok(())
+        bpm,
+        events: performance.events.len(),
+        sections: performance.sections.len(),
+        clipped: pcm.clipped,
+        dir: out_dir.to_path_buf(),
+    })
 }

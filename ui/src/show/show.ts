@@ -115,7 +115,7 @@ export interface ShowSong {
     source: string;
     /** Times through the song's form before the next song; the last song loops. */
     passes: number;
-    /** Absolute path to the performance-export directory, if given. */
+    /** Absolute path to the `cycletron export` directory, if given. */
     performance: string | null;
     /** Bars the song fades up from black at its start, and down to black at its last pass's end. */
     fade: {in: number; out: number};

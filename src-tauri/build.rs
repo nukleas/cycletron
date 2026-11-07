@@ -106,6 +106,15 @@ const COMMANDS: &[&str] = &[
     "osc_configure",
     "osc_transport",
     "osc_frame",
+    "render_plan",
+    "render_songs",
+    "render_cues",
+    "render_next",
+    "render_mix",
+    "render_frame",
+    "render_chunk_done",
+    "render_failed",
+    "render_hidden",
 ];
 
 fn main() {

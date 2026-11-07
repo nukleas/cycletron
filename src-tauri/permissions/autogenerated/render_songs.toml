@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-render-songs"
+description = "Enables the render_songs command without any pre-configured scope."
+commands.allow = ["render_songs"]
+
+[[permission]]
+identifier = "deny-render-songs"
+description = "Denies the render_songs command without any pre-configured scope."
+commands.deny = ["render_songs"]

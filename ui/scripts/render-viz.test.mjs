@@ -1,6 +1,6 @@
 /**
  * The offline renderer's chunking contract: a render that starts mid-song
- * (as each `render-viz.mjs --jobs` chunk does) paints the same pixels as one
+ * (as each `cycletron render --jobs` chunk does) paints the same pixels as one
  * that ran from the start. Headless Chromium, a synthetic mix, small frames.
  */
 import assert from 'node:assert/strict';

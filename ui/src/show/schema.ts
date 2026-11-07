@@ -86,7 +86,7 @@ export const SCHEMA: Record<TableName, Record<string, KeyDoc>> = {
         shots: {doc: 'Modes to cut between, in turn, through every section not listed.', choices: 'modes', table: 'shot', list: true, example: '["tunnel", "plasma"]'},
         passes: {doc: 'Times through the song\'s form before the next song. Default 1.', example: '1'},
         fade: {doc: 'Bars fading up from black at the start and down at the end: { in, out }.', table: 'fade', example: '{ in = 2, out = 2 }'},
-        performance: {doc: 'A performance-export directory to render from. Without it, the render exports the song itself.', example: '"performance"'},
+        performance: {doc: 'A `cycletron export` directory to render from. Without it, the render exports the song itself.', example: '"performance"'},
         sections: {doc: 'Looks for the song\'s sections, by label.', table: 'sections'},
         ...LOOK,
         ...AUDIO,
