@@ -2,7 +2,7 @@
 
 **Live coding for music, built on Rust** — a fast native desktop instrument.
 
-A [NaderLabs](https://www.naderlabs.io/) project · by [@nukleas](https://github.com/nukleas)
+Website and downloads: [cycletron.naderlabs.io](https://cycletron.naderlabs.io) · A [NaderLabs](https://www.naderlabs.io/) project · by [@nukleas](https://github.com/nukleas)
 
 [![CI](https://github.com/nukleas/cycletron/actions/workflows/ci.yml/badge.svg)](https://github.com/nukleas/cycletron/actions/workflows/ci.yml)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)

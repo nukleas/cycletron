@@ -29,9 +29,10 @@ export const formatSize = (bytes) => `${Math.round(bytes / 1e6)} MB`;
  * @param {string} page.description meta description
  * @param {string} page.body        the page's HTML
  * @param {object} page.release
+ * @param {string} [page.head]     more <head> markup
  * @param {string[]} [page.scripts] module scripts to load
  */
-export function layout({path, title, description, body, release, scripts = []}) {
+export function layout({path, title, description, body, release, head = '', scripts = []}) {
     const fullTitle = path === '/' ? title : `${title} · Cycletron`;
     const nav = NAV.map(({href, label}) => {
         const current = path === href || path.startsWith(`${href}/`);
@@ -50,10 +51,16 @@ export function layout({path, title, description, body, release, scripts = []}) 
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${SITE_URL}${path}">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Cycletron">
 <meta property="og:image" content="${SITE_URL}/media/stage-neon-circuit.png">
+<meta property="og:image:width" content="1920">
+<meta property="og:image:height" content="1080">
+<meta property="og:image:alt" content="Cycletron Stage mode with the Neon Circuit visualizer">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#05060a">
 <link rel="icon" href="/icon.png">
 <link rel="stylesheet" href="/style.css">
+${head}
 ${scripts.map((s) => `<script type="module" src="${s}"></script>`).join('\n')}
 </head>
 <body>

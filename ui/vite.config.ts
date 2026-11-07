@@ -118,7 +118,18 @@ const WEB_BASE = '/play/';
 
 // The web build's page: restore-saved.js is a plain script Vite doesn't
 // rewrite, so give it the base; and the web-only stylesheet hides what needs
-// the desktop shell (saving, export, AI, MIDI, …).
+// the desktop shell (saving, export, AI, MIDI, …); and the tags a shared link
+// previews with.
+const WEB_META = [
+    '<meta name="description" content="Cycletron in the browser: open a song, show or pack from the library and play it on the app\'s engine, with the visualizers.">',
+    '<meta property="og:site_name" content="Cycletron">',
+    '<meta property="og:title" content="Play · Cycletron">',
+    '<meta property="og:description" content="Cycletron in the browser: songs, shows and packs on the app\'s engine, with the visualizers.">',
+    '<meta property="og:type" content="website">',
+    '<meta property="og:image" content="https://cycletron.naderlabs.io/media/stage-neon-circuit.png">',
+    '<meta name="twitter:card" content="summary_large_image">',
+].join('\n    ');
+
 function webIndexPlugin(): Plugin {
     return {
         name: 'web-index',
@@ -127,7 +138,8 @@ function webIndexPlugin(): Plugin {
             order: 'pre',
             handler: (html) => html
                 .replace('<script src="restore-saved.js" vite-ignore></script>', `<script src="${WEB_BASE}restore-saved.js"></script>`)
-                .replace('<link rel="stylesheet" href="style.css">', '<link rel="stylesheet" href="style.css">\n    <link rel="stylesheet" href="web.css">'),
+                .replace('<link rel="stylesheet" href="style.css">', '<link rel="stylesheet" href="style.css">\n    <link rel="stylesheet" href="web.css">')
+                .replace('<title>Cycletron</title>', `<title>Play · Cycletron</title>\n    ${WEB_META}`),
         },
     };
 }
