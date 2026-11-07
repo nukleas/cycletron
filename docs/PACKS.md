@@ -152,9 +152,10 @@ install checks.
   anything draws). The import map in `index.html` maps `@cycletron/viz-sdk` to
   the app's sdk: the source in dev, the `viz-sdk.js` chunk in a build. A pack
   that fails to load is reported in a notification; the app goes on without it.
-- **The renderer** (`ui/scripts/render-viz.mjs`) finds the nearest `pack.json`
-  above the show file, builds its `viz` folders if stale, registers them for
-  the parser, and passes their sources to the render page.
+- **The renderer** (`cycletron render`) loads the pack of the nearest
+  `pack.json` above the show file, then the library's enabled packs, each built
+  `viz` folder once by id, and passes their sources to the render page. A pack
+  that isn't built (no `dist/index.js`) stops the render.
 - **Registration** appends a pack's modes before the end card and its palettes
   after the built-in ones (`registerPack` in `ui/src/viz/registry.ts`). Show
   files, the show pane's suggestions and the Visuals menu see them with no

@@ -1,11 +1,11 @@
 /**
- * Offline visualizer render page (`viz-render.html`), driven headlessly by
- * `scripts/render-viz.mjs`. Evaluates a pattern in the engine (no audio
+ * Offline visualizer render page (`viz-render.html`), driven by `cycletron
+ * render` (see `viz-render-driver.ts`) and by the seam test under Playwright. Evaluates a pattern in the engine (no audio
  * thread), replays the song's WAV through an {@link OfflineAnalyser}, and
  * paints one exact frame per `frame()` call on a fixed clock, so any length
- * renders identically at any speed. Each frame comes back as a PNG encoded
- * here: far cheaper than a DevTools screenshot, and rasterized on the CPU
- * from the first frame so every run, and every chunk, is bit-identical.
+ * renders identically at any speed. Frames are read back as raw pixels (or
+ * PNG, for the test), rasterized on the CPU from the first frame so every run,
+ * and every chunk, is bit-identical.
  */
 
 import wasmInit, {getActiveLocsBufPtr, getCycleViewBufPtr, parsePattern} from '../pkg/strudel_audio_wasm.js';
@@ -22,6 +22,8 @@ import {loadPackSource} from './viz/pack-loader.js';
 import {VIZ_MODES} from './viz/registry.js';
 import {DEFAULT_FONT_PX, StageCodeLayer} from './viz/stage/code-layer.js';
 import {readTheme} from './viz/theme.js';
+import {isTauri} from './tauri.js';
+import {runDriver} from './viz-render-driver.js';
 import type {Theme, VizLayer, VizMode, VizModeDef, VizServices} from '@cycletron/viz-sdk';
 
 type MutableServices = { -readonly [K in keyof VizServices]: VizServices[K] };
@@ -48,8 +50,8 @@ export interface RenderSetup {
     sensitivity: number;
     /** Built visualizer packs (their `dist/index.js` text) to load before the modes resolve. */
     packs?: string[];
-    /** URL of the song's mix. */
-    audio: string;
+    /** The song's mix: a URL, or the WAV itself. */
+    audio: string | ArrayBuffer;
 }
 
 interface Track {
@@ -57,7 +59,7 @@ interface Track {
     mode: VizMode;
 }
 
-class OfflineRender {
+export class OfflineRender {
     private readonly ctx: CanvasRenderingContext2D;
     /** One instance per mode the show uses, by id; all step every frame so each is warm when cut to. */
     private tracks = new Map<string, Track>();
@@ -86,7 +88,7 @@ class OfflineRender {
         await wasmInit({module_or_path: wasmUrl, memory});
         const pattern = parsePattern(opts.code);
 
-        const bytes = await (await fetch(opts.audio)).arrayBuffer();
+        const bytes = typeof opts.audio === 'string' ? await (await fetch(opts.audio)).arrayBuffer() : opts.audio;
         const audio = await new OfflineAudioContext(2, 1, 44_100).decodeAudioData(bytes);
         this.analyser = new OfflineAnalyser(audio);
 
@@ -153,6 +155,26 @@ class OfflineRender {
         return url.slice(url.indexOf(',') + 1);
     }
 
+    /** Frames advanced so far. */
+    frameIndex(): number {
+        return this.next;
+    }
+
+    /** Advance one frame and paint it. */
+    advance(): void {
+        this.step(true);
+    }
+
+    /** The painted frame's pixels, RGBA. */
+    rgba(): Uint8ClampedArray {
+        return this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height).data;
+    }
+
+    /** The painted frame as PNG. */
+    png(): Promise<Blob> {
+        return new Promise((resolve, reject) => this.canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'));
+    }
+
     /** Whether the frame after the next one starts a fade, which dissolves from the next one. */
     private fadeFollows(): boolean {
         if (!this.director.fades) return false;
@@ -212,3 +234,5 @@ class OfflineRender {
 
 const render = new OfflineRender(document.getElementById('stage') as HTMLCanvasElement);
 (window as unknown as {vizRender: OfflineRender}).vizRender = render;
+// Inside `cycletron render` the page is a worker; under Playwright it waits to be driven.
+if (isTauri) void runDriver(render);

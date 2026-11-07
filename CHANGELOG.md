@@ -4,6 +4,13 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+### Command line
+- **The app binary is a command line tool.** `cycletron render show.toml` renders a show file to a music video with no checkout, Node or browser install: the app's own render page paints the frames in small preview windows (one per `--jobs`, and they must stay on screen) and ffmpeg encodes them, so ffmpeg has to be installed and on the PATH. A show outside a pack can use the library's enabled packs. `cycletron check song.strudel` runs the AI's full review from the terminal, and `cycletron export song.strudel [out-dir]` writes the mix and `performance.json` a render makes of each song. `cycletron help` lists them; the user guide has a Command line section. The `song-check` and `performance-export` cargo tools and the `render-viz.mjs` script are gone.
+
+### Dialect docs
+- **The dialect pages now say what actually differs.** Help → Dialect, `docs/DIALECT.md` and the AI's rules were rewritten around three buckets: engine limitations being removed (commas inside `< >`, scale root, literal Euclid arguments, number-only method arguments, vowel numbers), things that fail silently, and things that are the same as web Strudel (pan range, chord voicing, `|` placement, `setbpm` parentheses, section length from `.slow(n)` or weights). Nearly all web Strudel notation works unchanged.
+- The supported-surface doc gained the engine's undocumented methods (`iter`, `chunk`, `swing`, `brak`, `shuffle`, `scramble`, `striate`, `bite`, `someCycles`, `randcat`, `wrandcat`, `binary`, `perlin`, aliases such as `hcutoff`, `bandf`, `dt`, `sz`, `o`) and dropped `q`, `duckrel` and `setcps`, which the current engine does not accept. Autocomplete and `list_methods` now include aliases listed in the doc's tables (`cat`, `seq`, `pm`).
+
 ## 0.1.0-alpha.27 (2026-11-05)
 
 ### Visualizer packs

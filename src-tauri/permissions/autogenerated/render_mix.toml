@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-render-mix"
+description = "Enables the render_mix command without any pre-configured scope."
+commands.allow = ["render_mix"]
+
+[[permission]]
+identifier = "deny-render-mix"
+description = "Denies the render_mix command without any pre-configured scope."
+commands.deny = ["render_mix"]

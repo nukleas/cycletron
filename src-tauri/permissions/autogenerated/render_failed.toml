@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-render-failed"
+description = "Enables the render_failed command without any pre-configured scope."
+commands.allow = ["render_failed"]
+
+[[permission]]
+identifier = "deny-render-failed"
+description = "Denies the render_failed command without any pre-configured scope."
+commands.deny = ["render_failed"]

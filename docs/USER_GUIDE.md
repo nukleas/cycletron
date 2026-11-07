@@ -2,7 +2,7 @@
 
 Live coding for music on a native Rust engine. Patterns run on **strudel-rs**
 with a Strudel-compatible mini-notation dialect. This guide is the product
-manual; for engine footguns see [DIALECT.md](./DIALECT.md).
+manual; for where the engine differs from web Strudel see [DIALECT.md](./DIALECT.md).
 
 ---
 
@@ -374,6 +374,32 @@ directly on a HiDPI display and want a 1:1 match.
 
 ---
 
+## Command line
+
+The app binary is also a command line tool. It is
+`/Applications/Cycletron.app/Contents/MacOS/cycletron` on macOS; on Linux the
+deb puts `cycletron` on your PATH, and the AppImage takes the same arguments.
+On Windows the commands run but print nothing yet (the exit code still tells).
+
+```sh
+cycletron render show.toml               # render a show file to a music video (docs/SHOW_FILES.md)
+cycletron check song.strudel             # the AI's full review: validity, silence, mix, and the form with its bars
+cycletron export song.strudel [out-dir]  # mix.wav + performance.json, what a render makes of each song
+cycletron help
+```
+
+`render` opens a small preview window per job and paints the frames there;
+the windows must stay on screen, and ffmpeg must be on the PATH. It takes
+`--out`, `--song n`, `--section label`, `--from s`, `--to s`, `--size WxH`,
+`--fps n`, `--jobs n` and `--fresh`. `check` takes `--cycles N` and `--strict`;
+`export` takes `--passes N`, `--seconds N` and `--samples manifest.json`. While
+Cycletron is running, the
+same binary drives it: `cycletron play`, `pause`, `toggle`, `stop` (or `hush`),
+`tempo 128`, `tempo-nudge -2`, and any `.strudel` or `.show.toml` path opens
+in the window.
+
+---
+
 ## Updates
 
 Cycletron checks GitHub Releases for updates on startup (toggle in
@@ -390,7 +416,7 @@ are signed; the app verifies them against its built-in public key.
 | No sound | Press **Play** once to arm audio; check OS mute / sample rate; try Lesson 1. |
 | AI panel does nothing | Enable AI first (AI panel → Enable AI…, or Preferences → AI). |
 | AI fails | Preferences → key status; for local, confirm base URL and that the server is running. |
-| Pattern silent | See [DIALECT.md](./DIALECT.md) (pan, voicing, scale format). Use Help → Dialect. |
+| Pattern silent | See [DIALECT.md](./DIALECT.md) (pan range, scale root, vowel numbers, commas in `< >`). Use Help → Dialect. |
 | Weird errors | Help → Show Logs → copy diagnostic dump into a bug report. |
 | API key prompt every launch (dev) | Export the env var in the shell you use for `cargo tauri dev`. |
 
@@ -401,9 +427,9 @@ are signed; the app verifies them against its built-in public key.
 | Item | Purpose |
 |------|---------|
 | Keyboard Shortcuts… | Full shortcut list |
-| Cycletron Dialect… | strudel-rs vs web-strudel footguns |
+| Cycletron Dialect… | What differs from web Strudel on this engine, and what fails silently |
 | User Guide… | This guide (in-app summary) |
-| Open Strudel Docs (web) | Upstream web-strudel learning (not dialect truth) |
+| Open Strudel Docs (web) | Upstream learning; nearly all of it applies, Dialect lists the exceptions |
 | Check for Updates… | Manual update check |
 | Show Logs… / Show Welcome… / About Cycletron | Support and setup |
 

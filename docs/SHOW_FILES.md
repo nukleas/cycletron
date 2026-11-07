@@ -6,7 +6,7 @@ camera, the cuts and transitions, colors, text, the song's code, and effects.
 
 - **Live:** open the file in Cycletron. The set plays with the show file in a
   pane beside the song, and edits take effect as you type.
-- **Rendered:** `render-viz.mjs` writes the same video to an MP4.
+- **Rendered:** `cycletron render` writes the same video to an MP4.
 
 Both cut the same video. Every frame is a function of song time, so what you
 preview live is what renders.
@@ -47,8 +47,7 @@ Play it: open the file in Cycletron (⌘O, or click it in the file tree).
 Render it:
 
 ```sh
-cd ui   # from the cycletron checkout
-node scripts/render-viz.mjs path/to/my.show.toml
+cycletron render path/to/my.show.toml
 ```
 
 ---
@@ -69,8 +68,8 @@ A show is a list of songs (`[[song]]`), played in order. Each song needs a
 A section's length in bars is its weight times the `slow` factor. Here
 `intro@2` under `.slow(4)` is 8 bars, and `outro` is 4. The labels (`intro`,
 `drop`, …) are what `[song.sections]` refers to. To list a song's sections
-with their bars, run `cargo run -p song-check -- song.strudel` from the
-Cycletron repo. A flat MIDI import (one `$:` track per instrument) gets a form
+with their bars, run `cycletron check song.strudel` (the app binary; see the
+user guide's Command line section). A flat MIDI import (one `$:` track per instrument) gets a form
 from `node ui/scripts/section-song.mjs song.strudel --sections intro:0-5,…`,
 which slices every track at the bars you name.
 
@@ -144,7 +143,7 @@ keeps playing.
 | `shots` | — | Modes to cut between through every section not listed. See [shots](#shots). |
 | `passes` | `1` | Times through the form before the next song. |
 | `fade` | none | `{ in = 2, out = 4 }`: bars fading up from black at the start, and down to black at the end of the last pass. |
-| `performance` | auto | A `performance-export` directory to render from. Without it, the render exports the song itself. |
+| `performance` | auto | A `cycletron export` directory to render from. Without it, the render exports the song itself. |
 | `gain_db` | `0` | Render volume. |
 | `sensitivity` | `1` | How strongly the visuals react to the audio. |
 | `sections` | — | The per-section table. |
@@ -379,9 +378,14 @@ code = { follow = "solo", place = "right", size = 22, opacity = 0.6, scrim = fal
 ## Rendering
 
 ```sh
-cd ui   # from the cycletron checkout
-node scripts/render-viz.mjs path/to/show.toml [flags]
+cycletron render path/to/show.toml [flags]
 ```
+
+The app binary is the renderer (the user guide's Command line section says
+where it is). It opens a small preview window per job and paints the frames
+there; the windows must stay on screen, since a hidden page is paused. ffmpeg
+must be on the PATH. From a checkout, `cargo run -q -p cycletron-app --bin
+cycletron -- render …` does the same, with `npm run dev` running in `ui/`.
 
 | Flag | Value |
 |---|---|
@@ -390,26 +394,28 @@ node scripts/render-viz.mjs path/to/show.toml [flags]
 | `--from s`, `--to s` | Trim to these seconds of what's rendered. |
 | `--size WxH`, `--fps n` | Override the show's settings, e.g. for quick previews. |
 | `--out file` | Override the show's `out`. |
-| `--jobs n` | Browsers rendering at once. The default is sized to the machine's cores. |
+| `--jobs n` | Preview windows rendering at once, a chunk each. The default is sized to the machine's cores, up to 8. |
 | `--fresh` | Re-export the songs even when the cached exports are current. |
 
 ### Previews
 
 ```sh
 # one section, small and fast
-node scripts/render-viz.mjs my.show.toml --song 1 --section drop --size 960x540 --fps 30 --out /tmp/drop.mp4
+cycletron render my.show.toml --song 1 --section drop --size 960x540 --fps 30 --out /tmp/drop.mp4
 
 # the whole set, small: about 10 s per minute of video
-node scripts/render-viz.mjs my.show.toml --size 640x360 --fps 24 --out /tmp/preview.mp4
+cycletron render my.show.toml --size 640x360 --fps 24 --out /tmp/preview.mp4
 ```
 
 A full 1080p60 render takes about as long as the video plays, on 8 cores.
 
 ### Exports and audio
 
-Rendering needs each song's mix and section timing (a performance export).
-The first render of a song makes one, in about 20 s, and caches it in
-`~/.cache/cycletron/performance`. It's redone when the song file changes.
+Rendering needs each song's mix and section timing (a `cycletron export`).
+The first render of a song makes one, in about 20 s, and caches it under the
+user cache directory (`~/Library/Caches/cycletron/performance` on macOS,
+`~/.cache/cycletron/performance` on Linux). It's redone when the song file
+changes.
 
 The render carries the raw mix, at the level the visuals are tuned to react
 to. To master it, re-encode the audio only:

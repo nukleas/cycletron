@@ -38,12 +38,22 @@ nightly toolchain or sibling checkout is needed.
   open on a rest aren't false-failed), must not contain unvoiced chords or
   unknown sounds, and the documented engine behaviors must still hold.
 
+- To review a whole song the way the agent does, run the app binary's `check`:
+
+  ```bash
+  cargo run -q -p cycletron-app --bin cycletron -- check song.strudel
+  ```
+
+- To render a show file (`docs/SHOW_FILES.md`) from the checkout, run its
+  `render` the same way, with `npm run dev` running in `ui/`: a debug build
+  loads the render page from vite. Needs ffmpeg on the PATH.
+
 ## The DSL is a documented subset
 
 The set of mini-notation operators, functions, and effects strudel-rs accepts
 is **exactly** what `docs/STRUDEL_RS_SUPPORTED.md` says — web-strudel docs
 diverge. Use that file as ground truth for anything you write or validate;
-`docs/DIALECT.md` covers the common footguns.
+`docs/DIALECT.md` lists where the engine differs from web Strudel and what fails silently.
 
 ## Contributing patterns and corpus examples
 

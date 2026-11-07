@@ -82,6 +82,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "bandf",
+        "detail": "bandf",
+        "info": "Band-pass filter",
+        "kind": "method"
+    },
+    {
         "label": "bandq",
         "detail": "bandq(q)",
         "info": "Band-pass filter",
@@ -103,6 +109,24 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "begin",
         "detail": "begin(0..1)",
         "info": "Sample playback",
+        "kind": "method"
+    },
+    {
+        "label": "binary",
+        "detail": "binary(n)",
+        "info": "The bits of n as a 1 0 … sequence, one cycle.",
+        "kind": "function"
+    },
+    {
+        "label": "binaryN",
+        "detail": "binaryN(n, bits)",
+        "info": "Same, padded or cut to bits steps.",
+        "kind": "function"
+    },
+    {
+        "label": "bite",
+        "detail": "bite(n, \"idx\")",
+        "info": "Cut the cycle into n slices and sequence them by the index pattern: bite(4, \"0 2 1 3\").",
         "kind": "method"
     },
     {
@@ -190,10 +214,22 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "brak",
+        "detail": "brak",
+        "info": "Every other cycle, squash the pattern into half a cycle and shift it a quarter later (breakbeat feel).",
+        "kind": "method"
+    },
+    {
         "label": "brown",
         "detail": "brown",
         "info": "Brown noise",
         "kind": "sound"
+    },
+    {
+        "label": "cat",
+        "detail": "cat",
+        "info": "One pattern per cycle. cat is slowcat here as in web Strudel.",
+        "kind": "function"
     },
     {
         "label": "chop",
@@ -220,6 +256,18 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "chunk",
+        "detail": "chunk(n, fn)",
+        "info": "Apply fn to one nth of the cycle, moving to the next chunk each cycle (backwards / every chunk per cycle).",
+        "kind": "method"
+    },
+    {
+        "label": "chunkBack",
+        "detail": "chunkBack(n, fn)",
+        "info": "Apply fn to one nth of the cycle, moving to the next chunk each cycle (backwards / every chunk per cycle).",
+        "kind": "method"
+    },
+    {
         "label": "clip",
         "detail": "clip(multiplier)",
         "info": "Distortion & shaping",
@@ -234,6 +282,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
     {
         "label": "color",
         "detail": "color(hex)",
+        "info": "Metadata (no audio effect)",
+        "kind": "method"
+    },
+    {
+        "label": "colour",
+        "detail": "colour",
         "info": "Metadata (no audio effect)",
         "kind": "method"
     },
@@ -277,6 +331,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "cutoff",
         "detail": "cutoff(hz)",
         "info": "Low-pass filter",
+        "kind": "method"
+    },
+    {
+        "label": "datt",
+        "detail": "datt",
+        "info": "Ducking / sidechain",
         "kind": "method"
     },
     {
@@ -346,6 +406,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "dfb",
+        "detail": "dfb",
+        "info": "Delay",
+        "kind": "method"
+    },
+    {
         "label": "dict",
         "detail": "dict",
         "info": "Notes / pitch / scale",
@@ -379,6 +445,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "div",
         "detail": "div(n)",
         "info": "Math on values",
+        "kind": "method"
+    },
+    {
+        "label": "dt",
+        "detail": "dt",
+        "info": "Delay",
         "kind": "method"
     },
     {
@@ -420,18 +492,6 @@ export const DSL_SYMBOLS: DslSymbol[] = [
     {
         "label": "duckorbit",
         "detail": "duckorbit(v)",
-        "info": "Ducking / sidechain",
-        "kind": "method"
-    },
-    {
-        "label": "duckrel",
-        "detail": "duckrel(t)",
-        "info": "Ducking / sidechain",
-        "kind": "method"
-    },
-    {
-        "label": "duckrelease",
-        "detail": "duckrelease",
         "info": "Ducking / sidechain",
         "kind": "method"
     },
@@ -518,6 +578,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "detail": "fastcat(...)",
         "info": "Concatenate, one cycle total.",
         "kind": "function"
+    },
+    {
+        "label": "fastChunk",
+        "detail": "fastChunk(n, fn)",
+        "info": "Apply fn to one nth of the cycle, moving to the next chunk each cycle (backwards / every chunk per cycle).",
+        "kind": "method"
     },
     {
         "label": "firstOf",
@@ -631,6 +697,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "grainsize",
         "detail": "grainsize(ms)",
         "info": "Effect quick-list (chainable)",
+        "kind": "method"
+    },
+    {
+        "label": "hcutoff",
+        "detail": "hcutoff",
+        "info": "High-pass filter",
         "kind": "method"
     },
     {
@@ -772,6 +844,18 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "function"
     },
     {
+        "label": "iter",
+        "detail": "iter(n)",
+        "info": "Each cycle, start the pattern one nth later (or earlier).",
+        "kind": "method"
+    },
+    {
+        "label": "iterBack",
+        "detail": "iterBack(n)",
+        "info": "Each cycle, start the pattern one nth later (or earlier).",
+        "kind": "method"
+    },
+    {
         "label": "jux",
         "detail": "jux(fn)",
         "info": "Stereo & layering",
@@ -811,6 +895,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "linger",
         "detail": "linger(t)",
         "info": "Time / sequencing",
+        "kind": "method"
+    },
+    {
+        "label": "log",
+        "detail": "log",
+        "info": "Metadata (no audio effect)",
         "kind": "method"
     },
     {
@@ -898,6 +988,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "m",
+        "detail": "m",
+        "info": "Parse a string as mini-notation (rarely needed; string literals already parse).",
+        "kind": "function"
+    },
+    {
         "label": "mask",
         "detail": "mask(pat)",
         "info": "Degradation",
@@ -918,8 +1014,8 @@ export const DSL_SYMBOLS: DslSymbol[] = [
     {
         "label": "n",
         "detail": "n",
-        "info": "Notes / pitch / scale",
-        "kind": "method"
+        "info": "Reinterpret values as MIDI notes.",
+        "kind": "function"
     },
     {
         "label": "never",
@@ -938,6 +1034,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "detail": "note(pat)",
         "info": "Reinterpret values as MIDI notes.",
         "kind": "function"
+    },
+    {
+        "label": "o",
+        "detail": "o",
+        "info": "Sample playback",
+        "kind": "method"
     },
     {
         "label": "off",
@@ -1018,6 +1120,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "perlin",
+        "detail": "perlin",
+        "info": "Smooth 0..1 noise across cycles.",
+        "kind": "function"
+    },
+    {
         "label": "ph",
         "detail": "ph",
         "info": "Sweep a notch through the signal. Rate alone engages it with a default depth.",
@@ -1051,6 +1159,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "phd",
         "detail": "phd",
         "info": "How far the notch travels.",
+        "kind": "method"
+    },
+    {
+        "label": "pianoroll",
+        "detail": "pianoroll",
+        "info": "Metadata (no audio effect)",
         "kind": "method"
     },
     {
@@ -1138,9 +1252,21 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "pm",
+        "detail": "pm",
+        "info": "Stack with LCM step alignment.",
+        "kind": "function"
+    },
+    {
         "label": "polymeter",
         "detail": "polymeter(...)",
         "info": "Stack with LCM step alignment.",
+        "kind": "function"
+    },
+    {
+        "label": "polyrhythm",
+        "detail": "polyrhythm",
+        "info": "Play patterns simultaneously.",
         "kind": "function"
     },
     {
@@ -1184,6 +1310,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "detail": "pulse",
         "info": "Variable-width pulse (width 0..1)",
         "kind": "sound"
+    },
+    {
+        "label": "punchcard",
+        "detail": "punchcard",
+        "info": "Metadata (no audio effect)",
+        "kind": "method"
     },
     {
         "label": "pure",
@@ -1234,15 +1366,15 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
-        "label": "q",
-        "detail": "q",
-        "info": "Low-pass filter",
-        "kind": "method"
-    },
-    {
         "label": "rand",
         "detail": "rand",
         "info": "Uniform random 0..1, deterministic per cycle.",
+        "kind": "function"
+    },
+    {
+        "label": "randcat",
+        "detail": "randcat(...)",
+        "info": "One of the patterns per cycle, chosen at random (seeded).",
         "kind": "function"
     },
     {
@@ -1342,6 +1474,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "rsize",
+        "detail": "rsize",
+        "info": "Reverb / room",
+        "kind": "method"
+    },
+    {
         "label": "run",
         "detail": "run(n)",
         "info": "Integer ramp 0..n across the cycle.",
@@ -1349,8 +1487,20 @@ export const DSL_SYMBOLS: DslSymbol[] = [
     },
     {
         "label": "s",
-        "detail": "s",
-        "info": "Notes / pitch / scale",
+        "detail": "s(\"bd sd\").every(\"<2 3>\", …)",
+        "info": "Reinterpret values as sound names.",
+        "kind": "function"
+    },
+    {
+        "label": "sampleBegin",
+        "detail": "sampleBegin",
+        "info": "Sample playback",
+        "kind": "method"
+    },
+    {
+        "label": "sampleEnd",
+        "detail": "sampleEnd",
+        "info": "Sample playback",
         "kind": "method"
     },
     {
@@ -1402,6 +1552,18 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "scope",
+        "detail": "scope",
+        "info": "Metadata (no audio effect)",
+        "kind": "method"
+    },
+    {
+        "label": "scramble",
+        "detail": "scramble(n)",
+        "info": "Cut the cycle into n slices and play them in random order (shuffle: each once; scramble: with repeats).",
+        "kind": "method"
+    },
+    {
         "label": "seg",
         "detail": "seg",
         "info": "Time / sequencing",
@@ -1414,6 +1576,18 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "kind": "method"
     },
     {
+        "label": "seq",
+        "detail": "seq",
+        "info": "Concatenate, one cycle total.",
+        "kind": "function"
+    },
+    {
+        "label": "sequence",
+        "detail": "sequence",
+        "info": "Concatenate, one cycle total.",
+        "kind": "function"
+    },
+    {
         "label": "setbpm",
         "detail": "setbpm(N)",
         "info": "Beats per minute. Conversion: cps = bpm / 240. Assumes 4 beats per cycle.",
@@ -1422,19 +1596,19 @@ export const DSL_SYMBOLS: DslSymbol[] = [
     {
         "label": "setcpm",
         "detail": "setcpm(N)",
-        "info": "Cycles per minute. cps = cpm / 60.",
-        "kind": "keyword"
-    },
-    {
-        "label": "setcps",
-        "detail": "setcps(N)",
-        "info": "Cycles per second, raw.",
+        "info": "Cycles per minute. cps = cpm / 60. Same as web Strudel.",
         "kind": "keyword"
     },
     {
         "label": "shape",
         "detail": "shape(amount)",
         "info": "Distortion & shaping",
+        "kind": "method"
+    },
+    {
+        "label": "shuffle",
+        "detail": "shuffle(n)",
+        "info": "Cut the cycle into n slices and play them in random order (shuffle: each once; scramble: with repeats).",
         "kind": "method"
     },
     {
@@ -1476,8 +1650,20 @@ export const DSL_SYMBOLS: DslSymbol[] = [
     {
         "label": "slowcat",
         "detail": "slowcat(...)",
-        "info": "One pattern per cycle.",
+        "info": "One pattern per cycle. cat is slowcat here as in web Strudel.",
         "kind": "function"
+    },
+    {
+        "label": "someCycles",
+        "detail": "someCycles(fn)",
+        "info": "Conditionals",
+        "kind": "method"
+    },
+    {
+        "label": "someCyclesBy",
+        "detail": "someCyclesBy(prob, fn)",
+        "info": "Conditionals",
+        "kind": "method"
     },
     {
         "label": "sometimes",
@@ -1501,6 +1687,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "speed",
         "detail": "speed(v)",
         "info": "Sample playback",
+        "kind": "method"
+    },
+    {
+        "label": "spiral",
+        "detail": "spiral",
+        "info": "Metadata (no audio effect)",
         "kind": "method"
     },
     {
@@ -1531,6 +1723,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "strans",
         "detail": "strans",
         "info": "Notes / pitch / scale",
+        "kind": "method"
+    },
+    {
+        "label": "striate",
+        "detail": "striate(n)",
+        "info": "Play the nth slice of every sample, moving through the slices across the cycle.",
         "kind": "method"
     },
     {
@@ -1603,6 +1801,24 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "label": "sustain",
         "detail": "sustain(level)",
         "info": "ADSR envelope (note)",
+        "kind": "method"
+    },
+    {
+        "label": "swing",
+        "detail": "swing(n)",
+        "info": "Delay every second of n subdivisions by x (swing uses a third).",
+        "kind": "method"
+    },
+    {
+        "label": "swingBy",
+        "detail": "swingBy(x, n)",
+        "info": "Delay every second of n subdivisions by x (swing uses a third).",
+        "kind": "method"
+    },
+    {
+        "label": "sz",
+        "detail": "sz",
+        "info": "Reverb / room",
         "kind": "method"
     },
     {
@@ -1760,6 +1976,12 @@ export const DSL_SYMBOLS: DslSymbol[] = [
         "detail": "within(start, end, fn)",
         "info": "Time / sequencing",
         "kind": "method"
+    },
+    {
+        "label": "wrandcat",
+        "detail": "wrandcat([pat, weight], …)",
+        "info": "Weighted randcat.",
+        "kind": "function"
     },
     {
         "label": "wt_bass",

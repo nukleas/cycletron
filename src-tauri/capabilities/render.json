@@ -1,0 +1,24 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "render",
+  "description": "Preview windows of an offline render",
+  "windows": ["render-*"],
+  "remote": {
+    "urls": [
+      "http://127.0.0.1:*",
+      "http://localhost:*"
+    ]
+  },
+  "permissions": [
+    "core:default",
+    "allow-render-plan",
+    "allow-render-songs",
+    "allow-render-cues",
+    "allow-render-next",
+    "allow-render-mix",
+    "allow-render-frame",
+    "allow-render-chunk-done",
+    "allow-render-failed",
+    "allow-render-hidden"
+  ]
+}

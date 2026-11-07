@@ -365,7 +365,7 @@ async function wireAiChat() {
             '1. Press **Play** to arm audio\n' +
             '2. Open **Examples → Lesson 1** (or describe a groove here)\n' +
             '3. Edit the code, Play again — I can rewrite the editor from chat\n\n' +
-            'Help → **User Guide** / **Dialect** covers shortcuts and strudel-rs footguns.'
+            'Help → **User Guide** / **Dialect** covers shortcuts and where this engine differs from web Strudel.'
         );
     }, 150);
 }
