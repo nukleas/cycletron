@@ -97,6 +97,8 @@ class LiveShow {
     private asking = false;
     /** True while start() plans the show and opens its first song. */
     private starting = false;
+    /** The show is armed but waits for Play; announced again once heard. */
+    private waiting = false;
 
     constructor() {
         // Opening another file ends the show; the song stays open as a plain song.
@@ -175,8 +177,11 @@ class LiveShow {
             app.onTick = (cycle) => this.advance(cycle);
             ambientViz.setDirector((cycle) => this.direct(cycle));
             this.timer = setInterval(() => void this.poll(), POLL_MS);
+            // A browser starts audio only after a click on the page (a ?open= link
+            // has none): the show is armed and waits for Play.
+            this.waiting = isWeb && !navigator.userActivation.hasBeenActive;
             // Song and show stay in view, to edit while it plays; ⌘⇧F is the stage.
-            await app.play();
+            if (!this.waiting) await app.play();
             this.announce();
         } finally {
             this.starting = false;
@@ -216,6 +221,7 @@ class LiveShow {
         this.next = null;
         this.stalled = false;
         this.holding = false;
+        this.waiting = false;
         this.playing = null;
         this.edit = null;
         showPane.close();
@@ -287,7 +293,13 @@ class LiveShow {
      */
     private advance(cycle: number): void {
         const app = window.strudelApp;
-        if (!app || this.preparing) return;
+        if (!app) return;
+        // Starting audio set its own status over the set's.
+        if (this.waiting) {
+            this.waiting = false;
+            this.announce();
+        }
+        if (this.preparing) return;
         if (this.next) {
             if (!app.songPending) this.arm(cycle);
             return;
@@ -371,9 +383,9 @@ class LiveShow {
     }
 
     private announce(): void {
-        if (this.plan.length > 1) {
-            status(`Set ${this.current + 1}/${this.plan.length} · ${basename(this.plan[this.current].song.source)}`);
-        }
+        const set = this.plan.length > 1 ? `Set ${this.current + 1}/${this.plan.length} · ${basename(this.plan[this.current].song.source)}` : '';
+        if (this.waiting) status(set ? `${set} · press Play to start` : 'Press Play to start the show');
+        else if (set) status(set);
     }
 
     /** The line that sets the playing section's look: its entry, or its song's `mode`. */
