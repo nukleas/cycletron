@@ -21,7 +21,8 @@ import {fileManager} from '../file-manager.js';
 import type {Shot} from '../fullscreen-viz.js';
 import {basename} from '../paths.js';
 import {stage} from '../stage.js';
-import {invoke} from '../tauri.js';
+import {invoke, isWeb} from '../tauri.js';
+import {WEB_LIBRARY_ROOT} from '../web-backend.js';
 import {VIZ_MODES} from '../viz/registry.js';
 import type {PatternHandle} from '../../pkg';
 import {direct, type Director} from './director.js';
@@ -474,10 +475,10 @@ async function planSongs(songs: ShowSong[], playing = -1, playingCode = '', know
 }
 
 async function context(path: string): Promise<ShowContext> {
-    const {homeDir} = await import('@tauri-apps/api/path');
     return {
         dir: path.replace(/[\\/][^\\/]*$/, ''),
-        home: await homeDir(),
+        // The web build's library has no home folder; `~` means its root.
+        home: isWeb ? WEB_LIBRARY_ROOT : await (await import('@tauri-apps/api/path')).homeDir(),
         modes: VIZ_MODES.map((m) => m.id),
     };
 }

@@ -9,7 +9,7 @@
  * tracking, and recents stay consistent with Cmd+O / Cmd+S flows.
  */
 
-import {invoke, isTauri} from './tauri.js';
+import {hasLibrary, invoke} from './tauri.js';
 import {escapeHtml} from './html.js';
 import {fileManager, isShowPath} from './file-manager.js';
 import {confirmDialog, errorDialog, openPathDialog} from './dialog.js';
@@ -55,7 +55,7 @@ export class FileExplorer {
         this.bindControls();
         this.bindFileEvents();
 
-        if (!isTauri) {
+        if (!hasLibrary) {
             this.treeEl.innerHTML = '<div class="file-tree-empty">File explorer only available in desktop build.</div>';
             return;
         }
@@ -596,6 +596,24 @@ export class FileExplorer {
 
     /** Toggle the panel and persist the state — the one implementation
      *  behind the collapse arrow and the command palette. */
+    /** Expand the folders down to `path` and scroll its row into view. */
+    async reveal(path: string): Promise<void> {
+        let dir = parentDirOf(path);
+        const ancestors: string[] = [];
+        while (dir && this.isUnderRoot(dir) && dir !== this.root) {
+            ancestors.unshift(dir);
+            dir = parentDirOf(dir);
+        }
+        for (const a of ancestors) {
+            this.expanded.add(a);
+            await this.loadChildren(a);
+        }
+        this.persistExpanded();
+        this.render();
+        this.treeEl?.querySelector<HTMLElement>(`.file-tree-row[data-path="${CSS.escape(path)}"]`)
+            ?.scrollIntoView({block: 'center'});
+    }
+
     toggleCollapsed(): void {
         if (!this.panel) return;
         const collapsed = !this.panel.classList.contains('collapsed');

@@ -11,6 +11,7 @@
     "dev": "vite --port 5173",
     "prebuild": "npm run gen:dsl && npm run gen:manifest",
     "build": "vite build",
+    "build:web": "npm run gen:dsl && npm run gen:manifest && vite build --mode web",
     "test:viz": "node --test scripts/viz.test.mjs",
     "test:render": "node --test scripts/render-viz.test.mjs",
     "test:show": "node --test scripts/show.test.mjs",
