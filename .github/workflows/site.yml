@@ -1,0 +1,86 @@
+name: Site
+
+# Builds cycletron.naderlabs.io (site/) and deploys it to the Vercel project
+# cycletron-site. Like aur.yml it runs when a release is PUBLISHED: the
+# download page links the release's assets, which have no working URL while
+# release.yml's draft is under review.
+#
+# The site is the release's: docs, changelog, demos and the in-browser app at
+# /play all come from the tag. The packs come from cycletron-packs master,
+# built against that tag's viz SDK, checked out next to this repo where
+# cycpack and the site build both look for each other.
+#
+# Vercel's Git integration is off for this project; this workflow is the only
+# thing that deploys it. site/vercel.json has no build command, so
+# `vercel build` only packages site/dist, and `--prebuilt` uploads that (a
+# plain `vercel deploy` would skip dist/, which is gitignored).
+#
+# Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build the site from, e.g. v0.1.0-alpha.27'
+        required: true
+
+concurrency:
+  group: site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    env:
+      SITE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CYCLETRON_PACKS: ${{ github.workspace }}/cycletron-packs
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SITE_TAG }}
+          path: cycletron
+
+      - uses: actions/checkout@v7
+        with:
+          repository: nukleas/cycletron-packs
+          path: cycletron-packs
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: |
+          (cd cycletron/ui && npm ci)
+          (cd cycletron/site && npm ci)
+          (cd cycletron-packs && npm ci)
+
+      # Every pack's visualizers, bundled by the app's pack-build. Underscore
+      # folders are staging and stay out, as they do in the site build.
+      - name: Build packs
+        working-directory: cycletron-packs
+        run: |
+          for dir in packs/*/; do
+            name=$(basename "$dir")
+            case "$name" in _*) continue ;; esac
+            node bin/cycpack.ts build "$name"
+          done
+
+      - name: Build site
+        working-directory: cycletron/site
+        run: npm run build
+
+      - name: Deploy
+        working-directory: cycletron/site
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          npx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx vercel@latest build --prod --token="$VERCEL_TOKEN"
+          npx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"

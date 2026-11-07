@@ -1,0 +1,23 @@
+/* The web build (vite --mode web): hide what needs the desktop shell —
+   saving and the File menu, export and recording, MIDI, the AI panel,
+   choosing a library folder, managing sample sets. The library is the
+   read-only copy published with the site (src/web-library.ts). */
+
+#fileMenuBtn,
+#fileMenuPopover,
+#midiInStatus,
+#aiPanel,
+#filesNewFile,
+#filesNewFolder,
+#filesMidiImport,
+#filesChangeRoot,
+#fileContextMenu,
+#historyBtn,
+#recordBtn,
+#recordBars,
+#recordStatus,
+#editorMidiBtn,
+#soundsManage,
+#emptyNewBtn {
+    display: none !important;
+}

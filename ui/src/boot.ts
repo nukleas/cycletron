@@ -9,7 +9,8 @@
  *   - global shortcuts (app-local): Cmd+O/S/Shift+S/N
  */
 
-import {invoke, isTauri} from './tauri.js';
+import {invoke, isTauri, isWeb} from './tauri.js';
+import {WEB_LIBRARY_ROOT} from './web-backend.js';
 import {confirmDialog} from './dialog.js';
 import {fileManager} from './file-manager.js';
 import {initMenuEvents} from './menu-events.js';
@@ -144,6 +145,10 @@ function setupAppShortcuts(): void {
 
 async function boot(): Promise<void> {
     await loadVizPacks();
+    if (isWeb) {
+        await bootWeb();
+        return;
+    }
     if (!isTauri) {
         console.log('[boot] not running in Tauri — file management disabled');
         return;
@@ -201,6 +206,26 @@ async function boot(): Promise<void> {
 
     // Autosave on significant events — the backend throttles internally.
     setupAutosave();
+}
+
+/**
+ * The web build: the read-only library in the file tree, help and the
+ * command palette, and `?open=<path in the library>` opening a song or show
+ * (the site's example and pack pages link here that way).
+ */
+async function bootWeb(): Promise<void> {
+    await waitForStrudelApp();
+    helpModal.init();
+    commandPalette.init();
+    editorEmptyState.init();
+    await fileExplorer.init();
+
+    const open = new URLSearchParams(location.search).get('open');
+    if (open) {
+        const path = `${WEB_LIBRARY_ROOT}/${open.replace(/^\/+/, '')}`;
+        await fileManager.openPath(path, {force: true});
+        await fileExplorer.reveal(path);
+    }
 }
 
 function setupMidiLabTriggers(): void {

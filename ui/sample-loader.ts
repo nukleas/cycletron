@@ -76,13 +76,22 @@ const LOCAL_WAF_BASE = '/soundfonts';
 const LOCAL_SAMPLES_BASE = '/samples/';
 
 /**
+ * Resolve a root-absolute path to a file in `ui/public/` against the build's
+ * base, so a build served under a subpath (the web build) still finds its
+ * samples. The app builds with base `/`, where this is the identity.
+ */
+function publicUrl(url: string): string {
+    return url.startsWith('/') ? import.meta.env.BASE_URL + url.slice(1) : url;
+}
+
+/**
  * Fetch the first URL that responds OK, trying each in order. Used for
  * offline-first loading: a bundled same-origin path first, then a remote CDN.
  */
 async function fetchFirstOk(urls: string[]): Promise<Response | null> {
     for (const u of urls) {
         try {
-            const resp = await fetch(u, {mode: 'cors'});
+            const resp = await fetch(publicUrl(u), {mode: 'cors'});
             if (resp.ok) return resp;
         } catch {
             // try the next URL
@@ -300,7 +309,7 @@ export class SampleLoader {
     async loadVcslBanks(): Promise<string[]> {
         const names: string[] = [];
         const fetchLocal = async (path: string): Promise<ArrayBuffer> => {
-            const res = await fetch(LOCAL_SAMPLES_BASE + path);
+            const res = await fetch(publicUrl(LOCAL_SAMPLES_BASE + path));
             if (!res.ok) throw new Error(`${res.status} ${path}`);
             return res.arrayBuffer();
         };

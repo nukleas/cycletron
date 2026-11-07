@@ -58,6 +58,8 @@ interface ImportMeta {
             as?: string;
         },
     ) => Record<string, unknown> | Promise<Record<string, unknown>>;
+    /** Vite's build-time env; `BASE_URL` is the configured base, ending in `/`. */
+    readonly env: {readonly BASE_URL: string; readonly MODE: string};
 }
 
 declare module '*?raw' {
