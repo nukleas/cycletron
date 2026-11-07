@@ -12,7 +12,7 @@ import {execFileSync} from 'node:child_process';
 import {cpSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {REPO_URL, ROOT, installers, loadChangelog, loadRelease, read, section} from './lib/content.mjs';
-import {esc, formatDate, formatSize, layout} from './lib/layout.mjs';
+import {SITE_URL, esc, formatDate, formatSize, layout} from './lib/layout.mjs';
 import {CHANNEL_URL, demos} from './lib/demos.mjs';
 import {loadPacks, showTitle, songMeta, writeLibrary} from './lib/library.mjs';
 import {SECTIONS, SECTION_INTROS, loadExamples} from './lib/examples.mjs';
@@ -25,8 +25,12 @@ const changelog = loadChangelog(release);
 rmSync(DIST, {recursive: true, force: true});
 mkdirSync(DIST, {recursive: true});
 
+/** Every page's path, for the sitemap. */
+const pages = [];
+
 /** Write a page; `/guide/shows` → dist/guide/shows.html (served without .html). */
 function emit(path, html) {
+    if (path !== '/404') pages.push(path);
     const file = path === '/' ? 'index.html' : `${path.slice(1)}.html`;
     mkdirSync(dirname(join(DIST, file)), {recursive: true});
     writeFileSync(join(DIST, file), html);
@@ -60,6 +64,27 @@ function downloadButtons() {
 </div>`;
 }
 
+/** What search engines read as the app: on the home and download pages. */
+const appData = `<script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Cycletron',
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'macOS, Windows, Linux',
+    softwareVersion: release.version,
+    url: `${SITE_URL}/`,
+    downloadUrl: `${SITE_URL}/download`,
+    license: 'https://www.gnu.org/licenses/agpl-3.0.html',
+    offers: {'@type': 'Offer', price: '0', priceCurrency: 'USD'},
+    publisher: {'@type': 'Organization', name: 'NaderLabs', url: 'https://www.naderlabs.io/'},
+})}</script>`;
+
+/** A meta description: about the length a search result shows, cut at a word. */
+function summary(text, max = 155) {
+    if (text.length <= max) return text;
+    return `${text.slice(0, text.lastIndexOf(' ', max - 1))}…`;
+}
+
 const STAGE_SHOTS = [
     {file: 'stage-neon-circuit.png', caption: 'Stage mode with the Neon Circuit visualizer.'},
     {file: 'stage-forest-drive.png', caption: 'Forest Drive: each note is a tree on the verge, and it reaches the windshield on the beat.'},
@@ -73,6 +98,7 @@ page({
     title: 'Cycletron — live coding music on a Rust engine',
     description:
         'A desktop app for live coding music on macOS, Linux and Windows: Strudel-style patterns on the strudel-rs engine, with visualizers that follow the pattern.',
+    head: appData,
     scripts: ['/site.js'],
     body: `
 <section class="hero">
@@ -135,6 +161,7 @@ page({
     path: '/download',
     title: 'Download',
     description: `Cycletron ${release.version} for macOS, Windows and Linux, with requirements, updates and privacy.`,
+    head: appData,
     scripts: ['/site.js'],
     body: `
 <h1>Download</h1>
@@ -298,6 +325,15 @@ ${SECTIONS.map((section) => {
 }).join('')}`,
 });
 
+/** The example's own line, and what the page is when that leaves room. */
+function exampleDescription(e) {
+    const own = `${e.title}${e.description ? `: ${e.description.replace(/\.$/, '')}` : ''}.`;
+    const what = e.kind === 'show'
+        ? 'A Cycletron show file, with its source.'
+        : 'A Strudel-style pattern from the Cycletron demo library, with its code.';
+    return `${own} ${what}`.length <= 155 ? `${own} ${what}` : summary(own);
+}
+
 for (const e of examples) {
     const siblings = examples.filter((x) => x.section === e.section);
     const at = siblings.indexOf(e);
@@ -305,8 +341,8 @@ for (const e of examples) {
     const next = siblings[at + 1];
     page({
         path: `/examples/${e.slug}`,
-        title: `${e.title} — Examples`,
-        description: e.description ?? `${e.title}, from the Cycletron demo library.`,
+        title: `${e.title}${e.kind === 'show' ? ' (show)' : ''} — Examples`,
+        description: exampleDescription(e),
         body: `
 <p class="crumbs"><a href="/examples">Examples</a> / ${e.section}${e.folder ? ` / ${esc(e.folder)}` : ''}</p>
 <h1>${esc(e.title)}</h1>
@@ -360,6 +396,19 @@ ${packs.map(card).join('')}`,
     });
 }
 
+// ---- /404 ------------------------------------------------------------------
+// Vercel serves dist/404.html, with a 404 status, for any path it has no file for.
+
+page({
+    path: '/404',
+    title: 'Page not found',
+    description: 'This page does not exist.',
+    body: `
+<h1>Page not found</h1>
+<p class="lede">There is no page at this address.</p>
+<p><a href="/">Cycletron home</a> · <a href="/download">Download</a> · <a href="/examples">Examples</a> · <a href="/guide">Guide</a></p>`,
+});
+
 // ---- static files ---------------------------------------------------------
 
 cpSync(join(import.meta.dirname, 'src'), DIST, {recursive: true});
@@ -368,6 +417,7 @@ for (const file of STAGE_SHOTS.map((s) => s.file)) {
     cpSync(join(ROOT, 'docs/media/screenshots', file), join(DIST, 'media', file));
 }
 cpSync(join(ROOT, 'src-tauri/icons/128x128.png'), join(DIST, 'icon.png'));
+cpSync(join(ROOT, 'src-tauri/icons/icon.ico'), join(DIST, 'favicon.ico'));
 
 // The app itself at /play (ui, `npm run build:web`), with the samples and
 // soundfonts it loads and its library: Demos/ as the app seeds it, and the
@@ -378,6 +428,18 @@ if (!process.env.SKIP_APP) {
 cpSync(join(ROOT, 'ui', 'dist-web'), join(DIST, 'play'), {recursive: true});
 const library = writeLibrary(join(DIST, 'play', 'library'), examples, packs);
 packsPage();
+
+// /play is the app, not a page to index (vercel.json sends it noindex); the
+// examples carry the same code as text.
+writeFileSync(join(DIST, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${pages.map((path) => `  <url><loc>${SITE_URL}${path}</loc></url>`).join('\n')}
+</urlset>
+`);
+writeFileSync(join(DIST, 'robots.txt'), `User-agent: *
+Allow: /
+Sitemap: ${SITE_URL}/sitemap.xml
+`);
 
 if (release.local) console.log('site: local build — docs and examples from the working tree; set SITE_TAG for a release build');
 console.log(`site: ${release.tag} (${formatDate(release.date)}), changelog ${changelog.length} releases, ${examples.length} examples, library ${library.files} files, packs: ${packs.map((p) => p.id).join(', ') || 'none'} → ${DIST}`);
