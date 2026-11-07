@@ -89,7 +89,7 @@ function noPrivatePublicDirsPlugin(): Plugin {
 // this plugin points at the built sdk chunk.
 // The chunk is emitted here, not as an input, so its exports keep their names:
 // vite builds app entries with preserveEntrySignatures off, which would mangle them.
-function vizSdkPlugin(): Plugin {
+function vizSdkPlugin(base: string): Plugin {
     return {
         name: 'viz-sdk',
         apply: 'build',
@@ -102,7 +102,7 @@ function vizSdkPlugin(): Plugin {
             });
         },
         transformIndexHtml(html) {
-            return html.replace('"@cycletron/viz-sdk": "/packages/viz-sdk/src/index.ts"', '"@cycletron/viz-sdk": "/viz-sdk.js"');
+            return html.replace('"@cycletron/viz-sdk": "/packages/viz-sdk/src/index.ts"', `"@cycletron/viz-sdk": "${base}viz-sdk.js"`);
         },
         generateBundle(_options, bundle) {
             const sdk = bundle['viz-sdk.js'];
@@ -113,11 +113,32 @@ function vizSdkPlugin(): Plugin {
     };
 }
 
+/** Where the web build is served on cycletron.naderlabs.io. */
+const WEB_BASE = '/play/';
+
+// The web build's page: restore-saved.js is a plain script Vite doesn't
+// rewrite, so give it the base; and the web-only stylesheet hides what needs
+// the desktop shell (saving, export, AI, MIDI, …).
+function webIndexPlugin(): Plugin {
+    return {
+        name: 'web-index',
+        transformIndexHtml: {
+            // Before Vite collects the page's scripts and styles.
+            order: 'pre',
+            handler: (html) => html
+                .replace('<script src="restore-saved.js" vite-ignore></script>', `<script src="${WEB_BASE}restore-saved.js"></script>`)
+                .replace('<link rel="stylesheet" href="style.css">', '<link rel="stylesheet" href="style.css">\n    <link rel="stylesheet" href="web.css">'),
+        },
+    };
+}
+
 export default defineConfig(({mode}) => ({
-    // No base path — served from Tauri webview root
+    // No base path — served from Tauri webview root. The web build
+    // (`--mode web`) is the app on cycletron.naderlabs.io, under /play/.
+    base: mode === 'web' ? WEB_BASE : '/',
     clearScreen: false,
     build: {
-        outDir: 'dist',
+        outDir: mode === 'web' ? 'dist-web' : 'dist',
         assetsDir: 'assets',
         rollupOptions: {
             input: {
@@ -169,6 +190,7 @@ export default defineConfig(({mode}) => ({
         InlineEnum.vite(),
         wasmMemoryLeakFixPlugin(),
         noPrivatePublicDirsPlugin(),
-        vizSdkPlugin(),
+        vizSdkPlugin(mode === 'web' ? WEB_BASE : '/'),
+        ...(mode === 'web' ? [webIndexPlugin()] : []),
     ]
 }));

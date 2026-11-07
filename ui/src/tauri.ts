@@ -1,4 +1,5 @@
 import {diag} from './diagnostics.js';
+import {webCommand} from './web-backend.js';
 
 /**
  * Shared Tauri IPC helper. Every module that talks to the Rust backend should
@@ -7,7 +8,12 @@ import {diag} from './diagnostics.js';
  */
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
     const api = window.__TAURI__?.core;
-    if (!api) throw new Error('Tauri not available');
+    if (!api) {
+        // The web build answers the commands it can (src/web-backend.ts).
+        const web = isWeb ? webCommand<T>(cmd, args) : undefined;
+        if (web) return web;
+        throw new Error('Tauri not available');
+    }
     return api.invoke<T>(cmd, args).catch((e: unknown) => failed(cmd, e));
 }
 
@@ -50,3 +56,9 @@ export async function listen<T = unknown>(
 
 /** True when running inside the Tauri desktop shell (vs. a plain browser). */
 export const isTauri = !!window.__TAURI__;
+
+/** The web build (`vite build --mode web`): the app on cycletron.naderlabs.io. */
+export const isWeb = !isTauri && import.meta.env.MODE === 'web';
+
+/** A library to browse and open: the desktop's folder, or the web build's read-only copy. */
+export const hasLibrary = isTauri || isWeb;

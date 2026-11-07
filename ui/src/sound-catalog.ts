@@ -243,7 +243,7 @@ async function build(): Promise<Catalog> {
     } else {
         // Bundled set active. This is the artifact export renders from — never
         // fall back to sample-tables.ts if it is missing; surface the error.
-        const resp = await fetch('/cycletron.strudel.json');
+        const resp = await fetch(`${import.meta.env.BASE_URL}cycletron.strudel.json`);
         if (!resp.ok) throw new Error(`bundled manifest unavailable (${resp.status})`);
         const manifest = (await resp.json()) as Record<string, ManifestValue>;
         for (const [name, value] of Object.entries(manifest)) {

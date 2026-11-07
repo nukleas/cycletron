@@ -7,7 +7,7 @@
 
 import {sdkSatisfies, validatePack, SDK_VERSION, type VizPack} from '@cycletron/viz-sdk';
 import {registerPack} from './registry.js';
-import {invoke, isTauri} from '../tauri.js';
+import {hasLibrary, invoke} from '../tauri.js';
 import {diag} from '../diagnostics.js';
 import type {VizPackSource} from '../types/tauri-commands.js';
 
@@ -40,7 +40,7 @@ export async function loadPackSource(source: string, from = 'a pack'): Promise<V
  * skipped.
  */
 export async function loadLibraryPacks(onError: (id: string, message: string) => void): Promise<string[]> {
-    if (!isTauri) return [];
+    if (!hasLibrary) return [];
     let packs: VizPackSource[];
     try {
         packs = await invoke<VizPackSource[]>('list_viz_packs');
