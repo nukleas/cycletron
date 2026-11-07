@@ -377,10 +377,7 @@ export class StrudelApp {
     };
 
     private _onBecameVisible(): void {
-        const ctx = this.audioManager?.getAudioContext?.();
-        if (ctx && ctx.state !== 'running') {
-            void ctx.resume();
-        }
+        this._wakeAudio();
         this.scheduler?.setUiPaused(false);
         this.scheduler?.kickSchedule();
         if (this.playbackState === PlaybackState.Playing) {
@@ -1300,7 +1297,18 @@ export class StrudelApp {
         await this.evaluate(code);
     }
 
+    /**
+     * Resume the AudioContext if it isn't running. A browser leaves one made
+     * before any click on the page suspended (WebKit: interrupted) until
+     * resume() is called from a click, so every start passes through here.
+     */
+    private _wakeAudio(): void {
+        const ctx = this.audioManager?.getAudioContext();
+        if (ctx && ctx.state !== 'running') void ctx.resume();
+    }
+
     private _enterPlayingState(): void {
+        this._wakeAudio();
         this.playbackState = PlaybackState.Playing;
         this._announceTransport('playing');
 

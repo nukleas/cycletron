@@ -4,6 +4,9 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+### Web player
+- **A `/play?open=` link to a show waits for Play instead of sticking.** A browser starts audio only after a click on the page, so a deep-linked show now loads, shows its set and says to press Play; the first click on Play starts it. Play and Resume also wake audio the browser had suspended.
+
 ## 0.1.0-alpha.28 (2026-11-07)
 
 ### Command line
