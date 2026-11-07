@@ -4,6 +4,8 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+## 0.1.0-alpha.28 (2026-11-07)
+
 ### Command line
 - **The app binary is a command line tool.** `cycletron render show.toml` renders a show file to a music video with no checkout, Node or browser install: the app's own render page paints the frames in small preview windows (one per `--jobs`, and they must stay on screen) and ffmpeg encodes them, so ffmpeg has to be installed and on the PATH. A show outside a pack can use the library's enabled packs. `cycletron check song.strudel` runs the AI's full review from the terminal, and `cycletron export song.strudel [out-dir]` writes the mix and `performance.json` a render makes of each song. `cycletron help` lists them; the user guide has a Command line section. The `song-check` and `performance-export` cargo tools and the `render-viz.mjs` script are gone.
 
