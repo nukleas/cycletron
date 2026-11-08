@@ -7,6 +7,9 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 ### Web player
 - **A `/play?open=` link to a show waits for Play instead of sticking.** A browser starts audio only after a click on the page, so a deep-linked show now loads, shows its set and says to press Play; the first click on Play starts it. Play and Resume also wake audio the browser had suspended.
 
+### Dependencies
+- zip 9 (closes the zip 4 advisories, including the dual-header path traversal; the updater plugin moved off zip 4 too), rustls 0.23.46, parking_lot 0.13, the Tauri plugins on both sides (dialog 2.8.4, notification 2.8.0, updater 2.14.1, single-instance 2.5.5), plus routine dependency updates.
+
 ## 0.1.0-alpha.28 (2026-11-07)
 
 ### Command line
