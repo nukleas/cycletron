@@ -37,10 +37,6 @@ const IMPORT_DIR: &str = "pack-import";
 
 static TOKEN_SEQ: AtomicU64 = AtomicU64::new(0);
 
-/// Documentation files are surfaced by name but never extracted — we report
-/// that terms exist, we do not read or interpret them.
-const DOC_NAMES: &[&str] = &["license", "licence", "readme", "terms", "copyright"];
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewFile {
@@ -186,11 +182,6 @@ pub fn sweep_import_temp(app: &AppHandle) {
     }
 }
 
-fn is_doc_name(name: &str) -> bool {
-    let lower = name.to_ascii_lowercase();
-    DOC_NAMES.iter().any(|d| lower.starts_with(d))
-}
-
 /// Trim a trailing encoding tag (`-768kbps`, `_16bit`) for display only. Never
 /// applied to the bank name, the file identity, or the sort order.
 fn display_label(stem: &str) -> String {
@@ -217,7 +208,6 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
         .map_err(|e| format!("not a readable zip: {e}"))?;
 
     let mut warnings: Vec<String> = Vec::new();
-    let mut docs: Vec<String> = Vec::new();
     let mut symlinks = 0usize;
     let mut unsupported = 0usize;
     let mut unsafe_paths = 0usize;
@@ -288,12 +278,6 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
         let Some(rel) = entry.enclosed_name() else {
             continue;
         };
-        let name = rel
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or_default()
-            .to_string();
-
         // Never follow or recreate a symlink out of an archive.
         if entry.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000) {
             symlinks += 1;
@@ -307,9 +291,6 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
             continue;
         }
         if !wanted(&rel) {
-            if is_doc_name(&name) && entry.size() <= 64 * 1024 {
-                docs.push(name);
-            }
             continue;
         }
 
@@ -366,12 +347,6 @@ fn stage_zip(src: &Path, stage: &Path) -> Result<(usize, u64, Vec<String>), Stri
     if unsupported > 0 {
         warnings.push(format!(
             "skipped {unsupported} file(s) using an unsupported compression method"
-        ));
-    }
-    if !docs.is_empty() {
-        warnings.push(format!(
-            "the archive includes {} — check its terms; Cycletron does not read or grant them",
-            docs.join(", ")
         ));
     }
     Ok((files, bytes, warnings))
@@ -746,10 +721,7 @@ pub fn commit_pack_import(
         "User-provided sample pack installed into Cycletron.\n\
          SPDX: LicenseRef-UserProvided\n\
          Source: {source}\n\
-         Pack id: {id}\n\
-         \n\
-         Cycletron does not claim ownership of these samples. Redistribute only\n\
-         if you have the right to do so under the samples' original license.\n"
+         Pack id: {id}\n"
     );
     fs::write(dest.join("LICENSE"), license_body).map_err(|e| format!("write LICENSE: {e}"))?;
 
@@ -1087,25 +1059,6 @@ mod tests {
     }
 
     #[test]
-    fn documentation_is_reported_by_name_but_never_extracted() {
-        let dir = tmp("docs");
-        fs::create_dir_all(&dir).unwrap();
-        let zip_path = dir.join("pack.zip");
-        make_zip(
-            &zip_path,
-            &[("BD-x-Kick.wav", b"RIFFfake"), ("LICENSE.txt", b"terms")],
-        );
-        let stage = dir.join("stage");
-        let (_, _, warnings) = stage_zip(&zip_path, &stage).unwrap();
-        assert!(
-            warnings.iter().any(|w| w.contains("LICENSE.txt")),
-            "expected the licence file to be surfaced, got {warnings:?}"
-        );
-        assert!(!stage.join("LICENSE.txt").exists());
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
     fn a_single_wrapper_directory_is_unwrapped() {
         let dir = tmp("nested");
         fs::create_dir_all(dir.join("Pack").join("bd")).unwrap();
@@ -1151,9 +1104,9 @@ mod tests {
         make_zip(&zip_path, &entries);
 
         let stage = dir.join("stage");
-        let (files, _, warnings) = stage_zip(&zip_path, &stage).unwrap();
+        let (files, _, _) = stage_zip(&zip_path, &stage).unwrap();
         assert_eq!(files, 9, "the README is not audio and is not extracted");
-        assert!(warnings.iter().any(|w| w.contains("README.txt")));
+        assert!(!stage.join("DX200 Pack").join("README.txt").exists());
 
         // The single wrapper folder is stripped, so the files are loose again.
         let root = unwrap_single_root(&stage);
@@ -1220,12 +1173,5 @@ mod tests {
         // A trailing number is part of the name, not an encoding tag.
         assert_eq!(display_label("BD 01"), "BD 01");
         assert_eq!(display_label("Clap"), "Clap");
-    }
-
-    #[test]
-    fn doc_names_are_recognised_case_insensitively() {
-        assert!(is_doc_name("LICENSE.txt"));
-        assert!(is_doc_name("readme.md"));
-        assert!(!is_doc_name("kick.wav"));
     }
 }

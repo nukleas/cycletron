@@ -51,7 +51,7 @@ Folder name must equal `pack.json` → `id`.
 |-------|--------|
 | `schema` | Must be `1` |
 | `id` | `[a-z0-9][a-z0-9_-]{0,62}`, matches directory name |
-| `spdx` | Or `license` alias. Allowlist for enable: `CC0-1.0`, `MIT`, `Apache-2.0`, `LicenseRef-PublicDomain`, `LicenseRef-UserProvided` |
+| `spdx` | Or `license` alias. Any non-empty id. |
 | `license_file` | Relative path; required on disk |
 | `banks[].name` | `s("name")` token, ≤31 chars; must not collide with core drums/colors/machines |
 | `banks[].files` | Relative paths; order is sample index (`name:0`, `name:1`, …) |
@@ -125,13 +125,10 @@ a bank are natural-sorted (`BD 2` before `BD 10`), and that order *is* the `:n`.
 
 Only audio is extracted. Path traversal and symlink entries are refused,
 `__MACOSX` and dotfiles are skipped, and the caps are enforced from the declared
-sizes *before* extraction as well as during it. A `LICENSE`/`README` in the
-archive is reported by name and never extracted — Cycletron tells you terms
-exist, it does not read or grant them.
+sizes *before* extraction as well as during it.
 
 Imported packs are written with `spdx: LicenseRef-UserProvided` and a `LICENSE`
-recording the source path. That marker means "the user supplied this"; it is not
-a grant.
+recording the source path.
 
 ## Where to get more samples
 

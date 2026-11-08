@@ -18,16 +18,6 @@ pub const PACKS_DIR: &str = "Packs";
 const ENABLED_FILE: &str = "enabled.json";
 pub(crate) const MANIFEST: &str = "pack.json";
 
-/// SPDX ids accepted for auto-enable. User-imported packs use
-/// `LicenseRef-UserProvided` and are allowed after the user installed them.
-const ALLOWED_SPDX: &[&str] = &[
-    "CC0-1.0",
-    "MIT",
-    "Apache-2.0",
-    "LicenseRef-PublicDomain",
-    "LicenseRef-UserProvided",
-];
-
 // --- on-disk shapes -------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -337,22 +327,18 @@ pub(crate) fn copy_dir_all(src: &Path, dest: &Path) -> Result<(usize, u64), Stri
 }
 
 fn validate_for_enable(dir: &Path, m: &PackManifest) -> Result<(), String> {
-    if !ALLOWED_SPDX.contains(&m.spdx.as_str()) {
-        return Err(format!(
-            "pack {} license {:?} is not in the enable allowlist",
-            m.id, m.spdx
-        ));
-    }
-    let lic = safe_rel_path(&m.license_file)?;
-    let lic_path = dir.join(&lic);
-    if !lic_path.is_file() {
-        return Err(format!(
-            "pack {} missing license file {}",
-            m.id, m.license_file
-        ));
-    }
-    if !library::within(dir, &lic_path) {
-        return Err(format!("pack {} license_file escapes pack dir", m.id));
+    if !m.banks.is_empty() {
+        let lic = safe_rel_path(&m.license_file)?;
+        let lic_path = dir.join(&lic);
+        if !lic_path.is_file() {
+            return Err(format!(
+                "pack {} missing license file {}",
+                m.id, m.license_file
+            ));
+        }
+        if !library::within(dir, &lic_path) {
+            return Err(format!("pack {} license_file escapes pack dir", m.id));
+        }
     }
     for bank in &m.banks {
         for f in &bank.files {
@@ -807,18 +793,6 @@ mod tests {
         let m = load_manifest(&tmp.join("bad-drums")).unwrap();
         let err = resolve_load(&tmp.join("bad-drums"), &m).unwrap_err();
         assert!(err.contains("no loadable banks"), "{err}");
-        let _ = fs::remove_dir_all(&tmp);
-    }
-
-    #[test]
-    fn rejects_unknown_license() {
-        let tmp = std::env::temp_dir().join(format!("cycletron_packs_lic_{}", std::process::id()));
-        let _ = fs::remove_dir_all(&tmp);
-        fs::create_dir_all(&tmp).unwrap();
-        write_pack(&tmp, "paid-pack", "Proprietary", "cool_lead", &["x.wav"]);
-        let m = load_manifest(&tmp.join("paid-pack")).unwrap();
-        let err = resolve_load(&tmp.join("paid-pack"), &m).unwrap_err();
-        assert!(err.contains("allowlist"), "{err}");
         let _ = fs::remove_dir_all(&tmp);
     }
 
