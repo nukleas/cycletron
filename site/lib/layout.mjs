@@ -61,6 +61,12 @@ export function layout({path, title, description, body, release, head = '', scri
 <link rel="icon" href="/icon.png">
 <link rel="stylesheet" href="/style.css">
 ${head}
+<script>
+window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<script defer src="/_vercel/speed-insights/script.js"></script>
 ${scripts.map((s) => `<script type="module" src="${s}"></script>`).join('\n')}
 </head>
 <body>

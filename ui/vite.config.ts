@@ -130,6 +130,29 @@ const WEB_META = [
     '<meta name="twitter:card" content="summary_large_image">',
 ].join('\n    ');
 
+// Vercel Web Analytics and Speed Insights, served by Vercel at these paths.
+// Added after Vite processes the page, which would otherwise try to bundle them.
+const WEB_ANALYTICS = [
+    '<script>',
+    '    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };',
+    '    window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };',
+    '    </script>',
+    '    <script defer src="/_vercel/insights/script.js"></script>',
+    '    <script defer src="/_vercel/speed-insights/script.js"></script>',
+].join('\n');
+
+function webAnalyticsPlugin(): Plugin {
+    return {
+        name: 'web-analytics',
+        transformIndexHtml: {
+            order: 'post',
+            handler: (html, ctx) => ctx.filename.endsWith('/index.html')
+                ? html.replace('</head>', `    ${WEB_ANALYTICS}\n</head>`)
+                : html,
+        },
+    };
+}
+
 function webIndexPlugin(): Plugin {
     return {
         name: 'web-index',
@@ -205,6 +228,6 @@ export default defineConfig(({mode}) => ({
         wasmMemoryLeakFixPlugin(),
         noPrivatePublicDirsPlugin(),
         vizSdkPlugin(mode === 'web' ? WEB_BASE : '/'),
-        ...(mode === 'web' ? [webIndexPlugin()] : []),
+        ...(mode === 'web' ? [webIndexPlugin(), webAnalyticsPlugin()] : []),
     ]
 }));
