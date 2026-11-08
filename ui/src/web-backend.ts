@@ -183,7 +183,7 @@ const COMMANDS: Record<string, Handler> = {
     ),
     song_form: async ({code}) => songForm(code),
     get_recents: async () => [],
-    get_current_file: async () => ({path: null, name: null, dirty: false}),
+    get_current_file: async () => ({path: null, name: null, saved_code: null}),
 };
 
 /** Answer a backend command in the web build, or `undefined` if it isn't one it answers. */

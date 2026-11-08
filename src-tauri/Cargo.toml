@@ -81,6 +81,7 @@ hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
 mpris-server = { version = "0.10", features = ["tokio"] }
 [dev-dependencies]
 tempfile = "3"
+async-trait = "0.1"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

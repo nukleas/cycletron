@@ -192,7 +192,15 @@ struct ResponsesAccumulator {
     tools: BTreeMap<String, ToolBuf>,
     /// Map stream item_id → call_id key.
     item_keys: BTreeMap<String, String>,
-    stop_reason: Option<String>,
+    /// Set by the terminal event (`response.completed` / `.incomplete` /
+    /// `.failed` / `error`). Absent at finalize, the stream was cut.
+    stop: Option<Stop>,
+}
+
+enum Stop {
+    Completed,
+    MaxTokens,
+    Error(String),
 }
 
 impl ResponsesAccumulator {
@@ -285,23 +293,16 @@ impl ResponsesAccumulator {
                     }
                 }
             }
-            "response.completed" => {
-                self.stop_reason = Some(if self.tools.is_empty() {
-                    "end_turn".into()
-                } else {
-                    "tool_use".into()
-                });
-            }
-            "response.incomplete" => {
-                self.stop_reason = Some("max_tokens".into());
-            }
-            "error" => {
+            "response.completed" => self.stop = Some(Stop::Completed),
+            "response.incomplete" => self.stop = Some(Stop::MaxTokens),
+            "response.failed" | "error" => {
                 let msg = v
-                    .get("error")
-                    .and_then(|e| e.get("message"))
+                    .pointer("/response/error/message")
+                    .or_else(|| v.pointer("/error/message"))
                     .and_then(|m| m.as_str())
                     .unwrap_or("unknown Codex stream error");
                 warn!("Codex stream error event: {msg}");
+                self.stop = Some(Stop::Error(msg.to_string()));
             }
             _ => {}
         }
@@ -321,32 +322,19 @@ impl StreamDecoder for ResponsesAccumulator {
         if !self.text.is_empty() {
             content.push(ContentBlock::Text { text: self.text });
         }
-        // Capture the explicit stop before moving `self.tools`; if the stream
-        // never sent `response.completed`/`incomplete`, infer it from whether
-        // any tool call landed.
-        let explicit_stop = self.stop_reason;
-        let (tool_blocks, incomplete_tool_input) =
-            finish_tool_calls(self.tools.into_values(), event_tx);
-        content.extend(tool_blocks);
+        content.extend(finish_tool_calls(self.tools.into_values(), event_tx));
 
-        let stop_reason = explicit_stop.or_else(|| {
-            Some(
-                if content
-                    .iter()
-                    .any(|c| matches!(c, ContentBlock::ToolUse { .. }))
-                {
-                    "tool_use".into()
-                } else {
-                    "end_turn".into()
-                },
-            )
-        });
+        let stop = match self.stop {
+            Some(Stop::Completed) => StopReason::from_content(&content),
+            Some(Stop::MaxTokens) => StopReason::max_tokens(&content),
+            Some(Stop::Error(message)) => StopReason::Error(message),
+            None => StopReason::Dropped,
+        };
 
         MessagesResponse {
             id: String::new(),
             content,
-            stop_reason,
-            incomplete_tool_input,
+            stop,
             usage: Usage {
                 input_tokens: 0,
                 output_tokens: 0,

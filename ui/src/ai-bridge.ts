@@ -14,8 +14,8 @@ import {renderMarkdownToHtml, enhanceCodeBlocks} from './markdown.js';
 import {openExternal} from './external-link.js';
 import {aiConsent} from './ai-consent.js';
 import {invoke as ipc, isTauri} from './tauri.js';
-import {createToolRow, completeToolRow} from './ai-tool-row.js';
-import type {AgentEvent, UserSettings} from './types/tauri-commands.js';
+import {createToolRow, completeToolRow, failToolRow} from './ai-tool-row.js';
+import type {AgentEvent, SendReply, UserSettings} from './types/tauri-commands.js';
 
 
 // The chat UI + agent-event stream are wired at most once, and only after the
@@ -32,6 +32,8 @@ export function toggleAiPanel(): void {
 /** Chat-UI reset hook, assigned once the chat is wired (its DOM helpers are
  *  closure-scoped inside the init). No-op before consent — there's no chat. */
 let resetChatUi: (() => void) | null = null;
+/** Posts a line into the transcript as a system message; same lifetime as `resetChatUi`. */
+let chatNotice: ((text: string) => void) | null = null;
 
 /**
  * Clear the AI conversation: backend history and the chat transcript. The
@@ -43,7 +45,9 @@ export async function clearSession(): Promise<void> {
     try {
         await ipc('clear_session');
     } catch (e) {
-        console.warn('[ai-bridge] clear_session failed:', e);
+        // The backend refuses while a reply is in flight; the transcript stays.
+        chatNotice?.(`Not cleared: ${e}`);
+        return;
     }
     resetChatUi?.();
 }
@@ -183,20 +187,30 @@ async function wireAiChat() {
             const editorCode = app?.editor?.getCode?.() ?? '';
             const startedAt = performance.now();
             addTask('ai-response');
-            const response: string = await invoke('send_message', {
+            const reply: SendReply = await invoke('send_message', {
                 message: text,
                 editorCode: editorCode || null,
             });
             removeTask('ai-response');
-            if (streamingBody) {
-                streamingBody.innerHTML = renderMarkdownToHtml(response || streamingText);
+            const response = reply.text || streamingText;
+            if (streamingEl && streamingBody) {
+                streamingBody.innerHTML = renderMarkdownToHtml(response);
                 enhanceCodeBlocks(streamingBody);
+                if (reply.notice) {
+                    // The turn ended under any tool still waiting for its result.
+                    streamingTools
+                        ?.querySelectorAll<HTMLDetailsElement>('.ai-tool-pending')
+                        .forEach((row) => failToolRow(row, 'interrupted'));
+                    // Nothing arrived at all: the notice is the whole reply.
+                    if (!response && streamingTools?.hidden) streamingEl.remove();
+                    addMessage('system', reply.notice);
+                }
             }
             // If the AI took more than ~6s and the user has switched away,
             // ping them with a system notification so they don't miss it.
             const elapsedMs = performance.now() - startedAt;
             if (elapsedMs > 6000 && !document.hasFocus()) {
-                const preview = (response || '').replace(/\s+/g, ' ').slice(0, 120);
+                const preview = (reply.notice ?? response).replace(/\s+/g, ' ').slice(0, 120);
                 void notify('AI response ready', preview || 'Open Cycletron to see the result.');
             }
         } catch (err: any) {
@@ -221,6 +235,7 @@ async function wireAiChat() {
         messagesEl.innerHTML = '';
         addMessage('assistant', 'Fresh start! Describe what you want to create.');
     };
+    chatNotice = (text) => void addMessage('system', text);
     clearBtn.addEventListener('click', () => void clearSession());
 
     // --- Form Submit ---

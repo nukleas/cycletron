@@ -1202,6 +1202,7 @@ name = "cycletron-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "cycletron-agent",
  "cycletron-analysis",

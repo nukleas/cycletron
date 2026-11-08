@@ -116,14 +116,55 @@ fn findings(fs: &[strudel::Finding]) -> Vec<ToolFinding> {
 /// so replaying past turns doesn't resend large file/corpus dumps every time.
 const TOOL_RESULT_MEMORY_CHARS: usize = 600;
 
-/// Run the full agent loop: conversation with Claude, tool execution, return the
-/// final text plus the compact tool traces to persist for cross-turn memory.
+/// What one user message produced. `text` and `tools` are everything that
+/// landed, whichever way the turn ended, so a tool that already rewrote the
+/// editor stays on record even when the provider failed afterwards.
+pub struct Turn {
+    pub text: String,
+    pub tools: Vec<ToolTrace>,
+    pub end: TurnEnd,
+}
+
+pub enum TurnEnd {
+    /// The model gave a final answer.
+    Complete,
+    /// The final answer was cut at the output token limit.
+    Truncated,
+    /// The tool-round cap was reached before a final answer.
+    IterationCap,
+    /// The provider or the connection failed; the message says how.
+    Failed(String),
+}
+
+impl TurnEnd {
+    /// The line the user sees under the reply, when the turn did not finish.
+    pub fn notice(&self) -> Option<String> {
+        match self {
+            Self::Complete => None,
+            Self::Truncated => Some(
+                "The reply was cut off at the output token limit. Ask it to continue.".to_string(),
+            ),
+            Self::IterationCap => Some(format!(
+                "Stopped after {MAX_ITERATIONS} tool rounds without a final answer."
+            )),
+            Self::Failed(message) => Some(message.clone()),
+        }
+    }
+}
+
+/// Tool rounds per user message. Each round is one model call plus its tool
+/// results; complex prompts need several, and the loop stops here with
+/// `TurnEnd::IterationCap` rather than forcing an answer.
+const MAX_ITERATIONS: usize = 20;
+
+/// Run the full agent loop: conversation with the model, tool execution, and
+/// the text plus compact tool traces to persist for cross-turn memory.
 pub async fn run_agent_loop(
     client: &dyn LlmProvider,
     session_messages: &[ChatMessage],
     state: &AppState,
     event_tx: mpsc::UnboundedSender<AgentEvent>,
-) -> Result<(String, Vec<ToolTrace>), String> {
+) -> Turn {
     let mut api_messages = session_to_api_messages(session_messages);
     let tool_defs = cycletron_agent::tools::music_tool_definitions();
 
@@ -158,18 +199,23 @@ pub async fn run_agent_loop(
     // Fresh review budget for this user message (keeps last-reviewed buffer).
     state.reset_agent_write_run();
     let telemetry_dir = state.app_data_dir();
-    // 20 leaves the agent room to call tools several times (each tool round
-    // is one iteration) before the loop forces an answer. 10 was tight
-    // enough that complex prompts would get cut mid-thought.
-    let max_iterations = 20;
 
-    for iteration in 0..max_iterations {
+    for iteration in 0..MAX_ITERATIONS {
         debug!("agent loop iteration {iteration}");
 
-        let mut response = client
+        let mut response = match client
             .stream_message(&system_prompt, &api_messages, tool_defs, &event_tx)
             .await
-            .map_err(|e| format!("AI provider error: {e}"))?;
+        {
+            Ok(response) => response,
+            Err(e) => {
+                return Turn {
+                    text: full_text,
+                    tools: turn_tools,
+                    end: TurnEnd::Failed(format!("AI provider error: {e}")),
+                };
+            }
+        };
 
         // Weak/local models often emit a tool call as TEXT (```json {name,
         // arguments}```) instead of a native tool_call. Recover those into real
@@ -192,8 +238,31 @@ pub async fn run_agent_loop(
 
         full_text.push_str(&response_text);
 
+        // A stream that did not finish is not a reply. Keep the text that
+        // arrived, run nothing from it, and tell the user.
+        let failed = match &response.stop {
+            StopReason::Dropped => Some("Connection to the AI dropped before the reply finished.".to_string()),
+            StopReason::Error(message) => Some(format!("AI provider error: {message}")),
+            _ => None,
+        };
+        if let Some(message) = failed {
+            return Turn {
+                text: full_text,
+                tools: turn_tools,
+                end: TurnEnd::Failed(message),
+            };
+        }
+
         if tool_calls.is_empty() {
-            break;
+            let end = match response.stop {
+                StopReason::MaxTokens { .. } => TurnEnd::Truncated,
+                _ => TurnEnd::Complete,
+            };
+            return Turn {
+                text: full_text,
+                tools: turn_tools,
+                end,
+            };
         }
 
         api_messages.push(ApiMessage {
@@ -201,19 +270,19 @@ pub async fn run_agent_loop(
             content: response.content.clone(),
         });
 
-        // Did this response get cut off at the token limit mid-tool-call? If
-        // so the tool's argument JSON never finished and `input` is an empty
-        // `{}`. Executing it just yields "missing 'code' parameter", which the
-        // model can't act on — it retries, truncates again, and loops. Detect
-        // it here and feed back an honest, actionable error instead.
-        let truncated =
-            response.stop_reason.as_deref() == Some("max_tokens") || response.incomplete_tool_input;
+        // A tool whose arguments were cut at the token limit has `input` `{}`.
+        // Executing it yields "missing 'code' parameter", which the model
+        // cannot act on; it retries, truncates again, and loops. Feed back the
+        // real cause instead.
+        let cut_tool = match &response.stop {
+            StopReason::MaxTokens { cut_tool } => cut_tool.clone(),
+            _ => None,
+        };
 
         let mut tool_results = Vec::new();
         for (id, name, input) in &tool_calls {
-            let input_empty = input.as_object().is_none_or(serde_json::Map::is_empty);
             let started = std::time::Instant::now();
-            let outcome = if truncated && input_empty {
+            let outcome = if cut_tool.as_deref() == Some(id.as_str()) {
                 warn!("tool '{name}' arguments truncated at token limit; not executing");
                 ToolOutcome::failed(
                     ToolCategory::Truncated,
@@ -291,11 +360,11 @@ pub async fn run_agent_loop(
         });
     }
 
-    let _ = event_tx.send(AgentEvent::Done {
-        full_text: full_text.clone(),
-    });
-
-    Ok((full_text, turn_tools))
+    Turn {
+        text: full_text,
+        tools: turn_tools,
+        end: TurnEnd::IterationCap,
+    }
 }
 
 /// The write-policy rules the model is told, matching what the tools enforce.
@@ -985,7 +1054,7 @@ fn tool_generate_pattern(input: &serde_json::Value) -> ToolResult {
 }
 
 /// Hash used as a review-cache key (stable for identical source).
-fn code_hash(code: &str) -> u64 {
+pub(crate) fn code_hash(code: &str) -> u64 {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let mut h = DefaultHasher::new();
@@ -1142,16 +1211,17 @@ fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> ToolResul
     // agent_write lock — it re-locks the same mutex (non-reentrant → deadlock).
     let cache_or_budget: Option<(ToolOutcome, &str)> = {
         let w = state.agent_write.lock();
-        if w.last_review_hash == Some(hash) {
-            w.last_review_result.as_ref().map(|cached| {
-                let mut o = cached.clone();
-                o.summary = format!("cached review: {}", cached.summary);
-                o.text.push_str(
-                    "\n\n(cached — identical code to previous review; \
-                     call play_pattern with no code to play it, or edit then re-review.)",
-                );
-                (o, "review_cache")
-            })
+        if let Some(cached) = w.last_review.as_ref().filter(|r| r.hash == hash) {
+            let mut o = cached.result.clone();
+            o.summary = format!("cached review: {}", o.summary);
+            o.text.push_str(if cached.result.ok {
+                "\n\n(cached — identical code to previous review; \
+                 call play_pattern with no code to play it, or edit then re-review.)"
+            } else {
+                "\n\n(cached — identical code to previous review, which failed; \
+                 fix it, then re-review.)"
+            });
+            Some((o, "review_cache"))
         } else if w.review_calls >= crate::state::MAX_REVIEWS_PER_RUN {
             Some((
                 ToolOutcome::failed(
@@ -1178,17 +1248,13 @@ fn tool_review_pattern(input: &serde_json::Value, state: &AppState) -> ToolResul
     let result = review_code(&code, cycles, state);
     state.stamp_write_kind("review");
 
-    // Count every non-cached attempt against the budget, and cache successful
-    // (parseable) reviews so play_pattern can reuse the buffer without a second
+    // Count every non-cached attempt against the budget, and remember the
+    // review so play_pattern can reuse a passing buffer without a second
     // full-document generation from the model.
     {
         let mut w = state.agent_write.lock();
         w.review_calls += 1;
-        w.last_review_hash = Some(hash);
-        w.last_review_result = Some(result.clone());
-        if result.ok {
-            w.last_reviewed_code = Some(code);
-        }
+        w.last_review = Some(crate::state::LastReview::new(code, result.clone()));
     }
     Ok(result)
 }
@@ -1655,12 +1721,8 @@ fn tool_play_pattern(
             return Ok(ToolOutcome::failed(ToolCategory::NotApplied, msg));
         }
         // Stash as last-reviewed so a later play_pattern() reuses it.
-        {
-            let mut w = state.agent_write.lock();
-            w.last_review_hash = Some(code_hash(&raw));
-            w.last_review_result = Some(report.clone());
-            w.last_reviewed_code = Some(raw.clone());
-        }
+        state.agent_write.lock().last_review =
+            Some(crate::state::LastReview::new(raw.clone(), report.clone()));
         // Compact the gate for the tool result (full report can be huge): the
         // digest line, a verdict, and the first few warns — from the envelope,
         // not re-parsed out of the report text.
@@ -1776,10 +1838,8 @@ fn apply_document(
     // request's edits silently reverted this way).
     {
         let mut w = state.agent_write.lock();
-        if w.last_reviewed_code.as_deref() != Some(code.as_str()) {
-            w.last_reviewed_code = None;
-            w.last_review_hash = None;
-            w.last_review_result = None;
+        if w.last_review.as_ref().map(|r| r.code.as_str()) != Some(code.as_str()) {
+            w.last_review = None;
         }
     }
     let _ = event_tx.send(AgentEvent::UiAction {
@@ -2787,6 +2847,157 @@ mod generator_inference_tests {
 }
 
 #[cfg(test)]
+mod turn_end_tests {
+    use super::*;
+    use cycletron_agent::client::AgentError;
+    use parking_lot::Mutex;
+    use std::collections::VecDeque;
+
+    /// Hands back scripted responses in order, then a provider error.
+    struct Scripted(Mutex<VecDeque<MessagesResponse>>);
+
+    impl Scripted {
+        fn new(responses: Vec<MessagesResponse>) -> Self {
+            Self(Mutex::new(responses.into()))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl LlmProvider for Scripted {
+        async fn stream_message(
+            &self,
+            _system: &str,
+            _messages: &[ApiMessage],
+            _tools: &[ToolDefinition],
+            _event_tx: &mpsc::UnboundedSender<AgentEvent>,
+        ) -> Result<MessagesResponse, AgentError> {
+            self.0
+                .lock()
+                .pop_front()
+                .ok_or_else(|| AgentError::Http("script exhausted".to_string()))
+        }
+
+        fn max_tokens(&self) -> u32 {
+            4096
+        }
+    }
+
+    fn response(content: Vec<ContentBlock>, stop: StopReason) -> MessagesResponse {
+        MessagesResponse {
+            id: String::new(),
+            content,
+            stop,
+            usage: Usage {
+                input_tokens: 0,
+                output_tokens: 0,
+            },
+        }
+    }
+
+    fn text(t: &str) -> ContentBlock {
+        ContentBlock::Text {
+            text: t.to_string(),
+        }
+    }
+
+    async fn run(provider: &Scripted) -> Turn {
+        let state = AppState::new();
+        let mut session = cycletron_core::session::Session::new(120.0);
+        session.add_user_message("make a beat".to_string());
+        let (tx, _rx) = mpsc::unbounded_channel();
+        run_agent_loop(provider, &session.messages, &state, tx).await
+    }
+
+    #[tokio::test]
+    async fn dropped_stream_fails_but_keeps_text() {
+        let p = Scripted::new(vec![response(vec![text("half a")], StopReason::Dropped)]);
+        let turn = run(&p).await;
+        assert_eq!(turn.text, "half a");
+        assert!(matches!(turn.end, TurnEnd::Failed(_)), "dropped stream must fail the turn");
+    }
+
+    #[test]
+    fn error_stop_notice_carries_the_provider_message() {
+        let end = TurnEnd::Failed("AI provider error: Overloaded".to_string());
+        assert_eq!(end.notice().as_deref(), Some("AI provider error: Overloaded"));
+        assert!(TurnEnd::Complete.notice().is_none());
+    }
+
+    #[tokio::test]
+    async fn max_tokens_without_tools_is_truncated() {
+        let p = Scripted::new(vec![response(
+            vec![text("a very long")],
+            StopReason::MaxTokens { cut_tool: None },
+        )]);
+        let turn = run(&p).await;
+        assert_eq!(turn.text, "a very long");
+        assert!(matches!(turn.end, TurnEnd::Truncated));
+    }
+
+    #[tokio::test]
+    async fn cut_tool_gets_truncated_result_and_a_complete_tool_still_runs() {
+        let call_ok = ContentBlock::ToolUse {
+            id: "t1".to_string(),
+            name: "list_methods".to_string(),
+            input: serde_json::json!({}),
+        };
+        let call_cut = ContentBlock::ToolUse {
+            id: "t2".to_string(),
+            name: "play_pattern".to_string(),
+            input: serde_json::json!({}),
+        };
+        let p = Scripted::new(vec![
+            response(
+                vec![call_ok, call_cut],
+                StopReason::MaxTokens {
+                    cut_tool: Some("t2".to_string()),
+                },
+            ),
+            response(vec![text("done")], StopReason::EndTurn),
+        ]);
+        let turn = run(&p).await;
+        assert!(matches!(turn.end, TurnEnd::Complete));
+        assert_eq!(turn.tools.len(), 2);
+        assert!(turn.tools[0].outcome.ok, "zero-arg tool must run: {:?}", turn.tools[0].outcome);
+        assert_eq!(turn.tools[1].outcome.category, Some(ToolCategory::Truncated));
+    }
+
+    #[tokio::test]
+    async fn provider_error_after_a_tool_round_keeps_the_trace() {
+        let call = ContentBlock::ToolUse {
+            id: "t1".to_string(),
+            name: "list_methods".to_string(),
+            input: serde_json::json!({}),
+        };
+        // One tool round, then the script runs out: the provider fails.
+        let p = Scripted::new(vec![response(vec![call], StopReason::ToolUse)]);
+        let turn = run(&p).await;
+        assert!(matches!(turn.end, TurnEnd::Failed(_)));
+        assert_eq!(turn.tools.len(), 1, "the tool that ran must stay on record");
+    }
+
+    #[tokio::test]
+    async fn endless_tool_rounds_hit_the_cap() {
+        let rounds = (0..MAX_ITERATIONS)
+            .map(|i| {
+                response(
+                    vec![ContentBlock::ToolUse {
+                        id: format!("t{i}"),
+                        name: "list_methods".to_string(),
+                        input: serde_json::json!({}),
+                    }],
+                    StopReason::ToolUse,
+                )
+            })
+            .collect();
+        let p = Scripted::new(rounds);
+        let turn = run(&p).await;
+        assert!(matches!(turn.end, TurnEnd::IterationCap));
+        assert_eq!(turn.tools.len(), MAX_ITERATIONS);
+    }
+}
+
+#[cfg(test)]
 mod session_history_tests {
     use super::*;
     use chrono::Utc;
@@ -3110,7 +3321,6 @@ mod agent_eval {
                                     outcome.summary
                                 );
                             }
-                            AgentEvent::Error { message } => eprintln!("  !! {message}"),
                             _ => {}
                         }
                     }
@@ -3118,19 +3328,17 @@ mod agent_eval {
                 });
 
                 let started = Instant::now();
-                let result = run_agent_loop(client.as_ref(), &messages, &state, tx).await;
+                let turn = run_agent_loop(client.as_ref(), &messages, &state, tx).await;
                 let wall = started.elapsed().as_secs_f64();
                 let run = printer.await.unwrap();
 
-                let reply = match result {
-                    Ok((text, tools)) => {
-                        state
-                            .session
-                            .lock()
-                            .add_assistant_message_with_tools(text.clone(), tools);
-                        text
-                    }
-                    Err(e) => format!("AGENT ERROR: {e}"),
+                state
+                    .session
+                    .lock()
+                    .add_assistant_message_with_tools(turn.text.clone(), turn.tools);
+                let reply = match turn.end.notice() {
+                    Some(notice) => format!("{} [{notice}]", turn.text),
+                    None => turn.text,
                 };
                 let reply_preview: String = reply.replace('\n', " ").chars().take(240).collect();
                 eprintln!("  ↳ {reply_preview}");

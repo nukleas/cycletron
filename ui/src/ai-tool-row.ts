@@ -54,6 +54,14 @@ export function completeToolRow(row: HTMLDetailsElement, outcome: ToolOutcome, d
     }
 }
 
+/** Close a row whose result never arrived: the turn ended under it. */
+export function failToolRow(row: HTMLDetailsElement, reason: string): void {
+    row.classList.remove('ai-tool-pending');
+    row.classList.add('ai-tool-err');
+    (row.querySelector('.ai-tool-glyph') as HTMLElement).textContent = '\u2717';
+    (row.querySelector('.ai-tool-summary') as HTMLElement).textContent = reason;
+}
+
 /** A finished row from a persisted trace (session restore). */
 export function toolRowFromTrace(t: ToolTrace): HTMLDetailsElement {
     const row = createToolRow(t.id, t.name, t.input);

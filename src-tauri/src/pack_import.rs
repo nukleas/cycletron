@@ -60,14 +60,13 @@ pub struct ProposedBank {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PackImportPreview {
-    /// Empty for an in-place folder import — there is nothing to clean up.
+    /// The staging directory's handle. Empty for an in-place folder import:
+    /// nothing was extracted, so there is nothing to cancel.
     pub token: String,
     /// The original path, recorded in `pack.json` for provenance.
     pub source: String,
     /// Directory the proposed files live in.
     pub root: String,
-    /// True when a commit or cancel must remove the staging directory.
-    pub staged: bool,
     pub suggested_id: String,
     pub suggested_name: String,
     pub strategy: GroupStrategy,
@@ -438,19 +437,29 @@ pub fn preview_pack_import(
             }
         };
         let viz = packs::viz_entries(&root, &manifest);
-        for v in &viz {
-            if !v.built {
-                warnings.push(format!(
-                    "visualizer pack {} is not built (no dist/index.js); it won't load",
-                    v.id
-                ));
+        // The install refuses an unbuilt visualizer, so the preview does too
+        // rather than show a dialog for a pack that cannot go in.
+        if let Some(v) = viz.iter().find(|v| !v.built) {
+            if staged {
+                let _ = fs::remove_dir_all(stage_dir(&app_handle, &token)?);
             }
+            return Err(format!(
+                "visualizer pack {} is not built (no dist/index.js)",
+                v.id
+            ));
         }
         if !staged {
             for entry in walkdir_count(&root) {
                 file_count += 1;
                 bytes += entry;
             }
+        }
+        let over_cap = file_count > MAX_INSTALL_FILES || bytes > MAX_INSTALL_BYTES;
+        if over_cap {
+            warnings.push(format!(
+                "over the install limit ({MAX_INSTALL_FILES} files / {} MB)",
+                MAX_INSTALL_BYTES / (1024 * 1024)
+            ));
         }
         let ready = ReadyPack {
             id: manifest.id.clone(),
@@ -468,14 +477,13 @@ pub fn preview_pack_import(
             token,
             source,
             root: root.to_string_lossy().into_owned(),
-            staged,
             suggested_id: manifest.id,
             suggested_name: manifest.name,
             strategy: GroupStrategy::SingleBank,
             folder_shaped: false,
             file_count,
             bytes,
-            over_cap: false,
+            over_cap,
             warnings,
             banks: Vec::new(),
             pack: Some(ready),
@@ -544,7 +552,6 @@ pub fn preview_pack_import(
         token,
         source,
         root: root.to_string_lossy().into_owned(),
-        staged,
         suggested_id,
         suggested_name: label.to_string(),
         strategy,
@@ -820,6 +827,15 @@ pub fn commit_pack_install(
         return Err(format!(
             "visualizer pack {} is not built (no dist/index.js)",
             v.id
+        ));
+    }
+    // A zip was capped as it was extracted; a folder is checked here.
+    let sizes = walkdir_count(&root);
+    let total: u64 = sizes.iter().sum();
+    if sizes.len() > MAX_INSTALL_FILES || total > MAX_INSTALL_BYTES {
+        return Err(format!(
+            "pack is over the install limit ({MAX_INSTALL_FILES} files / {} MB)",
+            MAX_INSTALL_BYTES / (1024 * 1024)
         ));
     }
     let packs_dir = packs::ensured_packs_root(&state);

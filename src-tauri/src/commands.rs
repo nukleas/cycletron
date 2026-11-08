@@ -22,10 +22,20 @@ pub async fn send_message(
     editor_code: Option<String>,
     app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
-) -> Result<String, String> {
+) -> Result<SendReply, String> {
+    if state.agent_running.swap(true, Ordering::SeqCst) {
+        return Err("the AI is still answering the previous message".to_string());
+    }
+    let _running = RunGuard(&state.agent_running);
+
     {
         let mut session = state.session.lock();
         if let Some(code) = &editor_code {
+            // The user edited since the agent last saw the document, so a
+            // buffer it reviewed back then is not what "play it" means now.
+            if session.current_pattern.as_deref() != Some(code.as_str()) {
+                state.forget_review();
+            }
             session.current_pattern = Some(code.clone());
         }
         session.add_user_message(message.clone());
@@ -48,7 +58,10 @@ pub async fn send_message(
         };
         let mut session = state.session.lock();
         session.add_assistant_message(msg.to_string());
-        return Ok(msg.to_string());
+        return Ok(SendReply {
+            text: msg.to_string(),
+            notice: None,
+        });
     };
 
     let messages = {
@@ -65,21 +78,41 @@ pub async fn send_message(
         }
     });
 
-    let result = agent_loop::run_agent_loop(client.as_ref(), &messages, &state, event_tx).await;
+    let turn = agent_loop::run_agent_loop(client.as_ref(), &messages, &state, event_tx).await;
     let _ = forwarder.await;
 
-    match result {
-        Ok((response, tools)) => {
-            let mut session = state.session.lock();
-            session.add_assistant_message_with_tools(response.clone(), tools);
-            Ok(response)
+    let notice = turn.end.notice();
+    {
+        let mut session = state.session.lock();
+        // Whatever landed is the assistant's turn, even when the provider
+        // failed partway: a tool that rewrote the editor must stay on record.
+        if !turn.text.is_empty() || !turn.tools.is_empty() {
+            session.add_assistant_message_with_tools(turn.text.clone(), turn.tools);
         }
-        Err(e) => {
-            let error_msg = format!("Agent error: {e}");
-            let mut session = state.session.lock();
-            session.add_assistant_message(error_msg.clone());
-            Ok(error_msg)
+        if let Some(notice) = &notice {
+            session.add_system_message(notice.clone());
         }
+    }
+    Ok(SendReply {
+        text: turn.text,
+        notice,
+    })
+}
+
+/// What `send_message` hands back: the assistant text, and a line to show
+/// under it when the turn did not finish cleanly.
+#[derive(Debug, serde::Serialize)]
+pub struct SendReply {
+    pub text: String,
+    pub notice: Option<String>,
+}
+
+/// Clears `agent_running` on every way out of `send_message`, panics included.
+struct RunGuard<'a>(&'a AtomicBool);
+
+impl Drop for RunGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
     }
 }
 
@@ -190,6 +223,10 @@ pub fn get_config(state: State<'_, AppState>) -> cycletron_core::config::AppConf
 /// Clear the session — reset chat history and pattern state for a new composition.
 #[tauri::command]
 pub fn clear_session(state: State<'_, AppState>) -> Result<(), String> {
+    // A reply in flight would land in the emptied history as its first turn.
+    if state.agent_running.load(Ordering::SeqCst) {
+        return Err("the AI is still answering — wait for it to finish".to_string());
+    }
     // Only the AI's memory goes: the chat history and the review cache /
     // last-reviewed buffer. The open file, the editor code, the tempo and the
     // undo history are the user's, not the conversation's.
@@ -221,6 +258,8 @@ pub fn open_file(
             session.tempo = bpm;
         }
     }
+    // A different document: a review of the previous one must not be played.
+    state.forget_review();
     push_recent(&state, pb.clone());
     rebuild_menu_after_recents_change(&app_handle);
 
@@ -367,37 +406,37 @@ pub fn save_as(
 /// Clear the current file reference and editor buffer.
 #[tauri::command]
 pub fn new_file(state: State<'_, AppState>) -> Result<(), String> {
-    let mut session = state.session.lock();
-    session.new_file();
+    state.session.lock().new_file();
+    state.forget_review();
     Ok(())
 }
 
-/// Check whether `code` differs from the last-saved snapshot.
-#[tauri::command]
-pub fn is_dirty(code: String, state: State<'_, AppState>) -> bool {
-    let session = state.session.lock();
-    session.is_dirty(&code)
-}
-
-/// Metadata about the current file (path + dirty state).
-#[derive(serde::Serialize)]
+/// The session's file: the backend owns this, the frontend mirrors it. Sent
+/// back from `get_current_file` and pushed as `current-file-changed` whenever
+/// the backend moves it on its own (a delete or rename in the library).
+#[derive(Clone, serde::Serialize)]
 pub struct CurrentFile {
     pub path: Option<String>,
     pub name: Option<String>,
-    pub dirty: bool,
+    /// The code as last saved or loaded; None for a buffer with no file. The
+    /// frontend compares the editor against it to know if it is dirty.
+    pub saved_code: Option<String>,
 }
 
-#[tauri::command]
-pub fn get_current_file(code: String, state: State<'_, AppState>) -> CurrentFile {
-    let session = state.session.lock();
+fn current_file(session: &cycletron_core::session::Session) -> CurrentFile {
     let path = session.file_path.clone();
     CurrentFile {
-        dirty: session.is_dirty(&code),
         name: path
             .as_ref()
             .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned())),
         path: path.map(|p| p.to_string_lossy().into_owned()),
+        saved_code: session.last_saved_snapshot.clone(),
     }
+}
+
+#[tauri::command]
+pub fn get_current_file(state: State<'_, AppState>) -> CurrentFile {
+    current_file(&state.session.lock())
 }
 
 #[tauri::command]
@@ -652,14 +691,21 @@ pub fn save_midi_to_library(
 
 #[tauri::command]
 pub fn session_undo(state: State<'_, AppState>) -> Option<String> {
-    let mut session = state.session.lock();
-    session.undo().map(std::string::ToString::to_string)
+    let code = state.session.lock().undo().map(std::string::ToString::to_string);
+    // The document moved; a review of where it was does not carry over.
+    if code.is_some() {
+        state.forget_review();
+    }
+    code
 }
 
 #[tauri::command]
 pub fn session_redo(state: State<'_, AppState>) -> Option<String> {
-    let mut session = state.session.lock();
-    session.redo().map(std::string::ToString::to_string)
+    let code = state.session.lock().redo().map(std::string::ToString::to_string);
+    if code.is_some() {
+        state.forget_review();
+    }
+    code
 }
 
 // ---------------------------------------------------------------------------
@@ -778,12 +824,22 @@ pub fn delete_library_path(
         return Err("cannot delete the library root".to_string());
     }
     library::delete_path(&target).map_err(|e| format!("delete {}: {e}", target.display()))?;
-    // If the deleted path was the current session file, clear the session.
-    {
+    // The open file went with it (or with its folder): the buffer stays in
+    // the editor as an unsaved document.
+    let moved = {
         let mut session = state.session.lock();
-        if session.file_path.as_deref() == Some(target.as_path()) {
-            session.new_file();
+        let hit = session
+            .file_path
+            .as_deref()
+            .is_some_and(|p| p.starts_with(&target));
+        if hit {
+            session.file_path = None;
+            session.last_saved_snapshot = None;
         }
+        hit.then(|| current_file(&session))
+    };
+    if let Some(file) = moved {
+        let _ = app_handle.emit("current-file-changed", &file);
     }
     let _ = app_handle.emit("library-changed", &path);
     Ok(())
@@ -799,12 +855,21 @@ pub fn rename_library_path(
     let src = guard_path(&state, &from)?;
     let dst = guard_path(&state, &to)?;
     library::rename_path(&src, &dst).map_err(|e| format!("rename: {e}"))?;
-    // Update session if the renamed path was the current file.
-    {
+    // The open file moved, by itself or inside a renamed folder.
+    let moved = {
         let mut session = state.session.lock();
-        if session.file_path.as_deref() == Some(src.as_path()) {
-            session.file_path = Some(dst.clone());
-        }
+        let next = session
+            .file_path
+            .as_deref()
+            .and_then(|p| p.strip_prefix(&src).ok())
+            .map(|rest| dst.join(rest));
+        next.map(|next| {
+            session.file_path = Some(next);
+            current_file(&session)
+        })
+    };
+    if let Some(file) = moved {
+        let _ = app_handle.emit("current-file-changed", &file);
     }
     let _ = app_handle.emit("library-changed", &to);
     Ok(())

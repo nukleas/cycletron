@@ -6,7 +6,7 @@
  * and push code into it on open.
  */
 
-import {invoke, isTauri} from './tauri.js';
+import {invoke, isTauri, listen} from './tauri.js';
 import {liveShow} from './show/live.js';
 import {showPane} from './show/show-pane.js';
 import {notify} from './notifications.js';
@@ -61,11 +61,16 @@ export class FileManager {
 
     async init(): Promise<void> {
         if (!isTauri) return;
-        // Ask backend for current state (may be restored from autosave).
+        // The backend owns which file is open. Follow its pushes (a delete or
+        // rename in the library moves the file under us), then ask for the
+        // current one.
         try {
-            const code = this.getEditorCode();
-            const info = await invoke<CurrentFile>('get_current_file', {code});
-            this.applyCurrentFile(info);
+            await listen<CurrentFile>('current-file-changed', (e) => this.applyCurrentFile(e.payload));
+        } catch (e) {
+            console.warn('[file-manager] current-file-changed listen failed:', e);
+        }
+        try {
+            this.applyCurrentFile(await invoke<CurrentFile>('get_current_file'));
         } catch (e) {
             console.warn('[file-manager] get_current_file failed:', e);
         }
@@ -393,12 +398,12 @@ export class FileManager {
     // Restore from autosave
     // ------------------------------------------------------------------
 
-    /** Called on startup — replays the last-saved open file into the editor. */
+    /** Take the backend's word for which file is open; dirty follows from the editor. */
     applyCurrentFile(info: CurrentFile): void {
         this.currentPath = info.path;
         this.currentName = info.name ?? 'untitled';
-        this.dirty = info.dirty;
-        this.lastSavedCode = info.dirty ? '' : this.getEditorCode();
+        this.lastSavedCode = info.saved_code ?? '';
+        this.dirty = this.getEditorCode() !== this.lastSavedCode;
         this.emitChanged();
     }
 

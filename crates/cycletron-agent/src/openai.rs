@@ -20,7 +20,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use tokio::sync::mpsc;
-use tracing::debug;
+use tracing::{debug, warn};
 
 /// HTTP client for any OpenAI-compatible chat/completions API.
 #[derive(Clone)]
@@ -201,6 +201,15 @@ fn to_openai_tools(tools: &[ToolDefinition]) -> Vec<Value> {
 struct ChatChunk {
     #[serde(default)]
     choices: Vec<ChatChoice>,
+    /// Servers report a mid-stream failure as a chunk with only this field.
+    #[serde(default)]
+    error: Option<ChatError>,
+}
+
+#[derive(Default, Deserialize)]
+struct ChatError {
+    #[serde(default)]
+    message: String,
 }
 
 #[derive(Default, Deserialize)]
@@ -245,10 +254,19 @@ struct Accumulator {
     text: String,
     tools: BTreeMap<usize, ToolBuf>,
     finish_reason: Option<String>,
+    /// `[DONE]` arrived. Some local servers send it without a finish_reason,
+    /// so either one marks the response complete.
+    done: bool,
+    error: Option<String>,
 }
 
 impl Accumulator {
     fn process(&mut self, chunk: &ChatChunk, event_tx: &mpsc::UnboundedSender<AgentEvent>) {
+        if let Some(err) = &chunk.error {
+            warn!("OpenAI stream error chunk: {}", err.message);
+            self.error = Some(err.message.clone());
+            return;
+        }
         let Some(choice) = chunk.choices.first() else {
             return;
         };
@@ -297,29 +315,31 @@ impl StreamDecoder for Accumulator {
         }
     }
 
+    fn on_done(&mut self) {
+        self.done = true;
+    }
+
     fn finalize(self, event_tx: &mpsc::UnboundedSender<AgentEvent>) -> MessagesResponse {
         let mut content = Vec::new();
         if !self.text.is_empty() {
             content.push(ContentBlock::Text { text: self.text });
         }
-        let (tool_blocks, incomplete_tool_input) =
-            finish_tool_calls(self.tools.into_values(), event_tx);
-        content.extend(tool_blocks);
+        content.extend(finish_tool_calls(self.tools.into_values(), event_tx));
 
-        // Map OpenAI finish reasons onto the Anthropic vocabulary the agent
-        // loop already understands (notably `max_tokens` for truncation).
-        let stop_reason = self.finish_reason.map(|fr| match fr.as_str() {
-            "tool_calls" => "tool_use".to_string(),
-            "length" => "max_tokens".to_string(),
-            "stop" => "end_turn".to_string(),
-            other => other.to_string(),
-        });
+        let stop = if let Some(message) = self.error {
+            StopReason::Error(message)
+        } else if self.finish_reason.as_deref() == Some("length") {
+            StopReason::max_tokens(&content)
+        } else if self.done || self.finish_reason.is_some() {
+            StopReason::from_content(&content)
+        } else {
+            StopReason::Dropped
+        };
 
         MessagesResponse {
             id: String::new(),
             content,
-            stop_reason,
-            incomplete_tool_input,
+            stop,
             usage: Usage {
                 input_tokens: 0,
                 output_tokens: 0,
@@ -421,8 +441,7 @@ mod tests {
             &tx,
         );
         let resp = acc.finalize(&tx);
-        assert_eq!(resp.stop_reason.as_deref(), Some("tool_use"));
-        assert!(!resp.incomplete_tool_input);
+        assert_eq!(resp.stop, StopReason::ToolUse);
         match &resp.content[0] {
             ContentBlock::Text { text } => assert_eq!(text, "hi "),
             other => panic!("expected text block, got {other:?}"),
@@ -449,6 +468,70 @@ mod tests {
             &tx,
         );
         let resp = acc.finalize(&tx);
-        assert_eq!(resp.stop_reason.as_deref(), Some("max_tokens"));
+        assert_eq!(resp.stop, StopReason::MaxTokens { cut_tool: None });
+    }
+
+    fn chunk(json: &str) -> ChatChunk {
+        serde_json::from_str(json).unwrap()
+    }
+
+    #[test]
+    fn length_stop_names_only_the_cut_tool() {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut acc = Accumulator::default();
+        // A complete zero-arg call, then a second call cut mid-arguments.
+        acc.process(
+            &chunk(
+                r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_a","function":{"name":"get_current_code","arguments":"{}"}}]}}]}"#,
+            ),
+            &tx,
+        );
+        acc.process(
+            &chunk(
+                r#"{"choices":[{"delta":{"tool_calls":[{"index":1,"id":"call_b","function":{"name":"play_pattern","arguments":"{\"code\":\"s(\\\"bd"}}]}}]}"#,
+            ),
+            &tx,
+        );
+        acc.process(&chunk(r#"{"choices":[{"delta":{},"finish_reason":"length"}]}"#), &tx);
+        let resp = acc.finalize(&tx);
+        assert_eq!(
+            resp.stop,
+            StopReason::MaxTokens {
+                cut_tool: Some("call_b".to_string())
+            }
+        );
+    }
+
+    #[test]
+    fn done_without_finish_reason_is_complete() {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut acc = Accumulator::default();
+        acc.process(&chunk(r#"{"choices":[{"delta":{"content":"hello"}}]}"#), &tx);
+        acc.on_done();
+        let resp = acc.finalize(&tx);
+        assert_eq!(resp.stop, StopReason::EndTurn);
+    }
+
+    #[test]
+    fn stream_ending_without_terminator_is_dropped() {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut acc = Accumulator::default();
+        acc.process(&chunk(r#"{"choices":[{"delta":{"content":"half a"}}]}"#), &tx);
+        let resp = acc.finalize(&tx);
+        assert_eq!(resp.stop, StopReason::Dropped);
+        match &resp.content[0] {
+            ContentBlock::Text { text } => assert_eq!(text, "half a"),
+            other => panic!("expected text block, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn error_chunk_becomes_error_stop() {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut acc = Accumulator::default();
+        acc.process(&chunk(r#"{"error":{"message":"overloaded"}}"#), &tx);
+        acc.on_done();
+        let resp = acc.finalize(&tx);
+        assert_eq!(resp.stop, StopReason::Error("overloaded".to_string()));
     }
 }

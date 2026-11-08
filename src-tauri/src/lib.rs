@@ -339,7 +339,6 @@ pub fn run() {
             commands::save_current,
             commands::save_as,
             commands::new_file,
-            commands::is_dirty,
             commands::get_current_file,
             commands::get_recents,
             commands::clear_recents,
