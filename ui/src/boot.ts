@@ -379,7 +379,6 @@ async function restoreIfAny(): Promise<void> {
             document.dispatchEvent(new Event('session:restored'));
             msgsEl.innerHTML = '';
             for (const m of snap.messages) {
-                if (m.role === 'system') continue;
                 const div = document.createElement('div');
                 div.className = `ai-msg ai-msg-${m.role}`;
                 // Same shape as a live assistant turn: tool rows, then prose.
@@ -403,8 +402,7 @@ async function restoreIfAny(): Promise<void> {
 
         // File metadata: dirty when the restored code differs from the file on disk.
         if (snap.file_path) {
-            const code = window.strudelApp?.editor?.getCode?.() ?? snap.code;
-            fileManager.applyCurrentFile(await invoke<CurrentFile>('get_current_file', {code}));
+            fileManager.applyCurrentFile(await invoke<CurrentFile>('get_current_file'));
         }
     } catch (e) {
         console.warn('[boot] restore failed:', e);

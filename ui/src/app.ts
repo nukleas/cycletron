@@ -107,6 +107,23 @@ interface PatternDigest {
     uses_pan: boolean;
 }
 
+/**
+ * The audio engine's lifecycle. Starting and Restarting are busy: a transport
+ * press during either is dropped rather than racing the work in flight.
+ */
+const enum EngineState {
+    /** No audio graph yet; the first Play builds it. */
+    Off,
+    /** initAudio is running. */
+    Starting,
+    /** Built and playable. */
+    Ready,
+    /** The worklet threw; nothing plays until the graph is rebuilt. */
+    Crashed,
+    /** The graph is being torn down, ahead of a rebuild or for good. */
+    Restarting,
+}
+
 export class StrudelApp {
     editor: StrudelEditor | null;
     visualizer: PatternVisualizer | null;
@@ -139,7 +156,14 @@ export class StrudelApp {
         this.playbackListeners.push(listener);
     }
 
-    isInitialized: boolean;
+    /** Where the audio engine is in its life. Every transport entry point
+     *  reads this one field; see _engineForTransport. */
+    private engine: EngineState = EngineState.Off;
+
+    /** True once the audio graph is built and playable. */
+    get isInitialized(): boolean {
+        return this.engine === EngineState.Ready;
+    }
 
     // WASM modules (loaded dynamically)
     private wasm: WasmModule | null;
@@ -150,22 +174,6 @@ export class StrudelApp {
 
     elements: AppElements;
     private statsInterval: ReturnType<typeof setInterval> | null;
-
-    // True while _initAndPlay is awaiting initAudio - used by _onPageHide to
-    // avoid attempting a full async dispose against a half-constructed AudioWorklet,
-    // which can deadlock the browser's audio thread during page unload.
-    private _initInProgress: boolean;
-    /**
-     * Set when the AudioWorklet's process() method throws — the worklet is
-     * unrecoverable at that point and any further audio output requires a
-     * fresh AudioContext + shared memory. The next play press triggers a
-     * full dispose+init cycle and resumes the current pattern.
-     */
-    private _audioCrashed: boolean;
-    /** Set while _recoverFromAudioCrash is in flight so a second click on
-     * Play (or a menu/tray/hotkey trigger) doesn't kick off a parallel
-     * dispose+init and race the first one to nulled state. */
-    private _recoveringFromCrash: boolean;
     private _resizeMoveRafId: number | null;
     private _activeLocations: ActiveLocations | null;
     /** Whether any active-note highlight is currently lit. See applyActiveNotes. */
@@ -203,8 +211,6 @@ export class StrudelApp {
         this.sampleLoader = null;
         this.processor = null;
 
-        this.isInitialized = false;
-
         // WASM modules (loaded dynamically)
         this.wasm = null;
 
@@ -214,9 +220,6 @@ export class StrudelApp {
 
         this.elements = null!;
         this.statsInterval = null;
-        this._initInProgress = false;
-        this._audioCrashed = false;
-        this._recoveringFromCrash = false;
         this._resizeMoveRafId = null;
         this._activeLocations = null;
         this._wasmMemory = null;
@@ -846,7 +849,8 @@ export class StrudelApp {
         this.manifestCountView = new Uint32Array(this._wasmMemory.buffer, missingManifestBufPtr, 1);
 
         this.hideError();
-        this.isInitialized = true;
+        // A worklet that threw during init already moved us to Crashed.
+        if (this.engine === EngineState.Starting) this.engine = EngineState.Ready;
 
         // Create sample loader
         this.sampleLoader = new SampleLoaderCtor(
@@ -1167,11 +1171,7 @@ export class StrudelApp {
     async evaluate(code: string): Promise<void> {
         // This evaluate supersedes a pending keystroke one for the same text.
         this.debouncedEvaluate.cancel();
-        if (!this.isInitialized) {
-            if (this._initInProgress) return;
-            await this._initAndPlay();
-            return;
-        }
+        if (!(await this._engineForTransport())) return;
 
         let pattern: PatternHandle;
         try {
@@ -1203,15 +1203,19 @@ export class StrudelApp {
     }
 
     async ensureAudioInitialized(): Promise<boolean> {
-        if (this.isInitialized) {
-            return true;
+        switch (this.engine) {
+            case EngineState.Ready:
+                return true;
+            case EngineState.Starting:
+            case EngineState.Restarting:
+                return false;
+            case EngineState.Crashed:
+                await this._rebuildEngine(false);
+                return this.isInitialized;
+            case EngineState.Off:
+                break;
         }
-
-        if (this._initInProgress) {
-            return false;
-        }
-
-        this._initInProgress = true;
+        this.engine = EngineState.Starting;
 
         const btn = this.elements.transportBtn;
         btn.disabled = true;
@@ -1226,14 +1230,31 @@ export class StrudelApp {
             this.showError('Could not start audio engine.');
             return false;
         } finally {
-            this._initInProgress = false;
+            // Widened on purpose: the crash handler may have moved the engine
+            // during the awaits, which TypeScript's narrowing does not see.
+            const engine = this.engine as EngineState;
+            // A failed init goes back to Off; a crash during init stays Crashed
+            // and keeps the 'Restart audio' label its handler set.
+            if (engine === EngineState.Starting) this.engine = EngineState.Off;
 
-            if (this.playbackState !== PlaybackState.Playing) {
+            if (this.playbackState !== PlaybackState.Playing && engine !== EngineState.Crashed) {
                 setTransportLabel(btn, 'Play', 'play');
                 btn.classList.remove('transport--playing');
                 btn.disabled = false;
             }
         }
+    }
+
+    /**
+     * Bring the engine to Ready for a transport press. False means the press
+     * was consumed: it started or rebuilt the engine, which then plays the
+     * editor code, or one of those is already in flight.
+     */
+    private async _engineForTransport(): Promise<boolean> {
+        if (this.engine === EngineState.Ready) return true;
+        if (this.engine === EngineState.Crashed) await this._recoverFromAudioCrash();
+        else if (this.engine === EngineState.Off) await this._initAndPlay();
+        return false;
     }
 
     /** Fired when a song started with {@link startSongAt} is first heard. */
@@ -1403,18 +1424,7 @@ export class StrudelApp {
      * On first press, initializes audio then plays immediately.
      */
     async togglePlayPause(): Promise<void> {
-        // Worklet crashed previously — tear down the dead pipeline and rebuild
-        // before doing anything else. Re-init then plays the current editor code.
-        if (this._audioCrashed) {
-            await this._recoverFromAudioCrash();
-            return;
-        }
-
-        if (!this.isInitialized) {
-            if (this._initInProgress) return;
-            await this._initAndPlay();
-            return;
-        }
+        if (!(await this._engineForTransport())) return;
         switch (this.playbackState) {
             case PlaybackState.Stopped:
                 await this.play();
@@ -1435,12 +1445,12 @@ export class StrudelApp {
      * the error to the user and arms the next Play press to re-init.
      */
     private _handleAudioCrash(): void {
-        if (this._audioCrashed) return;
-        this._audioCrashed = true;
-
-        // Mark the engine as not-initialized so debouncedEvaluate + the rest
-        // of the app stop poking at the dead scheduler/processor.
-        this.isInitialized = false;
+        // A second throw from the same dead worklet, or one from a graph that
+        // is already being torn down.
+        if (this.engine === EngineState.Crashed || this.engine === EngineState.Restarting) return;
+        // Leaving Ready stops debouncedEvaluate and the rest of the app poking
+        // at the dead scheduler/processor.
+        this.engine = EngineState.Crashed;
 
         try { this.scheduler?.stop(); } catch { /* worklet is dead, ignore */ }
         this.playbackState = PlaybackState.Stopped;
@@ -1464,21 +1474,24 @@ export class StrudelApp {
      * it evaluates that code so playback resumes from the same pattern.
      */
     private async _recoverFromAudioCrash(): Promise<void> {
-        if (this._recoveringFromCrash) return;
-        this._recoveringFromCrash = true;
+        if (this.engine !== EngineState.Crashed) return;
+        await this._rebuildEngine(true);
+    }
 
+    /**
+     * Tear the audio graph down and build it again, then play the editor code
+     * when `play`. dispose() holds the engine busy until the old graph is gone,
+     * so a transport press in the meantime is dropped, not raced.
+     */
+    private async _rebuildEngine(play: boolean): Promise<void> {
         const btn = this.elements.transportBtn;
         btn.disabled = true;
         setTransportLabel(btn, 'Restarting…');
 
-        try {
-            await this.dispose();
-            this._audioCrashed = false;
-            this.hideError();
-            await this._initAndPlay();
-        } finally {
-            this._recoveringFromCrash = false;
-        }
+        await this.dispose();
+        this.hideError();
+        if (play) await this._initAndPlay();
+        else await this.ensureAudioInitialized();
     }
 
     /**
@@ -1488,20 +1501,8 @@ export class StrudelApp {
      * first audio init (that init will already use the new set).
      */
     async reloadSampleSet(): Promise<void> {
-        if (!this.isInitialized || this._recoveringFromCrash || this._initInProgress) return;
-        this._recoveringFromCrash = true;
-        const wasPlaying = this.playbackState === PlaybackState.Playing;
-        try {
-            await this.dispose();
-            this.hideError();
-            if (wasPlaying) {
-                await this._initAndPlay();
-            } else {
-                await this.ensureAudioInitialized();
-            }
-        } finally {
-            this._recoveringFromCrash = false;
-        }
+        if (this.engine !== EngineState.Ready) return;
+        await this._rebuildEngine(this.playbackState === PlaybackState.Playing);
     }
 
     /**
@@ -1740,12 +1741,23 @@ export class StrudelApp {
     }
 
     async dispose(): Promise<void> {
+        // Busy until the graph is gone: resetUI re-enables Play below, and a
+        // press before the manager has released its worklet must not start a
+        // second engine over this one.
+        this.engine = EngineState.Restarting;
+        try {
+            await this._teardown();
+        } finally {
+            this.engine = EngineState.Off;
+        }
+    }
+
+    private async _teardown(): Promise<void> {
         // The capture tap lives on the graph we are about to tear down. Commit
         // first so a crash, a sample-set reload, or a quit mid-take still leaves
         // the audio on disk rather than an orphaned partial file.
         await audioRecorder.salvage();
 
-        this.isInitialized = false;
         this.playbackState = PlaybackState.Stopped;
         this.latestCycle = 0;
         this.vizPending = false;

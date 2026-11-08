@@ -62,14 +62,6 @@ impl Session {
         }
     }
 
-    /// Current saved-state snapshot; used by the dirty check.
-    pub fn is_dirty(&self, current_code: &str) -> bool {
-        match &self.last_saved_snapshot {
-            Some(saved) => saved != current_code,
-            None => !current_code.trim().is_empty(),
-        }
-    }
-
     /// Record that the session's working code was persisted to `path`.
     pub fn mark_saved(&mut self, path: PathBuf, code: String) {
         self.file_path = Some(path);
@@ -107,6 +99,19 @@ impl Session {
 
     pub fn add_assistant_message(&mut self, content: String) -> &ChatMessage {
         self.add_assistant_message_with_tools(content, Vec::new())
+    }
+
+    /// A line shown in the transcript but never sent to the model, such as
+    /// "the reply was cut off".
+    pub fn add_system_message(&mut self, content: String) -> &ChatMessage {
+        self.messages.push(ChatMessage {
+            id: Uuid::new_v4().to_string(),
+            role: ChatRole::System,
+            content,
+            timestamp: Utc::now(),
+            tools: Vec::new(),
+        });
+        self.messages.last().unwrap()
     }
 
     /// Record an assistant turn together with the compact [`ToolTrace`]s it

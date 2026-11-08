@@ -57,6 +57,9 @@ pub struct AppState {
     pub agent_write: Mutex<AgentWriteState>,
     /// Rewrite cap and note framing; see [`AgentPolicy`].
     pub agent_policy: Mutex<AgentPolicy>,
+    /// True while `send_message` is running the agent loop. A second send is
+    /// refused, and so is clearing the session under the run.
+    pub agent_running: std::sync::atomic::AtomicBool,
 }
 
 /// Agent write-path state that survives across tool calls within (and between)
@@ -71,13 +74,9 @@ pub struct AgentWriteState {
     /// Applied rewrites per section / track / binding id this user message
     /// (lower-cased, without `@`). The rewrite cap in [`AgentPolicy`] reads it.
     pub rewrites: std::collections::HashMap<String, usize>,
-    /// Hash of the code for the last review (cache key).
-    pub last_review_hash: Option<u64>,
-    /// The last review's envelope (served on cache hit).
-    pub last_review_result: Option<cycletron_core::types::ToolOutcome>,
-    /// Code body of the last successful (non-INVALID) review — playable via
-    /// `play_pattern` with no `code` argument.
-    pub last_reviewed_code: Option<String>,
+    /// The most recent review, served again for identical code. Its buffer is
+    /// playable via `play_pattern` with no `code` argument only when it passed.
+    pub last_review: Option<LastReview>,
     /// One-shot write-kind stamp for telemetry (set by a tool, taken by the
     /// agent loop when recording the event).
     pub pending_write_kind: Option<String>,
@@ -85,8 +84,24 @@ pub struct AgentWriteState {
     /// Full `play_pattern({code})` after structure listing is the #1 latency
     /// footgun (telemetry: list_sections → 34k-char play ×2 ≈ 9 min).
     pub listed_structure: bool,
-    /// Allow one full play_pattern after a structure list when `force: true`.
-    pub force_full_play: bool,
+}
+
+/// One review: the code it looked at, keyed by hash, and what it said.
+#[derive(Debug, Clone)]
+pub struct LastReview {
+    pub hash: u64,
+    pub code: String,
+    pub result: cycletron_core::types::ToolOutcome,
+}
+
+impl LastReview {
+    pub fn new(code: String, result: cycletron_core::types::ToolOutcome) -> Self {
+        Self {
+            hash: crate::agent_loop::code_hash(&code),
+            code,
+            result,
+        }
+    }
 }
 
 /// Hard cap on real (non-cached) `review_pattern` calls per user message.
@@ -163,6 +178,7 @@ impl AppState {
             read_budget: Mutex::new((0, 0)),
             agent_write: Mutex::new(AgentWriteState::default()),
             agent_policy: Mutex::new(AgentPolicy::default()),
+            agent_running: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -179,7 +195,11 @@ impl AppState {
         w.hear_calls = 0;
         w.rewrites.clear();
         w.listed_structure = false;
-        w.force_full_play = false;
+    }
+
+    /// Forget the last review. Called when the document changed under it.
+    pub fn forget_review(&self) {
+        self.agent_write.lock().last_review = None;
     }
 
     pub fn mark_listed_structure(&self) {
@@ -190,9 +210,14 @@ impl AppState {
         self.agent_write.lock().listed_structure
     }
 
-    /// Snapshot of the last successfully reviewed code, if any.
+    /// The last reviewed code, if that review passed.
     pub fn last_reviewed_code(&self) -> Option<String> {
-        self.agent_write.lock().last_reviewed_code.clone()
+        self.agent_write
+            .lock()
+            .last_review
+            .as_ref()
+            .filter(|r| r.result.ok)
+            .map(|r| r.code.clone())
     }
 
     /// Stamp a write-kind label the agent loop will attach to the next telemetry

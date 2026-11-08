@@ -53,18 +53,67 @@ pub struct ToolDefinition {
     pub input_schema: serde_json::Value,
 }
 
-/// Response from Claude Messages API (non-streaming).
-#[derive(Debug, Deserialize)]
+/// One model response in the canonical shape, assembled by a provider codec
+/// from its stream.
+#[derive(Debug)]
 pub struct MessagesResponse {
     pub id: String,
     pub content: Vec<ContentBlock>,
-    pub stop_reason: Option<String>,
-    /// True when a tool_use block's argument JSON was truncated mid-stream
-    /// (max_tokens cutoff). Not part of the API wire format — set by the
-    /// stream accumulator. Defaults to false on the `message_start` event,
-    /// which deserializes into this same struct.
-    #[serde(default)]
-    pub incomplete_tool_input: bool,
+    pub stop: StopReason,
+    pub usage: Usage,
+}
+
+/// Why a response ended. Every codec reduces its wire format to this, so the
+/// agent loop never reads provider strings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StopReason {
+    /// The model finished its turn.
+    EndTurn,
+    /// The model finished and wants its tool calls run.
+    ToolUse,
+    /// Output hit the token limit. `cut_tool` is the tool_use whose arguments
+    /// never finished (its `input` is `{}`), when the cut landed inside one.
+    MaxTokens { cut_tool: Option<String> },
+    /// The stream ended without its terminal event: the connection dropped.
+    /// `content` holds whatever arrived before that.
+    Dropped,
+    /// The provider sent an error event mid-stream.
+    Error(String),
+}
+
+impl StopReason {
+    /// Stop for a stream that completed normally: `ToolUse` when the content
+    /// carries a tool call, `EndTurn` otherwise.
+    pub fn from_content(content: &[ContentBlock]) -> Self {
+        if content
+            .iter()
+            .any(|c| matches!(c, ContentBlock::ToolUse { .. }))
+        {
+            Self::ToolUse
+        } else {
+            Self::EndTurn
+        }
+    }
+
+    /// `MaxTokens` with the cut tool identified: the last content block, when
+    /// it is a tool_use whose input never got past `{}`.
+    pub fn max_tokens(content: &[ContentBlock]) -> Self {
+        let cut_tool = match content.last() {
+            Some(ContentBlock::ToolUse { id, input, .. })
+                if input.as_object().is_none_or(serde_json::Map::is_empty) =>
+            {
+                Some(id.clone())
+            }
+            _ => None,
+        };
+        Self::MaxTokens { cut_tool }
+    }
+}
+
+/// The `message_start` payload: only the id and input usage matter.
+#[derive(Debug, Deserialize)]
+pub struct MessageStartBody {
+    pub id: String,
     pub usage: Usage,
 }
 
@@ -79,7 +128,7 @@ pub struct Usage {
 #[serde(tag = "type")]
 pub enum StreamEvent {
     #[serde(rename = "message_start")]
-    MessageStart { message: MessagesResponse },
+    MessageStart { message: MessageStartBody },
 
     #[serde(rename = "content_block_start")]
     ContentBlockStart {
@@ -160,12 +209,4 @@ pub enum AgentEvent {
     /// AppHandle, so this is how they reach the REPL and the file tree.
     #[serde(rename = "ui_action")]
     UiAction { name: String, payload: String },
-
-    /// AI response is complete.
-    #[serde(rename = "done")]
-    Done { full_text: String },
-
-    /// Error occurred.
-    #[serde(rename = "error")]
-    Error { message: String },
 }

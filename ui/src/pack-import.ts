@@ -32,10 +32,10 @@ interface ProposedBank {
     files: PreviewFile[];
 }
 interface PackImportPreview {
+    /** Staging handle; empty when the source folder is used in place. */
     token: string;
     source: string;
     root: string;
-    staged: boolean;
     suggestedId: string;
     suggestedName: string;
     strategy: 'leading-tag' | 'trailing-index' | 'single-bank';
@@ -176,19 +176,36 @@ export class PackImport {
             const viz = pack.viz.length ? '; the new visualizers load at the next launch' : '';
             lines.push('', `Already installed: v${installed.version}. Replace it with v${pack.version}? It stays ${installed.enabled ? 'enabled' : 'disabled'}${viz}.`);
         }
-        const ok = await confirmDialog(lines.join('\n'), {title: installed ? 'Replace pack' : 'Install pack', okLabel: installed ? 'Replace' : 'Install', cancelLabel: 'Cancel', kind: pack.viz.length ? 'warning' : 'info'});
-        if (!ok) {
-            if (preview.staged && preview.token) void invoke('cancel_pack_import', {token: preview.token}).catch(() => {});
-            return;
-        }
+        // The staging directory lives until the install takes it or this
+        // cancels it: declining, a size refusal, and a failed commit all cancel.
+        let committed = false;
         try {
-            const result = await invoke<{id: string; name: string; viz: string[]; banks: string[]; file_count: number;
-                load: {banks: Array<{name: string; files: string[]}>} | null}>('commit_pack_install', {
-                request: {token: preview.token, root: preview.root, enable: true, replace: installed !== undefined},
-            });
+            if (preview.overCap) {
+                await errorDialog(`Cannot install:\n${preview.warnings.join('\n')}`);
+                return;
+            }
+            const ok = await confirmDialog(lines.join('\n'), {title: installed ? 'Replace pack' : 'Install pack', okLabel: installed ? 'Replace' : 'Install', cancelLabel: 'Cancel', kind: pack.viz.length ? 'warning' : 'info'});
+            if (!ok) return;
+            let result: {id: string; name: string; viz: string[]; banks: string[]; file_count: number;
+                load: {banks: Array<{name: string; files: string[]}>} | null};
+            try {
+                result = await invoke('commit_pack_install', {
+                    request: {token: preview.token, root: preview.root, enable: true, replace: installed !== undefined},
+                });
+            } catch (e) {
+                await errorDialog(`Install failed:\n${e}`);
+                return;
+            }
+            committed = true;
+            document.dispatchEvent(new CustomEvent('sounds:changed'));
+            // The pack is in. What follows only loads it into the running app.
             let loaded = 0;
             if (result.load?.banks?.length) {
-                loaded = (await window.strudelApp?.loadPackBanks?.(result.load.banks)) ?? 0;
+                try {
+                    loaded = (await window.strudelApp?.loadPackBanks?.(result.load.banks)) ?? 0;
+                } catch (e) {
+                    void notify('Pack installed, samples not loaded', String(e));
+                }
             }
             const vizLoaded = await loadLibraryPacks((id, message) => notify(`Visualizer pack ${id} failed to load: ${message}`, 'error'));
             const parts = [`${result.file_count} files`];
@@ -196,9 +213,8 @@ export class PackImport {
             if (vizLoaded.length) parts.push(`visualizers ${vizLoaded.join(', ')} ready`);
             else if (installed && pack.viz.length) parts.push('restart Cycletron to load the new visualizers');
             void notify(installed ? 'Pack replaced' : 'Pack installed', `${result.name}: ${parts.join(' · ')}`);
-            document.dispatchEvent(new CustomEvent('sounds:changed'));
-        } catch (e) {
-            await errorDialog(`Install failed:\n${e}`);
+        } finally {
+            if (!committed && preview.token) void invoke('cancel_pack_import', {token: preview.token}).catch(() => {});
         }
     }
 
@@ -248,14 +264,14 @@ export class PackImport {
         if (!this.root) return;
         stopAudition();
         const token = this.preview?.token;
-        const staged = this.preview?.staged;
         this.root.hidden = true;
         this.cleanup?.();
         this.cleanup = null;
         this.preview = null;
         this.drafts = [];
-        // Always clean the staging directory up — this is the only path that does.
-        if (staged && token) void invoke('cancel_pack_import', {token}).catch(() => {});
+        // Every way out of the review dialog comes through here, so this is
+        // where the staging directory goes.
+        if (token) void invoke('cancel_pack_import', {token}).catch(() => {});
     }
 
     private renderWarnings(warnings: string[]): void {
@@ -309,7 +325,7 @@ export class PackImport {
         // Only banks the user has not renamed themselves should follow the id.
         try {
             const next = await invoke<PackImportPreview>('preview_pack_import', {
-                source: p.staged ? p.root : p.source,
+                source: p.token ? p.root : p.source,
                 id,
             });
             next.banks.forEach((b, i) => {
@@ -419,14 +435,15 @@ export class PackImport {
         const p = this.preview;
         if (!p || this.validationError()) return;
         const banks = this.kept().map((b) => ({name: b.name, files: b.files.map((f) => f.path)}));
+        let result: {
+            id: string;
+            banks: string[];
+            renamed: Array<{from: string; to: string}>;
+            file_count: number;
+            load: {banks: Array<{name: string; files: string[]}>} | null;
+        };
         try {
-            const result = await invoke<{
-                id: string;
-                banks: string[];
-                renamed: Array<{from: string; to: string}>;
-                file_count: number;
-                load: {banks: Array<{name: string; files: string[]}>} | null;
-            }>('commit_pack_import', {
+            result = await invoke('commit_pack_import', {
                 request: {
                     token: p.token,
                     source: p.source,
@@ -437,24 +454,30 @@ export class PackImport {
                     enable: true,
                 },
             });
-            // The staging directory is gone; don't ask for it to be cancelled.
-            this.preview = {...p, staged: false};
-            let loaded = 0;
-            if (result.load?.banks?.length) {
-                loaded = (await window.strudelApp?.loadPackBanks?.(result.load.banks)) ?? 0;
-            }
-            const renamed = result.renamed?.length
-                ? ` Renamed ${result.renamed.length} bank(s) that collide with the core kit.`
-                : '';
-            void notify(
-                'Pack imported',
-                `${result.id}: ${result.banks.length} banks, ${result.file_count} files, ${loaded} loaded.${renamed}`,
-            );
-            this.close();
-            document.dispatchEvent(new CustomEvent('sounds:changed'));
         } catch (e) {
             await errorDialog(`Import failed:\n${e}`);
+            return;
         }
+        // The install took the staging directory with it; close() must not cancel it.
+        this.preview = {...p, token: ''};
+        this.close();
+        document.dispatchEvent(new CustomEvent('sounds:changed'));
+        // The pack is in. What follows only loads it into the running app.
+        let loaded = 0;
+        if (result.load?.banks?.length) {
+            try {
+                loaded = (await window.strudelApp?.loadPackBanks?.(result.load.banks)) ?? 0;
+            } catch (e) {
+                void notify('Pack imported, samples not loaded', String(e));
+            }
+        }
+        const renamed = result.renamed?.length
+            ? ` Renamed ${result.renamed.length} bank(s) that collide with the core kit.`
+            : '';
+        void notify(
+            'Pack imported',
+            `${result.id}: ${result.banks.length} banks, ${result.file_count} files, ${loaded} loaded.${renamed}`,
+        );
     }
 }
 

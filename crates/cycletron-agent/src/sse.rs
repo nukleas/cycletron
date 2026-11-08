@@ -21,14 +21,19 @@ pub trait StreamDecoder {
     /// Handle one SSE `data:` payload (never empty, never `[DONE]`).
     fn on_event(&mut self, data: &str, event_tx: &mpsc::UnboundedSender<AgentEvent>);
 
-    /// Consume the decoder and produce the canonical response.
+    /// The `[DONE]` terminator arrived. Only the OpenAI chat wire sends one.
+    fn on_done(&mut self) {}
+
+    /// Consume the decoder and produce the canonical response. A stream that
+    /// ended early must come back as `StopReason::Dropped`, never as an error:
+    /// the text that did arrive is kept.
     fn finalize(self, event_tx: &mpsc::UnboundedSender<AgentEvent>) -> MessagesResponse;
 }
 
 /// POST a streaming `request` and fold its SSE stream into a [`MessagesResponse`]
-/// via `decoder`. Errors on transport failure or a non-success HTTP status;
-/// per-event stream errors are logged and skipped so one bad frame can't abort
-/// the turn.
+/// via `decoder`. Errors on a failed request or a non-success HTTP status. Once
+/// the stream is open, a malformed frame is logged and skipped, and a transport
+/// failure ends the stream so the decoder reports `Dropped`.
 pub async fn drive_stream<D: StreamDecoder + Send>(
     request: reqwest::RequestBuilder,
     mut decoder: D,
@@ -48,19 +53,27 @@ pub async fn drive_stream<D: StreamDecoder + Send>(
         });
     }
 
-    use eventsource_stream::Eventsource as _;
+    use eventsource_stream::{EventStreamError, Eventsource as _};
     use tokio_stream::StreamExt;
     let mut sse = std::pin::pin!(response.bytes_stream().eventsource());
 
     while let Some(event) = sse.next().await {
         let event = match event {
             Ok(ev) => ev,
+            Err(EventStreamError::Transport(e)) => {
+                error!("connection lost mid-stream: {e}");
+                break;
+            }
             Err(e) => {
-                error!("SSE stream error: {e}");
+                warn!("skipping malformed SSE frame: {e}");
                 continue;
             }
         };
-        if event.data.is_empty() || event.data == "[DONE]" {
+        if event.data == "[DONE]" {
+            decoder.on_done();
+            continue;
+        }
+        if event.data.is_empty() {
             continue;
         }
         decoder.on_event(&event.data, event_tx);
@@ -80,18 +93,15 @@ pub struct ToolBuf {
 }
 
 /// Turn streamed tool-call buffers into canonical [`ContentBlock::ToolUse`]
-/// blocks, emitting an [`AgentEvent::ToolCall`] for each. Empty args become
-/// `{}`; unparseable args (almost always a `max_tokens` cutoff mid-arguments)
-/// become `{}` and flip the returned `incomplete` flag, so the loop can give the
-/// model honest feedback instead of a misleading "missing parameter" error. A
-/// missing id is synthesized from the tool name so the `tool_result` round-trip
-/// still matches.
+/// blocks, emitting an [`AgentEvent::ToolCall`] for each. Empty or unparseable
+/// args become `{}`; under a `max_tokens` stop, [`crate::types::StopReason::max_tokens`]
+/// then names the last such block as the cut tool. A missing id is synthesized
+/// from the tool name so the `tool_result` round-trip still matches.
 pub fn finish_tool_calls(
     tools: impl IntoIterator<Item = ToolBuf>,
     event_tx: &mpsc::UnboundedSender<AgentEvent>,
-) -> (Vec<ContentBlock>, bool) {
+) -> Vec<ContentBlock> {
     let mut blocks = Vec::new();
-    let mut incomplete = false;
 
     for buf in tools {
         let input: Value = if buf.args.trim().is_empty() {
@@ -101,11 +111,10 @@ pub fn finish_tool_calls(
                 Ok(v) => v,
                 Err(e) => {
                     warn!(
-                        "tool '{}' input JSON truncated/unparseable ({e}); {} bytes buffered",
+                        "tool '{}' input JSON unparseable ({e}); {} bytes buffered",
                         buf.name,
                         buf.args.len()
                     );
-                    incomplete = true;
                     json!({})
                 }
             }
@@ -129,5 +138,5 @@ pub fn finish_tool_calls(
         });
     }
 
-    (blocks, incomplete)
+    blocks
 }

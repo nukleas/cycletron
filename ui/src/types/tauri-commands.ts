@@ -17,7 +17,8 @@ export interface FileDoc {
 export interface CurrentFile {
     path: string | null;
     name: string | null;
-    dirty: boolean;
+    /** The code as last saved or loaded; null for a buffer with no file. */
+    saved_code: string | null;
 }
 
 /** Mirror of Rust `ToolCategory` (kebab-case on the wire). */
@@ -79,9 +80,14 @@ export type AgentEvent =
     | {type: 'text_delta'; text: string}
     | {type: 'tool_call'; id: string; name: string; input: unknown}
     | {type: 'tool_result'; id: string; name: string; outcome: ToolOutcome; duration_ms: number}
-    | {type: 'ui_action'; name: string; payload: string}
-    | {type: 'done'; full_text: string}
-    | {type: 'error'; message: string};
+    | {type: 'ui_action'; name: string; payload: string};
+
+/** What `send_message` returns: the reply text, plus a line to show under it
+ *  when the turn did not finish (cut off, dropped connection, provider error). */
+export interface SendReply {
+    text: string;
+    notice: string | null;
+}
 
 export interface SessionSnapshot {
     file_path: string | null;
