@@ -11,8 +11,8 @@ export const SECTIONS = ['Songs', 'Shows', 'Techniques', 'Genres'];
 export const SECTION_INTROS = {
     Songs: 'Full tracks, including the Agency OST album.',
     Shows: 'Show files: songs played as music videos, section by section.',
-    Techniques: 'Short patterns, one musical idea each.',
-    Genres: 'A generated sketch for each genre recipe, and a few curated examples.',
+    Techniques: 'Short patterns, one musical idea each: a rhythm, a chord move, a filter sweep.',
+    Genres: 'A generated sketch for each genre recipe, with a few curated examples after the name.',
 };
 
 const TECHNIQUES = ['rhythm', 'melody', 'harmony', 'form', 'timbre', 'motion'];

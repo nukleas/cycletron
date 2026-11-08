@@ -102,7 +102,7 @@ page({
     scripts: ['/site.js'],
     body: `
 <section class="hero">
-  <h1 class="hero__title">Cycletron</h1>
+  <h1 class="hero__title" data-text="Cycletron">Cycle<span class="hero__tron">tron</span></h1>
   <p class="hero__lede">
     A desktop app for live coding music, on macOS, Linux and Windows.
     Write Strudel-style patterns and press Cmd+Enter: edits take effect on the
@@ -137,9 +137,9 @@ page({
 </section>
 
 <section class="links">
-  <a class="link-card" href="/examples">
+  <a class="link-card" href="/examples#featured">
     <h2>Examples</h2>
-    <p>The songs, techniques and genre sketches the app installs, with their code. Show files are listed too; they play in the app.</p>
+    <p>Shows, songs and packs that play in your browser, then the techniques and genre sketches the app installs, with their code.</p>
   </a>
   <a class="link-card" href="/guide">
     <h2>Guide</h2>
@@ -288,6 +288,43 @@ function groupBy(items, key) {
     return [...groups];
 }
 
+/**
+ * What leads /examples: the show files and songs that show what the app does,
+ * each with a frame of it playing in Stage (site/src/media/featured, captured
+ * from /play at 1280×720 and saved at 800×450).
+ */
+const FEATURED = [
+    {id: 'trailer', open: 'Demos/Shows/cycletron-trailer.show.toml', page: '/examples/shows/cycletron-trailer',
+        title: 'Cycletron Trailer', kind: 'Show',
+        about: 'The trailer as a show file: eleven visualizer modes across the song\'s sections, with camera moves, cuts, strobes and title cards.'},
+    {id: 'tour', open: 'Demos/Shows/feature-tour.show.toml', page: '/examples/shows/feature-tour',
+        title: 'Feature Tour', kind: 'Show',
+        about: 'Every show-file setting on two Agency tracks, one per section, with a comment above each saying what it uses. Edit a value while it plays.'},
+    {id: 'agency', open: 'Demos/Shows/agency-ost.show.toml', page: '/examples/shows/agency-ost',
+        title: 'Agency OST', kind: 'Show',
+        about: 'A thirteen-track album played back to back as one set, each track with its own mode.'},
+    {id: 'danse', open: 'Packs/halloween/shows/danse-macabre.show.toml', page: '/packs#halloween',
+        title: 'Danse Macabre', kind: 'Halloween pack',
+        about: 'Saint-Saëns in 3/4, on the pack\'s own modes: the graveyard, the haunted house and the monster band.'},
+    {id: 'jingle', open: 'Packs/christmas/shows/jingle-bells.show.toml', page: '/packs#christmas',
+        title: 'Jingle Bells', kind: 'Christmas pack',
+        about: 'The Christmas pack\'s modes, from the sleigh road to the snow globe, on one arrangement.'},
+    {id: 'flesh', open: 'Demos/Songs/flesh-firmware.strudel', page: '/examples/songs/flesh-firmware',
+        title: 'FLESH / FIRMWARE', kind: 'Song',
+        about: 'A full song in one file. Press Play and edit any line: the change is heard at the next evaluation, while the visualizer follows each voice.'},
+];
+
+const featuredCard = (f) => `
+  <article class="feature">
+    <a class="feature__shot" href="${playUrl(f.open)}" aria-label="Play ${esc(f.title)} in Cycletron">
+      <img src="/media/featured/${f.id}.jpg" alt="" width="800" height="450" loading="lazy">
+      <span class="feature__play" aria-hidden="true"></span>
+    </a>
+    <p class="feature__kind">${esc(f.kind)}</p>
+    <h3><a href="${f.page}">${esc(f.title)}</a></h3>
+    <p>${esc(f.about)}</p>
+  </article>`;
+
 const exampleRow = (e) => `
       <li class="example">
         <a href="/examples/${e.slug}">${esc(e.title)}</a>
@@ -295,34 +332,60 @@ const exampleRow = (e) => `
         ${e.description ? `<span class="example__about">${esc(e.description)}</span>` : ''}
       </li>`;
 
-page({
-    path: '/examples',
-    title: 'Examples',
-    description: 'The songs, show files, technique patterns and genre sketches Cycletron installs in its Demos folder. Songs, techniques and genre sketches play in the browser.',
-    body: `
-<h1>Examples</h1>
-<p class="lede">
-  What Cycletron puts in your library's Demos folder. Songs, techniques and
-  genre sketches play here on the app's own engine and samples; open any of
-  them in the app, press Cmd+Enter, and edit.
-</p>
-${SECTIONS.map((section) => {
+/** Techniques and genres are reference: names only, in columns. */
+const compactList = (items) => `<ul class="compact">${items.map((e) => `
+      <li><a href="/examples/${e.slug}"${e.description ? ` title="${esc(e.description)}"` : ''}>${esc(e.title)}</a></li>`).join('')}
+    </ul>`;
+
+function exampleSection(section) {
     const items = examples.filter((e) => e.section === section);
-    const body = section === 'Genres'
-        ? `<ul class="genres">${groupBy(items, 'folder').map(([genre, [sketch, ...curated]]) => `
+    let body;
+    if (section === 'Genres') {
+        body = `<ul class="compact">${groupBy(items, 'folder').map(([genre, [sketch, ...curated]]) => `
       <li><a href="/examples/${sketch.slug}">${esc(genre)}</a>${curated.map((e) => `, <a href="/examples/${e.slug}">${esc(e.title)}</a>`).join('')}</li>`).join('')}
-    </ul>`
-        : groupBy(items, 'folder').map(([folder, entries]) => `
+    </ul>`;
+    } else if (section === 'Techniques') {
+        body = `<div class="technique-groups">${groupBy(items, 'folder').map(([folder, entries]) => `
+    <div><h3>${esc(folder)}</h3>${compactList(entries)}</div>`).join('')}
+  </div>`;
+    } else {
+        body = groupBy(items, 'folder').map(([folder, entries]) => `
     ${folder ? `<h3>${esc(folder)}</h3>` : ''}
     <ul class="examples">${entries.map(exampleRow).join('')}
     </ul>`).join('');
+    }
     return `
-<section class="example-section">
+<section class="example-section" id="${section.toLowerCase()}">
   <h2>${section}</h2>
   <p class="example-section__intro">${SECTION_INTROS[section]}</p>
   ${body}
 </section>`;
-}).join('')}`,
+}
+
+page({
+    path: '/examples',
+    title: 'Examples',
+    description: 'Show files, songs and visualizer packs that play in the browser on Cycletron\'s engine, then the technique patterns and genre sketches the app installs.',
+    body: `
+<h1>Examples</h1>
+<p class="lede">
+  Each of these opens in the app in your browser, on its own engine and
+  samples, with the visualizers. Shows play a song as a music video, section
+  by section; the desktop app does the same and can render it to a video file.
+</p>
+
+<section class="featured" id="featured" aria-labelledby="featured-title">
+  <h2 id="featured-title">Watch it play</h2>
+  <div class="features">${FEATURED.map(featuredCard).join('')}
+  </div>
+  <p class="note">More shows and songs on the <a href="/packs">Packs</a> page. In the app, ⌘⇧F switches to Stage.</p>
+</section>
+
+<p class="lede">
+  The rest is what Cycletron puts in your library's Demos folder: open any of
+  them in the app, press Cmd+Enter, and edit.
+</p>
+${SECTIONS.map(exampleSection).join('')}`,
 });
 
 /** The example's own line, and what the page is when that leaves room. */
