@@ -63,7 +63,6 @@ h1, h2, h3, h4 {
 }
 
 h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0 0 1rem; }
-.hero__title { text-shadow: var(--text-glitch); }
 h2 { font-size: 1.35rem; margin: 2.5rem 0 0.75rem; }
 h3 { font-size: 1.05rem; margin: 1.75rem 0 0.5rem; }
 
@@ -96,13 +95,37 @@ pre code { background: none; padding: 0; color: var(--text-secondary); }
 }
 
 .wordmark {
-    color: var(--text);
+    color: var(--accent);
+    font-family: var(--font-mono);
     font-weight: 700;
     font-size: 1.05rem;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     text-decoration: none;
     text-shadow: var(--text-glitch);
+    animation: logo-glitch 9s infinite;
+}
+/* The app's header wordmark: a solid terminal cursor after the name. */
+.wordmark::after {
+    content: '▮';
+    margin-left: 4px;
+    text-shadow: 0 0 8px var(--neon-glow);
+}
+.wordmark:hover { color: #bdffff; }
+
+/* The app's logo jitter (ui/style.css): a couple of frames of chromatic
+   aberration every 9 s. */
+@keyframes logo-glitch {
+    0%, 93%, 100% { text-shadow: var(--text-glitch); transform: none; }
+    94% {
+        text-shadow: -3px 0 0 rgba(255, 43, 214, 0.85), 3px 0 0 rgba(71, 246, 255, 0.85);
+        transform: translateX(1px);
+    }
+    95% {
+        text-shadow: 3px 0 0 rgba(255, 43, 214, 0.85), -3px 0 0 rgba(71, 246, 255, 0.85);
+        transform: translateX(-1px) skewX(-6deg);
+    }
+    96% { text-shadow: var(--text-glitch); transform: none; }
 }
 
 .site-nav { display: flex; gap: 1.25rem; flex: 1; overflow-x: auto; }
@@ -161,10 +184,67 @@ pre code { background: none; padding: 0; color: var(--text-secondary); }
 
 .hero { padding: 3rem 0 2.5rem; }
 .hero__title {
+    position: relative;
+    display: inline-block;
     font-size: clamp(2.6rem, 8vw, 5rem);
+    font-weight: 800;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     margin-bottom: 1.25rem;
+    padding: 0 0.1em;
+    color: #bdffff;
+    text-shadow: 3px 0 0 rgba(255, 43, 214, 0.6), 0 0 18px var(--neon-glow), 0 0 42px rgba(71, 246, 255, 0.18);
+    animation: crt-boot 0.7s ease-out both, hero-glitch 9s 2s infinite;
+}
+/* The app's About logo: CYCLE in phosphor, TRON in edge light. */
+.hero__tron {
+    color: var(--magenta);
+    text-shadow: -3px 0 0 rgba(71, 246, 255, 0.45), 0 0 18px rgba(255, 43, 214, 0.45);
+}
+/* Scanlines across the letters, and a slow band of light (cyberdesign's
+   header sweep): copies of the word, painted only inside its glyphs. */
+.hero__title::before,
+.hero__title::after {
+    content: attr(data-text);
+    content: attr(data-text) / '';
+    position: absolute;
+    inset: 0;
+    padding: inherit;
+    pointer-events: none;
+    color: transparent;
+    text-shadow: none;
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+.hero__title::before {
+    background-image: repeating-linear-gradient(0deg, transparent 0 2px, rgba(5, 6, 10, 0.5) 2px 4px);
+}
+.hero__title::after {
+    background-image: linear-gradient(90deg, transparent 40%, rgba(255, 255, 255, 0.55) 50%, transparent 60%);
+    background-size: 300% 100%;
+    background-repeat: no-repeat;
+    animation: hero-sweep 10s ease-in-out infinite;
+}
+
+@keyframes crt-boot {
+    0% { filter: brightness(0); }
+    10% { filter: brightness(3) blur(2px); }
+    30% { filter: brightness(1.2) blur(0); }
+    100% { filter: brightness(1); }
+}
+@keyframes hero-glitch {
+    0%, 93%, 100% { transform: none; clip-path: none; }
+    94% { transform: translateX(3px); clip-path: inset(0 0 55% 0); }
+    95% { transform: translateX(-4px) skewX(-4deg); clip-path: inset(40% 0 0 0); }
+    96% { transform: none; clip-path: none; }
+}
+@keyframes hero-sweep {
+    0%, 20% { background-position: 100% 0; }
+    60%, 100% { background-position: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wordmark, .hero__title, .hero__title::after { animation: none; }
 }
 .hero__lede { font-size: 1.2rem; max-width: 60ch; color: var(--text); margin: 0 0 1.75rem; }
 

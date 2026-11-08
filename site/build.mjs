@@ -102,7 +102,7 @@ page({
     scripts: ['/site.js'],
     body: `
 <section class="hero">
-  <h1 class="hero__title">Cycletron</h1>
+  <h1 class="hero__title" data-text="Cycletron">Cycle<span class="hero__tron">tron</span></h1>
   <p class="hero__lede">
     A desktop app for live coding music, on macOS, Linux and Windows.
     Write Strudel-style patterns and press Cmd+Enter: edits take effect on the
