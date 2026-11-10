@@ -16,7 +16,7 @@ export interface DialectRule {
 }
 
 export const SHORTCUTS: ShortcutRow[] = [
-    {group: 'Transport', keys: '⌘↩', action: 'Play / pause'},
+    {group: 'Transport', keys: '⌘↩', action: 'Evaluate and play (play / pause outside the editor)'},
     {group: 'Transport', keys: '⇧↩', action: 'Evaluate current block'},
     {group: 'Transport', keys: 'Esc / ⌘.', action: 'Stop'},
     {group: 'Files', keys: '⌘N', action: 'New file'},

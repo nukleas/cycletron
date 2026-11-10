@@ -30,7 +30,8 @@ for (const row of document.querySelectorAll(`tr[data-os="${os}"]`)) row.classLis
 for (const button of document.querySelectorAll('[data-yt]')) {
     button.addEventListener('click', () => {
         const frame = document.createElement('iframe');
-        frame.src = `https://www.youtube-nocookie.com/embed/${button.dataset.yt}?autoplay=1&rel=0`;
+        const list = button.dataset.ytList ? `list=${button.dataset.ytList}&` : '';
+        frame.src = `https://www.youtube-nocookie.com/embed/${button.dataset.yt}?${list}autoplay=1&rel=0`;
         frame.title = button.getAttribute('aria-label')?.replace(/^Play /, '') ?? 'Video';
         frame.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
         frame.allowFullscreen = true;

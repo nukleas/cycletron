@@ -37,9 +37,11 @@ The curated corpus is no longer a panel — the AI searches it directly
 
 ## Transport & editing
 
+Shortcuts are written for macOS; on Windows and Linux, ⌘ is Ctrl.
+
 | Action | Shortcut |
 |--------|----------|
-| Play / Pause | **⌘↩** |
+| Evaluate and play (in the editor); play / pause elsewhere | **⌘↩** |
 | Evaluate current block only | **⇧↩** |
 | Stop | **Esc** or **⌘.** |
 | Command palette | **⌘⇧P** |
@@ -68,7 +70,8 @@ library files, not just commands.
 - Optional frontmatter at the top of a file can record `name`, `bpm`, tags,
   and creation date.
 - **⌘↩** evaluates the whole buffer and starts (or updates) playback.
-- Edits while playing hot-swap on the next eval — there is no separate "compile" step.
+- While a pattern plays, each edit is evaluated about 100 ms after you stop typing and
+  swapped in (on the next Q boundary, if launch quantization is set). There is no compile step.
 - **File → Export Audio…** (`⌘⇧E`) offline-bakes WAV (and stems, when the
   pattern has multiple `$:` tracks) via the Rust DSP engine — faster than
   realtime. MP3 export requires `ffmpeg` on your PATH.
@@ -164,6 +167,7 @@ root in the welcome wizard / Preferences), Cycletron seeds a **Demos/** folder:
 | Folder | Contents |
 |--------|----------|
 | `Demos/Songs/` | Full tracks + `Agency/` album |
+| `Demos/Shows/` | Show files that play the demo songs as music videos |
 | `Demos/Techniques/` | Curated short patterns by category |
 | `Demos/Genres/` | Generated skeletons + curated examples by genre |
 
@@ -347,7 +351,7 @@ section in Preferences shows the last error.
 ## Immersive visualizer
 
 **⌘⇧V** (or Visuals ▾ → Immersive) takes the music-reactive visualization
-fullscreen: 17 modes, **⌘⇧]** or the on-screen HUD to switch, AUTO to cycle
+fullscreen, in any built-in mode or a pack's, **⌘⇧]** or the on-screen HUD to switch, AUTO to cycle
 them, HIDE to drop the HUD. The Visuals menu also has a **Readable mode**
 toggle that calms the ambient background for readability.
 
@@ -404,8 +408,10 @@ in the window.
 
 Cycletron checks GitHub Releases for updates on startup (toggle in
 Preferences → Updates) and on demand via Help → Check for Updates…. Updates
-download only after you confirm, then the app relaunches. Update manifests
-are signed; the app verifies them against its built-in public key.
+download only after you confirm, then the app relaunches. Update packages
+are signed; the app checks each download against its built-in public key
+before installing it. A .deb or AUR install is updated through the system
+package manager; the app tells you when a new version is out.
 
 ---
 
