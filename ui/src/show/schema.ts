@@ -10,6 +10,8 @@ import {PALETTES} from '../viz/palettes.js';
 import {TRANSITION_KINDS} from '../viz/transitions.js';
 
 export const CODE_FOLLOW = ['hide', 'off', 'fold', 'solo'] as const;
+/** Render encodes, by file size; `cycletron render --quality` and src-tauri/src/render.rs take the same. */
+export const RENDER_QUALITIES = ['standard', 'small', 'master'] as const;
 export const CODE_PLACES = ['left', 'center', 'right'] as const;
 export const STROBE_ON = ['kick', 'snare', 'beat'] as const;
 export const CAPTION_PLACES = ['bottom', 'center', 'top'] as const;
@@ -78,6 +80,10 @@ export const SCHEMA: Record<TableName, Record<string, KeyDoc>> = {
         out: {doc: 'Where a render goes, relative to this file.', example: '"renders/my-show.mp4"'},
         size: {doc: 'The render\'s frame size, "WIDTHxHEIGHT". Default "1920x1080".', example: '"1920x1080"'},
         fps: {doc: 'The render\'s frame rate. Default 60.', example: '60'},
+        quality: {
+            doc: 'The render\'s encode: standard (about 90 MB a minute at 1080p60, YouTube\'s recommended rate), small (about 45 MB, for sharing), or master (about 200 MB, to edit further). Default standard.',
+            choices: RENDER_QUALITIES, example: '"standard"',
+        },
     },
     defaults: {...LOOK, ...AUDIO},
     song: {

@@ -388,10 +388,13 @@ cycletron export song.strudel [out-dir]  # mix.wav + performance.json, what a re
 cycletron help
 ```
 
-`render` opens a small preview window per job and paints the frames there;
-the windows must stay on screen, and ffmpeg must be on the PATH. It takes
-`--out`, `--song n`, `--section label`, `--from s`, `--to s`, `--size WxH`,
-`--fps n`, `--jobs n` and `--fresh`. `check` takes `--cycles N` and `--strict`;
+`render` is what File → Render Video… runs on the open show. On macOS 14 and
+later it renders out of sight; elsewhere it paints in a small preview window
+per job, and those windows must stay on screen. It needs ffmpeg installed
+(Homebrew's, one on the PATH, or `FFMPEG_PATH`). It takes `--out`, `--song n`,
+`--section label`, `--from s`, `--to s`, `--size WxH`, `--fps n`,
+`--quality standard|small|master`, `--jobs n`,
+`--fresh`, `--preview` (show the windows anyway) and `--progress json`. `check` takes `--cycles N` and `--strict`;
 `export` takes `--passes N`, `--seconds N` and `--samples manifest.json`. While
 Cycletron is running, the
 same binary drives it: `cycletron play`, `pause`, `toggle`, `stop` (or `hush`),

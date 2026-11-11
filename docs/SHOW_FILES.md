@@ -44,7 +44,7 @@ drop  = { shots = ["iso-city", "plasma"], every = 2, transition = "flash", strob
 ```
 
 Play it: open the file in Cycletron (⌘O, or click it in the file tree).
-Render it:
+Render it: File → Render Video… (or **Render** in the show pane), or
 
 ```sh
 cycletron render path/to/my.show.toml
@@ -133,6 +133,7 @@ keeps playing.
 | `out` | — | Where a render goes, relative to the show file. Required to render unless `--out` is given. |
 | `size` | `"1920x1080"` | The render's frame size, `"WIDTHxHEIGHT"`. |
 | `fps` | `60` | The render's frame rate. |
+| `quality` | `"standard"` | The render's encode. `standard` caps the bitrate at YouTube's recommended rate (about 90 MB a minute at 1080p60), `small` at half that (about 45 MB, for sharing), and `master` is uncapped crf 16 (about 200 MB, to edit further). The caps scale with frame size and rate. |
 
 ### `[[song]]`
 
@@ -381,10 +382,24 @@ code = { follow = "solo", place = "right", size = 22, opacity = 0.6, scrim = fal
 cycletron render path/to/show.toml [flags]
 ```
 
+In the app, open the show and choose File → Render Video…, or press
+**Render** in the show pane's header. A dialog picks the quality, the frame
+size and the file, starting from the show's settings, and estimates the size
+per minute. Progress shows in the bottom right corner with a Cancel button,
+and when it's done, Show opens the file's folder. Unsaved show edits are saved
+first, since the render reads the file. A show without an `out` asks where to
+save.
+
 The app binary is the renderer (the user guide's Command line section says
-where it is). It opens a small preview window per job and paints the frames
-there; the windows must stay on screen, since a hidden page is paused. ffmpeg
-must be on the PATH. From a checkout, `cargo run -q -p cycletron-app --bin
+where it is). It paints the frames in one window per job. On macOS 14 and
+later those windows stay hidden (`--preview` shows them). Elsewhere they are
+small previews that must stay on screen. Hyprland may focus them as they open;
+a window rule stops that, e.g. in a Lua config (Omarchy, Hyprland 0.56):
+`hl.window_rule({ match = { title = "^Cycletron render" }, no_initial_focus = true })`. ffmpeg must be installed, with its H.264 encoder (libx264; Fedora's
+default `ffmpeg-free` lacks it, RPM Fusion's has it): on the PATH, in Homebrew's or
+another usual location, or named by `FFMPEG_PATH`. Before it starts, the render
+checks the encoder and that the disk beside the output has room for about twice
+the video. From a checkout, `cargo run -q -p cycletron-app --bin
 cycletron -- render …` does the same, with `npm run dev` running in `ui/`.
 
 | Flag | Value |
@@ -393,9 +408,14 @@ cycletron -- render …` does the same, with `npm run dev` running in `ui/`.
 | `--section label` | Only that section, from the first song that has it. Add `--song` to skip exporting the others. |
 | `--from s`, `--to s` | Trim to these seconds of what's rendered. |
 | `--size WxH`, `--fps n` | Override the show's settings, e.g. for quick previews. |
+| `--quality q` | Override the show's `quality`: `standard`, `small` or `master`. |
 | `--out file` | Override the show's `out`. |
-| `--jobs n` | Preview windows rendering at once, a chunk each. The default is sized to the machine's cores, up to 8. |
+| `--jobs n` | Windows rendering at once, a chunk each. The default is the machine's cores less two, up to 8, and no more than the free memory holds (about 1.1 GB a job at 1080p). |
 | `--fresh` | Re-export the songs even when the cached exports are current. |
+| `--preview` | Show the render windows where they'd otherwise be hidden. |
+| `--progress json` | One JSON event per line on stdout (`exporting`, `plan`, `frames`, `notice`, then `done` or `error`), instead of text on stderr. |
+
+Ctrl-C (or SIGTERM) stops the encoders and removes the partial files.
 
 ### Previews
 

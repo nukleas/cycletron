@@ -61,6 +61,8 @@ rusty_link = "0.4"
 # Free-space query for the recording sink. Pure Rust — no new -sys crate, so
 # the macOS-universal / AppImage / NSIS jobs are unaffected.
 fs4 = "1.1"
+# Free memory, so `cycletron render` sizes its default job count to the machine (see src/render.rs).
+sysinfo = { version = "0.40", default-features = false, features = ["system"] }
 # .zip import for sample packs (see src/pack_import.rs). Already in Cargo.lock
 # at 4.6.1 via tauri-plugin-updater, so this is a feature union rather than a
 # new dependency; deflate is pure Rust (flate2), so no new -sys crate either.
@@ -79,6 +81,19 @@ hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
 # keys, the GNOME/KDE now-playing popovers, waybar, Omarchy's media widget.
 [target.'cfg(target_os = "linux")'.dependencies]
 mpris-server = { version = "0.10", features = ["tokio"] }
+# `cycletron render` ends its pages' web processes before exiting (see render.rs
+# `shut_down`). Already in Cargo.lock via wry.
+webkit2gtk = "2.0"
+
+# `cycletron render`: the macOS version (hidden render windows need 14+) and an
+# activity that keeps App Nap off the windowless render. Already in Cargo.lock via wry.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSProcessInfo", "NSString"] }
+
+# Sending the render process SIGTERM on cancel. Already in Cargo.lock.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 tempfile = "3"
 async-trait = "0.1"
