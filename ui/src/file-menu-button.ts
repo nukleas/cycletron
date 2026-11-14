@@ -9,6 +9,7 @@
 
 import {fileManager} from './file-manager.js';
 import {midiLab} from './midi-lab.js';
+import {videoRender} from './show/render-video.js';
 import {diag} from './diagnostics.js';
 import {basename} from './paths.js';
 
@@ -175,6 +176,7 @@ class FileMenuButton {
             {label: 'Import MIDI…', run: () => { void midiLab.openWithPicker(); }},
             {label: 'Export Audio…', hint: '⌘⇧E', run: () => { void fileManager.exportAudio(); }},
             {label: 'Export MIDI…', run: () => { void fileManager.exportMidi(); }},
+            {label: 'Render Video…', run: () => { void videoRender.start(); }},
             {label: 'Open MIDI Lab…', run: () => { void midiLab.openEmpty(); }},
         ];
     }
