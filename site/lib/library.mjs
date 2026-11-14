@@ -1,4 +1,4 @@
-// The library the app opens in the browser (ui/src/web-library.ts reads it):
+// The library the app opens in the browser (ui/src/web-backend.ts reads it):
 // Demos/ exactly as the app seeds it, and Packs/<id>/ with each pack's songs,
 // shows and built visualizers. Files are copied as they are in the repos.
 
