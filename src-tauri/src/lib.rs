@@ -5,6 +5,7 @@ mod commands;
 mod demos;
 mod desktop_theme;
 mod export;
+mod ffmpeg;
 mod files;
 mod library;
 mod library_index;
@@ -32,6 +33,7 @@ mod sounds;
 mod state;
 mod telemetry;
 mod tray;
+mod video;
 mod xai_oauth;
 
 use state::AppState;
@@ -180,6 +182,7 @@ pub fn run() {
         .manage(tray::TrayStateHolder::new())
         .manage(midi_input::MidiInputState::new())
         .manage(recording::RecordingState::new())
+        .manage(video::VideoState::new())
         .setup(|app| {
             // Resolve the app data dir (e.g. ~/Library/Application Support/com.nukleas.cycletron)
             // and hand it to AppState so recents + session snapshots can persist.
@@ -417,6 +420,8 @@ pub fn run() {
             recording::recording_close,
             recording::recording_orphans,
             recording::recording_recover,
+            video::render_video,
+            video::cancel_render_video,
         ])
         .build(context)
         .expect("error while running tauri application")
@@ -428,6 +433,8 @@ pub fn run() {
                 // Commit any in-flight take before we go, so quitting mid-recording
                 // still leaves a playable file rather than an orphaned .part.
                 app.state::<recording::RecordingState>().commit_all();
+                // A render running on its own would outlive the app.
+                app.state::<video::VideoState>().cancel();
                 // Take the state file with us, so anything watching it doesn't
                 // keep reporting a session that has ended.
                 playback::remove_state_file(app);

@@ -110,6 +110,16 @@ class LiveShow {
         });
     }
 
+    /** The open show file, if any. */
+    get showPath(): string | null {
+        return this.path;
+    }
+
+    /** What the open show's paths and modes resolve against. */
+    get showContext(): ShowContext | null {
+        return this.ctx;
+    }
+
     async open(path: string): Promise<void> {
         let text: string;
         let ctx: ShowContext;

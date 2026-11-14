@@ -39,6 +39,7 @@ import {checkForUpdates} from './updater.js';
 import {dismissibleModal} from './modal-utils.js';
 import {logsModal} from './logs-modal.js';
 import {stage} from './stage.js';
+import {videoRender} from './show/render-video.js';
 import {errorDialog} from './dialog.js';
 import type {SampleSetStatus, UserSettings} from './types/tauri-commands.js';
 
@@ -212,6 +213,7 @@ const COMMANDS: Item[] = [
     {id: 'cmd.launch_quantum', title: 'Launch Quantization: Next Grid', section: 'Commands',       run: () => launchQuantum.cycleNext()},
     {id: 'cmd.export_audio',title: 'Export Audio…',         section: 'Commands', hint: '⌘⇧E',    run: () => fileManager.exportAudio()},
     {id: 'cmd.export_midi', title: 'Export MIDI…',          section: 'Commands',                 run: () => fileManager.exportMidi()},
+    {id: 'cmd.render_video', title: 'Render Video… (open show)', section: 'Commands',            run: () => videoRender.start()},
     {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => midiLab.openEmpty()},
     {id: 'cmd.sounds',      title: 'Browse Sounds…',        section: 'Commands', hint: '⌘⇧O',   run: () => soundBrowser.open()},
     {id: 'cmd.samples',     title: 'Samples… (sets & packs)', section: 'Commands',               run: () => samplesModal.open()},

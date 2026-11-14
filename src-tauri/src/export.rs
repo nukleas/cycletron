@@ -1,12 +1,11 @@
 //! Offline export: pattern → WAV / MP3 / stems / MIDI.
 //!
 //! Audio path uses strudel-rs `OfflineRenderer` (same as `strudio render`).
-//! MP3 is produced via an optional `ffmpeg` post-step when available on PATH.
+//! MP3 is produced via an optional `ffmpeg` post-step when ffmpeg is installed.
 //! MIDI path ports the `strudio to-midi` logic.
 
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use cycletron_render::{
     SAMPLE_RATE, SampleSetPaths, mix_of, render_pcm, resolve_gain, resolve_patterns, resolve_tempo,
@@ -109,7 +108,7 @@ pub fn export_audio(
 
     // Before rendering, which can take minutes.
     if format != AudioFormat::Wav {
-        find_ffmpeg().ok_or_else(ffmpeg_missing)?;
+        crate::ffmpeg::require("MP3 export")?;
     }
 
     // Always bake the full mix first. For MP3 only, into a hidden temp file,
@@ -502,15 +501,10 @@ fn value_to_midi_note(value: &str) -> Option<u8> {
 // MP3 via ffmpeg
 // ---------------------------------------------------------------------------
 
-fn ffmpeg_missing() -> String {
-    "MP3 export requires `ffmpeg` on PATH (with libmp3lame). Install via brew: `brew install ffmpeg`."
-        .to_string()
-}
-
 fn encode_mp3(wav: &Path, mp3: &Path) -> Result<(), String> {
-    let ffmpeg = find_ffmpeg().ok_or_else(ffmpeg_missing)?;
+    let ffmpeg = crate::ffmpeg::require("MP3 export")?;
 
-    let output = Command::new(&ffmpeg)
+    let output = crate::ffmpeg::command(&ffmpeg)
         .args([
             "-y",
             "-i",
@@ -539,39 +533,6 @@ fn encode_mp3(wav: &Path, mp3: &Path) -> Result<(), String> {
         ));
     }
     Ok(())
-}
-
-fn find_ffmpeg() -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("FFMPEG_PATH") {
-        let pb = PathBuf::from(p);
-        if pb.is_file() {
-            return Some(pb);
-        }
-    }
-    // Common install locations + PATH lookup via `which`-style.
-    let candidates = [
-        "ffmpeg",
-        "/opt/homebrew/bin/ffmpeg",
-        "/usr/local/bin/ffmpeg",
-        "/usr/bin/ffmpeg",
-    ];
-    for c in candidates {
-        let path = PathBuf::from(c);
-        if path.is_file() {
-            return Some(path);
-        }
-        // Bare name — let Command resolve via PATH by checking `command -v`.
-        if c == "ffmpeg"
-            && let Ok(out) = Command::new("which").arg("ffmpeg").output()
-            && out.status.success()
-        {
-            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !s.is_empty() {
-                return Some(PathBuf::from(s));
-            }
-        }
-    }
-    None
 }
 
 // ---------------------------------------------------------------------------
@@ -854,7 +815,7 @@ $: s("hh*8").gain(0.3)
 
     #[test]
     fn mp3_when_ffmpeg_available() {
-        if find_ffmpeg().is_none() {
+        if !matches!(crate::ffmpeg::find(), Ok(Some(_))) {
             eprintln!("skipping mp3 test: ffmpeg not on PATH");
             return;
         }

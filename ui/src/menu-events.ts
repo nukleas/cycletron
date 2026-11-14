@@ -17,10 +17,12 @@ import {helpModal} from './help-modal.js';
 import {diag} from './diagnostics.js';
 import {errorDialog, infoDialog} from './dialog.js';
 import {openExternal} from './external-link.js';
+import {videoRender} from './show/render-video.js';
 
 
 export async function initMenuEvents(): Promise<void> {
     if (!isTauri) return;
+    videoRender.init();
 
     const simple: Record<string, () => void | Promise<void>> = {
         'menu:new': () => fileManager.newFile(),
@@ -30,6 +32,7 @@ export async function initMenuEvents(): Promise<void> {
         'menu:import_midi': () => { void midiLab.openWithPicker(); },
         'menu:export_audio': () => { void fileManager.exportAudio(); },
         'menu:export_midi': () => { void fileManager.exportMidi(); },
+        'menu:render_video': () => { void videoRender.start(); },
         'menu:clear_session': () => clearSession(),
         'menu:toggle_ai': () => {
             toggleAiPanel();

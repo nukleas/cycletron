@@ -1243,7 +1243,7 @@ pub fn diagnostic_dump(app_handle: tauri::AppHandle) -> String {
 /// Offline-render the editor pattern to WAV and/or MP3 (same engine as
 /// `strudio render`), optionally splitting multi-track stems.
 ///
-/// `format` is `"wav"`, `"mp3"`, or `"both"`. MP3 requires `ffmpeg` on PATH.
+/// `format` is `"wav"`, `"mp3"`, or `"both"`. MP3 requires ffmpeg (see `ffmpeg::find`).
 /// `stems` splits `$:` tracks or a top-level `stack(...)` into separate files.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]

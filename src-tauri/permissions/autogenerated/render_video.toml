@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-render-video"
+description = "Enables the render_video command without any pre-configured scope."
+commands.allow = ["render_video"]
+
+[[permission]]
+identifier = "deny-render-video"
+description = "Denies the render_video command without any pre-configured scope."
+commands.deny = ["render_video"]
