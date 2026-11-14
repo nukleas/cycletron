@@ -92,6 +92,8 @@
     "allow-recording-orphans",
     "allow-recording-recover",
     "allow-export-audio",
+    "allow-render-video",
+    "allow-cancel-render-video",
     "allow-export-midi",
     "allow-list-snapshots",
     "allow-read-snapshot",

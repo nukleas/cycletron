@@ -1345,6 +1345,103 @@ select option {
     opacity: 1;
 }
 
+.show-pane-action {
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.show-pane-action {
+    opacity: 0.75;
+}
+
+.show-pane-action:hover:not(:disabled) {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.show-pane-action:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* Long jobs (update download, video render), bottom right; see progress-toast.ts. */
+.progress-toasts {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.progress-toast {
+    min-width: 240px;
+    max-width: 380px;
+    padding: 10px 14px;
+    background: var(--bg-lighter, #111827);
+    border: 1px solid var(--border, #26324c);
+    border-radius: 6px;
+    color: var(--text, #f2f7ff);
+    font: 12px/1.5 ui-monospace, monospace;
+    letter-spacing: 0.04em;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+.progress-toast-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.progress-toast-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.progress-toast-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.progress-toast-action {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent, #47f6ff);
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+}
+
+.progress-toast-action:hover {
+    text-decoration: underline;
+}
+
+.progress-toast-track {
+    margin-top: 8px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--accent-subtle, rgba(71, 246, 255, 0.12));
+    overflow: hidden;
+}
+
+.progress-toast-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent, #47f6ff);
+    transition: width 0.15s linear;
+}
+
 .show-pane-editor {
     flex: 1;
     min-height: 0;

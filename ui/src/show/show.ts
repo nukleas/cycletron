@@ -16,10 +16,11 @@ import {CAMERA_MOVES, type CameraMove, type CameraStyle, DEFAULT_CAMERA} from '.
 import {PALETTES} from '../viz/palettes.js';
 import type {CodePlace} from '../viz/stage/code-layer.js';
 import {type Transition, TRANSITION_BARS, TRANSITION_KINDS, type TransitionKind} from '../viz/transitions.js';
-import {CAPTION_PLACES, CAPTION_STYLES, closest, CODE_FOLLOW, CODE_PLACES, keysOf, STROBE_ON} from './schema.js';
+import {CAPTION_PLACES, CAPTION_STYLES, closest, CODE_FOLLOW, CODE_PLACES, keysOf, RENDER_QUALITIES, STROBE_ON} from './schema.js';
 
 /** How the code shows over the visuals: hidden, or following the music (`off` shows it all, still). */
 export type CodeFollow = typeof CODE_FOLLOW[number];
+export type RenderQuality = typeof RENDER_QUALITIES[number];
 
 /** How a section shows the song's code. */
 export interface CodeLook {
@@ -133,6 +134,7 @@ export interface Show {
     out: string | null;
     size: {width: number; height: number} | null;
     fps: number | null;
+    quality: RenderQuality | null;
     /** The setlist, in order. */
     songs: ShowSong[];
 }
@@ -188,6 +190,10 @@ export function parseShow(text: string, ctx: ShowContext): Show {
         out: optional(show.out, 'show.out', (v, at) => resolvePath(str(v, at), ctx)),
         size: optional(show.size, 'show.size', size),
         fps: optional(show.fps, 'show.fps', positiveInt),
+        quality: optional(show.quality, 'show.quality', (v, at) => {
+            if (!RENDER_QUALITIES.includes(v as RenderQuality)) throw new ShowError(at, notOneOf(RENDER_QUALITIES, v));
+            return v as RenderQuality;
+        }),
         songs: doc.song.map((entry, i) => parseSong(entry, i, base, ctx)),
     };
 }

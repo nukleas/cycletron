@@ -59,19 +59,35 @@ export async function runDriver(render: OfflineRender): Promise<void> {
                 if (!form) throw new Error(`no export came back for song ${song.index + 1}`);
                 return {index: song.index, cues: cue(song, form.sections), fade: song.fade, gainDb: song.gainDb, sensitivity: song.sensitivity};
             });
-            await invoke('render_cues', {payload: {songs, out: show.out, fps: show.fps, size: show.size}});
+            await invoke('render_cues', {payload: {songs, out: show.out, fps: show.fps, size: show.size, quality: show.quality}});
         }
         for (;;) {
             const job = await invoke<Job | null>('render_next');
             if (!job) break;
             await loadPacks(job.packs);
+            // Where the chunk's time goes, in ms, for the render's closing summary.
+            const timings = {setup: 0, update: 0, draw: 0, readback: 0, send: 0, frames: job.count, modes: 0};
+            let t = performance.now();
+            const lap = (key: 'setup' | 'readback' | 'send') => {
+                const now = performance.now();
+                timings[key] += now - t;
+                t = now;
+            };
             const mix = await invoke<ArrayBuffer>('render_mix', {index: job.mix});
             await render.setup({...job, packs: [], audio: mix});
+            lap('setup');
+            render.takeCosts();
             for (let i = 0; i < job.count; i++) {
                 render.advance();
-                await invokeRaw('render_frame', new Uint8Array(render.rgba().buffer), {});
+                t = performance.now();
+                const pixels = render.rgba();
+                lap('readback');
+                await invokeRaw('render_frame', new Uint8Array(pixels.buffer), {});
+                lap('send');
             }
-            await invoke('render_chunk_done');
+            const costs = render.takeCosts();
+            Object.assign(timings, {update: costs.update, draw: costs.draw, modes: costs.modes});
+            await invoke('render_chunk_done', {timings});
         }
     } catch (e) {
         const message = e instanceof ShowError ? `${e.line ? `line ${e.line}: ` : ''}${e.message}`

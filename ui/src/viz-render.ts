@@ -35,6 +35,22 @@ type MutableServices = { -readonly [K in keyof VizServices]: VizServices[K] };
  */
 const TRAIL_PREROLL_SECONDS = 3;
 
+/**
+ * Warm-up steps between yields to the event loop. At 120, six jobs on a
+ * four-core Linux machine still grew a page to 6 GB; at 12 every page stayed
+ * under 0.9 GB (2026-11-10). A yield is one message turn, so this costs nothing.
+ */
+const WARM_YIELD_FRAMES = 12;
+
+/** A task-queue turn that hidden pages don't throttle, unlike `setTimeout`. */
+function yieldToEventLoop(): Promise<void> {
+    return new Promise((resolve) => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = () => resolve();
+        channel.port2.postMessage(null);
+    });
+}
+
 export interface RenderSetup {
     code: string;
     bpm: number;
@@ -73,6 +89,8 @@ export class OfflineRender {
     private fps = 60;
     private cps = 0.5;
     private next = 0;
+    /** Milliseconds spent updating every mode, and drawing the shown one, since last taken. */
+    private costs = {update: 0, draw: 0};
     private scanlineOffset = 0;
     private stageCode: {layer: StageCodeLayer; locations: ActiveLocations; code: string;
         pattern: ReturnType<typeof parsePattern>} | null = null;
@@ -145,7 +163,13 @@ export class OfflineRender {
         const warm = opts.startFrame;
         const trails = [...this.tracks.values()].some((t) => t.def.trailFade !== undefined);
         const preroll = trails ? Math.round(TRAIL_PREROLL_SECONDS * this.fps) : 0;
-        while (this.next < warm) this.step(this.next >= warm - preroll || this.fadeFollows());
+        while (this.next < warm) {
+            this.step(this.next >= warm - preroll || this.fadeFollows());
+            // A long synchronous warm-up starves WebKitGTK's garbage collector, which
+            // runs off the event loop: pages grew to 6–8 GB on Linux and WebKit
+            // killed the hidden ones (2026-11-10). Yield often.
+            if (this.next % WARM_YIELD_FRAMES === 0) await yieldToEventLoop();
+        }
     }
 
     /** Advance one frame, paint it, and return it as base64 PNG. */
@@ -165,8 +189,15 @@ export class OfflineRender {
         this.step(true);
     }
 
+    /** Modes stepped each frame (every mode the show uses), and the costs since last taken. */
+    takeCosts(): {modes: number; update: number; draw: number} {
+        const costs = {modes: this.tracks.size, ...this.costs};
+        this.costs = {update: 0, draw: 0};
+        return costs;
+    }
+
     /** The painted frame's pixels, RGBA. */
-    rgba(): Uint8ClampedArray {
+    rgba(): Uint8ClampedArray<ArrayBuffer> {
         return this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height).data;
     }
 
@@ -197,7 +228,9 @@ export class OfflineRender {
             s.theme = theme;
             for (const {mode} of this.tracks.values()) mode.layout(s);
         }
+        const updating = performance.now();
         for (const {mode} of this.tracks.values()) mode.update(dt * frame.speed, s);
+        this.costs.update += performance.now() - updating;
         const layers: VizLayer[] = [];
         if (this.stageCode) {
             // Same query and lookahead as the live app's per-frame highlight.
@@ -219,6 +252,7 @@ export class OfflineRender {
             this.ctx.fillRect(0, 0, s.width, s.height);
         }
         this.shown = track;
+        const drawing = performance.now();
         paintFrame(this.ctx, track.def, track.mode, layers, s, {
             scanlines: frame.scanlines ? this.scanlineOffset : null,
             view: frame.view ?? undefined,
@@ -229,6 +263,7 @@ export class OfflineRender {
             },
             after: (ctx) => wash(ctx, '#000000', frame.dim),
         });
+        this.costs.draw += performance.now() - drawing;
     }
 }
 

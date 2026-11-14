@@ -691,7 +691,11 @@ pub fn save_midi_to_library(
 
 #[tauri::command]
 pub fn session_undo(state: State<'_, AppState>) -> Option<String> {
-    let code = state.session.lock().undo().map(std::string::ToString::to_string);
+    let code = state
+        .session
+        .lock()
+        .undo()
+        .map(std::string::ToString::to_string);
     // The document moved; a review of where it was does not carry over.
     if code.is_some() {
         state.forget_review();
@@ -701,7 +705,11 @@ pub fn session_undo(state: State<'_, AppState>) -> Option<String> {
 
 #[tauri::command]
 pub fn session_redo(state: State<'_, AppState>) -> Option<String> {
-    let code = state.session.lock().redo().map(std::string::ToString::to_string);
+    let code = state
+        .session
+        .lock()
+        .redo()
+        .map(std::string::ToString::to_string);
     if code.is_some() {
         state.forget_review();
     }
@@ -1235,7 +1243,7 @@ pub fn diagnostic_dump(app_handle: tauri::AppHandle) -> String {
 /// Offline-render the editor pattern to WAV and/or MP3 (same engine as
 /// `strudio render`), optionally splitting multi-track stems.
 ///
-/// `format` is `"wav"`, `"mp3"`, or `"both"`. MP3 requires `ffmpeg` on PATH.
+/// `format` is `"wav"`, `"mp3"`, or `"both"`. MP3 requires ffmpeg (see `ffmpeg::find`).
 /// `stems` splits `$:` tracks or a top-level `stack(...)` into separate files.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]

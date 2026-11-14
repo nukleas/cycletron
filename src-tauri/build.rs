@@ -70,6 +70,8 @@ const COMMANDS: &[&str] = &[
     "recording_recover",
     "export_audio",
     "export_midi",
+    "render_video",
+    "cancel_render_video",
     "list_snapshots",
     "read_snapshot",
     "get_logs",

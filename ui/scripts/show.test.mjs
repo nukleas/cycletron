@@ -68,6 +68,13 @@ test('settings layer defaults → song → section, and paths resolve', () => {
     ]);
 });
 
+test('quality is standard, small or master, and unset by default', () => {
+    const song = '[[song]]\nsource = "a.strudel"\nmode = "tunnel"\n';
+    assert.equal(parseShow(song, CTX).quality, null);
+    assert.equal(parseShow(`[show]\nquality = "small"\n${song}`, CTX).quality, 'small');
+    assert.throws(() => parseShow(`[show]\nquality = "huge"\n${song}`, CTX), (e) => e instanceof ShowError && e.message.startsWith('show.quality'));
+});
+
 test('a titled section shows its card even where the cards are off', () => {
     const looks = parseShow('[defaults]\ntitles = false\n[[song]]\nsource = "a.strudel"\nmode = "tunnel"\n[song.sections]\n'
         + 'drop = { title = "GO" }\noutro = { title = "BYE", titles = false }\n', CTX).songs[0].sections;

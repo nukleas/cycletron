@@ -4,6 +4,18 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+### Shows
+- **Render Video from the app.** File → Render Video…, the command palette, or **Render** in the show pane renders the open show to a music video. Progress shows in the bottom right corner, like an update download, with Cancel, and Show opens the finished file's folder. A dialog picks the quality, frame size and file first, with an estimated size per minute. Unsaved show and song edits are saved first.
+- **No more pop-up windows on macOS 14+.** The render windows stay hidden and keep full speed. `--preview` shows them anyway. Linux, Windows and older macOS still paint in small on-screen previews.
+- **Linux renders no longer balloon in memory.** A page warming up a late chunk could grow to 5–8 GB on WebKitGTK; it now stays under 1 GB. A render page that dies stops the render with the reason instead of hanging it.
+- **Renders end cleanly.** Cancelling or interrupting a render on Linux no longer leaves WebKit processes that crash and dump core a few seconds later.
+- **A render's closing summary says where the time went** per frame: updating the modes, drawing, reading back, and sending to the encoder.
+- **ffmpeg is found where it's installed.** Rendering and MP3 export look in Homebrew's and the other usual locations, and in `FFMPEG_PATH`, not just the PATH, so the app finds ffmpeg when opened from the Finder.
+- **Smaller videos by default.** Renders used to come out at about 200 MB a minute at 1080p60. The new `quality` setting (in `[show]`, the dialog, or `--quality`) defaults to `standard`, which caps the bitrate at YouTube's recommended rate: about 90 MB a minute. `small` is about 45 MB a minute for sharing, and `master` keeps the old encode for editing.
+- **Renders check before they start**: an ffmpeg without the H.264 encoder (Fedora's `ffmpeg-free`) and a disk too full for the video stop the render with what to do, instead of failing partway. The default job count also fits the free memory, and each encoder takes a share of the cores, which cut the render's memory by about 2 GB at 8 jobs and made it a little faster. On Windows, ffmpeg no longer flashes console windows.
+- **Fixed:** `--to` shorter than a multi-song show no longer panics (the songs after the cut get no chunks). A set but missing `FFMPEG_PATH` is an error instead of silently falling back. Small renders carry 128k audio, so the sound no longer outweighs the picture.
+- `cycletron render` stops cleanly on Ctrl-C (no partial files left beside the output) and takes `--progress json` for scripts.
+
 ## 0.1.0-alpha.29 (2026-11-07)
 
 ### Web player

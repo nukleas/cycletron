@@ -492,7 +492,10 @@ mod tests {
             ),
             &tx,
         );
-        acc.process(&chunk(r#"{"choices":[{"delta":{},"finish_reason":"length"}]}"#), &tx);
+        acc.process(
+            &chunk(r#"{"choices":[{"delta":{},"finish_reason":"length"}]}"#),
+            &tx,
+        );
         let resp = acc.finalize(&tx);
         assert_eq!(
             resp.stop,
@@ -506,7 +509,10 @@ mod tests {
     fn done_without_finish_reason_is_complete() {
         let (tx, _rx) = mpsc::unbounded_channel();
         let mut acc = Accumulator::default();
-        acc.process(&chunk(r#"{"choices":[{"delta":{"content":"hello"}}]}"#), &tx);
+        acc.process(
+            &chunk(r#"{"choices":[{"delta":{"content":"hello"}}]}"#),
+            &tx,
+        );
         acc.on_done();
         let resp = acc.finalize(&tx);
         assert_eq!(resp.stop, StopReason::EndTurn);
@@ -516,7 +522,10 @@ mod tests {
     fn stream_ending_without_terminator_is_dropped() {
         let (tx, _rx) = mpsc::unbounded_channel();
         let mut acc = Accumulator::default();
-        acc.process(&chunk(r#"{"choices":[{"delta":{"content":"half a"}}]}"#), &tx);
+        acc.process(
+            &chunk(r#"{"choices":[{"delta":{"content":"half a"}}]}"#),
+            &tx,
+        );
         let resp = acc.finalize(&tx);
         assert_eq!(resp.stop, StopReason::Dropped);
         match &resp.content[0] {

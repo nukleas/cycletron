@@ -81,6 +81,7 @@ pub fn build_app_menu<R: Runtime>(
                 .build(app)?,
         )
         .item(&MenuItemBuilder::with_id("file.export_midi", "Export MIDI…").build(app)?)
+        .item(&MenuItemBuilder::with_id("file.render_video", "Render Video…").build(app)?)
         .separator()
         .item(&PredefinedMenuItem::quit(app, Some("Quit"))?)
         .build()?;
@@ -235,6 +236,7 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "file.import_midi" => "menu:import_midi",
         "file.export_audio" => "menu:export_audio",
         "file.export_midi" => "menu:export_midi",
+        "file.render_video" => "menu:render_video",
         "edit.undo" => "menu:undo",
         "edit.redo" => "menu:redo",
         "edit.clear_session" => "menu:clear_session",

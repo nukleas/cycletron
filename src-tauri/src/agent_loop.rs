@@ -241,7 +241,9 @@ pub async fn run_agent_loop(
         // A stream that did not finish is not a reply. Keep the text that
         // arrived, run nothing from it, and tell the user.
         let failed = match &response.stop {
-            StopReason::Dropped => Some("Connection to the AI dropped before the reply finished.".to_string()),
+            StopReason::Dropped => {
+                Some("Connection to the AI dropped before the reply finished.".to_string())
+            }
             StopReason::Error(message) => Some(format!("AI provider error: {message}")),
             _ => None,
         };
@@ -2913,13 +2915,19 @@ mod turn_end_tests {
         let p = Scripted::new(vec![response(vec![text("half a")], StopReason::Dropped)]);
         let turn = run(&p).await;
         assert_eq!(turn.text, "half a");
-        assert!(matches!(turn.end, TurnEnd::Failed(_)), "dropped stream must fail the turn");
+        assert!(
+            matches!(turn.end, TurnEnd::Failed(_)),
+            "dropped stream must fail the turn"
+        );
     }
 
     #[test]
     fn error_stop_notice_carries_the_provider_message() {
         let end = TurnEnd::Failed("AI provider error: Overloaded".to_string());
-        assert_eq!(end.notice().as_deref(), Some("AI provider error: Overloaded"));
+        assert_eq!(
+            end.notice().as_deref(),
+            Some("AI provider error: Overloaded")
+        );
         assert!(TurnEnd::Complete.notice().is_none());
     }
 
@@ -2958,8 +2966,15 @@ mod turn_end_tests {
         let turn = run(&p).await;
         assert!(matches!(turn.end, TurnEnd::Complete));
         assert_eq!(turn.tools.len(), 2);
-        assert!(turn.tools[0].outcome.ok, "zero-arg tool must run: {:?}", turn.tools[0].outcome);
-        assert_eq!(turn.tools[1].outcome.category, Some(ToolCategory::Truncated));
+        assert!(
+            turn.tools[0].outcome.ok,
+            "zero-arg tool must run: {:?}",
+            turn.tools[0].outcome
+        );
+        assert_eq!(
+            turn.tools[1].outcome.category,
+            Some(ToolCategory::Truncated)
+        );
     }
 
     #[tokio::test]

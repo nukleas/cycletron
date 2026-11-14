@@ -19,19 +19,24 @@ use cycletron_render::{SampleSetPaths, performance};
 
 const USAGE: &str = "\
 usage: cycletron render <show.toml> [--out video.mp4] [--song n] [--section label] [--from s] [--to s]
-                        [--size WxH] [--fps n] [--jobs n] [--fresh]
+                        [--size WxH] [--fps n] [--quality q] [--jobs n] [--fresh] [--preview]
+                        [--progress json]
        cycletron export <song.strudel> [out-dir] [--passes N] [--seconds N] [--samples manifest.json]
        cycletron check <song.strudel>... [--cycles N] [--strict]
        cycletron help
 
 render   Render a show file to a music video (docs/SHOW_FILES.md). Songs are exported
-         first (cached under the user cache dir); small preview windows show the frames
-         as they render and must stay on screen. Needs ffmpeg on the PATH.
+         first (cached under the user cache dir). On macOS 14+ the render windows stay
+         hidden; elsewhere small preview windows show the frames and must stay on screen.
+         Needs ffmpeg (on the PATH, a usual install location, or FFMPEG_PATH).
          --song n       only the nth song (from 1); --section label  only that section
          --from/--to s  trim, in seconds of what's rendered
          --size/--fps   override the show's; --out overrides its `out`
-         --jobs n       windows rendering at once (default: the machine's cores, up to 8)
+         --quality q    standard (default, ~90 MB/min at 1080p60), small (~45) or master (~200)
+         --jobs n       windows rendering at once (default: cores less two, up to 8, as memory allows)
          --fresh        re-export the songs even when the cached exports are current
+         --preview      show the render windows where they'd otherwise be hidden
+         --progress json  one JSON event per line on stdout instead of text on stderr
 
 export   Render the song to <out-dir>/mix.wav and write performance.json beside it
          (its code, sections and every onset on the audio's clock) for the video
