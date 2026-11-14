@@ -130,22 +130,26 @@ fn snapshot_of(link: &AblLink) -> LinkSnapshot {
     let tempo = state.tempo();
     let phase = state.phase_at_time(now, QUANTUM);
 
-    // Beats remaining in the bar over beats per second. A non-positive tempo
-    // would be a Link protocol violation, but the division is guarded anyway:
-    // this value gets fed to a timer, and an inf would hang the transport.
-    let seconds_to_next_bar = if tempo > 0.0 {
-        (QUANTUM - phase) * 60.0 / tempo
-    } else {
-        0.0
-    };
-
     LinkSnapshot {
         enabled: true,
         peers: link.num_peers(),
         tempo,
         beat: state.beat_at_time(now, QUANTUM),
         phase,
-        seconds_to_next_bar,
+        seconds_to_next_bar: seconds_to_next_bar(phase, tempo),
+    }
+}
+
+/// Beats remaining in the bar over beats per second.
+///
+/// A non-positive tempo would be a Link protocol violation, but the division is
+/// guarded anyway: this value gets fed to a timer, and an inf would hang the
+/// transport.
+fn seconds_to_next_bar(phase: f64, tempo: f64) -> f64 {
+    if tempo > 0.0 {
+        (QUANTUM - phase) * 60.0 / tempo
+    } else {
+        0.0
     }
 }
 
@@ -153,48 +157,74 @@ fn snapshot_of(link: &AblLink) -> LinkSnapshot {
 mod tests {
     use super::*;
 
-    /// Link lives behind one process-global instance, so the whole enable →
-    /// read → disable contract is asserted in a single test rather than having
-    /// sibling tests race each other for it. Same discipline as `osc`.
     #[test]
-    fn reports_the_session_timeline() {
-        // Untouched: reads as disabled rather than panicking on the empty slot.
+    fn wait_lands_on_the_bar_line() {
+        // The arithmetic the transport trusts to start in time with everyone
+        // else: phase plus the reported wait, in beats, is exactly one bar.
+        for tempo in [60.0, 90.0, 120.0, 142.0, 174.5] {
+            for phase in [0.0, 0.25, 1.0, 2.5, 3.999] {
+                let beats = seconds_to_next_bar(phase, tempo) * tempo / 60.0;
+                assert!(
+                    (phase + beats - QUANTUM).abs() < 1e-9,
+                    "phase {phase} at {tempo} bpm missed the bar by {}",
+                    phase + beats - QUANTUM
+                );
+            }
+        }
+        assert_eq!(seconds_to_next_bar(0.0, 120.0), 2.0);
+        assert_eq!(seconds_to_next_bar(3.0, 120.0), 0.5);
+    }
+
+    #[test]
+    fn bad_tempo_starts_now() {
+        // A timer fed inf or a negative wait would hang or misfire the transport.
+        assert_eq!(seconds_to_next_bar(1.0, 0.0), 0.0);
+        assert_eq!(seconds_to_next_bar(1.0, -120.0), 0.0);
+    }
+
+    #[test]
+    fn disabled_reads_start_now() {
+        let off = LinkSnapshot::disabled();
+        assert!(!off.enabled);
+        assert_eq!(off.seconds_to_next_bar, 0.0);
+    }
+
+    // The tests below run a real Link session, which joins any other Link
+    // participant on the local network (a DAW, the installed app, another run
+    // of these tests). They share one process-global instance, so run them one
+    // at a time:
+    //
+    //     cargo test -p cycletron-app link:: -- --ignored --test-threads=1 --nocapture
+
+    /// The enable → read → set → leave → rejoin contract against a live
+    /// session. Needs no other Link peer in view.
+    #[test]
+    #[ignore = "runs a real Link session on the network"]
+    fn session_contract() {
         let idle = link_snapshot();
-        assert!(!idle.enabled);
-        assert_eq!(
-            idle.seconds_to_next_bar, 0.0,
-            "a disabled read must start now"
-        );
+        assert!(!idle.enabled, "untouched reads as disabled");
 
         let joined = link_enable(true, 130.0);
         assert!(joined.enabled);
-        assert!(joined.tempo > 0.0, "a live session always carries a tempo");
+        assert_eq!(joined.peers, 0, "another Link peer is in view");
+        assert!(
+            (joined.tempo - 130.0).abs() < 1e-9,
+            "tempo {}",
+            joined.tempo
+        );
 
         let snap = link_snapshot();
-        assert!(snap.enabled);
         assert!(
             (0.0..QUANTUM).contains(&snap.phase),
             "phase {} escaped the bar",
             snap.phase
         );
 
-        // The whole point of the field: phase plus the reported wait must land
-        // exactly on the bar line. This is the arithmetic the transport trusts
-        // to start in time with everyone else.
-        let beats_remaining = snap.seconds_to_next_bar * snap.tempo / 60.0;
-        assert!(
-            (snap.phase + beats_remaining - QUANTUM).abs() < 1e-6,
-            "phase {} + {beats_remaining} beats missed the bar line",
-            snap.phase
-        );
-
-        // Setting the tempo alone moves the session.
         let set = link_set_tempo(142.0);
         assert!((set.tempo - 142.0).abs() < 1e-9, "tempo {}", set.tempo);
         assert!((link_snapshot().tempo - 142.0).abs() < 1e-9);
 
-        // Leaving reports disabled, and stays that way on a later read — the
-        // instance is kept alive, so this asserts `enable(false)` really took.
+        // The instance is kept alive, so this asserts `enable(false)` took.
         assert!(!link_enable(false, 130.0).enabled);
         assert!(!link_snapshot().enabled);
         assert!(!link_set_tempo(150.0).enabled, "set while off is a no-op");
@@ -210,13 +240,8 @@ mod tests {
         link_enable(false, 90.0);
     }
 
-    /// Peer discovery, which needs a second Link participant on the network and
-    /// so is not a hermetic test. Start any Link app (or this same
-    /// test in a second terminal) and run:
-    ///
-    /// ```text
-    /// cargo test -p cycletron-app discovers_peers -- --ignored --nocapture
-    /// ```
+    /// Peer discovery. Start any Link app (or this test in a second terminal)
+    /// first.
     #[test]
     #[ignore = "needs a second Link peer on the network"]
     fn discovers_peers() {
