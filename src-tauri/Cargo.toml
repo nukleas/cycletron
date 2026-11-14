@@ -80,7 +80,7 @@ hyper-util = { version = "0.1", features = ["tokio", "server-auto"] }
 # MPRIS is how a Linux desktop discovers and drives a media player: media
 # keys, the GNOME/KDE now-playing popovers, waybar, Omarchy's media widget.
 [target.'cfg(target_os = "linux")'.dependencies]
-mpris-server = { version = "0.10", features = ["tokio"] }
+mpris-server = { version = "0.11", features = ["tokio"] }
 # `cycletron render` ends its pages' web processes before exiting (see render.rs
 # `shut_down`). Already in Cargo.lock via wry.
 webkit2gtk = "2.0"
