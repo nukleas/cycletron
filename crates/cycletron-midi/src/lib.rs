@@ -55,6 +55,10 @@ impl VelocityMode {
 
 /// Conservative note-level cleanup applied **in memory** before conversion.
 /// The source `.mid` file is never rewritten.
+///
+/// Drums (channel 10, or a drum-named track when name detection is on) are
+/// onsets: they are never dropped as short, merged, or velocity-clamped, and
+/// de-duplication only removes exact same-onset copies.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CleanupOptions {
     /// Drop notes shorter than `1/N` of a quarter note (by duration).
@@ -72,8 +76,7 @@ pub struct CleanupOptions {
     /// staccato riff (Darude, Sandstorm: 32nd notes with 32nd rests), so only
     /// the person listening can pick; the MIDI Lab preview reports the count.
     /// 8 = fragments under a 32nd, 4 = under a 16th (chiptune-style 64th
-    /// pulses), 2 = under an 8th (basic-pitch output). Drum channels are never
-    /// merged.
+    /// pulses), 2 = under an 8th (basic-pitch output).
     pub merge_fragment_divisor: u32,
     /// Snap onsets and offsets to a grid of `N` steps per bar (16 = sixteenths
     /// in 4/4). `0` disables (default). Lossy for swing and triplets; useful for
@@ -237,7 +240,7 @@ pub fn convert_bytes(data: &[u8], opts: &ImportOptions) -> anyhow::Result<Import
     let bpm = midi.bpm;
 
     let cleanup = if opts.cleanup.is_active() {
-        apply_cleanup(&mut midi, &opts.cleanup)
+        apply_cleanup(&mut midi, &opts.cleanup, opts.detect_drum_names)
     } else {
         CleanupReport {
             notes_before: count_notes(&midi),
@@ -501,7 +504,13 @@ fn count_notes(midi: &MidiData) -> usize {
 // ---------------------------------------------------------------------------
 
 /// Apply cleanup options to every track's note list. Source file is untouched.
-pub fn apply_cleanup(midi: &mut MidiData, opts: &CleanupOptions) -> CleanupReport {
+/// `detect_drum_names` must match the converter's setting so cleanup and
+/// conversion agree on which tracks are drums.
+pub fn apply_cleanup(
+    midi: &mut MidiData,
+    opts: &CleanupOptions,
+    detect_drum_names: bool,
+) -> CleanupReport {
     let mut report = CleanupReport {
         notes_before: count_notes(midi),
         ..CleanupReport::default()
@@ -515,8 +524,9 @@ pub fn apply_cleanup(midi: &mut MidiData, opts: &CleanupOptions) -> CleanupRepor
 
     // track_info is a Box<[TrackInfo]>; rebuild each events slice.
     for track in midi.track_info.iter_mut() {
+        let drum_track = detect_drum_names && track.name.as_deref().is_some_and(is_drum_track_name);
         let mut events: Vec<NoteEvent> = track.events.to_vec();
-        cleanup_event_list(&mut events, &params, &mut report);
+        cleanup_event_list(&mut events, &params, drum_track, &mut report);
         track.events = events.into_boxed_slice();
     }
 
@@ -592,19 +602,26 @@ impl CleanupParams {
 /// drop short notes, drop duplicates, snap to grid (then de-duplicate again,
 /// since snapping can land two notes on one onset), clamp velocity. Merge runs
 /// first so overlapping same-pitch fragments are joined rather than thrown
-/// away by the duplicate pass.
-fn cleanup_event_list(events: &mut Vec<NoteEvent>, p: &CleanupParams, report: &mut CleanupReport) {
+/// away by the duplicate pass. `drum_track` marks a drum-named track; see
+/// [`is_drum`] for how drums are treated.
+fn cleanup_event_list(
+    events: &mut Vec<NoteEvent>,
+    p: &CleanupParams,
+    drum_track: bool,
+    report: &mut CleanupReport,
+) {
     if let Some(gap) = p.merge_gap.filter(|_| events.len() > 1) {
         let before = events.len();
-        *events = merge_retriggers(std::mem::take(events), gap, p.fragment_max);
+        *events = merge_retriggers(std::mem::take(events), gap, p.fragment_max, drum_track);
         report.merged += before - events.len();
     }
 
     if let Some(thresh) = p.short_threshold {
         events.retain(|ev| {
-            // Zero-duration / missing-off notes are almost always noise.
-            let short =
-                ev.duration_sec < thresh || (ev.duration_ticks == 0 && ev.duration_sec <= 0.0);
+            // Zero-duration / missing-off notes are almost always noise, except
+            // on drums, where a hit is written as a 1-tick or 0-tick blip.
+            let short = !is_drum(ev, drum_track)
+                && (ev.duration_sec < thresh || (ev.duration_ticks == 0 && ev.duration_sec <= 0.0));
             if short {
                 report.removed_short += 1;
             }
@@ -615,7 +632,7 @@ fn cleanup_event_list(events: &mut Vec<NoteEvent>, p: &CleanupParams, report: &m
     let dedupe = |events: &mut Vec<NoteEvent>, report: &mut CleanupReport| {
         if events.len() > 1 {
             let before = events.len();
-            *events = greedy_keep_non_overlapping(std::mem::take(events));
+            *events = dedupe_notes(std::mem::take(events), drum_track);
             report.removed_duplicates += before - events.len();
         }
     };
@@ -631,7 +648,10 @@ fn cleanup_event_list(events: &mut Vec<NoteEvent>, p: &CleanupParams, report: &m
     }
 
     if let Some((lo, hi)) = p.vel_range {
-        for ev in events.iter_mut().filter(|ev| ev.velocity != 0) {
+        for ev in events
+            .iter_mut()
+            .filter(|ev| ev.velocity != 0 && !is_drum(ev, drum_track))
+        {
             let clamped = ev.velocity.clamp(lo, hi);
             if clamped != ev.velocity {
                 report.velocity_adjusted += 1;
@@ -641,9 +661,16 @@ fn cleanup_event_list(events: &mut Vec<NoteEvent>, p: &CleanupParams, report: &m
     }
 }
 
-/// GM percussion channel (0-based). Drum hits are onsets, not sustains — a
-/// 32nd-note roll must never be folded into one long hit.
+/// GM percussion channel (0-based).
 const DRUM_CHANNEL: u8 = 9;
+
+/// Same test midi-to-strudel uses: channel 10, or a drum-named track. Drum
+/// hits are onsets, not sustains, so their length means nothing: a 1-tick
+/// kick is a kick, a 32nd roll must not fold into one hit, and a hat held
+/// past the next hat still sounds twice.
+fn is_drum(ev: &NoteEvent, drum_track: bool) -> bool {
+    drum_track || ev.channel == DRUM_CHANNEL
+}
 
 /// Join chains of same-channel, same-pitch notes into one note spanning first
 /// onset to last release, at the chain's peak velocity. Two adjacent notes
@@ -651,7 +678,13 @@ const DRUM_CHANNEL: u8 = 9;
 /// release (overlaps included) **and** at least one of the two is shorter
 /// than `fragment_max`. Both comparisons are strict, so a 32nd note followed
 /// by an exact 32nd rest never links under a 32nd setting.
-fn merge_retriggers(mut events: Vec<NoteEvent>, gap: f64, fragment_max: f64) -> Vec<NoteEvent> {
+/// Drums never link.
+fn merge_retriggers(
+    mut events: Vec<NoteEvent>,
+    gap: f64,
+    fragment_max: f64,
+    drum_track: bool,
+) -> Vec<NoteEvent> {
     events.sort_by(|a, b| {
         a.channel
             .cmp(&b.channel)
@@ -698,7 +731,7 @@ fn merge_retriggers(mut events: Vec<NoteEvent>, gap: f64, fragment_max: f64) -> 
                 .map(|c| c.time_sec + c.duration_sec)
                 .fold(f64::MIN, f64::max);
             last.channel == ev.channel
-                && last.channel != DRUM_CHANNEL
+                && !is_drum(last, drum_track)
                 && last.note == ev.note
                 && ev.time_sec - chain_end < gap
                 && (last.duration_sec < fragment_max || ev.duration_sec < fragment_max)
@@ -755,25 +788,35 @@ fn snap_events(events: &mut [NoteEvent], grid: SnapGrid) -> usize {
     moved
 }
 
-/// Keep non-overlapping notes per (channel, pitch). When two notes of the same
-/// pitch on the same channel overlap (or share an onset), keep the longer one
-/// (tie-break: higher velocity). Later partial overlaps are dropped.
-fn greedy_keep_non_overlapping(mut events: Vec<NoteEvent>) -> Vec<NoteEvent> {
-    if events.len() <= 1 {
-        return events;
-    }
-    // Sort: channel, note, time, longer duration first, louder first.
-    events.sort_by(|a, b| {
+/// Drop duplicate notes per (channel, pitch). Pitched notes keep only
+/// non-overlapping notes: when two overlap (or share an onset) the longer one
+/// wins (tie-break: louder) and later partial overlaps are dropped. Drums only
+/// lose exact same-onset copies. Returns notes in chronological order.
+fn dedupe_notes(events: Vec<NoteEvent>, drum_track: bool) -> Vec<NoteEvent> {
+    let (mut drums, mut pitched): (Vec<_>, Vec<_>) =
+        events.into_iter().partition(|ev| is_drum(ev, drum_track));
+    // Channel, note, time, longer first, louder first: the first note of each
+    // run is the one to keep.
+    let by_pitch_then_strength = |a: &NoteEvent, b: &NoteEvent| {
         a.channel
             .cmp(&b.channel)
             .then_with(|| a.note.cmp(&b.note))
             .then_with(|| a.time_tick.cmp(&b.time_tick))
             .then_with(|| b.duration_ticks.cmp(&a.duration_ticks))
             .then_with(|| b.velocity.cmp(&a.velocity))
+    };
+    pitched.sort_by(by_pitch_then_strength);
+    // Drum length means nothing, so the louder copy wins.
+    drums.sort_by(|a, b| {
+        a.channel
+            .cmp(&b.channel)
+            .then_with(|| a.note.cmp(&b.note))
+            .then_with(|| a.time_tick.cmp(&b.time_tick))
+            .then_with(|| b.velocity.cmp(&a.velocity))
     });
 
-    let mut kept: Vec<NoteEvent> = Vec::with_capacity(events.len());
-    for ev in events {
+    let mut kept: Vec<NoteEvent> = Vec::with_capacity(pitched.len() + drums.len());
+    for ev in pitched {
         let start = ev.time_tick;
         let end = start.saturating_add(ev.duration_ticks.max(1));
         let conflicts = kept
@@ -788,6 +831,9 @@ fn greedy_keep_non_overlapping(mut events: Vec<NoteEvent>) -> Vec<NoteEvent> {
             kept.push(ev);
         }
     }
+
+    drums.dedup_by(|b, a| a.channel == b.channel && a.note == b.note && a.time_tick == b.time_tick);
+    kept.append(&mut drums);
 
     // Restore chronological order for the converter.
     kept.sort_by(|a, b| {
@@ -833,8 +879,12 @@ mod tests {
 
     /// Run one cleanup pass with everything off except what the test sets.
     fn run(events: &mut Vec<NoteEvent>, p: CleanupParams) -> CleanupReport {
+        run_track(events, p, false)
+    }
+
+    fn run_track(events: &mut Vec<NoteEvent>, p: CleanupParams, drum_track: bool) -> CleanupReport {
         let mut report = CleanupReport::default();
-        cleanup_event_list(events, &p, &mut report);
+        cleanup_event_list(events, &p, drum_track, &mut report);
         report
     }
 
@@ -1001,6 +1051,126 @@ mod tests {
         let r = run(&mut events, merge_params());
         assert_eq!(r.merged, 0);
         assert_eq!(events.len(), 8);
+    }
+
+    #[test]
+    fn short_pass_keeps_drum_hits() {
+        // Lakh-style drums: every hit a 1-tick or 0-tick blip on channel 10.
+        let mut events = vec![
+            note(0, 1, "C2", 100, DRUM_CHANNEL),
+            note(240, 0, "D2", 100, DRUM_CHANNEL),
+            note(480, 1, "C2", 100, DRUM_CHANNEL),
+            note(480, 1, "E4", 40, 0), // pitched ghost: still dropped
+        ];
+        let p = CleanupParams {
+            short_threshold: Some(0.01),
+            ..Default::default()
+        };
+        let r = run(&mut events, p);
+        assert_eq!(r.removed_short, 1);
+        assert_eq!(events.len(), 3);
+        assert!(events.iter().all(|e| e.channel == DRUM_CHANNEL));
+    }
+
+    #[test]
+    fn short_pass_keeps_named_drum_track() {
+        // A drum kit on channel 1 whose track is named "Drums".
+        let mut events = (0..4).map(|i| note(i * 120, 1, "C2", 100, 0)).collect();
+        let p = CleanupParams {
+            short_threshold: Some(0.01),
+            ..Default::default()
+        };
+        let r = run_track(&mut events, p, true);
+        assert_eq!(r.removed_short, 0);
+        assert_eq!(events.len(), 4);
+    }
+
+    #[test]
+    fn dedupe_keeps_overlapping_drum_hits() {
+        // Closed hats on 8ths, each written a quarter long: every hit overlaps
+        // the next. The exact same-onset copy is the only real duplicate.
+        let mut events: Vec<NoteEvent> = (0..4)
+            .map(|i| note(i * 240, 480, "F#2", 90, DRUM_CHANNEL))
+            .collect();
+        events.push(note(0, 1, "F#2", 110, DRUM_CHANNEL)); // louder blip copy
+        let p = CleanupParams {
+            remove_duplicates: true,
+            ..Default::default()
+        };
+        let r = run(&mut events, p);
+        assert_eq!(r.removed_duplicates, 1);
+        assert_eq!(events.len(), 4);
+        assert_eq!(
+            events[0].velocity, 110,
+            "keeps the louder copy, not the longer"
+        );
+        let onsets: Vec<u64> = events.iter().map(|e| e.time_tick).collect();
+        assert_eq!(onsets, [0, 240, 480, 720]);
+    }
+
+    #[test]
+    fn merge_skips_named_drum_track() {
+        let mut events = (0..8).map(|i| note(i * 60, 60, "D2", 100, 0)).collect();
+        let r = run_track(&mut events, merge_params(), true);
+        assert_eq!(r.merged, 0);
+        assert_eq!(events.len(), 8);
+    }
+
+    #[test]
+    fn velocity_clamp_skips_drums() {
+        let mut events = vec![
+            note(0, 10, "D2", 20, DRUM_CHANNEL), // ghost snare keeps its dynamics
+            note(0, 100, "C4", 10, 0),
+        ];
+        let p = CleanupParams {
+            vel_range: Some((56, 108)),
+            ..Default::default()
+        };
+        let r = run(&mut events, p);
+        assert_eq!(r.velocity_adjusted, 1);
+        let snare = events.iter().find(|e| e.channel == DRUM_CHANNEL).unwrap();
+        assert_eq!(snare.velocity, 20);
+    }
+
+    /// Format-0 SMF, 480 PPQ at 120 BPM: two bars of 1-tick kicks on channel
+    /// 10 over a held piano C4 on channel 1. The shape of the Lakh files whose
+    /// whole drum track used to be cleaned away.
+    fn blip_drums_smf() -> Vec<u8> {
+        let mut trk: Vec<u8> = vec![0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20]; // 500000 us/qn
+        trk.extend([0x00, 0x90, 60, 80]); // piano on
+        // 479 ticks as a 2-byte VLQ: the rest of each quarter.
+        const REST: [u8; 2] = [0x83, 0x5F];
+        for i in 0..8 {
+            if i > 0 {
+                trk.extend(REST);
+            } else {
+                trk.push(0x00);
+            }
+            trk.extend([0x99, 36, 100]); // kick on
+            trk.extend([0x01, 0x89, 36, 0]); // off one tick later
+        }
+        trk.extend(REST);
+        trk.extend([0x80, 60, 0]); // piano off
+        trk.extend([0x00, 0xFF, 0x2F, 0x00]);
+        let mut smf = b"MThd".to_vec();
+        smf.extend([0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0]);
+        smf.extend(b"MTrk");
+        smf.extend(u32::try_from(trk.len()).unwrap().to_be_bytes());
+        smf.extend(trk);
+        smf
+    }
+
+    #[test]
+    fn default_cleanup_keeps_blip_drum_track() {
+        let result =
+            convert_bytes(&blip_drums_smf(), &ImportOptions::default()).expect("should convert");
+        assert_eq!(result.cleanup.removed_short, 0, "{:?}", result.cleanup);
+        assert_eq!(result.cleanup.notes_after, 9);
+        assert!(
+            result.code.contains("bd"),
+            "drum track missing:\n{}",
+            result.code
+        );
     }
 
     #[test]
