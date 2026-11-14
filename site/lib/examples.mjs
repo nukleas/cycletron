@@ -8,11 +8,19 @@ import {ROOT, read} from './content.mjs';
 
 export const SECTIONS = ['Songs', 'Shows', 'Techniques', 'Genres'];
 
+/**
+ * What the site lists and gives a page: the shows and the full songs. The
+ * technique patterns, genre sketches and short loops stay in the library the
+ * app (and /play) opens.
+ */
+export const SITE_SECTIONS = ['Songs', 'Shows'];
+const SITE_SONGS = ['songs/agency/', 'songs/cycletron-trailer', 'songs/flesh-firmware'];
+export const onSite = (e) => e.section === 'Shows'
+    || (e.section === 'Songs' && SITE_SONGS.some((s) => e.slug.startsWith(s)));
+
 export const SECTION_INTROS = {
     Songs: 'Full tracks, including the Agency OST album.',
     Shows: 'Show files: songs played as music videos, section by section.',
-    Techniques: 'Short patterns, one musical idea each: a rhythm, a chord move, a filter sweep.',
-    Genres: 'A generated sketch for each genre recipe, with a few curated examples after the name.',
 };
 
 const TECHNIQUES = ['rhythm', 'melody', 'harmony', 'form', 'timbre', 'motion'];

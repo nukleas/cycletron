@@ -23,7 +23,7 @@ engine (compiled to WASM — no JS in the signal path), with a file library,
 MIDI tools, music-reactive visuals, and an optional AI co-pilot.
 
 - **Play** — evaluate patterns in the editor (⌘↩), transport, BPM, visuals;
-  edits hot-swap on the next eval with no compile step
+  while a pattern plays, edits apply as you type, with no compile step
 - **MIDI** — file import, MIDI Lab conversion, play-in capture (record a phrase
   from your controller into a pattern), CC mapping, learnable pads
 - **Library** — save patterns, recents, snapshots, export to WAV / stems / MIDI
@@ -141,8 +141,10 @@ and pattern text go to the AI provider you choose. API keys stay in the
 local secrets store (keychain in release builds). SuperGrok / Codex OAuth tokens
 live in app data (`xai-oauth.json`, `codex-oauth.json`, owner-only file
 permissions on macOS/Linux). Logs and agent stats remain on this machine.
-The only other network request is the startup update check against GitHub
-Releases — it can be turned off in Preferences → Updates.
+Other network requests: the update check against GitHub Releases (at startup,
+which Preferences → Updates turns off, and from Help → Check for Updates…);
+sample-set downloads from GitHub when you choose one; and Ableton Link and OSC
+traffic on your network, when you turn them on.
 
 ## Releasing
 
