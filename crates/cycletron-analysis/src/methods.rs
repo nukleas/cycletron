@@ -21,8 +21,9 @@ pub struct DslSymbol {
     pub detail: String,
     /// One-line description / section name, e.g. `Conditionals`, `Delay`.
     pub info: String,
-    /// `function` | `method` | `keyword` | `sound`.
-    pub kind: String,
+    /// Every section the name is listed in: `function`, `method`, `keyword`,
+    /// `sound`. `note` is both a function and a method.
+    pub kinds: Vec<String>,
 }
 
 /// The generated surface, embedded at compile time. Relative path from this
@@ -50,9 +51,9 @@ pub fn methods_listing(kind_filter: Option<&str>, category: Option<&str>) -> Str
     let mut syms: Vec<DslSymbol> = dsl_symbols()
         .into_iter()
         // Sounds live in `list_sounds`; this tool is the verb surface.
-        .filter(|s| s.kind != "sound")
+        .filter(|s| s.kinds.iter().any(|k| k != "sound"))
         .filter(|s| match &want_kind {
-            Some(k) => &s.kind == k,
+            Some(k) => s.kinds.contains(k),
             None => true,
         })
         .filter(|s| match &want_cat {
@@ -80,7 +81,17 @@ pub fn methods_listing(kind_filter: Option<&str>, category: Option<&str>) -> Str
     for s in &syms {
         if s.info != current {
             current = &s.info;
-            out.push_str(&format!("\n## {} ({})\n", section_label(current), s.kind));
+            let kinds: Vec<&str> = s
+                .kinds
+                .iter()
+                .map(String::as_str)
+                .filter(|k| *k != "sound")
+                .collect();
+            out.push_str(&format!(
+                "\n## {} ({})\n",
+                section_label(current),
+                kinds.join("/")
+            ));
         }
         out.push_str(&format!("  {}\n", s.detail));
     }

@@ -8,7 +8,7 @@
 
 import type {Completion, CompletionContext, CompletionResult, CompletionSource} from '@codemirror/autocomplete';
 import {hoverTooltip, type Tooltip} from '@codemirror/view';
-import {hoverTheme} from '../editor-completions.js';
+import {hoverTheme} from '../hover-theme.js';
 import {type KeyDoc, SCHEMA, type TableName} from './schema.js';
 
 /** What goes at the cursor. */
