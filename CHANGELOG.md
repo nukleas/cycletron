@@ -15,6 +15,26 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 - **Renders check before they start**: an ffmpeg without the H.264 encoder (Fedora's `ffmpeg-free`) and a disk too full for the video stop the render with what to do, instead of failing partway. The default job count also fits the free memory, and each encoder takes a share of the cores, which cut the render's memory by about 2 GB at 8 jobs and made it a little faster. On Windows, ffmpeg no longer flashes console windows.
 - **Fixed:** `--to` shorter than a multi-song show no longer panics (the songs after the cut get no chunks). A set but missing `FFMPEG_PATH` is an error instead of silently falling back. Small renders carry 128k audio, so the sound no longer outweighs the picture.
 - `cycletron render` stops cleanly on Ctrl-C (no partial files left beside the output) and takes `--progress json` for scripts.
+- **Renders and exports use pack sample banks.** A song using an enabled pack's banks played in the app but rendered silent.
+
+### Packs
+- **Any SPDX license id enables a pack.** A license file is required only for packs that ship sample banks.
+- Declining or failing an import cleans up the staged pack. A pack whose samples fail to load after install says so.
+
+### Assistant
+- **Failed turns say why.** A dropped connection or provider error ends the turn with a notice and keeps the text that arrived. A token-limit cut names the tool it cut, and hitting the step limit is reported.
+- Sending or clearing the chat while a reply streams is refused instead of wiping the transcript.
+- A review goes stale on hand edits, undo, redo and opening another file, so the assistant doesn't act on an old one.
+
+### Editor and playback
+- **Ctrl+Enter after an audio engine crash rebuilds it** instead of starting a second engine. Play during a sample-set reload no longer leaves a stray audio context.
+- Deleting the open file in the library unbinds it; the editor keeps the text and undo history. Renaming or deleting its folder updates the open file.
+
+### MIDI import
+- **Drum tracks survive cleanup.** The short-note pass dropped 1-tick drum hits, losing whole drum tracks (28 of 133 Lakh files). Drums are now exempt from short-note, overlap and velocity cleanup.
+
+### Sample sets
+- **Fixed:** moving an older sample-set cache to the shared layout could keep a half-downloaded copy and delete the finished one, mostly on Linux.
 
 ## 0.1.0-alpha.29 (2026-11-07)
 
