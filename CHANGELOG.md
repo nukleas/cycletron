@@ -33,6 +33,9 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 ### MIDI import
 - **Drum tracks survive cleanup.** The short-note pass dropped 1-tick drum hits, losing whole drum tracks (28 of 133 Lakh files). Drums are now exempt from short-note, overlap and velocity cleanup.
 
+### Sample sets
+- **Fixed:** moving an older sample-set cache to the shared layout could keep a half-downloaded copy and delete the finished one, mostly on Linux.
+
 ## 0.1.0-alpha.29 (2026-11-07)
 
 ### Web player
