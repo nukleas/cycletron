@@ -349,9 +349,11 @@ fn source_dirs(app: &tauri::AppHandle, def: &SetDefinition) -> Result<Vec<PathBu
 }
 
 /// Forward-only migration from the original `<set-id>/<NN>-<slug>/` layout
-/// (one copy per set) to `sources/<slug>/`. Renames are free; a slug that
-/// already exists in the new layout wins and the old copy is deleted. Runs on
-/// every root lookup but is a single `read_dir` once nothing is left to move.
+/// (one copy per set) to `sources/<slug>/`. Renames are free. When two sets
+/// held the same source, a complete copy (one with its manifest, which a
+/// download writes last) is kept over a partial one; `read_dir` order decides
+/// nothing. Runs on every root lookup but is a single `read_dir` once nothing
+/// is left to move.
 fn migrate_per_set_layout(root: &Path) {
     let Ok(entries) = std::fs::read_dir(root) else {
         return;
@@ -377,10 +379,14 @@ fn migrate_per_set_layout(root: &Path) {
                 continue;
             };
             let dest = sources.join(slug);
-            let result = if dest.exists() {
+            let complete = |dir: &Path| dir.join(LOCAL_MANIFEST).is_file();
+            let result = if !dest.exists() {
+                std::fs::create_dir_all(&sources).and_then(|()| std::fs::rename(&old, &dest))
+            } else if complete(&dest) || !complete(&old) {
                 std::fs::remove_dir_all(&old)
             } else {
-                std::fs::create_dir_all(&sources).and_then(|()| std::fs::rename(&old, &dest))
+                // The copy moved earlier is partial and this one finished.
+                std::fs::remove_dir_all(&dest).and_then(|()| std::fs::rename(&old, &dest))
             };
             if let Err(e) = result {
                 tracing::warn!(
@@ -1337,27 +1343,41 @@ mod tests {
 
     #[test]
     fn per_set_layout_migrates_to_shared_source_dirs() {
-        let root = tempfile::tempdir().unwrap();
-        let old = root
-            .path()
-            .join("strudel")
-            .join("01-tidalcycles-uzu-drumkit");
-        std::fs::create_dir_all(&old).unwrap();
-        std::fs::write(old.join(LOCAL_MANIFEST), "{}").unwrap();
-        // A second set had its own copy of the same source: the first-moved
-        // copy wins and the duplicate is deleted.
-        let dup = root.path().join("mine").join("00-tidalcycles-uzu-drumkit");
-        std::fs::create_dir_all(&dup).unwrap();
+        // Two sets each held a copy of the same source; only one finished.
+        // Both name orders, so `read_dir` order can't pick the survivor.
+        for (complete_set, partial_set) in [("a-set", "z-set"), ("z-set", "a-set")] {
+            let root = tempfile::tempdir().unwrap();
+            let complete = root
+                .path()
+                .join(complete_set)
+                .join("01-tidalcycles-uzu-drumkit");
+            std::fs::create_dir_all(&complete).unwrap();
+            std::fs::write(complete.join(LOCAL_MANIFEST), "{}").unwrap();
+            std::fs::write(complete.join("bd.wav"), "complete").unwrap();
+            let partial = root
+                .path()
+                .join(partial_set)
+                .join("00-tidalcycles-uzu-drumkit");
+            std::fs::create_dir_all(&partial).unwrap();
+            std::fs::write(partial.join("bd.wav"), "partial").unwrap();
 
-        migrate_per_set_layout(root.path());
+            migrate_per_set_layout(root.path());
 
-        let shared = source_dir(root.path(), "github:tidalcycles/uzu-drumkit");
-        assert!(shared.join(LOCAL_MANIFEST).is_file());
-        assert!(!root.path().join("strudel").exists());
-        assert!(!root.path().join("mine").exists());
-        // Idempotent.
-        migrate_per_set_layout(root.path());
-        assert!(shared.join(LOCAL_MANIFEST).is_file());
+            let shared = source_dir(root.path(), "github:tidalcycles/uzu-drumkit");
+            assert!(
+                shared.join(LOCAL_MANIFEST).is_file(),
+                "complete copy in {complete_set} was lost"
+            );
+            assert_eq!(
+                std::fs::read_to_string(shared.join("bd.wav")).unwrap(),
+                "complete"
+            );
+            assert!(!root.path().join(complete_set).exists());
+            assert!(!root.path().join(partial_set).exists());
+            // Idempotent.
+            migrate_per_set_layout(root.path());
+            assert!(shared.join(LOCAL_MANIFEST).is_file());
+        }
     }
 
     #[test]
