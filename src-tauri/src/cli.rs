@@ -198,7 +198,10 @@ fn export(
         Some(path) => path,
         None => bundled_manifest(package)?,
     };
-    let samples = SampleSetPaths::Cycletron { manifest };
+    let samples = SampleSetPaths::Cycletron {
+        manifest,
+        packs: Vec::new(),
+    };
     let s = performance::export(song, &out_dir, opts, &samples)?;
     println!(
         "{}: {:.1}s at {} bpm, {} events, {} sections, {} clipped samples → {}",

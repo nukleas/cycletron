@@ -674,15 +674,18 @@ pub fn refresh_bank_names(app: &tauri::AppHandle) {
 }
 
 /// Resolve the sample-set manifests offline renders resolve sounds from —
-/// the same set live playback loads, so the two cannot drift apart.
+/// the same set live playback loads, enabled packs' banks included, so the
+/// two cannot drift apart.
 pub fn active_sample_set(app: &tauri::AppHandle) -> Result<SampleSetPaths, String> {
-    let active = app
-        .state::<crate::state::AppState>()
-        .user_settings
-        .lock()
-        .samples
-        .active
-        .clone();
+    let state = app.state::<crate::state::AppState>();
+    let active = state.user_settings.lock().samples.active.clone();
+    let banks_dir = app
+        .path()
+        .cache_dir()
+        .map_err(|e| e.to_string())?
+        .join("cycletron")
+        .join("pack-banks");
+    let packs = crate::packs::bank_manifests(&state.library_root(), &banks_dir);
     if active == BUNDLED_SET_ID {
         let manifest = app
             .path()
@@ -697,14 +700,15 @@ pub fn active_sample_set(app: &tauri::AppHandle) -> Result<SampleSetPaths, Strin
                 manifest.display()
             ));
         }
-        return Ok(SampleSetPaths::Cycletron { manifest });
+        return Ok(SampleSetPaths::Cycletron { manifest, packs });
     }
-    let manifests = manifest_paths(app, &active)?;
+    let mut manifests = manifest_paths(app, &active)?;
     if manifests.iter().any(|m| !m.is_file()) {
         return Err(format!(
             "sample set '{active}' is not downloaded — download it in the Samples manager"
         ));
     }
+    manifests.extend(packs);
     Ok(SampleSetPaths::Strudel { manifests })
 }
 

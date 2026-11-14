@@ -3214,6 +3214,7 @@ mod agent_eval {
         state.initialize(data_dir).expect("initialize app state");
         let samples = cycletron_render::SampleSetPaths::Cycletron {
             manifest: workspace.join("ui/public/cycletron.strudel.json"),
+            packs: Vec::new(),
         };
         *state.sample_paths.lock() = Some(samples.clone());
         let active = state.user_settings.lock().llm.active.clone();

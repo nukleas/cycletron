@@ -377,6 +377,41 @@ pub(crate) fn scan_installed(packs: &Path) -> Vec<(PathBuf, PackManifest)> {
     out
 }
 
+/// The enabled packs' sample banks as strudel manifests for offline renders,
+/// one file per pack under `dir` (bank name → absolute paths). They are the
+/// banks live playback loads, checked the same way; a pack that fails is
+/// skipped with a warning.
+pub(crate) fn bank_manifests(library_root: &Path, dir: &Path) -> Vec<PathBuf> {
+    let root = packs_root(library_root);
+    let enabled = read_enabled(&root).enabled;
+    scan_installed(&root)
+        .into_iter()
+        .filter(|(_, m)| enabled.contains(&m.id))
+        .filter_map(|(pack_dir, m)| bank_manifest(&pack_dir, &m, dir))
+        .collect()
+}
+
+/// One pack's banks as a strudel manifest under `dir`, or None when it has none.
+pub(crate) fn bank_manifest(pack_dir: &Path, m: &PackManifest, dir: &Path) -> Option<PathBuf> {
+    if m.banks.is_empty() {
+        return None;
+    }
+    let load = resolve_load(pack_dir, m)
+        .map_err(|e| tracing::warn!("pack {}: banks left out of renders: {e}", m.id))
+        .ok()?;
+    let manifest: serde_json::Map<String, serde_json::Value> = load
+        .banks
+        .into_iter()
+        .map(|b| (b.name, b.files.into()))
+        .collect();
+    let path = dir.join(format!("{}.strudel.json", m.id));
+    fs::create_dir_all(dir)
+        .and_then(|()| fs::write(&path, serde_json::Value::Object(manifest).to_string()))
+        .map_err(|e| tracing::warn!("pack {}: write {}: {e}", m.id, path.display()))
+        .ok()?;
+    Some(path)
+}
+
 fn resolve_load(dir: &Path, m: &PackManifest) -> Result<PackLoadResult, String> {
     validate_for_enable(dir, m)?;
     let core = core_bank_names();
