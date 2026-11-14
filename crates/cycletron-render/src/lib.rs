@@ -37,8 +37,12 @@ pub const DEFAULT_GAIN: f32 = 0.7;
 #[derive(Debug, Clone)]
 pub enum SampleSetPaths {
     /// The bundled Cycletron set: one manifest (`cycletron.strudel.json`,
-    /// generated from `ui/sample-tables.ts`) describing the shipped files.
-    Cycletron { manifest: PathBuf },
+    /// generated from `ui/sample-tables.ts`) describing the shipped files,
+    /// then the enabled packs' sample banks, one manifest per pack.
+    Cycletron {
+        manifest: PathBuf,
+        packs: Vec<PathBuf>,
+    },
     /// The downloaded strudel-rs set: localized manifests registered in
     /// strudio order (piano, uzu-drumkit, uzu-wavetables, dirt-samples) so
     /// first-manifest-wins resolves identically to `strudio render`.
@@ -306,8 +310,9 @@ fn register_sample_manifests(renderer: &mut OfflineRenderer, samples: &SampleSet
         urls.push(over.to_string_lossy().into_owned());
     }
     match samples {
-        SampleSetPaths::Cycletron { manifest } => {
+        SampleSetPaths::Cycletron { manifest, packs } => {
             urls.push(manifest.to_string_lossy().into_owned());
+            urls.extend(packs.iter().map(|m| m.to_string_lossy().into_owned()));
         }
         SampleSetPaths::Strudel { manifests } => {
             urls.extend(manifests.iter().map(|m| m.to_string_lossy().into_owned()));
@@ -350,6 +355,7 @@ pub(crate) mod test_support {
         SampleSetPaths::Cycletron {
             manifest: Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../ui/public/cycletron.strudel.json"),
+            packs: Vec::new(),
         }
     }
 }

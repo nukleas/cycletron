@@ -604,6 +604,7 @@ mod tests {
         SampleSetPaths::Cycletron {
             manifest: Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../ui/public/cycletron.strudel.json"),
+            packs: Vec::new(),
         }
     }
 

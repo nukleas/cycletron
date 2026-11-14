@@ -652,8 +652,8 @@ struct Render {
     show_dir: PathBuf,
     home: PathBuf,
     cache: PathBuf,
-    /// The bundled sample manifest, for exports.
-    manifest: PathBuf,
+    /// The bundled sample set and the enabled packs' banks, for exports.
+    samples: cycletron_render::SampleSetPaths,
     packs: Vec<PackSource>,
     plan: Mutex<Plan>,
     /// Flips to true once the schedule exists; `render_next` waits on it.
@@ -809,7 +809,10 @@ impl Render {
         let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
         let library = crate::library::LibrarySettings::load_or_default(&data_dir).root;
         let packs = packs_for(&flags.show, &library)?;
-        let manifest = crate::cli::bundled_manifest(app.package_info())?;
+        let samples = cycletron_render::SampleSetPaths::Cycletron {
+            manifest: crate::cli::bundled_manifest(app.package_info())?,
+            packs: banks_for(&flags.show, &library, &cache.with_file_name("pack-banks"))?,
+        };
         let (ready, _) = tokio::sync::watch::channel(false);
         Ok(Self {
             flags,
@@ -819,7 +822,7 @@ impl Render {
             show_dir,
             home,
             cache,
-            manifest,
+            samples,
             packs,
             plan: Mutex::new(Plan::Unclaimed),
             ready,
@@ -892,6 +895,37 @@ impl Render {
     }
 }
 
+/// The pack the show sits in: the nearest `pack.json` above the show file.
+fn show_pack(show: &Path) -> Result<Option<(PathBuf, crate::packs::PackManifest)>, String> {
+    let mut dir = show.parent();
+    while let Some(d) = dir {
+        if d.join("pack.json").is_file() {
+            return Ok(Some((d.to_path_buf(), crate::packs::parse_manifest(d)?)));
+        }
+        dir = d.parent();
+    }
+    Ok(None)
+}
+
+/// The sample banks a show renders with, as manifests under `dir`: its own
+/// pack's, then the library's enabled packs', each pack once by id.
+fn banks_for(show: &Path, library: &Path, dir: &Path) -> Result<Vec<PathBuf>, String> {
+    let own = show_pack(show)?;
+    let own_id = own.as_ref().map(|(_, m)| m.id.clone());
+    let mut out: Vec<PathBuf> = own
+        .and_then(|(d, m)| crate::packs::bank_manifest(&d, &m, &dir.join("show")))
+        .into_iter()
+        .collect();
+    let root = crate::packs::packs_root(library);
+    let enabled = crate::packs::read_enabled(&root).enabled;
+    for (d, m) in crate::packs::scan_installed(&root) {
+        if enabled.contains(&m.id) && own_id.as_ref() != Some(&m.id) {
+            out.extend(crate::packs::bank_manifest(&d, &m, dir));
+        }
+    }
+    Ok(out)
+}
+
 /// The packs a show renders with: the ones of the nearest `pack.json` above
 /// the show file, then the library's enabled packs, each built viz folder
 /// once by id. The app loads the library's packs the same way.
@@ -912,14 +946,8 @@ fn packs_for(show: &Path, library: &Path) -> Result<Vec<PackSource>, String> {
         }
         Ok(())
     };
-    let mut dir = show.parent();
-    while let Some(d) = dir {
-        if d.join("pack.json").is_file() {
-            let m = crate::packs::parse_manifest(d)?;
-            add(d, &m)?;
-            break;
-        }
-        dir = d.parent();
+    if let Some((d, m)) = show_pack(show)? {
+        add(&d, &m)?;
     }
     let root = crate::packs::packs_root(library);
     let enabled = crate::packs::read_enabled(&root).enabled;
@@ -995,7 +1023,7 @@ async fn render_songs(
 ) -> Result<Vec<SongForm>, String> {
     render.touch();
     let cache = render.cache.clone();
-    let manifest = render.manifest.clone();
+    let samples = render.samples.clone();
     let fresh = render.flags.fresh;
     let progress = render.flags.progress;
     let plans = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<SongPlan>, String> {
@@ -1004,13 +1032,13 @@ async fn render_songs(
                 .iter()
                 .map(|song| {
                     let cache = &cache;
-                    let manifest = &manifest;
+                    let samples = &samples;
                     scope.spawn(move || -> Result<SongPlan, String> {
                         let source = PathBuf::from(&song.source);
                         let dir = match &song.performance {
                             Some(dir) => PathBuf::from(dir),
                             None => {
-                                exported(&source, song.passes, cache, fresh, manifest, progress)?
+                                exported(&source, song.passes, cache, fresh, samples, progress)?
                             }
                         };
                         let json = dir.join("performance.json");
@@ -1070,7 +1098,7 @@ fn exported(
     passes: usize,
     cache: &Path,
     fresh: bool,
-    manifest: &Path,
+    samples: &cycletron_render::SampleSetPaths,
     progress: Progress,
 ) -> Result<PathBuf, String> {
     use sha2::Digest as _;
@@ -1079,6 +1107,12 @@ fn exported(
     let mut hasher = sha2::Sha256::new();
     hasher.update(text.as_bytes());
     hasher.update(format!("passes={passes}").as_bytes());
+    // A pack's banks changing (a new sample, a sample removed) re-exports the song.
+    if let cycletron_render::SampleSetPaths::Cycletron { packs, .. } = samples {
+        for bank in packs {
+            hasher.update(std::fs::read(bank).unwrap_or_default());
+        }
+    }
     let key = hex(&hasher.finalize()[..8]);
     let stem = source.file_stem().unwrap_or_default().to_string_lossy();
     let dir = cache.join(format!("{stem}-{key}"));
@@ -1095,14 +1129,11 @@ fn exported(
                 .into_owned(),
         },
     );
-    let samples = cycletron_render::SampleSetPaths::Cycletron {
-        manifest: manifest.to_path_buf(),
-    };
     let opts = cycletron_render::performance::Options {
         passes,
         seconds: None,
     };
-    cycletron_render::performance::export(source, &dir, &opts, &samples)?;
+    cycletron_render::performance::export(source, &dir, &opts, samples)?;
     Ok(dir)
 }
 
