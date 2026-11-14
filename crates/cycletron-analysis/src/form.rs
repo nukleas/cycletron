@@ -98,11 +98,11 @@ impl LabeledSection {
 }
 
 /// The song form a `pickRestart` selector declares: each label run lasts
-/// `run × .slow(n)` cycles. `None` unless both the labels and the `.slow(n)`
-/// parse.
+/// `run × .slow(n)` cycles, one cycle per slot without `.slow`. `None` unless
+/// the labels parse.
 pub fn pickrestart_sections(code: &str) -> Option<Vec<LabeledSection>> {
     let labels = parse_pickrestart_labels(code)?;
-    let n = parse_pickrestart_slow(code)?;
+    let n = parse_pickrestart_slow(code).unwrap_or(1);
     Some(merge_labels(&labels, n))
 }
 
@@ -145,8 +145,8 @@ struct FormSection {
 /// ground truth**: sections are `label run × .slow(n)` cycles (consecutive
 /// repeats of a label merge into one section) and density segmentation is not
 /// consulted — instrumentation flicker inside a section can no longer invent
-/// phantom sections. A selector with no `.slow(n)` gets a first-class warn
-/// (every section lasts one cycle) instead of a wall of off-grid spam.
+/// phantom sections. Without `.slow(n)` each slot is one cycle, so `@n`
+/// weights alone set the lengths.
 /// Without pickRestart, falls back to density segmentation as before.
 /// `cycles` clamps to 8..=64.
 pub fn critique_form(ev: &crate::Evaluated) -> Critique {
@@ -181,61 +181,42 @@ pub fn critique_form(ev: &crate::Evaluated) -> Critique {
     let mut labels_known = false;
 
     if let Some(labels) = &labels {
-        match parse_pickrestart_slow(code) {
-            None => {
-                // Without .slow(n) every selector token lasts one cycle. Flag it
-                // once, clearly, and skip the per-section checks (they'd all be
-                // noise until this is fixed).
-                let secs = d
-                    .seconds_per_cycle
-                    .map(|s| format!(" (~{s:.1}s each at this tempo)"))
-                    .unwrap_or_default();
-                findings.push(warn(
-                    "missing-slow",
-                    format!(
-                        "pickRestart selector has no .slow(n) — each of the {} section tokens \
-                         lasts ONE cycle{secs}. Add .slow(bars) to the selector, e.g. \
-                         \"<intro drop>\".slow(8) for 8-cycle sections.",
-                        labels.len()
-                    ),
-                ));
-                let ok = false;
-                return Critique { ok, findings };
-            }
-            Some(n) => {
-                labels_known = true;
-                if n % 4 != 0 {
-                    findings.push(warn(
-                        "off-grid",
-                        format!(
-                            ".slow({n}) makes each section token {n} cycle(s) — not a whole \
-                             number of 4-bar phrases. Use a multiple of 4 (e.g. .slow({})).",
-                            ((n + 2) / 4).max(1) * 4
-                        ),
-                    ));
-                }
-                sections = merge_labels(labels, n)
-                    .into_iter()
-                    .map(|s| FormSection {
-                        density: density_over(s.start_cycle, s.end_cycle()),
-                        end_cycle: s.end_cycle(),
-                        label: s.label,
-                        start_cycle: s.start_cycle,
-                        cycles: s.cycles,
-                    })
-                    .collect();
-                let start = sections.last().map_or(0, |s| s.end_cycle + 1);
-                if start > window {
-                    findings.push(note(
-                        "window-short",
-                        format!(
-                            "The form spans {start} cycles but only {window} were scanned — \
-                             density checks skip the tail. Re-run with cycles={start} to cover \
-                             the whole song.",
-                        ),
-                    ));
-                }
-            }
+        labels_known = true;
+        sections = merge_labels(labels, parse_pickrestart_slow(code).unwrap_or(1))
+            .into_iter()
+            .map(|s| FormSection {
+                density: density_over(s.start_cycle, s.end_cycle()),
+                end_cycle: s.end_cycle(),
+                label: s.label,
+                start_cycle: s.start_cycle,
+                cycles: s.cycles,
+            })
+            .collect();
+        let off: Vec<String> = sections
+            .iter()
+            .filter(|s| s.cycles % 4 != 0)
+            .map(|s| format!("{} ({})", s.label, s.cycles))
+            .collect();
+        if !off.is_empty() {
+            findings.push(warn(
+                "off-grid",
+                format!(
+                    "Section length in cycles is not a whole number of 4-bar phrases: {}. \
+                     Set lengths with @n weights or .slow(n) on the selector.",
+                    off.join(", ")
+                ),
+            ));
+        }
+        let start = sections.last().map_or(0, |s| s.end_cycle + 1);
+        if start > window {
+            findings.push(note(
+                "window-short",
+                format!(
+                    "The form spans {start} cycles but only {window} were scanned — \
+                     density checks skip the tail. Re-run with cycles={start} to cover \
+                     the whole song.",
+                ),
+            ));
         }
     }
 

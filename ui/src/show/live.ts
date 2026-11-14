@@ -507,7 +507,7 @@ async function context(path: string): Promise<ShowContext> {
 
 async function form(code: string): Promise<FormSection[]> {
     const sections = await invoke<LabeledSection[] | null>('song_form', {code});
-    if (!sections) throw new ShowError('', 'the song has no section form: a show needs a "<a b …>".slow(n).pickRestart({…}) selector');
+    if (!sections) throw new ShowError('', 'the song has no section form: a show needs a "<a b …>".pickRestart({…}) selector');
     return sections.map((s) => ({label: s.label, startCycle: s.start_cycle, cycles: s.cycles}));
 }
 
