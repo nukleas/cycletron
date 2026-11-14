@@ -68,7 +68,9 @@ function codeSpans(line) {
  * `every(n, fn)` → {name:'every', signature:'every(n, fn)'};  `firstOf` → bare.
  */
 function parseSymbol(span) {
-    const m = /^([A-Za-z_][A-Za-z0-9_]*)\s*(\(([^`]*)\))?/.exec(span);
+    // Args stop at the first `)` so a prose example like `s("bd").every(…)`
+    // reads as `s("bd")`, not as one long signature.
+    const m = /^([A-Za-z_][A-Za-z0-9_]*)\s*(\(([^()`]*)\))?/.exec(span);
     if (!m) return null;
     const name = m[1];
     const signature = m[2] ? `${name}(${m[3].trim()})` : name;
@@ -78,7 +80,7 @@ function parseSymbol(span) {
 const doc = readFileSync(DOC, 'utf8');
 const lines = doc.split('\n');
 
-/** name → {label, detail, info, kind, specific} — richest entry wins. */
+/** name → {label, detail, info, kinds, specific} — richest entry wins. */
 const table = new Map();
 
 let kind = null; // current section kind, or null when outside a harvested section
@@ -92,13 +94,16 @@ function record(sym, info, specific, symbolKind) {
         label: sym.name,
         detail: sym.signature,
         info: info || '',
-        kind: symbolKind,
+        kinds: new Set([symbolKind]),
         specific,
     };
     if (!prev) {
         table.set(sym.name, next);
         return;
     }
+    // A name listed in several sections is all of them: `note` is both a
+    // free function and a method.
+    prev.kinds.add(symbolKind);
     // Prefer a signature that carries args, and a section-specific doc over a
     // generic heading fallback.
     const better =
@@ -140,12 +145,14 @@ for (const raw of lines) {
             continue;
         }
         const info = cleanDoc(cells[cells.length - 1]);
-        for (const span of codeSpans(cells[0])) {
-            record(parseSymbol(span), info, true, kind);
-        }
+        const primary = codeSpans(cells[0]).map(parseSymbol).filter(Boolean);
+        for (const sym of primary) record(sym, info, true, kind);
         if (aliasCol > 0 && aliasCol < cells.length - 1) {
+            // An alias takes the primary's args: `n` → `n(pat)`.
+            const args = primary[0]?.signature.slice(primary[0].name.length) ?? '';
             for (const span of codeSpans(cells[aliasCol])) {
-                record(parseSymbol(span), info, true, kind);
+                const sym = parseSymbol(span);
+                if (sym) record({name: sym.name, signature: sym.name + args}, info, true, kind);
             }
         }
         continue;
@@ -169,7 +176,7 @@ for (const raw of lines) {
 
 const symbols = [...table.values()]
     .sort((a, b) => a.label.localeCompare(b.label))
-    .map(({label, detail, info, kind}) => ({label, detail, info, kind}));
+    .map(({label, detail, info, kinds}) => ({label, detail, info, kinds: [...kinds].sort()}));
 
 const banner = `// AUTO-GENERATED from docs/STRUDEL_RS_SUPPORTED.md — do not edit by hand.
 // Regenerate with \`npm run gen:dsl\`. Sourced from the ground-truth DSL surface
@@ -186,7 +193,8 @@ export interface DslSymbol {
     detail: string;
     /** One-line description (section-specific where the doc had one). */
     info: string;
-    kind: DslKind;
+    /** Every section the name is listed in, e.g. ['function', 'method'] for \`note\`. */
+    kinds: DslKind[];
 }
 
 export const DSL_SYMBOLS: DslSymbol[] = ${JSON.stringify(symbols, null, 4)};

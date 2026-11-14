@@ -27,6 +27,7 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 - A review goes stale on hand edits, undo, redo and opening another file, so the assistant doesn't act on an old one.
 
 ### Editor and playback
+- **Autocomplete knows where you are.** After a `.` it offers methods; in code, functions. Inside `s("…")` it offers sound banks and their `:n` variants, the machine's voices when the chain has `.bank("…")`; inside `.bank("…")`, drum machines. Note and chord strings and comments get nothing.
 - **Ctrl+Enter after an audio engine crash rebuilds it** instead of starting a second engine. Play during a sample-set reload no longer leaves a stray audio context.
 - Deleting the open file in the library unbinds it; the editor keeps the text and undo history. Renaming or deleting its folder updates the open file.
 

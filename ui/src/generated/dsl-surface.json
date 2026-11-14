@@ -3,2100 +3,2811 @@
     "label": "add",
     "detail": "add(n)",
     "info": "Math on values",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "adsr",
     "detail": "adsr(a, d, s, r)",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "almostAlways",
     "detail": "almostAlways(fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "almostNever",
     "detail": "almostNever(fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "always",
     "detail": "always(fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "amp",
     "detail": "amp(v)",
     "info": "Amplitude / panning",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "anchor",
     "detail": "anchor(pos)",
     "info": "Metadata (no audio effect)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "arp",
     "detail": "arp(pat)",
     "info": "Arpeggiate each chord. pat is an index pattern (arp(\"0 2 1 3\"), rebased per chord) or a Tidal ordering name: up, down, updown, downup, up&down, down&up, converge, diverge, disconverge, pinkyup, pinkyupdown, thumbup, thumbupdown. Names and indices mix in one pattern; an unknown name is silence, not a fallback to up.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "arrange",
     "detail": "arrange(...)",
     "info": "Section combinator: arrange([bars, pat], …) plays each pattern for bars cycles at its native rate, then loops.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "att",
     "detail": "att",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "attack",
     "detail": "attack(t)",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bandf",
     "detail": "bandf",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bandq",
     "detail": "bandq(q)",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bank",
     "detail": "bank(name)",
     "info": "Sample playback",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "beat",
     "detail": "beat(positions, div)",
     "info": "Place the source at the given slots of a cycle divided into div: beat(\"0 4\", 8). Positions wrap modulo div; div is a plain number.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "begin",
     "detail": "begin(0..1)",
     "info": "Sample playback",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "binary",
     "detail": "binary(n)",
     "info": "The bits of n as a 1 0 … sequence, one cycle.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "binaryN",
     "detail": "binaryN(n, bits)",
     "info": "Same, padded or cut to bits steps.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "bite",
     "detail": "bite(n, \"idx\")",
     "info": "Cut the cycle into n slices and sequence them by the index pattern: bite(4, \"0 2 1 3\").",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bjork",
     "detail": "bjork",
     "info": "Structure",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bp",
     "detail": "bp",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bpatt",
     "detail": "bpatt",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bpattack",
     "detail": "bpattack(t)",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bpdec",
     "detail": "bpdec",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bpdecay",
     "detail": "bpdecay(t)",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bpe",
     "detail": "bpe",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bpenv",
     "detail": "bpenv(amount)",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bpf",
     "detail": "bpf(hz)",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bpq",
     "detail": "bpq",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bprel",
     "detail": "bprel",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bprelease",
     "detail": "bprelease(t)",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bpsus",
     "detail": "bpsus",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "bpsustain",
     "detail": "bpsustain(level)",
     "info": "Band-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "brak",
     "detail": "brak",
     "info": "Every other cycle, squash the pattern into half a cycle and shift it a quarter later (breakbeat feel).",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "brown",
     "detail": "brown",
     "info": "Brown noise",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "cat",
-    "detail": "cat",
+    "detail": "cat(...)",
     "info": "One pattern per cycle. cat is slowcat here as in web Strudel.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "chop",
     "detail": "chop(n)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "chord",
     "detail": "chord(pat)",
     "info": "Expand chord symbols (e.g. \"Cm7\" → constituent notes).",
-    "kind": "function"
+    "kinds": [
+      "function",
+      "method"
+    ]
   },
   {
     "label": "chorus",
     "detail": "chorus(\"0.5:1.2\")",
     "info": "Chorus",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "choruspeed",
     "detail": "choruspeed",
     "info": "Effect quick-list (chainable)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "chunk",
     "detail": "chunk(n, fn)",
     "info": "Apply fn to one nth of the cycle, moving to the next chunk each cycle (backwards / every chunk per cycle).",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "chunkBack",
     "detail": "chunkBack(n, fn)",
     "info": "Apply fn to one nth of the cycle, moving to the next chunk each cycle (backwards / every chunk per cycle).",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "clip",
     "detail": "clip(multiplier)",
     "info": "Distortion & shaping",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "coarse",
     "detail": "coarse(n)",
     "info": "Distortion & shaping",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "color",
     "detail": "color(hex)",
     "info": "Metadata (no audio effect)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "colour",
     "detail": "colour",
     "info": "Metadata (no audio effect)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "contract",
     "detail": "contract(factor)",
     "info": "Divide the step count; see expand.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "cosine",
     "detail": "cosine",
     "info": "Cosine.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "crackle",
     "detail": "crackle",
     "info": "Granular crackle",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "crush",
     "detail": "crush(bits)",
     "info": "Distortion & shaping",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "ctf",
     "detail": "ctf(hz)",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "cut",
     "detail": "cut(group)",
     "info": "Sample playback",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "cutoff",
     "detail": "cutoff(hz)",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "datt",
     "detail": "datt",
     "info": "Ducking / sidechain",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "dec",
     "detail": "dec",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "decay",
     "detail": "decay(t)",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "degrade",
     "detail": "degrade",
     "info": "Degradation",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "degradeBy",
     "detail": "degradeBy(prob)",
     "info": "Degradation",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "delay",
     "detail": "delay(amount)",
     "info": "Delay",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "delayfb",
     "detail": "delayfb",
     "info": "Delay",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "delayfeedback",
     "detail": "delayfeedback(amount)",
     "info": "Delay",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "delayt",
     "detail": "delayt",
     "info": "Delay",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "delaytime",
     "detail": "delaytime(t)",
     "info": "Delay",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "det",
     "detail": "det",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "detune",
     "detail": "detune(semitones)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "dfb",
     "detail": "dfb",
     "info": "Delay",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "dict",
     "detail": "dict",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "dictionary",
     "detail": "dictionary(name)",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "dist",
     "detail": "dist(amount)",
     "info": "Distortion & shaping",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "distort",
     "detail": "distort",
     "info": "Distortion & shaping",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "distortion",
     "detail": "distortion",
     "info": "Distortion & shaping",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "div",
     "detail": "div(n)",
     "info": "Math on values",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "dt",
     "detail": "dt",
     "info": "Delay",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "duck",
     "detail": "duck(v)",
     "info": "Ducking / sidechain",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "duckatt",
     "detail": "duckatt(t)",
     "info": "Ducking / sidechain",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "duckattack",
     "detail": "duckattack",
     "info": "Ducking / sidechain",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "duckdepth",
     "detail": "duckdepth(v)",
     "info": "Ducking / sidechain",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "duckons",
     "detail": "duckons(v)",
     "info": "Ducking / sidechain",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "duckonset",
     "detail": "duckonset",
     "info": "Ducking / sidechain",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "duckorbit",
     "detail": "duckorbit(v)",
     "info": "Ducking / sidechain",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "dur",
     "detail": "dur",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "duration",
     "detail": "duration(t)",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "early",
     "detail": "early(t)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "echo",
     "detail": "echo(times, time, feedback)",
     "info": "Stutter / echo",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "echoWith",
     "detail": "echoWith",
     "info": "Stutter / echo",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "end",
     "detail": "end(0..1)",
     "info": "Sample playback",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "euclid",
     "detail": "euclid(p, s, [rot])",
     "info": "Structure",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "euclidLegato",
     "detail": "euclidLegato(p, s)",
     "info": "Structure",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "euclidLegatoRot",
     "detail": "euclidLegatoRot(p, s, r)",
     "info": "Structure",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "euclidRot",
     "detail": "euclidRot",
     "info": "Structure",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "every",
     "detail": "every(n, fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "expand",
     "detail": "expand(factor)",
     "info": "Multiply the step count without moving events. Audible only once pace reads it back.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fast",
     "detail": "fast(n)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fastcat",
     "detail": "fastcat(...)",
     "info": "Concatenate, one cycle total.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "fastChunk",
     "detail": "fastChunk(n, fn)",
     "info": "Apply fn to one nth of the cycle, moving to the next chunk each cycle (backwards / every chunk per cycle).",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "firstOf",
     "detail": "firstOf",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fm",
     "detail": "fm",
     "info": "2-op FM (fmindex, fmratio)",
-    "kind": "method"
+    "kinds": [
+      "method",
+      "sound"
+    ]
   },
   {
     "label": "fma",
     "detail": "fma",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmattack",
     "detail": "fmattack(t)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmd",
     "detail": "fmd",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmdecay",
     "detail": "fmdecay(t)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fme",
     "detail": "fme",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmenv",
     "detail": "fmenv(amount)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmh",
     "detail": "fmh",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmi",
     "detail": "fmi",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmindex",
     "detail": "fmindex(v)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmr",
     "detail": "fmr",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmratio",
     "detail": "fmratio(v)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmrelease",
     "detail": "fmrelease(t)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fms",
     "detail": "fms",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "fmsustain",
     "detail": "fmsustain(level)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "gain",
     "detail": "gain(v)",
     "info": "Amplitude / panning",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "grain",
     "detail": "grain",
     "info": "Effect quick-list (chainable)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "grainsize",
     "detail": "grainsize(ms)",
     "info": "Effect quick-list (chainable)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hcutoff",
     "detail": "hcutoff",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hp",
     "detail": "hp",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hpatt",
     "detail": "hpatt",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hpattack",
     "detail": "hpattack(t)",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hpdec",
     "detail": "hpdec",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hpdecay",
     "detail": "hpdecay(t)",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hpe",
     "detail": "hpe",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hpenv",
     "detail": "hpenv(amount)",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hpf",
     "detail": "hpf(hz)",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hpq",
     "detail": "hpq",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hprel",
     "detail": "hprel",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hprelease",
     "detail": "hprelease(t)",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hpsus",
     "detail": "hpsus",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hpsustain",
     "detail": "hpsustain(level)",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hresonance",
     "detail": "hresonance(q)",
     "info": "High-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hurry",
     "detail": "hurry(n)",
     "info": "fast(n) plus a matching sample-speed change.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "hush",
-    "detail": "hush",
-    "info": "Silence everything.",
-    "kind": "keyword"
+    "detail": "hush()",
+    "info": "Empty pattern.",
+    "kinds": [
+      "function",
+      "keyword"
+    ]
   },
   {
     "label": "if",
     "detail": "if",
     "info": "Distortion & shaping",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "inhabit",
     "detail": "inhabit(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "inhabitmod",
     "detail": "inhabitmod(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "inside",
     "detail": "inside(n, fn)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "ir",
     "detail": "ir(v)",
     "info": "Effect quick-list (chainable)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "irand",
     "detail": "irand(n)",
     "info": "Integer random in [0, n).",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "isaw",
     "detail": "isaw",
     "info": "Sawtooth ramps; isaw = inverted.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "iter",
     "detail": "iter(n)",
     "info": "Each cycle, start the pattern one nth later (or earlier).",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "iterBack",
     "detail": "iterBack(n)",
     "info": "Each cycle, start the pattern one nth later (or earlier).",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "jux",
     "detail": "jux(fn)",
     "info": "Stereo & layering",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "juxBy",
     "detail": "juxBy(amount, fn)",
     "info": "Stereo & layering",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lastOf",
     "detail": "lastOf(n, fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "late",
     "detail": "late(t)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "layer",
     "detail": "layer(fn, ...)",
     "info": "Stereo & layering",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "legato",
     "detail": "legato",
     "info": "Distortion & shaping",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "linger",
     "detail": "linger(t)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "log",
     "detail": "log",
     "info": "Metadata (no audio effect)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "loop",
     "detail": "loop(v)",
     "info": "Sample playback",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lp",
     "detail": "lp",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lpatt",
     "detail": "lpatt",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lpattack",
     "detail": "lpattack(t)",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lpdec",
     "detail": "lpdec",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lpdecay",
     "detail": "lpdecay(t)",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lpe",
     "detail": "lpe",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lpenv",
     "detail": "lpenv(amount)",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lpf",
     "detail": "lpf",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lpq",
     "detail": "lpq",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lprel",
     "detail": "lprel",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lprelease",
     "detail": "lprelease(t)",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lpsus",
     "detail": "lpsus",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "lpsustain",
     "detail": "lpsustain(level)",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "m",
-    "detail": "m",
+    "detail": "m(str)",
     "info": "Parse a string as mini-notation (rarely needed; string literals already parse).",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "mask",
     "detail": "mask(pat)",
     "info": "Degradation",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "mini",
     "detail": "mini(str)",
     "info": "Parse a string as mini-notation (rarely needed; string literals already parse).",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "mul",
     "detail": "mul(n)",
     "info": "Math on values",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "n",
-    "detail": "n",
+    "detail": "n(pat)",
     "info": "Reinterpret values as MIDI notes.",
-    "kind": "function"
+    "kinds": [
+      "function",
+      "method"
+    ]
   },
   {
     "label": "never",
     "detail": "never",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "noise",
     "detail": "noise",
     "info": "White noise",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "note",
     "detail": "note(pat)",
     "info": "Reinterpret values as MIDI notes.",
-    "kind": "function"
+    "kinds": [
+      "function",
+      "method"
+    ]
   },
   {
     "label": "o",
     "detail": "o",
     "info": "Sample playback",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "off",
     "detail": "off(time, fn)",
     "info": "Stereo & layering",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "often",
     "detail": "often(fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "orbit",
     "detail": "orbit(v)",
     "info": "Sample playback",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "outside",
     "detail": "outside(n, fn)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pace",
     "detail": "pace(steps)",
     "info": "Refit the pattern to that many steps per cycle. Identity when the pattern carries no step count.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "palindrome",
     "detail": "palindrome",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pan",
     "detail": "pan(v)",
     "info": "Amplitude / panning",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "patt",
     "detail": "patt",
     "info": "Pitch envelope",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pattack",
     "detail": "pattack(t)",
     "info": "Pitch envelope",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pdec",
     "detail": "pdec",
     "info": "Pitch envelope",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pdecay",
     "detail": "pdecay(t)",
     "info": "Pitch envelope",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pe",
     "detail": "pe",
     "info": "Pitch envelope",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "penv",
     "detail": "penv(amount)",
     "info": "Pitch envelope",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "perlin",
     "detail": "perlin",
     "info": "Smooth 0..1 noise across cycles.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "ph",
     "detail": "ph",
     "info": "Sweep a notch through the signal. Rate alone engages it with a default depth.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "phasdp",
     "detail": "phasdp",
     "info": "How far the notch travels.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "phaser",
     "detail": "phaser(hz)",
     "info": "Sweep a notch through the signal. Rate alone engages it with a default depth.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "phaserdepth",
     "detail": "phaserdepth(v)",
     "info": "How far the notch travels.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "phaserrate",
     "detail": "phaserrate",
     "info": "Sweep a notch through the signal. Rate alone engages it with a default depth.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "phd",
     "detail": "phd",
     "info": "How far the notch travels.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pianoroll",
     "detail": "pianoroll",
     "info": "Metadata (no audio effect)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pick",
     "detail": "pick(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickF",
     "detail": "pickF(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickmod",
     "detail": "pickmod(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickmodF",
     "detail": "pickmodF(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickmodOut",
     "detail": "pickmodOut(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickmodReset",
     "detail": "pickmodReset(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickmodRestart",
     "detail": "pickmodRestart(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickmodSqueeze",
     "detail": "pickmodSqueeze",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickOut",
     "detail": "pickOut(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickReset",
     "detail": "pickReset(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickRestart",
     "detail": "pickRestart(...)",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pickSqueeze",
     "detail": "pickSqueeze",
     "info": "Selection / picking",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pink",
     "detail": "pink",
     "info": "Pink noise",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "ply",
     "detail": "ply(n)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pm",
-    "detail": "pm",
+    "detail": "pm(...)",
     "info": "Stack with LCM step alignment.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "polymeter",
     "detail": "polymeter(...)",
     "info": "Stack with LCM step alignment.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "polyrhythm",
-    "detail": "polyrhythm",
+    "detail": "polyrhythm(...)",
     "info": "Play patterns simultaneously.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "prel",
     "detail": "prel",
     "info": "Pitch envelope",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "prelease",
     "detail": "prelease(t)",
     "info": "Pitch envelope",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "press",
     "detail": "press",
     "info": "Push every event into the second half of its own span.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pressBy",
     "detail": "pressBy(r)",
     "info": "Shift each event r of the way into its span (r may be a pattern). 0 is identity; outside 0–1 is silence.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "psus",
     "detail": "psus",
     "info": "Pitch envelope",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "psustain",
     "detail": "psustain(level)",
     "info": "Pitch envelope",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pulse",
     "detail": "pulse",
     "info": "Variable-width pulse (width 0..1)",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "punchcard",
     "detail": "punchcard",
     "info": "Metadata (no audio effect)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pure",
     "detail": "pure(value)",
     "info": "One event per cycle holding value.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "pw",
     "detail": "pw",
     "info": "Pulse width 0–1. Setting it on a plain sine / tri / saw / square voice promotes it to a pulse oscillator. Colon form pw(\"0.3:2:0.4\") sets width, rate and depth at once.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pwmdepth",
     "detail": "pwmdepth(v)",
     "info": "Depth of the pulse-width LFO.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pwmrate",
     "detail": "pwmrate(hz)",
     "info": "Rate of the pulse-width LFO.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pwr",
     "detail": "pwr",
     "info": "Rate of the pulse-width LFO.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pwrate",
     "detail": "pwrate",
     "info": "Rate of the pulse-width LFO.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pws",
     "detail": "pws",
     "info": "Depth of the pulse-width LFO.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "pwsweep",
     "detail": "pwsweep",
     "info": "Depth of the pulse-width LFO.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "rand",
     "detail": "rand",
     "info": "Uniform random 0..1, deterministic per cycle.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "randcat",
     "detail": "randcat(...)",
     "info": "One of the patterns per cycle, chosen at random (seeded).",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "range",
     "detail": "range(lo, hi)",
     "info": "Math on values",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "rangex",
     "detail": "rangex(lo, hi)",
     "info": "Math on values",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "rarely",
     "detail": "rarely(fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "red",
     "detail": "red",
     "info": "Brown noise",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "rel",
     "detail": "rel",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "release",
     "detail": "release(t)",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "repeatCycles",
     "detail": "repeatCycles(n)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "replicate",
     "detail": "replicate(n)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "resonance",
     "detail": "resonance(q)",
     "info": "Low-pass filter",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "rev",
     "detail": "rev",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "rib",
     "detail": "rib",
     "info": "Loop the window of that many cycles starting at offset, for as long as the pattern plays. Fractional lengths work.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "ribbon",
     "detail": "ribbon(offset, cycles)",
     "info": "Loop the window of that many cycles starting at offset, for as long as the pattern plays. Fractional lengths work.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "room",
     "detail": "room(amount)",
     "info": "Reverb / room",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "roomdamp",
     "detail": "roomdamp(amount)",
     "info": "Reverb / room",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "roomsize",
     "detail": "roomsize(size)",
     "info": "Reverb / room",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "rootNotes",
     "detail": "rootNotes(octave)",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "rsize",
     "detail": "rsize",
     "info": "Reverb / room",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "run",
     "detail": "run(n)",
     "info": "Integer ramp 0..n across the cycle.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "s",
-    "detail": "s(\"bd sd\").every(\"<2 3>\", …)",
+    "detail": "s(pat)",
     "info": "Reinterpret values as sound names.",
-    "kind": "function"
+    "kinds": [
+      "function",
+      "method"
+    ]
   },
   {
     "label": "sampleBegin",
     "detail": "sampleBegin",
     "info": "Sample playback",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "sampleEnd",
     "detail": "sampleEnd",
     "info": "Sample playback",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "saw",
     "detail": "saw",
     "info": "Sawtooth ramps; isaw = inverted.",
-    "kind": "function"
+    "kinds": [
+      "function",
+      "sound"
+    ]
   },
   {
     "label": "saw2",
     "detail": "saw2",
     "info": "Sawtooth ramps; isaw = inverted.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "sawtooth",
     "detail": "sawtooth",
     "info": "Sawtooth oscillator",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "sbd",
     "detail": "sbd",
     "info": "Subtractive bass-drum synth",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "scale",
     "detail": "scale(\"name\")",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "scaleTrans",
     "detail": "scaleTrans",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "scaleTranspose",
     "detail": "scaleTranspose(n)",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "scatter",
     "detail": "scatter(v)",
     "info": "Effect quick-list (chainable)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "scope",
     "detail": "scope",
     "info": "Metadata (no audio effect)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "scramble",
     "detail": "scramble(n)",
     "info": "Cut the cycle into n slices and play them in random order (shuffle: each once; scramble: with repeats).",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "seg",
     "detail": "seg",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "segment",
     "detail": "segment(rate)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "seq",
-    "detail": "seq",
+    "detail": "seq(...)",
     "info": "Concatenate, one cycle total.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "sequence",
-    "detail": "sequence",
+    "detail": "sequence(...)",
     "info": "Concatenate, one cycle total.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "setbpm",
     "detail": "setbpm(N)",
     "info": "Beats per minute. Conversion: cps = bpm / 240. Assumes 4 beats per cycle.",
-    "kind": "keyword"
+    "kinds": [
+      "keyword"
+    ]
   },
   {
     "label": "setcpm",
     "detail": "setcpm(N)",
     "info": "Cycles per minute. cps = cpm / 60. Same as web Strudel.",
-    "kind": "keyword"
+    "kinds": [
+      "keyword"
+    ]
   },
   {
     "label": "shape",
     "detail": "shape(amount)",
     "info": "Distortion & shaping",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "shuffle",
     "detail": "shuffle(n)",
     "info": "Cut the cycle into n slices and play them in random order (shuffle: each once; scramble: with repeats).",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "silence",
     "detail": "silence()",
     "info": "Empty pattern.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "sin",
     "detail": "sin",
     "info": "Sine oscillator",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "sine",
     "detail": "sine",
     "info": "Sine, single / double-frequency.",
-    "kind": "function"
+    "kinds": [
+      "function",
+      "sound"
+    ]
   },
   {
     "label": "sine2",
     "detail": "sine2",
     "info": "Sine, single / double-frequency.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "size",
     "detail": "size",
     "info": "Reverb / room",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "slow",
     "detail": "slow(n)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "slowcat",
     "detail": "slowcat(...)",
     "info": "One pattern per cycle. cat is slowcat here as in web Strudel.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "someCycles",
     "detail": "someCycles(fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "someCyclesBy",
     "detail": "someCyclesBy(prob, fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "sometimes",
     "detail": "sometimes(fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "sometimesBy",
     "detail": "sometimesBy(prob, fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "sound",
     "detail": "sound(pat)",
     "info": "Reinterpret values as sound names.",
-    "kind": "function"
+    "kinds": [
+      "function",
+      "method"
+    ]
   },
   {
     "label": "speed",
     "detail": "speed(v)",
     "info": "Sample playback",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "spiral",
     "detail": "spiral",
     "info": "Metadata (no audio effect)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "sq",
     "detail": "sq",
     "info": "Square oscillator",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "square",
     "detail": "square",
     "info": "Square wave.",
-    "kind": "function"
+    "kinds": [
+      "function",
+      "sound"
+    ]
   },
   {
     "label": "square2",
     "detail": "square2",
     "info": "Square wave.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "stack",
     "detail": "stack(...)",
     "info": "Play patterns simultaneously.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "strans",
     "detail": "strans",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "striate",
     "detail": "striate(n)",
     "info": "Play the nth slice of every sample, moving through the slices across the cycle.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "struct",
     "detail": "struct(pat)",
     "info": "Structure",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "stut",
     "detail": "stut(times, feedback, time)",
     "info": "Stutter / echo",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "stutWith",
     "detail": "stutWith(times, time, fn)",
     "info": "Stutter / echo",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "sub",
     "detail": "sub(n)",
     "info": "Math on values",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "sup",
     "detail": "sup",
     "info": "Stereo & layering",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "superimpose",
     "detail": "superimpose(fn, ...)",
     "info": "Stereo & layering",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "superpwm",
     "detail": "superpwm",
     "info": "Detuned pulse-width-modulation stack",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "supersaw",
     "detail": "supersaw",
     "info": "Detuned saw stack",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "supersquare",
     "detail": "supersquare",
     "info": "Detuned square stack",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "superzow",
     "detail": "superzow",
     "info": "Detuned \"zow\" saw/square hybrid stack",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "sus",
     "detail": "sus",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "sustain",
     "detail": "sustain(level)",
     "info": "ADSR envelope (note)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "swing",
     "detail": "swing(n)",
     "info": "Delay every second of n subdivisions by x (swing uses a third).",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "swingBy",
     "detail": "swingBy(x, n)",
     "info": "Delay every second of n subdivisions by x (swing uses a third).",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "sz",
     "detail": "sz",
     "info": "Reverb / room",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "trans",
     "detail": "trans",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "transpose",
     "detail": "transpose(n)",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "trem",
     "detail": "trem",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "tremdepth",
     "detail": "tremdepth",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "tremolo",
     "detail": "tremolo(rate)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "tremolodepth",
     "detail": "tremolodepth(depth)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "tremoloshape",
     "detail": "tremoloshape(s)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "tremshape",
     "detail": "tremshape",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "tri",
     "detail": "tri",
     "info": "Triangle.",
-    "kind": "function"
+    "kinds": [
+      "function",
+      "sound"
+    ]
   },
   {
     "label": "tri2",
     "detail": "tri2",
     "info": "Triangle.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "triangle",
     "detail": "triangle",
     "info": "Triangle oscillator",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "unit",
     "detail": "unit(name)",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "vel",
     "detail": "vel",
     "info": "Amplitude / panning",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "velocity",
     "detail": "velocity(v)",
     "info": "Amplitude / panning",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "verbdamp",
     "detail": "verbdamp",
     "info": "Reverb / room",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "vib",
     "detail": "vib(rate)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "vibmod",
     "detail": "vibmod(depth)",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "vibrato",
     "detail": "vibrato",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "vmod",
     "detail": "vmod",
     "info": "Pitch modulation / FM",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "voicing",
     "detail": "voicing()",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "voicings",
     "detail": "voicings(dict)",
     "info": "Notes / pitch / scale",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "vowel",
     "detail": "vowel(v)",
     "info": "Effect quick-list (chainable)",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "when",
     "detail": "when(cond, fn)",
     "info": "Conditionals",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "white",
     "detail": "white",
     "info": "White noise",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "width",
     "detail": "width(v)",
     "info": "Pulse width 0–1. Setting it on a plain sine / tri / saw / square voice promotes it to a pulse oscillator. Colon form pw(\"0.3:2:0.4\") sets width, rate and depth at once.",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "within",
     "detail": "within(start, end, fn)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "wrandcat",
     "detail": "wrandcat([pat, weight], …)",
     "info": "Weighted randcat.",
-    "kind": "function"
+    "kinds": [
+      "function"
+    ]
   },
   {
     "label": "wt_bass",
     "detail": "wt_bass",
     "info": "Wavetable — electric bass",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_bassoon",
     "detail": "wt_bassoon",
     "info": "Wavetable — bassoon timbre",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_bell",
     "detail": "wt_bell",
     "info": "Wavetable — bell / metallic",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_cello",
     "detail": "wt_cello",
     "info": "Wavetable — cello timbre",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_choir",
     "detail": "wt_choir",
     "info": "Wavetable — choir / vocal",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_clarinet",
     "detail": "wt_clarinet",
     "info": "Wavetable — clarinet timbre",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_flute",
     "detail": "wt_flute",
     "info": "Wavetable — flute timbre",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_lead",
     "detail": "wt_lead",
     "info": "Wavetable — synth lead",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_oboe",
     "detail": "wt_oboe",
     "info": "Wavetable — oboe timbre",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_organ",
     "detail": "wt_organ",
     "info": "Wavetable — pipe organ",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_pad",
     "detail": "wt_pad",
     "info": "Wavetable — warm pad",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_piano",
     "detail": "wt_piano",
     "info": "Wavetable — piano timbre",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_pluck",
     "detail": "wt_pluck",
     "info": "Wavetable — plucked string",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_saw",
     "detail": "wt_saw",
     "info": "Wavetable — sawtooth",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_sine",
     "detail": "wt_sine",
     "info": "Wavetable — pure sine",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_square",
     "detail": "wt_square",
     "info": "Wavetable — square wave",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_strings",
     "detail": "wt_strings",
     "info": "Wavetable — string ensemble",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_tri",
     "detail": "wt_tri",
     "info": "Wavetable — triangle (odd harmonics)",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_trumpet",
     "detail": "wt_trumpet",
     "info": "Wavetable — trumpet timbre",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "wt_violin",
     "detail": "wt_violin",
     "info": "Wavetable — violin timbre",
-    "kind": "sound"
+    "kinds": [
+      "sound"
+    ]
   },
   {
     "label": "x",
     "detail": "x",
     "info": "Distortion & shaping",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   },
   {
     "label": "zoom",
     "detail": "zoom(s, e)",
     "info": "Time / sequencing",
-    "kind": "method"
+    "kinds": [
+      "method"
+    ]
   }
 ]

@@ -1,10 +1,11 @@
 /**
  * One normalized view of every playable sound, assembled in the frontend.
+ * The sounds panel, the sound browser and editor autocomplete all read it.
  *
  * Deliberately *not* a new Tauri command. `list_sounds` is the agent's
  * prose-annotated tool payload and the silence linter's input
- * (`src-tauri/src/sounds.rs` `sound_catalog`), consumed by the agent loop,
- * `editor-completions.ts` and `preferences.ts`. It is not a UI data model, and
+ * (`src-tauri/src/sounds.rs` `sound_catalog`), consumed by the agent loop and
+ * `preferences.ts`. It is not a UI data model, and
  * shadowing it with a parallel Rust command would put the same facts in two
  * places with two drift surfaces. Everything the browser needs is already
  * reachable from commands that exist:
