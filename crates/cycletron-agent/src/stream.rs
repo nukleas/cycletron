@@ -181,8 +181,14 @@ mod tests {
     #[test]
     fn missing_message_stop_is_dropped_with_text_kept() {
         let mut acc = start();
-        feed(&mut acc, r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#);
-        feed(&mut acc, r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"half a"}}"#);
+        feed(
+            &mut acc,
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#,
+        );
+        feed(
+            &mut acc,
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"half a"}}"#,
+        );
         let resp = acc.into_response();
         assert_eq!(resp.stop, StopReason::Dropped);
         match &resp.content[0] {
@@ -194,22 +200,43 @@ mod tests {
     #[test]
     fn error_event_is_error_stop() {
         let mut acc = start();
-        feed(&mut acc, r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#);
-        assert_eq!(acc.into_response().stop, StopReason::Error("Overloaded".to_string()));
+        feed(
+            &mut acc,
+            r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#,
+        );
+        assert_eq!(
+            acc.into_response().stop,
+            StopReason::Error("Overloaded".to_string())
+        );
     }
 
     #[test]
     fn max_tokens_names_only_the_cut_tool() {
         let mut acc = start();
         // A complete zero-arg call.
-        feed(&mut acc, r#"{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t1","name":"get_current_code","input":{}}}"#);
-        feed(&mut acc, r#"{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}"#);
+        feed(
+            &mut acc,
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t1","name":"get_current_code","input":{}}}"#,
+        );
+        feed(
+            &mut acc,
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}"#,
+        );
         feed(&mut acc, r#"{"type":"content_block_stop","index":0}"#);
         // A second call cut mid-arguments.
-        feed(&mut acc, r#"{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"t2","name":"play_pattern","input":{}}}"#);
-        feed(&mut acc, r#"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"code\": \"s(\\\"bd"}}"#);
+        feed(
+            &mut acc,
+            r#"{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"t2","name":"play_pattern","input":{}}}"#,
+        );
+        feed(
+            &mut acc,
+            r#"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"code\": \"s(\\\"bd"}}"#,
+        );
         feed(&mut acc, r#"{"type":"content_block_stop","index":1}"#);
-        feed(&mut acc, r#"{"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"input_tokens":3,"output_tokens":9}}"#);
+        feed(
+            &mut acc,
+            r#"{"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"input_tokens":3,"output_tokens":9}}"#,
+        );
         feed(&mut acc, r#"{"type":"message_stop"}"#);
         let resp = acc.into_response();
         assert_eq!(
@@ -223,11 +250,23 @@ mod tests {
     #[test]
     fn max_tokens_in_prose_has_no_cut_tool() {
         let mut acc = start();
-        feed(&mut acc, r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#);
-        feed(&mut acc, r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"long"}}"#);
+        feed(
+            &mut acc,
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#,
+        );
+        feed(
+            &mut acc,
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"long"}}"#,
+        );
         feed(&mut acc, r#"{"type":"content_block_stop","index":0}"#);
-        feed(&mut acc, r#"{"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":null}"#);
+        feed(
+            &mut acc,
+            r#"{"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":null}"#,
+        );
         feed(&mut acc, r#"{"type":"message_stop"}"#);
-        assert_eq!(acc.into_response().stop, StopReason::MaxTokens { cut_tool: None });
+        assert_eq!(
+            acc.into_response().stop,
+            StopReason::MaxTokens { cut_tool: None }
+        );
     }
 }
