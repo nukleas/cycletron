@@ -262,15 +262,13 @@ export class StrudelEditor {
     }
 
     createEditor(): EditorView {
-        const self = this;
-
         // Custom keybindings for live coding
         const liveKeymap = keymap.of([
             {
                 key: 'Ctrl-Enter',
                 mac: 'Cmd-Enter',
                 run: () => {
-                    self.evaluate();
+                    this.evaluate();
                     return true;
                 }
             },
@@ -278,7 +276,7 @@ export class StrudelEditor {
                 key: 'Shift-Enter',
                 run: () => {
                     // Evaluate current block (between blank lines)
-                    self.evaluateBlock();
+                    this.evaluateBlock();
                     return true;
                 }
             },
@@ -292,7 +290,7 @@ export class StrudelEditor {
                         closeCompletion(view);
                         return true;
                     }
-                    self.onStop();
+                    this.onStop();
                     return true;
                 }
             },
@@ -300,7 +298,7 @@ export class StrudelEditor {
                 key: 'Ctrl-.',
                 mac: 'Cmd-.',
                 run: () => {
-                    self.onStop();
+                    this.onStop();
                     return true;
                 }
             }

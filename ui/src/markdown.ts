@@ -80,7 +80,7 @@ export function renderDocToHtml(text: string): string {
 export function renderMarkdownToHtml(text: string): string {
     try {
         return md.parse(text, {async: false});
-    } catch (_e) {
+    } catch {
         return `<p>${escapeHtml(text)}</p>`;
     }
 }

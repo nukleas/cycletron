@@ -269,8 +269,8 @@ export function sectionSong(song, sections, fast = new Map(), opts = {}) {
     const head = [];
     if (song.frontmatter.length) {
         const fm = song.frontmatter.map((line) => {
-            if (opts.name && /^name:/.test(line)) return `name: ${JSON.stringify(opts.name)}`;
-            if (opts.tags && /^tags:/.test(line)) return `tags: [${opts.tags}]`;
+            if (opts.name && line.startsWith('name:')) return `name: ${JSON.stringify(opts.name)}`;
+            if (opts.tags && line.startsWith('tags:')) return `tags: [${opts.tags}]`;
             return line;
         });
         head.push('---', ...fm, '---');

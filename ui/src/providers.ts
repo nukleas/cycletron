@@ -82,7 +82,7 @@ export function defaultLlmSettings(): LlmSettings {
 export function normalizeLlm(llm: LlmSettings | undefined | null): LlmSettings {
     const base = defaultLlmSettings();
     if (!llm) return base;
-    const providers = {...base.providers, ...(llm.providers ?? {})};
+    const providers = {...base.providers, ...llm.providers};
     const active = llm.active && presetById(llm.active) ? llm.active : 'anthropic';
     return {active, providers};
 }

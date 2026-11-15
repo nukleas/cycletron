@@ -181,7 +181,7 @@ async function wireAiChat() {
         try {
             const app = getApp();
             if (app && !app.isInitialized && typeof app.ensureAudioInitialized === 'function') {
-                try { await app.ensureAudioInitialized(); } catch (_e) { /* ok */ }
+                try { await app.ensureAudioInitialized(); } catch { /* ok */ }
             }
 
             const editorCode = app?.editor?.getCode?.() ?? '';
@@ -351,12 +351,12 @@ async function wireAiChat() {
     function stopPlayback() {
         const app = getApp();
         if (!app) return;
-        try { app.stop?.(); } catch (_e) { /* ok */ }
+        try { app.stop?.(); } catch { /* ok */ }
     }
 
     function setTempo(bpm: number) {
         // applyBpm is the sole writer — it updates every BPM display itself.
-        try { getApp()?.applyBpm?.(bpm); } catch (_e) { /* ok */ }
+        try { getApp()?.applyBpm?.(bpm); } catch { /* ok */ }
     }
 
     // --- Welcome ---

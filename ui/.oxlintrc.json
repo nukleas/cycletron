@@ -1,0 +1,109 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [
+    "dist/**",
+    "pkg/**",
+    "public/**",
+    "node_modules/**"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "unicorn/no-new-array": "off",
+    "unicorn/no-useless-spread": "off",
+    "no-restricted-properties": [
+      "error",
+      {
+        "property": "innerHTML",
+        "message": "Build HTML with escapeHtml (src/html.ts) or renderMarkdownToHtml (src/markdown.ts), set textContent, build nodes, or clear with replaceChildren(). Raw HTML sinks are only allowed in those two files."
+      },
+      {
+        "property": "outerHTML",
+        "message": "Build HTML with escapeHtml (src/html.ts) or renderMarkdownToHtml (src/markdown.ts), set textContent, build nodes, or clear with replaceChildren(). Raw HTML sinks are only allowed in those two files."
+      },
+      {
+        "property": "insertAdjacentHTML",
+        "message": "Build HTML with escapeHtml (src/html.ts) or renderMarkdownToHtml (src/markdown.ts), set textContent, build nodes, or clear with replaceChildren(). Raw HTML sinks are only allowed in those two files."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "worklet.ts",
+        "wav-tap-worklet.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**",
+                  "!./polyfills.js",
+                  "!./pkg",
+                  "!./pkg/**",
+                  "!./src/types/**"
+                ],
+                "message": "Worklet code runs in the AudioWorkletGlobalScope: no DOM, no main-thread modules. Import only ./polyfills.js, ./pkg and ./src/types/*; pass anything else over the port."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "packages/viz-sdk/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../../**"
+                ],
+                "message": "viz-sdk is the only API packs see; it can't reach into the app. Move the shared piece into the SDK."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/markdown.ts",
+        "src/html.ts",
+        "audio-manager.ts",
+        "src/ai-bridge.ts",
+        "src/ai-tool-row.ts",
+        "src/app.ts",
+        "src/boot.ts",
+        "src/command-palette.ts",
+        "src/editor.ts",
+        "src/examples.ts",
+        "src/file-explorer.ts",
+        "src/file-manager.ts",
+        "src/file-menu-button.ts",
+        "src/help-modal.ts",
+        "src/history-modal.ts",
+        "src/logs-modal.ts",
+        "src/midi-lab.ts",
+        "src/pack-import.ts",
+        "src/preferences.ts",
+        "src/samples-modal.ts",
+        "src/show/render-video.ts",
+        "src/sound-browser.ts",
+        "src/sounds-panel.ts",
+        "src/updater.ts"
+      ],
+      "rules": {
+        "no-restricted-properties": "off"
+      }
+    }
+  ]
+}

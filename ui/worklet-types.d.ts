@@ -42,7 +42,7 @@ interface TypedPort<In, Out> extends MessagePort {
     addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
 }
 
-declare class AudioWorkletProcessor<K extends keyof AudioWorkletRegistry> {
+declare abstract class AudioWorkletProcessor<K extends keyof AudioWorkletRegistry> {
     readonly port: TypedPort<
         AudioWorkletRegistry[K]['in'],
         AudioWorkletRegistry[K]['out']

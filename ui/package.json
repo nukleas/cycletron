@@ -19,6 +19,7 @@
     "test:scheduler": "node --test scripts/scheduler.test.mjs",
     "test:osc": "node --test scripts/osc-out.test.mjs",
     "test:assist": "node --test scripts/editor-assist.test.mjs",
+    "lint": "oxlint --deny-warnings",
     "preview": "vite preview --port 5173",
     "comment:build:wasm": "The prebuilt engine WASM is committed under ui/pkg. Only rerun build:wasm to bump the engine: it needs nightly + wasm-pack and a strudel-rs checkout (STRUDEL_RS, default ../../clean-strudel-rs) at the v<version> tag of the release Cargo.toml pins \u2014 the script refuses anything else. Then commit ui/pkg with the version bump.",
     "build:wasm": "node scripts/build-wasm.mjs"
@@ -43,6 +44,7 @@
     "smol-toml": "^1.9.1"
   },
   "devDependencies": {
+    "oxlint": "^1.93.0",
     "playwright": "^1.65.0",
     "typescript": "^7.0.2",
     "unplugin-inline-enum": "^0.8.4",

@@ -912,7 +912,8 @@ class CockpitMode implements VizMode {
             const rr = r * (0.6 + rand01(hash32(h.seed, i * 13 + 5)) * 0.55);
             const px = x + Math.cos(ang) * rr;
             const py = y + Math.sin(ang) * rr;
-            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
         }
         ctx.closePath();
         const [rr, gg, bb] = h.accent;
@@ -1001,7 +1002,8 @@ class CockpitMode implements VizMode {
         for (let i = 0; i < 6; i++) {
             const angle = i * TAU / 6;
             const px = Math.cos(angle) * r, py = Math.sin(angle) * r;
-            i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+            if (i) ctx.lineTo(px, py);
+            else ctx.moveTo(px, py);
         }
         ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.beginPath(); ctx.arc(0, 0, r * 0.45, 0, TAU); ctx.stroke();
