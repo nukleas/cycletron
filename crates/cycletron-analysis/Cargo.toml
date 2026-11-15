@@ -20,6 +20,7 @@ rustfft = { workspace = true }
 [dev-dependencies]
 cycletron-gen = { workspace = true }
 criterion = { workspace = true }
+proptest = { workspace = true }
 
 [[bench]]
 name = "review"
