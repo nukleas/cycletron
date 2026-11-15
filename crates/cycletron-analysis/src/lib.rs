@@ -398,8 +398,26 @@ $: "<intro build drop drop break drop2 drop2 outro>".slow(8).pickRestart({
         assert!(c.ok, "expected clean form, got {:?}", c.findings);
     }
 
+    /// `.slow(n)` is a convention: `@n` weights alone set section lengths.
     #[test]
-    fn form_critique_flags_missing_slow_once() {
+    fn form_critique_reads_weights_without_slow() {
+        let code = r#"setbpm(130);
+$: "<intro@4 drop@8 outro@4>".pickRestart({
+    intro: s("hh ~ ~ ~"),
+    drop: s("bd*4, hh*8, ~ cp ~ cp"),
+    outro: s("hh ~ ~ ~")
+})"#;
+        let c = critique_form_code(code, 16).unwrap();
+        assert!(!has_code(&c, "off-grid"), "{:?}", c.findings);
+        let form = pickrestart_sections(code).unwrap();
+        let lens: Vec<_> = form.iter().map(|s| (s.label.as_str(), s.cycles)).collect();
+        assert_eq!(lens, [("intro", 4), ("drop", 8), ("outro", 4)]);
+    }
+
+    /// Without `.slow` or weights each slot is one cycle: one grid warn naming
+    /// the sections, not a refusal.
+    #[test]
+    fn form_critique_flags_one_cycle_sections_once() {
         let code = r#"setbpm(130);
 $: "<intro drop outro>".pickRestart({
     intro: s("hh ~ ~ ~"),
@@ -407,9 +425,10 @@ $: "<intro drop outro>".pickRestart({
     outro: s("hh ~ ~ ~")
 })"#;
         let c = critique_form_code(code, 16).unwrap();
-        assert!(has_code(&c, "missing-slow"), "{:?}", c.findings);
-        // ONE clear warn, not a wall of off-grid spam.
-        assert_eq!(c.findings.len(), 1, "{:?}", c.findings);
+        let grid: Vec<_> = c.findings.iter().filter(|f| f.code == "off-grid").collect();
+        assert_eq!(grid.len(), 1, "{:?}", c.findings);
+        assert!(grid[0].message.contains("intro (1)"), "{}", grid[0].message);
+        assert_eq!(pickrestart_sections(code).unwrap().len(), 3);
     }
 
     #[test]

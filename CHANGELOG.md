@@ -15,6 +15,7 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 - **Renders check before they start**: an ffmpeg without the H.264 encoder (Fedora's `ffmpeg-free`) and a disk too full for the video stop the render with what to do, instead of failing partway. The default job count also fits the free memory, and each encoder takes a share of the cores, which cut the render's memory by about 2 GB at 8 jobs and made it a little faster. On Windows, ffmpeg no longer flashes console windows.
 - **Fixed:** `--to` shorter than a multi-song show no longer panics (the songs after the cut get no chunks). A set but missing `FFMPEG_PATH` is an error instead of silently falling back. Small renders carry 128k audio, so the sound no longer outweighs the picture.
 - `cycletron render` stops cleanly on Ctrl-C (no partial files left beside the output) and takes `--progress json` for scripts.
+- **A song's sections don't need `.slow(n)`.** Shows, renders and the AI's form review read `@n` weights on a `pickRestart` selector alone; without `.slow` each slot is one cycle. The form review's 4-bar warning now checks the section lengths themselves.
 - **Renders and exports use pack sample banks.** A song using an enabled pack's banks played in the app but rendered silent.
 
 ### Packs
