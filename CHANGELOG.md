@@ -4,6 +4,8 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+## 0.1.0-alpha.30 (2026-11-14)
+
 ### Shows
 - **Render Video from the app.** File → Render Video…, the command palette, or **Render** in the show pane renders the open show to a music video. Progress shows in the bottom right corner, like an update download, with Cancel, and Show opens the finished file's folder. A dialog picks the quality, frame size and file first, with an estimated size per minute. Unsaved show and song edits are saved first.
 - **No more pop-up windows on macOS 14+.** The render windows stay hidden and keep full speed. `--preview` shows them anyway. Linux, Windows and older macOS still paint in small on-screen previews.
