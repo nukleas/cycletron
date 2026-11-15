@@ -1380,6 +1380,55 @@ mod tests {
         }
     }
 
+    proptest::proptest! {
+        /// Any number of sets holding copies of the same sources, each copy
+        /// finished or not, under any set names: every source ends up in
+        /// `sources/`, complete whenever some copy was, and the old set dirs
+        /// are gone.
+        #[test]
+        fn migration_keeps_a_complete_copy(
+            copies in proptest::collection::vec(
+                ("[a-z]{1,6}", 0usize..3, proptest::bool::ANY),
+                1..12,
+            ),
+        ) {
+            const SLUGS: [&str; 3] = ["tidalcycles-uzu-drumkit", "yaxu-mrid", "felixroos-dough"];
+            let root = tempfile::tempdir().unwrap();
+            let mut want_complete = [false; 3];
+            let mut present = [false; 3];
+            let mut written = std::collections::HashSet::new();
+            for (i, (set, slug, complete)) in copies.iter().enumerate() {
+                // One copy of a source per set, as the old layout had.
+                if !written.insert((set.clone(), *slug)) {
+                    continue;
+                }
+                let dir = root.path().join(set).join(format!("{:02}-{}", i % 100, SLUGS[*slug]));
+                std::fs::create_dir_all(&dir).unwrap();
+                std::fs::write(dir.join("bd.wav"), "x").unwrap();
+                if *complete {
+                    std::fs::write(dir.join(LOCAL_MANIFEST), "{}").unwrap();
+                }
+                want_complete[*slug] |= *complete;
+                present[*slug] = true;
+            }
+
+            migrate_per_set_layout(root.path());
+
+            for (k, slug) in SLUGS.iter().enumerate() {
+                let dest = root.path().join(SOURCES_DIR).join(slug);
+                proptest::prop_assert_eq!(dest.is_dir(), present[k]);
+                proptest::prop_assert_eq!(dest.join(LOCAL_MANIFEST).is_file(), want_complete[k], "{}", slug);
+            }
+            let left: Vec<_> = std::fs::read_dir(root.path())
+                .unwrap()
+                .flatten()
+                .map(|e| e.file_name())
+                .filter(|n| n != SOURCES_DIR)
+                .collect();
+            proptest::prop_assert!(left.is_empty(), "old set dirs left: {:?}", left);
+        }
+    }
+
     #[test]
     fn source_slugs_are_readable_and_safe() {
         // Short URLs keep their readable slug verbatim — these are the cache

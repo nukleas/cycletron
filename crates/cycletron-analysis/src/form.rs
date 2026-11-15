@@ -408,3 +408,31 @@ pub fn form_critique_to_text(c: &Critique) -> String {
     }
     s
 }
+
+#[cfg(test)]
+mod props {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Sections tile the form: they start at 0, follow each other with no
+        /// gap, cover every slot × n, and no two neighbours share a label.
+        #[test]
+        fn merged_sections_tile_the_form(
+            labels in prop::collection::vec("[abc]", 1..40),
+            n in 1u32..16,
+        ) {
+            let sections = merge_labels(&labels, n);
+            prop_assert_eq!(sections[0].start_cycle, 0);
+            for w in sections.windows(2) {
+                prop_assert_eq!(w[1].start_cycle, w[0].end_cycle() + 1);
+                prop_assert_ne!(&w[0].label, &w[1].label);
+            }
+            for s in &sections {
+                prop_assert!(s.cycles >= n as usize && s.cycles % n as usize == 0);
+            }
+            let total: usize = sections.iter().map(|s| s.cycles).sum();
+            prop_assert_eq!(total, labels.len() * n as usize);
+        }
+    }
+}

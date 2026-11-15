@@ -156,6 +156,25 @@ fn seconds_to_next_bar(phase: f64, tempo: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Any phase inside the bar at any real tempo: the wait is positive, at
+        /// most one bar, and lands exactly on the bar line.
+        #[test]
+        fn wait_is_within_one_bar(phase in 0.0..QUANTUM, tempo in 20.0f64..999.0) {
+            let wait = seconds_to_next_bar(phase, tempo);
+            let bar = QUANTUM * 60.0 / tempo;
+            prop_assert!(wait > 0.0 && wait <= bar);
+            prop_assert!((phase + wait * tempo / 60.0 - QUANTUM).abs() < 1e-9);
+        }
+
+        /// Zero, negative or NaN tempo never yields an infinite or NaN wait.
+        #[test]
+        fn bad_tempo_waits_zero(phase in 0.0..QUANTUM, tempo in prop_oneof![Just(0.0), Just(f64::NAN), -999.0f64..0.0]) {
+            prop_assert_eq!(seconds_to_next_bar(phase, tempo), 0.0);
+        }
+    }
 
     #[test]
     fn wait_lands_on_the_bar_line() {
