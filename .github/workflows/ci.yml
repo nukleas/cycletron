@@ -23,7 +23,7 @@ env:
 # GitHub-hosted — no workflow edit needed if the home cluster is offline.
 jobs:
   ui:
-    name: UI typecheck
+    name: UI typecheck + lint
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     defaults:
       run:
@@ -41,6 +41,8 @@ jobs:
         # The real WASM types are committed under ui/pkg (built from the pinned
         # strudel-rs release), so tsc checks against the actual engine surface.
         run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
 
   rust:
     name: Rust test + corpus-check

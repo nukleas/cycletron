@@ -35,7 +35,7 @@ export function highlightJsToHtml(code: string): string {
             () => { parts.push('\n'); }
         );
         return parts.join('');
-    } catch (_e) {
+    } catch {
         return escapeHtml(code);
     }
 }
