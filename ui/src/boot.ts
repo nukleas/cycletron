@@ -277,8 +277,7 @@ function setupExternalChangeListener(): void {
     void event.listen('file-externally-changed', async (e: any) => {
         const path: string | null = e.payload ?? null;
         if (!path) return;
-        // Ignore the event if we just saved this file ourselves; the file
-        // manager's dirty flag is a good enough proxy.
+        // Rust already drops our own saves; only the open file matters here.
         if (fileManager.filePath !== path) return;
 
         if (!document.hasFocus()) {
