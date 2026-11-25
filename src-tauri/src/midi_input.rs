@@ -246,3 +246,40 @@ fn parse_midi_message(message: &[u8], device_name: &str) -> Option<MidiInputEven
         timestamp,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_note_on_note_off_and_cc() {
+        let on = parse_midi_message(&[0x90, 60, 100], "Keys").unwrap();
+        assert_eq!(on.event_type, "note_on");
+        assert_eq!(on.note, 60);
+        assert_eq!(on.velocity, 100);
+        assert_eq!(on.channel, 1);
+
+        let zero_vel = parse_midi_message(&[0x93, 60, 0], "Keys").unwrap();
+        assert_eq!(zero_vel.event_type, "note_off");
+        assert_eq!(zero_vel.channel, 4);
+
+        let off = parse_midi_message(&[0x8F, 64, 40], "Keys").unwrap();
+        assert_eq!(off.event_type, "note_off");
+        assert_eq!(off.channel, 16);
+
+        let cc = parse_midi_message(&[0xB1, 74, 127], "Keys").unwrap();
+        assert_eq!(cc.event_type, "cc");
+        assert_eq!(cc.note, 74);
+        assert_eq!(cc.velocity, 127);
+        assert_eq!(cc.channel, 2);
+    }
+
+    #[test]
+    fn ignores_short_and_unsupported_messages() {
+        assert!(parse_midi_message(&[], "Keys").is_none());
+        assert!(parse_midi_message(&[0x90, 60], "Keys").is_none());
+        // Program change / pitch bend are not forwarded.
+        assert!(parse_midi_message(&[0xC0, 5, 0], "Keys").is_none());
+        assert!(parse_midi_message(&[0xE0, 0, 64], "Keys").is_none());
+    }
+}

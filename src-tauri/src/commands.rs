@@ -196,6 +196,64 @@ pub fn genre_recipe(
     }
 }
 
+/// The parts saved in the library, for the Parts shelf.
+#[tauri::command]
+pub async fn list_saved_parts(
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::parts_import::SavedPart>, String> {
+    let root = state.library_root();
+    tauri::async_runtime::spawn_blocking(move || crate::parts_import::list_saved(&root))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Cycles of a part the Parts shelf previews.
+const PART_PREVIEW_CYCLES: f64 = 2.0;
+
+/// Render the start of one part for the Parts shelf to audition. The body is a
+/// little-endian `u32` sample rate, then interleaved stereo `f32` frames.
+#[tauri::command]
+pub async fn render_part_preview(
+    code: String,
+    bpm: f64,
+    state: State<'_, AppState>,
+) -> Result<tauri::ipc::Response, String> {
+    let samples = state
+        .sample_paths
+        .lock()
+        .clone()
+        .ok_or("The active sample set is not downloaded yet.")?;
+    let bytes = tauri::async_runtime::spawn_blocking(move || part_preview(&code, bpm, &samples))
+        .await
+        .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+fn part_preview(
+    code: &str,
+    bpm: f64,
+    samples: &cycletron_render::SampleSetPaths,
+) -> Result<Vec<u8>, String> {
+    let bpm = cycletron_render::resolve_tempo(None, Some(bpm)).clamp(20.0, 300.0);
+    let (patterns, _) = cycletron_render::resolve_patterns(code, false)?;
+    // One cycle is four beats.
+    let seconds = PART_PREVIEW_CYCLES * 4.0 * 60.0 / bpm;
+    let pcm = cycletron_render::render_pcm(
+        &cycletron_render::mix_of(&patterns),
+        bpm,
+        cycletron_render::DEFAULT_GAIN,
+        seconds,
+        samples,
+    )?;
+    let mut bytes = Vec::with_capacity(4 + pcm.left.len() * 8);
+    bytes.extend_from_slice(&pcm.sample_rate.to_le_bytes());
+    for (l, r) in pcm.left.iter().zip(&pcm.right) {
+        bytes.extend_from_slice(&l.to_le_bytes());
+        bytes.extend_from_slice(&r.to_le_bytes());
+    }
+    Ok(bytes)
+}
+
 /// Reload the corpus index and genre recipes from disk. Recipes are otherwise
 /// read once at startup, so a running app never picks up newly-generated recipes
 /// (e.g. after `cargo run -p gen-recipes`) until restart — this refreshes them in
@@ -659,8 +717,19 @@ pub fn save_midi_to_library(
     } else {
         format!("{base}.strudel")
     };
+    let mut comps = std::path::Path::new(&with_ext).components();
+    let is_single_name = matches!(comps.next(), Some(std::path::Component::Normal(_)))
+        && comps.next().is_none()
+        && !with_ext.contains('/')
+        && !with_ext.contains('\\');
+    if !is_single_name {
+        return Err(format!("invalid file name: {with_ext:?}"));
+    }
 
     let mut target = dir.join(&with_ext);
+    if !library::within(&dir, &target) {
+        return Err("target file is outside the library".into());
+    }
     // Refuse silent overwrite — bump a numeric suffix instead.
     let mut suffix = 1u32;
     while target.exists() {
@@ -676,6 +745,9 @@ pub fn save_midi_to_library(
             .unwrap_or("strudel");
         target = dir.join(format!("{stem}-{suffix}.{ext}"));
         suffix += 1;
+    }
+    if !library::within(&dir, &target) {
+        return Err("target file is outside the library".into());
     }
 
     files::write_file(&target, &result.code, Some(result.bpm))
@@ -1273,11 +1345,17 @@ pub async fn export_audio(
     if EXPORT_RUNNING.swap(true, Ordering::SeqCst) {
         return Err("an export is already running".into());
     }
+    struct ExportGuard;
+    impl Drop for ExportGuard {
+        fn drop(&mut self) {
+            EXPORT_RUNNING.store(false, Ordering::SeqCst);
+        }
+    }
+    let _guard = ExportGuard;
     let result = tauri::async_runtime::spawn_blocking(move || {
         crate::export::export_audio(&code, &path, duration_secs, bpm, gain, fmt, stems, &samples)
     })
     .await;
-    EXPORT_RUNNING.store(false, Ordering::SeqCst);
     result.map_err(|e| format!("export task failed: {e}"))?
 }
 
@@ -1519,8 +1597,13 @@ pub fn relaunch_app(app_handle: tauri::AppHandle) -> Result<(), String> {
     // app itself — but keep a best-effort fallback.
     #[cfg(target_os = "windows")]
     let spawned = std::process::Command::new("cmd")
-        .args(["/C", "ping -n 2 127.0.0.1 >nul & start \"\" "])
-        .arg(installed)
+        .args([
+            "/C",
+            &format!(
+                r#"ping -n 2 127.0.0.1 >nul & start "" "{}""#,
+                installed.display()
+            ),
+        ])
         .spawn();
 
     spawned.map_err(|e| format!("failed to spawn relauncher: {e}"))?;

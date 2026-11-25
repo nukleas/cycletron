@@ -354,21 +354,25 @@ fn unique_name(mut name: String, used: &mut std::collections::HashSet<String>) -
 /// Read an audio file's raw bytes for the frontend to decode. Returns the bytes
 /// as an efficient binary IPC response (not a JSON number array).
 #[tauri::command]
-pub fn read_audio_file(path: String) -> Result<tauri::ipc::Response, String> {
-    let pb = PathBuf::from(&path);
-    if !is_audio(&pb) {
-        return Err(format!("not an audio file: {path}"));
-    }
-    let meta = std::fs::metadata(&pb).map_err(|e| format!("stat {}: {e}", pb.display()))?;
-    if meta.len() > MAX_AUDIO_FILE_BYTES {
-        return Err(format!(
-            "{} is {} MB — exceeds the {} MB limit",
-            pb.display(),
-            meta.len() / (1024 * 1024),
-            MAX_AUDIO_FILE_BYTES / (1024 * 1024)
-        ));
-    }
-    let bytes = std::fs::read(&pb).map_err(|e| format!("read {}: {e}", pb.display()))?;
+pub async fn read_audio_file(path: String) -> Result<tauri::ipc::Response, String> {
+    let bytes = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<u8>, String> {
+        let pb = PathBuf::from(&path);
+        if !is_audio(&pb) {
+            return Err(format!("not an audio file: {path}"));
+        }
+        let meta = std::fs::metadata(&pb).map_err(|e| format!("stat {}: {e}", pb.display()))?;
+        if meta.len() > MAX_AUDIO_FILE_BYTES {
+            return Err(format!(
+                "{} is {} MB — exceeds the {} MB limit",
+                pb.display(),
+                meta.len() / (1024 * 1024),
+                MAX_AUDIO_FILE_BYTES / (1024 * 1024)
+            ));
+        }
+        std::fs::read(&pb).map_err(|e| format!("read {}: {e}", pb.display()))
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     Ok(tauri::ipc::Response::new(bytes))
 }
 

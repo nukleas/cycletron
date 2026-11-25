@@ -36,10 +36,11 @@ use std::collections::HashMap;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Stdio};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
@@ -316,7 +317,6 @@ pub fn run(flags: Flags, context: tauri::Context<tauri::Wry>) -> u8 {
                 *render
                     .epochs
                     .lock()
-                    .unwrap()
                     .entry(webview.label().to_string())
                     .or_insert(0) += 1;
             }
@@ -360,7 +360,7 @@ pub fn run(flags: Flags, context: tauri::Context<tauri::Wry>) -> u8 {
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(FIRST_CALL_TIMEOUT_SECS));
                 let render = handle.state::<Render>();
-                if render.first_call.lock().unwrap().is_none() {
+                if render.first_call.lock().is_none() {
                     fail(
                         &handle,
                         &format!(
@@ -853,7 +853,6 @@ impl Render {
         let children: Vec<Child> = self
             .workers
             .lock()
-            .unwrap()
             .values_mut()
             .filter_map(|w| {
                 w.stdin = None;
@@ -864,8 +863,8 @@ impl Render {
             let _ = child.kill();
             let _ = child.wait();
         }
-        let muxing = self.mux.lock().unwrap().take();
-        if let Plan::Ready(s) = &*self.plan.lock().unwrap() {
+        let muxing = self.mux.lock().take();
+        if let Plan::Ready(s) = &*self.plan.lock() {
             if let Some(mut child) = muxing {
                 let _ = child.kill();
                 let _ = child.wait();
@@ -877,14 +876,11 @@ impl Render {
     }
 
     fn touch(&self) {
-        self.first_call
-            .lock()
-            .unwrap()
-            .get_or_insert_with(Instant::now);
+        self.first_call.lock().get_or_insert_with(Instant::now);
     }
 
     fn worker_packs(&self, label: &str) -> Vec<PackSource> {
-        let mut workers = self.workers.lock().unwrap();
+        let mut workers = self.workers.lock();
         let worker = workers.entry(label.to_string()).or_default();
         if worker.packs_sent {
             Vec::new()
@@ -977,7 +973,7 @@ fn render_plan(window: tauri::Window, render: State<'_, Render>) -> Option<PlanR
     render.touch();
     let label = window.label().to_string();
     {
-        let mut plan = render.plan.lock().unwrap();
+        let mut plan = render.plan.lock();
         match &*plan {
             Plan::Unclaimed => *plan = Plan::Claimed(label.clone()),
             Plan::Claimed(by) if *by == label => {}
@@ -1079,16 +1075,19 @@ async fn render_songs(
                 .performance
                 .sections
                 .iter()
-                .map(|s| FormSection {
-                    label: s.label.clone(),
-                    start_cycle: (s.start_ns as f64 / p.performance.cycle_ns as f64).round() as u64,
-                    cycles: ((s.end_ns - s.start_ns) as f64 / p.performance.cycle_ns as f64).round()
-                        as u64,
+                .map(|s| {
+                    let cycle_ns = p.performance.cycle_ns.max(1) as f64;
+                    FormSection {
+                        label: s.label.clone(),
+                        start_cycle: (s.start_ns as f64 / cycle_ns).round() as u64,
+                        cycles: (s.end_ns.saturating_sub(s.start_ns) as f64 / cycle_ns).round()
+                            as u64,
+                    }
                 })
                 .collect(),
         })
         .collect();
-    *render.songs.lock().unwrap() = plans;
+    *render.songs.lock() = plans;
     Ok(forms)
 }
 
@@ -1181,6 +1180,9 @@ fn render_cues(payload: CuesPayload, render: State<'_, Render>) -> Result<(), St
         ),
     };
     let fps = flags.fps.or(payload.fps).unwrap_or(60);
+    if fps == 0 {
+        return Err("fps must be greater than 0".into());
+    }
     let (width, height) = flags
         .size
         .or(payload.size.map(|s| (s.width, s.height)))
@@ -1193,7 +1195,7 @@ fn render_cues(payload: CuesPayload, render: State<'_, Render>) -> Result<(), St
         (None, None) => Quality::Standard,
     };
 
-    let mut songs = render.songs.lock().unwrap();
+    let mut songs = render.songs.lock();
     for sc in payload.songs {
         let song = songs
             .iter_mut()
@@ -1325,7 +1327,8 @@ fn render_cues(payload: CuesPayload, render: State<'_, Render>) -> Result<(), St
         quality: format!("{quality:?}").to_lowercase(),
         out: out.to_string_lossy().into_owned(),
     });
-    *render.plan.lock().unwrap() = Plan::Ready(Schedule {
+    drop(songs);
+    *render.plan.lock() = Plan::Ready(Schedule {
         width,
         height,
         fps,
@@ -1379,11 +1382,11 @@ async fn render_next(
     ready.wait_for(|r| *r).await.map_err(|e| e.to_string())?;
     let label = window.label().to_string();
     let packs = render.worker_packs(&label);
-    let mut plan = render.plan.lock().unwrap();
+    let mut plan = render.plan.lock();
     let Plan::Ready(schedule) = &mut *plan else {
         return Err("no schedule".into());
     };
-    let mut workers = render.workers.lock().unwrap();
+    let mut workers = render.workers.lock();
     let worker = workers.entry(label.clone()).or_default();
     // A chunk still in flight means the page reloaded under it: start it over.
     if let Some(k) = worker.chunk.take() {
@@ -1450,7 +1453,7 @@ async fn render_next(
     worker.stdin = child.stdin.take().map(|s| Arc::new(Mutex::new(s)));
     worker.child = Some(child);
     worker.chunk = Some(k);
-    let songs = render.songs.lock().unwrap();
+    let songs = render.songs.lock();
     let song = &songs[chunk.song];
     Ok(Some(Job {
         code: song.performance.code.clone(),
@@ -1474,7 +1477,7 @@ async fn render_next(
 /// A song's mix, as WAV bytes.
 #[tauri::command]
 fn render_mix(index: usize, render: State<'_, Render>) -> Result<tauri::ipc::Response, String> {
-    let songs = render.songs.lock().unwrap();
+    let songs = render.songs.lock();
     let song = songs.get(index).ok_or("no such song")?;
     let path = song.dir.join(&song.performance.audio);
     let bytes = std::fs::read(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
@@ -1496,7 +1499,7 @@ async fn render_frame(
     let bytes = bytes.clone();
     let label = window.label();
     let stdin = {
-        let workers = render.workers.lock().unwrap();
+        let workers = render.workers.lock();
         workers
             .get(label)
             .and_then(|w| w.stdin.clone())
@@ -1506,7 +1509,6 @@ async fn render_frame(
         let at = Instant::now();
         stdin
             .lock()
-            .unwrap()
             .write_all(&bytes)
             .map_err(|e| format!("ffmpeg stdin: {e}"))?;
         Ok::<_, String>(at.elapsed())
@@ -1517,7 +1519,7 @@ async fn render_frame(
         .encoder_wait
         .fetch_add(waited.as_nanos() as u64, Ordering::Relaxed);
     let done = render.frames_done.fetch_add(1, Ordering::Relaxed) + 1;
-    let plan = render.plan.lock().unwrap();
+    let plan = render.plan.lock();
     if let Plan::Ready(s) = &*plan
         && done.is_multiple_of(s.fps as u64)
     {
@@ -1539,9 +1541,9 @@ async fn render_chunk_done(
     app: AppHandle,
     render: State<'_, Render>,
 ) -> Result<(), String> {
-    render.timings.lock().unwrap().add(timings);
+    render.timings.lock().add(timings);
     let (child, k) = {
-        let mut workers = render.workers.lock().unwrap();
+        let mut workers = render.workers.lock();
         let worker = workers.get_mut(window.label()).ok_or("unknown window")?;
         worker.stdin = None;
         (worker.child.take(), worker.chunk.take())
@@ -1558,7 +1560,7 @@ async fn render_chunk_done(
         return Ok(());
     }
     let all_done = {
-        let mut plan = render.plan.lock().unwrap();
+        let mut plan = render.plan.lock();
         let Plan::Ready(s) = &mut *plan else {
             return Err("no schedule".into());
         };
@@ -1569,7 +1571,7 @@ async fn render_chunk_done(
         s.done == s.chunks.len()
     };
     if all_done {
-        let mut finished = render.finished.lock().unwrap();
+        let mut finished = render.finished.lock();
         if !*finished {
             *finished = true;
             let app = app.clone();
@@ -1587,16 +1589,19 @@ async fn render_chunk_done(
 
 /// Concat the parts and lay each song's mix under its frames.
 fn finish(render: &Render) -> Result<(), String> {
-    let plan = render.plan.lock().unwrap();
+    let plan = render.plan.lock();
     let Plan::Ready(s) = &*plan else {
         return Err("no schedule".into());
     };
-    let songs = render.songs.lock().unwrap();
+    let songs = render.songs.lock();
     let list = s.parts.join("parts.txt");
     let lines: String = s
         .chunks
         .iter()
-        .map(|c| format!("file '{}'\n", c.part.display()))
+        .map(|c| {
+            let escaped = c.part.display().to_string().replace('\'', r"'\''");
+            format!("file '{escaped}'\n")
+        })
         .collect();
     std::fs::write(&list, lines).map_err(|e| format!("write {}: {e}", list.display()))?;
     let mut playing: Vec<usize> = s.chunks.iter().map(|c| c.song).collect();
@@ -1663,13 +1668,13 @@ fn finish(render: &Render) -> Result<(), String> {
         s.label.clone(),
         s.last - s.first,
     );
-    *render.mux.lock().unwrap() = Some(child);
+    *render.mux.lock() = Some(child);
     // Released so an interrupt can stop the mux; it takes the child away when it does.
     drop(songs);
     drop(plan);
     let status = loop {
         {
-            let mut mux = render.mux.lock().unwrap();
+            let mut mux = render.mux.lock();
             let Some(child) = mux.as_mut() else {
                 return Err("interrupted".into());
             };
@@ -1684,7 +1689,7 @@ fn finish(render: &Render) -> Result<(), String> {
         return Err(format!("ffmpeg (mux) exited {status}"));
     }
     let _ = std::fs::remove_dir_all(&parts);
-    let t = *render.timings.lock().unwrap();
+    let t = *render.timings.lock();
     let per = |ms: f64| (ms / t.frames.max(1) as f64 * 10.0).round() / 10.0;
     render.say(Event::Done {
         label,
@@ -1775,21 +1780,9 @@ async fn render_failed(
 ) -> Result<(), String> {
     render.touch();
     let label = window.label().to_string();
-    let epoch = render
-        .epochs
-        .lock()
-        .unwrap()
-        .get(&label)
-        .copied()
-        .unwrap_or(0);
+    let epoch = render.epochs.lock().get(&label).copied().unwrap_or(0);
     tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-    let now = render
-        .epochs
-        .lock()
-        .unwrap()
-        .get(&label)
-        .copied()
-        .unwrap_or(0);
+    let now = render.epochs.lock().get(&label).copied().unwrap_or(0);
     if now == epoch {
         fail(&app, &message);
     }

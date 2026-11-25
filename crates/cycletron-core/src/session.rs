@@ -9,7 +9,6 @@ pub struct Session {
     pub messages: Vec<ChatMessage>,
     pub current_pattern: Option<String>,
     pub pattern_history: Vec<PatternEntry>,
-    pub named_sections: Vec<NamedSection>,
     pub tempo: f64,
     pub playback: PlaybackState,
     /// Index into pattern_history for undo/redo.
@@ -19,13 +18,6 @@ pub struct Session {
     /// Code content as it was last written to / read from disk.
     /// Used to detect unsaved changes (dirty state).
     pub last_saved_snapshot: Option<String>,
-}
-
-/// A named section in the current composition.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NamedSection {
-    pub name: String,
-    pub code: String,
 }
 
 /// An entry in the pattern history.
@@ -53,7 +45,6 @@ impl Session {
             messages: Vec::new(),
             current_pattern: None,
             pattern_history: Vec::new(),
-            named_sections: Vec::new(),
             tempo: default_tempo,
             playback: PlaybackState::Stopped,
             history_index: None,
@@ -182,13 +173,65 @@ impl Session {
         self.current_pattern = Some(code.clone());
         Some(code)
     }
+}
 
-    pub fn transport_state(&self) -> TransportState {
-        TransportState {
-            playback: self.playback,
-            tempo: self.tempo,
-            cycle: 0.0,
-            pattern_code: self.current_pattern.clone(),
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn undo_redo_and_branch_truncation() {
+        let mut s = Session::new(120.0);
+        assert_eq!(s.undo(), None);
+        assert_eq!(s.redo(), None);
+
+        s.set_pattern("s(\"bd\")".into());
+        s.set_pattern_from_user("s(\"bd sd\")".into());
+        s.set_pattern("s(\"bd sd hh\")".into());
+
+        assert_eq!(s.undo(), Some("s(\"bd sd\")"));
+        assert_eq!(s.current_pattern.as_deref(), Some("s(\"bd sd\")"));
+        assert_eq!(s.undo(), Some("s(\"bd\")"));
+        assert_eq!(s.undo(), None);
+
+        assert_eq!(s.redo(), Some("s(\"bd sd\")"));
+        // Pushing a new pattern discards the future redo branch.
+        s.set_pattern("s(\"cp*4\")".into());
+        assert_eq!(s.redo(), None);
+        assert_eq!(s.pattern_history.len(), 3);
+        assert_eq!(s.undo(), Some("s(\"bd sd\")"));
+    }
+
+    #[test]
+    fn file_lifecycle_and_messages() {
+        let mut s = Session::new(128.0);
+        s.load_code(
+            "setbpm(128);\ns(\"bd*4\")".into(),
+            Some(PathBuf::from("/a.strudel")),
+        );
+        assert_eq!(
+            s.file_path.as_deref(),
+            Some(std::path::Path::new("/a.strudel"))
+        );
+        assert_eq!(s.last_saved_snapshot, s.current_pattern);
+
+        s.mark_saved(PathBuf::from("/b.strudel"), "s(\"hh*8\")".into());
+        assert_eq!(
+            s.file_path.as_deref(),
+            Some(std::path::Path::new("/b.strudel"))
+        );
+        assert_eq!(s.last_saved_snapshot.as_deref(), Some("s(\"hh*8\")"));
+
+        s.add_user_message("hi".into());
+        s.add_assistant_message("hello".into());
+        s.add_system_message("notice".into());
+        assert_eq!(s.messages.len(), 3);
+
+        s.set_pattern("s(\"sd\")".into());
+        s.new_file();
+        assert!(s.file_path.is_none());
+        assert!(s.current_pattern.is_none());
+        assert!(s.pattern_history.is_empty());
+        assert_eq!(s.undo(), None);
     }
 }

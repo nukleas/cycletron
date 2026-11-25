@@ -378,7 +378,12 @@ fn build_midi_file(events: &[MidiNoteEvent], bpm: f64, ppq: u16) -> Result<Smf<'
 
     let mut track: MidiTrack<'static> = Vec::new();
 
-    let tempo_us = (60_000_000.0 / bpm) as u32;
+    let clamped_bpm = if bpm.is_finite() {
+        bpm.clamp(4.0, 999.0)
+    } else {
+        120.0
+    };
+    let tempo_us = ((60_000_000.0 / clamped_bpm).round() as u32).clamp(1, 0xFF_FFFF);
     track.push(TrackEvent {
         delta: u28::new(0),
         kind: TrackEventKind::Meta(midly::MetaMessage::Tempo(u24::new(tempo_us))),

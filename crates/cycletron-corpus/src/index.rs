@@ -62,7 +62,13 @@ impl InMemoryCorpusIndex {
         let metadata_path = corpus_path.join("inventory/normalized-metadata.jsonl");
 
         if metadata_path.exists() {
-            entries.extend(crate::loader::load_metadata(&metadata_path)?);
+            let mut seen: std::collections::HashSet<String> =
+                entries.iter().map(|e| e.id.clone()).collect();
+            for entry in crate::loader::load_metadata(&metadata_path)? {
+                if seen.insert(entry.id.clone()) {
+                    entries.push(entry);
+                }
+            }
         } else {
             tracing::warn!("metadata index not found at {}", metadata_path.display());
         }
@@ -165,5 +171,156 @@ impl InMemoryCorpusIndex {
 
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cycletron_core::types::{CorpusEntry, CorpusQuery};
+
+    fn entry(
+        id: &str,
+        title: Option<&str>,
+        tags: &[&str],
+        tempo: Option<f64>,
+        complexity: Option<&str>,
+        sounds: &[&str],
+    ) -> CorpusEntry {
+        CorpusEntry {
+            id: id.into(),
+            filename: format!("{id}.strudel"),
+            file_type: Some("strudel".into()),
+            title: title.map(str::to_string),
+            author: None,
+            tags: tags.iter().map(|s| (*s).to_string()).collect(),
+            tempo,
+            complexity: complexity.map(str::to_string),
+            sounds: sounds.iter().map(|s| (*s).to_string()).collect(),
+            effects: Vec::new(),
+            scales: Vec::new(),
+            features: Vec::new(),
+            source_code: Some(format!("// {id}\ns(\"bd\")")),
+        }
+    }
+
+    fn index_of(entries: Vec<CorpusEntry>) -> InMemoryCorpusIndex {
+        let keys = entries.iter().map(SearchKeys::of).collect();
+        InMemoryCorpusIndex {
+            entries,
+            keys,
+            corpus_path: PathBuf::new(),
+        }
+    }
+
+    #[test]
+    fn search_filters_by_tags_tempo_complexity_sounds_keyword_and_limit() {
+        let idx = index_of(vec![
+            entry(
+                "house-1",
+                Some("Warm Deep House"),
+                &["house", "four-floor"],
+                Some(124.0),
+                Some("intermediate"),
+                &["bd", "RolandTR909_hh"],
+            ),
+            entry(
+                "dnb-1",
+                Some("Liquid Roller"),
+                &["dnb", "breakbeat"],
+                Some(174.0),
+                Some("complex"),
+                &["bd", "sd", "gm_epiano1"],
+            ),
+            entry(
+                "ambient-1",
+                Some("Slow Pads"),
+                &["ambient", "pads"],
+                Some(80.0),
+                Some("simple"),
+                &["sine", "triangle"],
+            ),
+        ]);
+
+        // Tag AND matching (case-insensitive)
+        let res = idx.search(&CorpusQuery {
+            tags: vec!["HOUSE".into(), "four".into()],
+            ..Default::default()
+        });
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].id, "house-1");
+
+        // Tempo bounds
+        let res = idx.search(&CorpusQuery {
+            tempo_min: Some(100.0),
+            tempo_max: Some(140.0),
+            ..Default::default()
+        });
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].id, "house-1");
+
+        // Complexity
+        let res = idx.search(&CorpusQuery {
+            complexity: Some("simple".into()),
+            ..Default::default()
+        });
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].id, "ambient-1");
+
+        // Sounds OR matching
+        let res = idx.search(&CorpusQuery {
+            sounds: vec!["epiano".into(), "triangle".into()],
+            ..Default::default()
+        });
+        assert_eq!(res.len(), 2);
+
+        // Keyword + limit
+        let res = idx.search(&CorpusQuery {
+            keyword: Some("liquid".into()),
+            limit: Some(1),
+            ..Default::default()
+        });
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].id, "dnb-1");
+        assert!(idx.get_source("dnb-1").unwrap().contains("dnb-1"));
+        assert!(idx.get_source("missing").is_err());
+    }
+
+    #[test]
+    fn curated_entries_deduplicate_colliding_bulk_ids() {
+        let dir =
+            std::env::temp_dir().join(format!("cycletron_corpus_dedup_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let curated = dir.join("curated");
+        let bulk = dir.join("bulk");
+        std::fs::create_dir_all(curated.join("rhythm")).unwrap();
+        std::fs::create_dir_all(bulk.join("inventory")).unwrap();
+        std::fs::write(
+            curated.join("rhythm/beat.strudel"),
+            "// Curated\ns(\"bd*4\")\n",
+        )
+        .unwrap();
+        let bulk_line = serde_json::json!({
+            "id": "curated/rhythm/beat",
+            "filename": "beat.strudel",
+            "file_type": "strudel",
+            "content_kind": "code",
+            "title": "Bulk Duplicate",
+            "tags": ["rhythm"],
+        });
+        std::fs::write(
+            bulk.join("inventory/normalized-metadata.jsonl"),
+            format!("{bulk_line}\n"),
+        )
+        .unwrap();
+
+        let idx = InMemoryCorpusIndex::load_with_curated(&bulk, Some(&curated)).unwrap();
+        let all = idx.search(&CorpusQuery {
+            limit: Some(10),
+            ..Default::default()
+        });
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].title.as_deref(), Some("Curated"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
