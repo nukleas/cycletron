@@ -13,7 +13,7 @@ import {
 } from '@codemirror/view';
 import {Decoration, type DecorationSet} from '@codemirror/view';
 import {EditorState, Compartment, StateEffect, StateField} from '@codemirror/state';
-import {defaultKeymap, history, historyKeymap, indentWithTab} from '@codemirror/commands';
+import {defaultKeymap, history, historyKeymap, indentWithTab, isolateHistory} from '@codemirror/commands';
 import {javascript} from '@codemirror/lang-javascript';
 import {
     bracketMatching,
@@ -135,6 +135,31 @@ const flashTheme = EditorView.baseTheme({
         borderRadius: '0',
         transition: 'background-color 0.4s ease-out',
     },
+});
+
+/** Where a dragged part would land: a line, and which edge of it. Null hides the marker. */
+const setDropLine = StateEffect.define<{pos: number; below: boolean} | null>();
+
+const dropLineField = StateField.define<DecorationSet>({
+    create() {
+        return Decoration.none;
+    },
+    update(decorations, tr) {
+        for (const effect of tr.effects) {
+            if (!effect.is(setDropLine)) continue;
+            if (!effect.value) return Decoration.none;
+            const line = tr.state.doc.lineAt(Math.min(effect.value.pos, tr.state.doc.length));
+            const cls = effect.value.below ? 'cm-drop-below' : 'cm-drop-above';
+            return Decoration.set([Decoration.line({class: cls}).range(line.from)]);
+        }
+        return tr.docChanged ? Decoration.none : decorations;
+    },
+    provide: (f) => EditorView.decorations.from(f),
+});
+
+const dropLineTheme = EditorView.baseTheme({
+    '.cm-drop-above': {boxShadow: 'inset 0 2px 0 var(--neon)'},
+    '.cm-drop-below': {boxShadow: 'inset 0 -2px 0 var(--neon)'},
 });
 
 /** Set (or clear, with null) the inline inspect-readout panel content (HTML). */
@@ -350,6 +375,8 @@ export class StrudelEditor {
                 // Active note highlight (during playback)
                 activeNoteField,
                 activeNoteTheme,
+                dropLineField,
+                dropLineTheme,
 
                 // Inline pattern readout (bottom panel)
                 inspectField,
@@ -459,6 +486,27 @@ export class StrudelEditor {
             selection: {anchor: sel.from + text.length},
         });
         this.view.focus();
+    }
+
+    /**
+     * Put a part into the document as one undo step and flash it.
+     * `partFrom`/`partTo` mark the part's own code inside `text`.
+     */
+    insertPart(from: number, to: number, text: string, partFrom: number, partTo: number): void {
+        this.view.dispatch({
+            changes: {from, to, insert: text},
+            selection: {anchor: from + partTo},
+            effects: setDropLine.of(null),
+            annotations: isolateHistory.of('full'),
+            scrollIntoView: true,
+        });
+        this.flashBlock(from + partFrom, from + partTo);
+        this.view.focus();
+    }
+
+    /** Mark the line a dragged part would land on; null clears the mark. */
+    setDropLine(mark: {pos: number; below: boolean} | null): void {
+        this.view.dispatch({effects: setDropLine.of(mark)});
     }
 
     /** Append `text` as a fresh line at the end of the document; cursor lands on it. */

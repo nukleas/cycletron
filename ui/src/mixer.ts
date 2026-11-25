@@ -110,8 +110,20 @@ class Mixer {
     private panel: HTMLElement | null = null;
     private countEl: HTMLElement | null = null;
     private onChange: (() => void) | null = null;
+    private _onSave: ((track: MixTrack) => void) | null = null;
     /** Label list of the last render, so keystrokes don't rebuild an identical panel. */
     private signature = '';
+
+    /** When set, each row gets a button that hands its track to this. */
+    get onSave(): ((track: MixTrack) => void) | null {
+        return this._onSave;
+    }
+
+    set onSave(handler: ((track: MixTrack) => void) | null) {
+        if (this._onSave === handler) return;
+        this._onSave = handler;
+        this.render();
+    }
 
     /** `onChange` fires whenever the audible set changes and a re-eval is due. */
     init(onChange: () => void): void {
@@ -247,6 +259,17 @@ class Mixer {
             name.textContent = track.label;
             name.title = track.label;
             row.append(name);
+
+            if (this.onSave) {
+                const save = document.createElement('button');
+                save.type = 'button';
+                save.className = 'mixer-btn';
+                save.textContent = '+';
+                save.setAttribute('aria-label', `Save ${track.label} as a part`);
+                save.dataset.tooltip = 'Save as part';
+                save.addEventListener('click', () => this.onSave?.(track));
+                row.append(save);
+            }
 
             return row;
         }));

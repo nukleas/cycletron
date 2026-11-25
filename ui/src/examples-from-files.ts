@@ -135,6 +135,7 @@ function entryFromModule(
         tempo: extractTempo(code),
         section,
         blurb,
+        ...(file.startsWith('generated-') ? {generated: true} : {}),
     };
 }
 

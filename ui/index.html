@@ -111,7 +111,10 @@
         <!-- File Explorer Panel -->
         <div class="files-panel" id="filesPanel">
             <div class="files-panel-header">
-                <span class="files-panel-title">File System</span>
+                <div class="files-panel-tabs" role="tablist">
+                    <button id="filesTabFiles" class="files-tab active" type="button" role="tab" aria-selected="true" aria-controls="fileTree">Files</button>
+                    <button id="filesTabParts" class="files-tab" type="button" role="tab" aria-selected="false" aria-controls="partsPane" data-tooltip="Drums, bass, chords and leads to add to the song">Parts</button>
+                </div>
                 <div class="files-panel-actions">
                     <button id="filesNewFile" class="files-action-btn" data-tooltip="New file" aria-label="New file">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -153,6 +156,11 @@
                 </div>
             </div>
             <div id="fileTree" class="file-tree" role="tree"></div>
+            <div id="partsPane" class="parts-pane" role="tabpanel" hidden>
+                <input id="partsFilter" class="snd-panel-search" type="search" placeholder="Filter parts…" autocomplete="off" spellcheck="false" aria-label="Filter parts" aria-controls="partsList">
+                <div id="partsList" class="parts-list" role="listbox" aria-label="Parts"></div>
+                <div class="parts-hint">Click to add a track. Drag to place.</div>
+            </div>
             <div class="files-panel-footer">
                 <span class="files-root-label" id="filesRootLabel"></span>
             </div>

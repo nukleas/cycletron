@@ -7,6 +7,9 @@
 //!   cycletron render <show.toml> [flags]
 //!   cycletron export <song.strudel> [out-dir] [--passes N] [--seconds N] [--samples manifest.json]
 //!   cycletron check <song.strudel>... [--cycles N] [--strict]
+//!   cycletron parts <midi-file-or-folder>... --license L [--collection name] [--loose] [--max N]
+//!   cycletron parts index <out-dir> [--per N] [--collection name]... [--all]
+//!   cycletron parts apply <verdicts.jsonl>... --by <name>
 //!   cycletron help
 //!
 //! Exit codes: 0 done, 1 the command failed (for `check`: a file is invalid,
@@ -23,6 +26,10 @@ usage: cycletron render <show.toml> [--out video.mp4] [--song n] [--section labe
                         [--progress json]
        cycletron export <song.strudel> [out-dir] [--passes N] [--seconds N] [--samples manifest.json]
        cycletron check <song.strudel>... [--cycles N] [--strict]
+       cycletron parts <midi-file-or-folder>... --license L [--collection name] [--out library]
+                        [--loose] [--max N]
+       cycletron parts index <out-dir> [--per N] [--collection name]... [--all] [--library dir]
+       cycletron parts apply <verdicts.jsonl>... --by <name> [--library dir]
        cycletron help
 
 render   Render a show file to a music video (docs/SHOW_FILES.md). Songs are exported
@@ -48,6 +55,19 @@ check    Review songs the way the AI's review_pattern does: validate, digest,
          silence lint, mix critique, and the form map for multi-section songs.
          --cycles N    analysis window in cycles (default 64)
          --strict      treat warnings as failures
+parts    Cut MIDI files into loop-sized parts for the Parts shelf: the 1, 2, 4 or 8 bar
+         phrases each track repeats. Written to Parts/<role>/<collection>/ in the library.
+         --license L    licence of the source, recorded in every part (required);
+                        use `personal` for files that must stay on this machine
+         --collection   folder name under each role (default: the input's name)
+         --out          library root to write into (default: the app's library)
+         --loose        keep the played timing instead of snapping to 16ths
+         --max N        most parts kept per track (default 3)
+         index          list the parts with no rating yet as JSON lines, in shards of --per
+                        (default 150): id, role, name, bpm, bars, key, code
+         apply          write verdicts into the part headers. A verdict is a JSON line
+                        with id, title, tags and rating (1 to 5). The old name is kept
+                        as `song`; a part rated 1 moves to _parts-rejected/ in the library
 
 With no command, cycletron opens the app. A running instance also takes
 play, pause, toggle, stop (or hush), tempo <bpm>, tempo-nudge <delta> and files to open.";
@@ -66,6 +86,8 @@ pub enum Command {
     },
     Help,
     Render(crate::render::Flags),
+    Parts(crate::parts_import::Flags),
+    PartsReview(crate::parts_review::Flags),
 }
 
 /// `Some` when `args` (the process's, program name first) name a command;
@@ -78,7 +100,29 @@ pub fn parse(args: &[String]) -> Option<Result<Command, String>> {
         "check" => Some(parse_check(rest)),
         "help" | "--help" | "-h" => Some(Ok(Command::Help)),
         "render" => Some(crate::render::parse(rest).map(Command::Render)),
+        "parts" => Some(match rest.first().map(String::as_str) {
+            Some(verb @ ("index" | "apply")) => {
+                crate::parts_review::parse(verb, &rest[1..]).map(Command::PartsReview)
+            }
+            _ => crate::parts_import::parse(rest).map(Command::Parts),
+        }),
         _ => None,
+    }
+}
+
+/// The library the app is set to use.
+fn library_root(context: &tauri::Context<tauri::Wry>) -> Option<PathBuf> {
+    let app_data = dirs::data_dir()?.join(&context.config().identifier);
+    Some(crate::library::LibrarySettings::load_or_default(&app_data).root)
+}
+
+fn report(verb: &str, result: Result<(), String>) -> u8 {
+    match result {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("cycletron {verb}: {e}");
+            1
+        }
     }
 }
 
@@ -164,6 +208,20 @@ pub fn run(parsed: Result<Command, String>, context: tauri::Context<tauri::Wry>)
     };
     match command {
         Command::Render(flags) => crate::render::run(flags, context),
+        Command::Parts(flags) => {
+            let Some(root) = flags.out.clone().or_else(|| library_root(&context)) else {
+                eprintln!("cycletron parts: no user data folder; pass --out <library>");
+                return 1;
+            };
+            report("parts", crate::parts_import::run(&flags, &root))
+        }
+        Command::PartsReview(flags) => {
+            let Some(root) = flags.library.clone().or_else(|| library_root(&context)) else {
+                eprintln!("cycletron parts: no user data folder; pass --library <library>");
+                return 1;
+            };
+            report("parts", crate::parts_review::run(&flags, &root))
+        }
         Command::Help => {
             println!("cycletron {}\n{USAGE}", package.version);
             0

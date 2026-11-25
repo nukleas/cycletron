@@ -27,7 +27,7 @@ model is only needed for the AI operator — and only after you enable it.
 |------|----------------|
 | **Editor** (center) | Pattern code. Empty state offers Open / New / Examples. |
 | **AI Operator** (left) | Chat with the model; it writes and rewrites the editor. Off until enabled. |
-| **File System** (left, under AI) | Your library root — patterns, MIDI imports, folders. |
+| **Files / Parts** (left, under AI) | **Files** is your library root — patterns, MIDI imports, folders. **Parts** is a shelf of single voices to add to the open song. |
 | **Right sidebar** | **Sequence Grid** (Cycle / Piano Roll / Waveform), the **Mixer**, **Signal Scope**, runtime stats, the **Sounds** browser, and the Browse Examples button. |
 
 The curated corpus is no longer a panel — the AI searches it directly
@@ -159,6 +159,80 @@ Open **View → Browse Examples** (or the empty-state Examples button). Sections
 Use the filter box to search by title, tag, or description. Always **Play
 first**, then load an example so audio is already armed.
 
+### Parts
+
+Examples replace the whole editor. **Parts** add one voice to the song you
+already have. Open the **Parts** tab in the left panel (or **⌘⇧P → Show
+Parts**). Parts are grouped as Drums, Bass, Chords, Lead and Other, and the
+filter box searches names, genres and code.
+
+- **Click** a part to add it. With the cursor inside a `stack(…)` it becomes one
+  more line of that stack. Anywhere else it becomes a new `$:` track at the end.
+- **Drag** a part onto the editor to choose the spot. A line shows where it
+  will land: between two tracks, or inside the `stack(…)` under the pointer. In
+  a song with sections, that puts the part in one section only.
+- **▶** plays the first two bars without adding anything. The preview is never
+  recorded.
+
+A part dropped into an empty editor brings its tempo. Otherwise the song keeps
+its own. One undo removes a part.
+
+The shelf holds the curated corpus and the genre recipes, cut into single
+voices: `four-on-the-floor` is three parts, kick, snare and hats.
+
+**Your own parts.** Press **+** on a Mixer row, or put the cursor in a `$:`
+track (or select some code) and run **⌘⇧P → Save Track as Part…**. Parts are
+plain files in `Parts/<role>/` in your library, where the role is one of
+`drums`, `bass`, `chords`, `lead` or `other`. Move a file to another folder to
+change its group.
+
+**Parts from MIDI.** `cycletron parts` cuts MIDI files into parts: for each
+track it keeps the 1, 2, 4 or 8 bar phrases the track repeats, snapped to
+16ths (`--loose` keeps the played timing).
+
+```
+cycletron parts ~/midi/grooves --license CC-BY-4.0 --collection groove-midi
+```
+
+Parts land in `Parts/<role>/<collection>/`. Each file's header records the
+source file and the licence you gave, so you can tell later what a part may be
+used for. Use `--license personal` for files that should stay on your machine.
+
+**Finding a part.** The shelf is a tree: role, then collection, then tempo
+(drums) or key (everything else), then pack folder and length. A group of 24 or
+fewer lists its parts directly. Typing in the filter searches names, tags, keys,
+the source file's name and the code.
+
+**Key.** A bass, chord or lead part is moved into the song's key as it goes in,
+by the fewest semitones, and its note names are rewritten to match. The song's
+key is its `.scale(…)` when it has one, else the best fit to the notes already
+in it. A minor part in a major song lands on the relative minor. The preview
+plays in the song's key too. Drums are left alone, and so is everything in a
+song with no notes yet: the first part sets the key.
+
+**Kits.** A kit is a set of parts written to play together: one tempo, one key,
+one chord progression. Kits sit at the top of the shelf, by style. **+** on a kit
+adds its main drums, bass, chords and lead as four tracks, in the song's key when
+the song has one; ▶ previews them together. Open the kit for the rest: a
+variation of each part and a drum fill, to swap in as the song moves on. To make
+your own, give the parts the same `kit: "Name"` line in their headers and tag the
+alternates `variation` or `fill`.
+
+**Reviewing parts.** A big import is mostly filler until someone sorts it.
+`cycletron parts index <folder>` writes the parts that have no rating yet as
+JSON lines, in shards. A reviewer answers each with a line holding `id`,
+`title`, `tags` and a `rating` from 1 to 5, and `cycletron parts apply
+<file> --by <name>` writes those into the part headers:
+
+```
+cycletron parts index ~/review/in --collection groove-midi
+cycletron parts apply ~/review/out/shard-001.jsonl --by nader
+```
+
+The title becomes the part's name and the old name is kept as `song`. Parts
+rated 4 or 5 get a ★ and list first; a part rated 1 moves to
+`_parts-rejected/` in the library, where the shelf does not look.
+
 ### Library & demos
 
 Whenever your library folder is set up (first launch default, or when you choose a
@@ -166,7 +240,7 @@ root in the welcome wizard / Preferences), Cycletron seeds a **Demos/** folder:
 
 | Folder | Contents |
 |--------|----------|
-| `Demos/Songs/` | Full tracks + `Agency/` album |
+| `Demos/Songs/` | Full tracks + `agency/` album |
 | `Demos/Shows/` | Show files that play the demo songs as music videos |
 | `Demos/Techniques/` | Curated short patterns by category |
 | `Demos/Genres/` | Generated skeletons + curated examples by genre |
@@ -389,6 +463,7 @@ On Windows the commands run but print nothing yet (the exit code still tells).
 cycletron render show.toml               # render a show file to a music video (docs/SHOW_FILES.md)
 cycletron check song.strudel             # the AI's full review: validity, silence, mix, and the form with its bars
 cycletron export song.strudel [out-dir]  # mix.wav + performance.json, what a render makes of each song
+cycletron parts <midi> --license <spdx>  # cut reusable parts from MIDI files into Parts/ (plus `parts index` / `parts apply`)
 cycletron help
 ```
 
