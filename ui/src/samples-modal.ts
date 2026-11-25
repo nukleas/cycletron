@@ -403,7 +403,7 @@ export class SamplesModal {
                 if (result.skipped.length) {
                     console.warn('[samples] skipped core collisions:', result.skipped);
                 }
-                const viz = await loadLibraryPacks((pid, message) => notify(`Visualizer pack ${pid} failed to load: ${message}`, 'error'));
+                const viz = await loadLibraryPacks((pid, message) => notify('Visualizer pack failed', `${pid}: ${message}`));
                 const parts = [`${n ?? 0} samples`];
                 if (viz.length) parts.push(`visualizers ${viz.join(', ')} ready`);
                 void notify('Pack enabled', `${id}: ${parts.join(' · ')}`);

@@ -207,7 +207,7 @@ export class PackImport {
                     void notify('Pack installed, samples not loaded', String(e));
                 }
             }
-            const vizLoaded = await loadLibraryPacks((id, message) => notify(`Visualizer pack ${id} failed to load: ${message}`, 'error'));
+            const vizLoaded = await loadLibraryPacks((id, message) => notify('Visualizer pack failed', `${id}: ${message}`));
             const parts = [`${result.file_count} files`];
             if (result.banks.length) parts.push(`${result.banks.length} banks, ${loaded} samples loaded`);
             if (vizLoaded.length) parts.push(`visualizers ${vizLoaded.join(', ')} ready`);

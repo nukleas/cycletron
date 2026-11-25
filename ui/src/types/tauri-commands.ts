@@ -165,15 +165,25 @@ export interface ExportAudioResult {
     notes: string[];
 }
 
-/** @deprecated alias — prefer ExportAudioResult */
-export type ExportWavResult = ExportAudioResult;
-
-/** Result of `export_midi` (strudio to-midi path). */
+/** Result of `export_midi`. */
 export interface ExportMidiResult {
     path: string;
     cycles: number;
     bpm: number;
     note_count: number;
+}
+
+/** An interrupted `.part` recording found on disk by `recording_orphans`. */
+export interface RecordingOrphan {
+    part_path: string;
+    final_path: string;
+    bytes: number;
+    meta: {
+        codec: string;
+        sample_rate: number;
+        channels: number;
+        bits_per_sample: number;
+    } | null;
 }
 
 export interface Snapshot {
@@ -190,7 +200,7 @@ export interface AnthropicOverrides {
 
 /** One provider's settings. The API key lives in the secrets store, not here. */
 export interface ProviderProfile {
-    /** Wire codec: "anthropic" or "openai" (OpenAI-compatible). */
+    /** Wire codec: "anthropic", "openai" (OpenAI-compatible), or "codex". */
     codec: string;
     /** Base URL for OpenAI-compatible providers; null for the Anthropic codec. */
     base_url: string | null;

@@ -9,13 +9,14 @@
  *   - global shortcuts (app-local): Cmd+O/S/Shift+S/N
  */
 
-import {invoke, isTauri, isWeb} from './tauri.js';
+import {invoke, isTauri, isWeb, listen} from './tauri.js';
 import {WEB_LIBRARY_ROOT} from './web-backend.js';
 import {confirmDialog} from './dialog.js';
 import {fileManager} from './file-manager.js';
 import {initMenuEvents} from './menu-events.js';
 import {initDragDrop} from './drag-drop.js';
 import {soundsPanel} from './sounds-panel.js';
+import {partsPanel} from './parts/panel.js';
 import {soundBrowser} from './sound-browser.js';
 import {fileExplorer} from './file-explorer.js';
 import {midiLab} from './midi-lab.js';
@@ -67,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // synths and downloaded sets fill in once the backend is there.
     soundBrowser.init();
     void soundsPanel.init();
+    void partsPanel.init();
     void boot();
 });
 
@@ -206,6 +208,9 @@ async function boot(): Promise<void> {
 
     // Autosave on significant events — the backend throttles internally.
     setupAutosave();
+
+    // Offer to recover any interrupted `.part` audio recordings left on disk.
+    void audioRecorder.checkOrphans();
 }
 
 /**
@@ -251,10 +256,8 @@ function setupMidiLabTriggers(): void {
  *  hand-off (i.e. user double-clicks a .strudel/.mid in Finder). */
 function setupOpenFilesListener(): void {
     if (!isTauri) return;
-    const event = window.__TAURI__?.event;
-    if (!event?.listen) return;
-    void event.listen('open-files', async (e: any) => {
-        const paths: string[] = e.payload ?? [];
+    void listen<string[]>('open-files', async (e) => {
+        const paths = e.payload ?? [];
         void diag('info', 'open-files', `received ${paths.length} path(s): ${paths.join(', ')}`);
         for (const p of paths) {
             if (/\.(mid|midi)$/i.test(p)) {
@@ -272,10 +275,8 @@ function setupOpenFilesListener(): void {
  *  - window not focused → also fire a notification */
 function setupExternalChangeListener(): void {
     if (!isTauri) return;
-    const event = window.__TAURI__?.event;
-    if (!event?.listen) return;
-    void event.listen('file-externally-changed', async (e: any) => {
-        const path: string | null = e.payload ?? null;
+    void listen<string | null>('file-externally-changed', async (e) => {
+        const path = e.payload ?? null;
         if (!path) return;
         // Rust already drops our own saves; only the open file matters here.
         if (fileManager.filePath !== path) return;
@@ -435,5 +436,5 @@ function setupAutosave(): void {
 
 /** Register the library's enabled visualizer packs before anything draws. A broken pack is reported, not fatal. */
 async function loadVizPacks(): Promise<void> {
-    await loadLibraryPacks((id, message) => notify(`Visualizer pack ${id} failed to load: ${message}`, 'error'));
+    await loadLibraryPacks((id, message) => notify('Visualizer pack failed', `${id}: ${message}`));
 }

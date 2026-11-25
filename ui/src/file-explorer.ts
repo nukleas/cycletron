@@ -9,7 +9,7 @@
  * tracking, and recents stay consistent with Cmd+O / Cmd+S flows.
  */
 
-import {hasLibrary, invoke} from './tauri.js';
+import {hasLibrary, invoke, isTauri, listen} from './tauri.js';
 import {escapeHtml} from './html.js';
 import {fileManager, isShowPath} from './file-manager.js';
 import {confirmDialog, errorDialog, openPathDialog} from './dialog.js';
@@ -33,6 +33,7 @@ export class FileExplorer {
     private treeEl: HTMLElement | null = null;
     private rootLabel: HTMLElement | null = null;
     private contextMenu: HTMLElement | null = null;
+    private contextMenuCleanup: (() => void) | null = null;
 
     private root: string = '';
     private childrenCache: Map<string, DirEntry[]> = new Map();
@@ -135,11 +136,10 @@ export class FileExplorer {
     }
 
     private async listenLibraryChanged(): Promise<void> {
-        const event = window.__TAURI__?.event;
-        if (!event?.listen) return;
+        if (!isTauri) return;
         // Returns an unlisten fn — we keep it implicit since the explorer
         // lives for the lifetime of the app.
-        await event.listen('library-changed', () => {
+        await listen('library-changed', () => {
             void this.refresh();
         });
     }
@@ -516,7 +516,11 @@ export class FileExplorer {
 
     private showContextMenu(entry: DirEntry, x: number, y: number): void {
         if (!this.contextMenu) return;
+        this.hideContextMenu();
         const menu = this.contextMenu;
+        const isMac = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+        const isWin = /Win/i.test(navigator.platform || navigator.userAgent);
+        const revealLabel = isMac ? 'Reveal in Finder' : isWin ? 'Show in Explorer' : 'Show in File Manager';
         const items: Array<{label: string; danger?: boolean; sep?: boolean; action: () => void}> = [];
         if (!entry.is_dir) {
             items.push({label: 'Open', action: () => void this.openFileEntry(entry.path)});
@@ -524,8 +528,8 @@ export class FileExplorer {
             items.push({label: 'New File',   action: () => void this.newFile(entry.path)});
             items.push({label: 'New Folder', action: () => void this.newFolder(entry.path)});
         }
-        items.push({label: 'Rename',          action: () => void this.renameEntry(entry)});
-        items.push({label: 'Reveal in Finder', action: () => void this.revealEntry(entry)});
+        items.push({label: 'Rename',       action: () => void this.renameEntry(entry)});
+        items.push({label: revealLabel,    action: () => void this.revealEntry(entry)});
         items.push({label: 'Delete', danger: true, action: () => void this.deleteEntry(entry)});
 
         menu.innerHTML = '';
@@ -551,21 +555,26 @@ export class FileExplorer {
         const dismiss = (ev: Event) => {
             if (ev.target instanceof Node && menu.contains(ev.target)) return;
             this.hideContextMenu();
-            document.removeEventListener('mousedown', dismiss, true);
-            document.removeEventListener('keydown', escDismiss, true);
-            window.removeEventListener('resize', dismiss, true);
         };
         const escDismiss = (ev: KeyboardEvent) => {
-            if (ev.key === 'Escape') dismiss(ev);
+            if (ev.key === 'Escape') this.hideContextMenu();
         };
-        setTimeout(() => {
+        const timer = window.setTimeout(() => {
             document.addEventListener('mousedown', dismiss, true);
             document.addEventListener('keydown', escDismiss, true);
             window.addEventListener('resize', dismiss, true);
         }, 0);
+        this.contextMenuCleanup = () => {
+            window.clearTimeout(timer);
+            document.removeEventListener('mousedown', dismiss, true);
+            document.removeEventListener('keydown', escDismiss, true);
+            window.removeEventListener('resize', dismiss, true);
+        };
     }
 
     private hideContextMenu(): void {
+        this.contextMenuCleanup?.();
+        this.contextMenuCleanup = null;
         if (!this.contextMenu) return;
         this.contextMenu.hidden = true;
         this.contextMenu.style.left = '-9999px';

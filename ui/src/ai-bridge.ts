@@ -13,7 +13,7 @@ import {addTask, removeTask} from './dock-badge.js';
 import {renderMarkdownToHtml, enhanceCodeBlocks} from './markdown.js';
 import {openExternal} from './external-link.js';
 import {aiConsent} from './ai-consent.js';
-import {invoke as ipc, isTauri} from './tauri.js';
+import {emit, invoke as ipc, isTauri, listen} from './tauri.js';
 import {createToolRow, completeToolRow, failToolRow} from './ai-tool-row.js';
 import type {AgentEvent, SendReply, UserSettings} from './types/tauri-commands.js';
 
@@ -104,10 +104,7 @@ function wirePanelToggle(): void {
 
 /** Wire the chat form, quick prompts, and agent-event stream. Runs once. */
 async function wireAiChat() {
-    const tauri = window.__TAURI__;
-    if (!tauri) return;
-    const { invoke } = tauri.core;
-    const { listen } = tauri.event;
+    if (!isTauri) return;
 
     const messagesEl = document.getElementById('aiMessages')!;
     const form = document.getElementById('aiForm') as HTMLFormElement;
@@ -141,7 +138,7 @@ async function wireAiChat() {
         return div;
     }
 
-    function getApp(): any {
+    function getApp() {
         return window.strudelApp;
     }
 
@@ -187,7 +184,7 @@ async function wireAiChat() {
             const editorCode = app?.editor?.getCode?.() ?? '';
             const startedAt = performance.now();
             addTask('ai-response');
-            const reply: SendReply = await invoke('send_message', {
+            const reply = await ipc<SendReply>('send_message', {
                 message: text,
                 editorCode: editorCode || null,
             });
@@ -267,7 +264,7 @@ async function wireAiChat() {
 
     // --- Streaming Agent Events ---
 
-    await listen('agent-event', (event: {payload?: AgentEvent}) => {
+    await listen<AgentEvent>('agent-event', (event) => {
         const data = event.payload;
         if (!data) return;
 
@@ -305,9 +302,7 @@ async function wireAiChat() {
                     setTempo(parseFloat(data.payload));
                 } else if (data.name === '__library_changed') {
                     // Agent wrote to the library — refresh the file tree + toast.
-                    try {
-                        window.__TAURI__?.event?.emit?.('library-changed', data.payload);
-                    } catch { /* non-tauri */ }
+                    void emit('library-changed', data.payload).catch(() => {});
                     void notify('Library updated', data.payload);
                 }
                 break;

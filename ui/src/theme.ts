@@ -46,7 +46,7 @@ export const strudelTheme = EditorView.theme({
         // A glow on 14px running code costs legibility and buys nothing; the
         // display glow (logo, stat values, viz) carries the look instead. This
         // used to be opt-in behind .readable-mode.
-        textShadow: '0 0 2px rgba(71, 246, 255, 0.08)',
+        textShadow: '0 0 2px var(--pixel-grid)',
     },
     '&.cm-focused .cm-cursor': {
         borderLeftColor: colors.accent,
@@ -65,7 +65,7 @@ export const strudelTheme = EditorView.theme({
         border: 'none',
         borderRight: `1px solid ${colors.border}`,
         paddingRight: '8px',
-        boxShadow: 'inset -2px 0 0 rgba(71, 246, 255, 0.05)',
+        boxShadow: 'inset -2px 0 0 var(--pixel-grid)',
     },
     '.cm-lineNumbers .cm-gutterElement': {
         padding: '0 8px 0 16px',
@@ -86,7 +86,7 @@ export const strudelTheme = EditorView.theme({
         padding: '0 6px',
     },
     '.cm-matchingBracket': {
-        backgroundColor: 'rgba(125, 249, 255, 0.18)',
+        backgroundColor: 'var(--neon-subtle)',
         outline: `1px solid ${colors.accent}`,
     },
     '.cm-tooltip': {
@@ -110,10 +110,11 @@ export const strudelTheme = EditorView.theme({
         padding: '8px',
     },
     '.cm-searchMatch': {
-        backgroundColor: 'rgba(255, 45, 212, 0.30)',
+        backgroundColor: 'var(--neon-secondary-glow)',
     },
     '.cm-searchMatch.cm-searchMatch-selected': {
-        backgroundColor: 'rgba(255, 45, 212, 0.50)',
+        backgroundColor: 'var(--neon-secondary)',
+        color: colors.bg,
     },
     // Scrollbar styling
     '&::-webkit-scrollbar': {
