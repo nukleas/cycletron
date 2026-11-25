@@ -69,9 +69,9 @@ impl TokenStore {
 }
 
 #[cfg(unix)]
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
     use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
     let mut f = fs::OpenOptions::new()
         .write(true)
         .create(true)
@@ -79,14 +79,25 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .mode(0o600)
         .open(path)
         .map_err(|e| e.to_string())?;
+    let _ = f.set_permissions(fs::Permissions::from_mode(0o600));
     f.write_all(bytes).map_err(|e| e.to_string())?;
     f.sync_all().map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[cfg(not(unix))]
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
     fs::write(path, bytes).map_err(|e| e.to_string())
+}
+
+/// Bounded HTTP client for OAuth token/device exchanges so a stalled endpoint
+/// cannot hang an in-flight login or message send indefinitely.
+pub(crate) fn http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("failed to build OAuth HTTP client: {e}"))
 }
 
 /// Is an access token still usable, refreshing `skew` seconds early?
@@ -144,7 +155,7 @@ pub async fn refresh_grant(
     refresh: &str,
     label: &str,
 ) -> Result<RefreshedGrant, RefreshError> {
-    let client = reqwest::Client::new();
+    let client = http_client().map_err(RefreshError::Other)?;
     let resp = client
         .post(token_url)
         .header("Accept", "application/json")

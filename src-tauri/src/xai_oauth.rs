@@ -225,7 +225,7 @@ use crate::oauth_store::TokenResponse;
 
 /// Start device authorization; open `verification_uri_complete` in a browser.
 pub async fn start_device_login() -> Result<DeviceStart, String> {
-    let client = reqwest::Client::new();
+    let client = oauth_store::http_client()?;
     let resp = client
         .post(DEVICE_CODE_URL)
         .header("Accept", "application/json")
@@ -258,9 +258,10 @@ pub async fn poll_device_login(
     interval_secs: u64,
     expires_in: u64,
 ) -> Result<OAuthStatus, String> {
-    let client = reqwest::Client::new();
-    let deadline = oauth_store::now_unix() + expires_in as i64;
-    let mut interval = Duration::from_secs(interval_secs.max(1));
+    let client = oauth_store::http_client()?;
+    let clamped_expires = expires_in.clamp(1, 900) as i64;
+    let deadline = oauth_store::now_unix() + clamped_expires;
+    let mut interval = Duration::from_secs(interval_secs.clamp(1, 60));
 
     loop {
         if oauth_store::now_unix() >= deadline {

@@ -53,6 +53,9 @@ impl std::error::Error for LibError {}
 /// would blow the agent's context if `read_song` returned one).
 const MAX_SONG_BYTES: u64 = 256 * 1024;
 
+/// Top-level library folder of saved parts (`Parts/<role>/<name>.strudel`).
+pub const PARTS_DIR: &str = "Parts";
+
 /// Directories that are never a song library — skipped during the walk so a root
 /// that happens to be a code checkout doesn't drown the index in engine sources,
 /// vendored samples, and build output. (Dotdirs like `.git` are skipped anyway.)
@@ -84,7 +87,7 @@ pub const MAX_READ_BYTES_PER_TURN: usize = 256 * 1024;
 /// `.js` file as a song — that keeps non-song code and secrets out of the index
 /// and off the wire. `.strudel` is a deliberate extension and is trusted.
 fn looks_like_pattern(code: &str) -> bool {
-    let head = &code[..code.len().min(4096)];
+    let head = &code[..code.floor_char_boundary(code.len().min(4096))];
     [
         "s(", "note(", "n(", "stack(", "setbpm", "setcpm", "$:", "sound(", ".s(", "chord(",
     ]
@@ -219,13 +222,22 @@ fn walk(root: &Path, dir: &Path, depth: usize, out: &mut Vec<LibrarySong>) {
         if name.starts_with('.') {
             continue; // dotfiles / .tmp / hidden + VCS dirs
         }
+        let Ok(ft) = entry.file_type() else { continue };
+        if ft.is_symlink() {
+            continue;
+        }
         let Ok(meta) = entry.metadata() else { continue };
-        if meta.is_dir() {
+        if ft.is_dir() {
             if SKIP_DIRS.iter().any(|d| name.eq_ignore_ascii_case(d)) {
                 continue;
             }
+            // Saved parts are single voices for the Parts shelf, not songs.
+            if depth == 0 && name.eq_ignore_ascii_case(PARTS_DIR) {
+                continue;
+            }
             walk(root, &path, depth + 1, out);
-        } else if is_song(&path)
+        } else if ft.is_file()
+            && is_song(&path)
             && meta.len() <= MAX_SONG_BYTES
             && let Some(song) = read_song_meta(root, &path, &meta)
         {
@@ -299,7 +311,6 @@ use cycletron_core::text::tempo::scan_bpm;
 /// mini-notation ornaments (`*4`, `:2`, `(3,8)`, `~`) down to bare names.
 fn scan_sounds(code: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    let bytes = code.as_bytes();
     for pat in [".s(\"", " s(\"", "\ns(\"", ".sound(\"", "(s(\""] {
         let mut from = 0;
         while let Some(rel) = code[from..].find(pat) {
@@ -320,7 +331,6 @@ fn scan_sounds(code: &str) -> Vec<String> {
             }
         }
     }
-    let _ = bytes;
     out.sort();
     out
 }
@@ -607,6 +617,20 @@ mod tests {
         assert!(read_song(&root, "/etc/passwd").is_err());
 
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn saved_parts_are_not_songs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        std::fs::create_dir_all(root.join("Parts/drums")).unwrap();
+        std::fs::create_dir_all(root.join("Album/Parts")).unwrap();
+        std::fs::write(root.join("Parts/drums/kick.strudel"), "s(\"bd*4\")").unwrap();
+        std::fs::write(root.join("Album/Parts/one.strudel"), "s(\"hh*8\")").unwrap();
+
+        let idx = LibraryIndex::build(root);
+        let paths: Vec<_> = idx.songs.iter().map(|s| s.rel_path.as_str()).collect();
+        assert_eq!(paths, ["Album/Parts/one.strudel"]);
     }
 
     #[test]

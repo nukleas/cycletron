@@ -158,6 +158,21 @@ pub(crate) fn is_valid_pack_id(id: &str) -> bool {
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
 }
 
+pub(crate) fn is_valid_bank_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !first.is_ascii_alphanumeric() && first != '_' {
+        return false;
+    }
+    if name.len() > 31 {
+        return false;
+    }
+    name.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
 /// Relative path with no `..` / absolute components.
 pub(crate) fn safe_rel_path(rel: &str) -> Result<PathBuf, String> {
     if rel.is_empty() || rel.starts_with('/') || rel.contains('\\') {
@@ -216,7 +231,7 @@ pub(crate) fn parse_manifest(dir: &Path) -> Result<PackManifest, String> {
         return Err(format!("pack {} has no banks, viz, songs or shows", m.id));
     }
     for bank in &m.banks {
-        if bank.name.is_empty() || bank.name.len() > 31 {
+        if !is_valid_bank_name(&bank.name) {
             return Err(format!(
                 "pack {} has invalid bank name {:?}",
                 m.id, bank.name
@@ -272,6 +287,10 @@ pub(crate) fn viz_entries(dir: &Path, m: &PackManifest) -> Vec<VizEntry> {
             continue;
         };
         let viz_dir = dir.join(rel_path);
+        if !crate::library::within(dir, &viz_dir) {
+            tracing::warn!("pack {}: viz path {rel:?} escapes pack directory", m.id);
+            continue;
+        }
         let json = fs::read_to_string(viz_dir.join(MANIFEST))
             .ok()
             .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
@@ -283,6 +302,8 @@ pub(crate) fn viz_entries(dir: &Path, m: &PackManifest) -> Vec<VizEntry> {
             );
             continue;
         };
+        let entry_js = viz_dir.join("dist").join("index.js");
+        let built = entry_js.is_file() && crate::library::within(dir, &entry_js);
         out.push(VizEntry {
             id: json
                 .get("id")
@@ -290,7 +311,7 @@ pub(crate) fn viz_entries(dir: &Path, m: &PackManifest) -> Vec<VizEntry> {
                 .unwrap_or(rel)
                 .to_string(),
             dir: viz_dir.to_string_lossy().into_owned(),
-            built: viz_dir.join("dist").join("index.js").is_file(),
+            built,
             modes: strings(json.get("modes")),
             palettes: strings(json.get("palettes")),
             sdk: json.get("sdk").and_then(|v| v.as_str()).map(str::to_string),
@@ -299,8 +320,16 @@ pub(crate) fn viz_entries(dir: &Path, m: &PackManifest) -> Vec<VizEntry> {
     out
 }
 
-/// Copy a folder, skipping dot files. Returns files and bytes copied.
+/// Copy a folder, skipping dot files and symlinks. Returns files and bytes copied.
 pub(crate) fn copy_dir_all(src: &Path, dest: &Path) -> Result<(usize, u64), String> {
+    copy_dir_bounded(src, dest, 0)
+}
+
+fn copy_dir_bounded(src: &Path, dest: &Path, depth: usize) -> Result<(usize, u64), String> {
+    const MAX_DEPTH: usize = 32;
+    if depth > MAX_DEPTH {
+        return Err(format!("directory nesting exceeds {MAX_DEPTH} levels"));
+    }
     fs::create_dir_all(dest).map_err(|e| format!("create {}: {e}", dest.display()))?;
     let mut files = 0usize;
     let mut bytes = 0u64;
@@ -311,13 +340,17 @@ pub(crate) fn copy_dir_all(src: &Path, dest: &Path) -> Result<(usize, u64), Stri
         if name.to_string_lossy().starts_with('.') {
             continue;
         }
+        let Ok(ft) = entry.file_type() else { continue };
+        if ft.is_symlink() {
+            continue;
+        }
         let from = entry.path();
         let to = dest.join(&name);
-        if from.is_dir() {
-            let (f, b) = copy_dir_all(&from, &to)?;
+        if ft.is_dir() {
+            let (f, b) = copy_dir_bounded(&from, &to, depth + 1)?;
             files += f;
             bytes += b;
-        } else {
+        } else if ft.is_file() {
             bytes += fs::copy(&from, &to)
                 .map_err(|e| format!("copy {} → {}: {e}", from.display(), to.display()))?;
             files += 1;
@@ -618,8 +651,7 @@ fn clip_with_suffix(base: &str, suffix: &str) -> String {
         s.pop();
     }
     s.push_str(&tag);
-    s.truncate(31);
-    s
+    s.chars().take(31).collect()
 }
 
 /// If `name` collides with a core bank, append `_{pack_id}` (clipped to 31).
