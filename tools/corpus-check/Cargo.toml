@@ -1,7 +1,9 @@
 [package]
 name = "corpus-check"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+publish = false
 
 [lints]
 workspace = true
@@ -14,5 +16,5 @@ path = "main.rs"
 cycletron-core = { workspace = true }
 cycletron-corpus = { workspace = true }
 cycletron-analysis = { workspace = true }
-walkdir = "2"
+walkdir = { workspace = true }
 serde_json = { workspace = true }

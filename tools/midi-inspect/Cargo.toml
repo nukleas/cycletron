@@ -9,5 +9,5 @@ publish = false
 workspace = true
 
 [dependencies]
-midly = "0.5"
+midly = { workspace = true }
 anyhow = { workspace = true }

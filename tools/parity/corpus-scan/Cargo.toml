@@ -1,7 +1,9 @@
 [package]
 name = "corpus-scan"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
+publish = false
 
 [lints]
 workspace = true
@@ -12,8 +14,7 @@ path = "main.rs"
 
 [dependencies]
 strudel-dsl = { workspace = true }
-strudel-mini = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true }
 serde_json = { workspace = true }
-walkdir = "2"
+walkdir = { workspace = true }
 regex = "1"
