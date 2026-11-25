@@ -23,7 +23,7 @@ env:
 # GitHub-hosted — no workflow edit needed if the home cluster is offline.
 jobs:
   ui:
-    name: UI typecheck + lint
+    name: UI typecheck + lint + test + build
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     defaults:
       run:
@@ -40,9 +40,26 @@ jobs:
       - name: Typecheck
         # The real WASM types are committed under ui/pkg (built from the pinned
         # strudel-rs release), so tsc checks against the actual engine surface.
-        run: npx tsc --noEmit
+        run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Generated files up to date
+        run: |
+          npm run gen:dsl
+          npm run gen:manifest
+          git diff --exit-code -- src/generated public/cycletron.strudel.json
+      - name: Production builds (desktop + web)
+        run: |
+          npm run build
+          npm run build:web
+      - name: Site script syntax check
+        working-directory: .
+        run: |
+          for f in site/build.mjs site/lib/*.mjs; do
+            node --check "$f"
+          done
 
   rust:
     name: Rust test + corpus-check
@@ -83,9 +100,6 @@ jobs:
 
       - name: cargo clippy (deny warnings)
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
-
-      - name: cargo check (workspace)
-        run: cargo check --workspace --locked
 
       # Self-maintaining: new crates are tested without touching this file.
       # Includes cycletron-app's lib tests (pure logic; no GUI needed).

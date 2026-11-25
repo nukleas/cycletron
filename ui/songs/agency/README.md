@@ -12,7 +12,7 @@ Every track is a single validated `.strudel` file (gated by `corpus-check` +
 
 | # | Track | Story beat | Genre | BPM | Key |
 |---|-------|-----------|-------|-----|-----|
-| 1 | Legacy System | Boot-up; the old mainframe hums | dark ambient → Berlin school | 58 | C# minor |
+| 1 | Legacy System | Boot-up; the old mainframe hums | dark ambient → Berlin school | 56 | C# minor |
 | 2 | Ticket Queue | Fluorescent office, endless forms | synthwave (darksynth shading) | 100 | F# minor |
 | 3 | Red Tape | Bureaucracy as a boss fight | EBM / industrial | 128 | C# phrygian |
 | 4 | First Incident | The pager goes off | darksynth | 110 | C# minor |

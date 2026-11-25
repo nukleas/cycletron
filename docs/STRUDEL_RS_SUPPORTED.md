@@ -100,7 +100,7 @@ receiver.
 | `silence()` | `hush` | Empty pattern. |
 | `note(pat)` | `n` | Reinterpret values as MIDI notes. |
 | `sound(pat)` | `s` | Reinterpret values as sound names. |
-| `chord(pat)` | — | Expand chord symbols (e.g. `"Cm7"` → constituent notes). |
+| `chord(pat)` | — | Tag chord symbols (e.g. `"Cm7"`) — follow with `.voicing()` to expand into notes. |
 | `mini(str)` | `m` | Parse a string as mini-notation (rarely needed; string literals already parse). |
 | `binary(n)` | — | The bits of `n` as a `1 0 …` sequence, one cycle. |
 | `binaryN(n, bits)` | — | Same, padded or cut to `bits` steps. |
@@ -437,7 +437,7 @@ instruments `kalimba marimba vibraphone glockenspiel tubularbells harp ocarina
 recorder_alto_sus balafon harmonica steinway strumstick psaltery_pluck dantranh`
 (`note("c4 e4").s("kalimba")` plays in tune from the nearest recorded note) and indexed
 percussion `gong timpani didgeridoo bongo shaker_small tambourine agogo guiro sleighbells
-triangles framedrum darbuka` — and the five drum machine kits.
+triangles framedrum darbuka` — and the seven drum machine kits (RolandTR808/909/707/606/727, LinnDrum, BossDR55).
 Additional banks load on demand from the configured URL. Sample indices select
 variants: `bd:3` / `flbass:2` pick the Nth sample in that bank. Names are case-insensitive.
 
@@ -458,7 +458,7 @@ as `s("gm_piano")`, `s("gm_violin")`, etc. stream in on demand from the
 WebAudioFont CDN (`ui/sample-loader.ts` `loadWebAudioFont`, driven by
 `ui/src/app.ts` `_loadMissingBanks` + `ui/soundfont-tables.ts`). The first
 cycle that references an instrument may be silent while its soundfont loads.
-Custom `strudel.json` sample-map banks are **not yet** wired (GM only for now).
+Custom `strudel.json` sample-map banks are wired through Sample Sets (`sample-sets.json`) for both live playback and offline export (see `docs/SAMPLE_PACKS.md`).
 
 **Offline bundling:** the default drum kit and ~21 common GM instruments are
 vendored into `ui/public/{samples,soundfonts}/` and served same-origin, so they
@@ -467,7 +467,7 @@ CDN fallback), so other GM instruments and the DR-55 kit still stream from the
 network when referenced.
 
 **Local sample folders (desktop):** users install their own samples as a pack
-(command palette → "Install Sample Pack…"; `src-tauri/src/packs.rs` +
+(command palette → "Import Sample Pack (Folder)…" or "Import Sample Pack (.zip)…"; `src-tauri/src/packs.rs` +
 `src-tauri/src/sounds.rs` `scan_folder_banks`). Each subfolder becomes a bank
 `s("<folder>")` with files indexed in natural order (`<folder>:1` etc.); loose
 audio at the root is grouped by filename convention — `BD-…`/`SNARE-…` become
@@ -541,9 +541,9 @@ the pinned engine (re-check when bumping):
   `$:`/`_$:` tracks work. Free-standing arrow helpers (`const f = p => …; f(pat)`),
   `"a b".s()` string-literal methods and named tracks (`$drums:`) are rejected.
   No `samples(...)`: sample banks come from the library and the bundled kits.
-- Spectral effects, MIDI input: not implemented.
+- Spectral effects: not implemented. (Live MIDI input is wired via native `midir` — see `docs/USER_GUIDE.md`.)
 - `.bank(...)` **is** supported for the bundled drum-machine kits (RolandTR808/909/707/606/727,
-  LinnDrum, BossDR55), see §6; custom `strudel.json` banks aren't wired yet.
+  LinnDrum, BossDR55) and custom Sample Sets / Packs (see `docs/SAMPLE_PACKS.md`).
 
 Out-of-range or malformed values that web Strudel clamps or rejects can be **silent**
 here: pan outside 0..1, `scale` without a root, `vowel` letters, a `.add()` on a bare
@@ -554,11 +554,11 @@ string. `validate_pattern` warns on the first; the rest are listed in `docs/DIAL
 Cycletron ships two validators driven by the same logic:
 
 - `validate_pattern` IPC tool (used by the agent and the editor) →
-  `src-tauri/src/strudel.rs::validate_code`.
+  `crates/cycletron-analysis/src/execute.rs`.
 - `cargo run -p corpus-check` CLI gate → `tools/corpus-check/main.rs`.
 
 Both run the candidate through `parse_strudel_file → evaluate_file`, then
 `eval_dsl_with_tempo`, then `strudel_mini::parse + evaluate`, surfacing the
 last error if all paths fail. The CLI additionally asserts the pattern emits
-at least one event in cycle 0 (catches silent patterns). Anything that
-round-trips both is by definition supported.
+at least one event within the first 8 cycles (catches silent patterns). Anything
+that round-trips both is by definition supported.

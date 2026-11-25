@@ -52,15 +52,15 @@ Folder name must equal `pack.json` → `id`.
 | `schema` | Must be `1` |
 | `id` | `[a-z0-9][a-z0-9_-]{0,62}`, matches directory name |
 | `spdx` | Or `license` alias. Any non-empty id. |
-| `license_file` | Relative path; required on disk |
-| `banks[].name` | `s("name")` token, ≤31 chars; must not collide with core drums/colors/machines |
+| `license_file` | Relative path; required on disk for packs that ship sample banks |
+| `banks[].name` | `s("name")` token, ≤31 chars (`[A-Za-z0-9_-]`); must not collide with core drums/colors/machines |
 | `banks[].files` | Relative paths; order is sample index (`name:0`, `name:1`, …) |
 
 Paths cannot escape the pack directory.
 
 ## UI
 
-Command palette → **Sample Packs…**
+Command palette → **Samples… (sets & packs)**
 
 - Toggle enable (persists to `enabled.json`, loads banks immediately)
 - **Open Packs Folder** / **Reload Enabled**
@@ -203,14 +203,11 @@ palette's "Sample Set: …" entries — reloads the audio engine with the new
 set immediately (export always follows the setting). The manager also holds
 the Packs list, so all sample management lives in one place.
 
-Known gap (all sets): enabled Packs are **live-only — audio export does not load
-them**, so a pattern using a pack bank exports with that part silent. This is
-now the only live/export divergence left. GM soundfonts stream from the
-WebAudioFont data during export.
+Enabled packs are loaded in both live playback and offline audio/video export.
+GM soundfonts stream from the WebAudioFont data during export.
 
 ## Not yet
 
-- Pack-aware audio export (see the known gap above)
 - Remote download of Packs (sample sets above have their own downloader)
 - Agent `list_packs` / `enable_pack` tools
 - Pitched multisample metadata
@@ -218,5 +215,5 @@ WebAudioFont data during export.
 ## Example: hand-built pack
 
 1. Create `{library}/Packs/my-pack/` with `pack.json`, `LICENSE`, and wavs.
-2. Palette → Sample Packs… → enable **my-pack**.
+2. Palette → **Samples… (sets & packs)** → enable **my-pack**.
 3. Play: `s("my_bank my_bank:1")`.

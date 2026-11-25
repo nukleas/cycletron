@@ -15,6 +15,10 @@ corpus/
 ├── form/      — multi-section pieces, builds, intros, AABB switching
 ├── timbre/    — synth design: FM, supersaw, bitcrush, pluck+delay
 ├── motion/    — continuous modulation: LFOs, rotating Euclidean
+├── genres/    — researched genre recipes (`*.md`) and curated genre examples
+├── lessons/   — guided dialect & technique lessons
+├── patterns/  — short focused building-block patterns
+├── showcase/  — featured showcase excerpts for the Examples browser
 └── _examples/ — unpicked MusicRepo candidates (local staging: not gated, not shipped, not committed)
 ```
 

@@ -25,8 +25,8 @@ rewrites patterns with you.
 ## Know before you play
 
 - **The dialect is a subset of web Strudel.** The exact supported surface is
-  documented in [`docs/STRUDEL_RS_SUPPORTED.md`](docs/STRUDEL_RS_SUPPORTED.md);
-  common footguns in [`docs/DIALECT.md`](docs/DIALECT.md). Patterns from
+  documented in [`docs/STRUDEL_RS_SUPPORTED.md`](STRUDEL_RS_SUPPORTED.md);
+  common footguns in [`docs/DIALECT.md`](DIALECT.md). Patterns from
   strudel.cc may need small adjustments.
 - **AI features require your own API key or a local model.** Nothing is
   bundled, and nothing leaves your machine until you enable a provider.
@@ -38,6 +38,6 @@ rewrites patterns with you.
 Cycletron is free software: **AGPL-3.0-or-later** — free as in freedom. It
 builds on and adapts [Strudel](https://codeberg.org/uzu/strudel) and
 [strudel-rs](https://codeberg.org/nukleas/strudel-rs) (both AGPL-3.0-or-later);
-see [`NOTICE`](NOTICE) for derivation credits and corresponding-source details,
-and [`ATTRIBUTION.md`](ATTRIBUTION.md) for bundled audio (all CC0/MIT/PD).
+see [`NOTICE`](../NOTICE) for derivation credits and corresponding-source details,
+and [`ATTRIBUTION.md`](../ATTRIBUTION.md) for bundled audio (all CC0/MIT/PD).
 Cycletron is not affiliated with or endorsed by strudel.cc.
