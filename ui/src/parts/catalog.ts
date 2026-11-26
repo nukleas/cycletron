@@ -5,7 +5,7 @@
 
 import {invoke, isTauri} from '../tauri.js';
 import {loadGenreExamples, loadTechniqueExamples} from '../examples-from-files.js';
-import {classify, nameFromCode, splitLanes, ROLES, type Role} from './split.js';
+import {classify, nameFromCode, splitLanes, tidy, ROLES, type Role} from './split.js';
 
 export type PartSource = 'corpus' | 'recipe' | 'mine';
 
@@ -95,7 +95,10 @@ function stackOf(codes: string[]): string {
     return `stack(\n${codes.map((c) => `  ${c.replace(/\n/g, '\n  ')}`).join(',\n')}\n)`;
 }
 
+let cachedCorpus: Part[] | null = null;
+
 function corpusParts(): Part[] {
+    if (cachedCorpus) return cachedCorpus;
     const techniques = loadTechniqueExamples()
         .filter((ex) => !ex.tags.includes('form'))
         .map((ex) => partsFrom({id: `corpus:${ex.title}`, name: ex.title, text: ex.code, source: 'corpus'}));
@@ -107,7 +110,8 @@ function corpusParts(): Part[] {
         genre: ex.tags.find((t) => t !== 'genres') ?? null,
         generated: ex.generated,
     }));
-    return [...techniques, ...genres].flat();
+    cachedCorpus = [...techniques, ...genres].flat();
+    return cachedCorpus;
 }
 
 interface Recipe {
@@ -116,29 +120,38 @@ interface Recipe {
     sections: {fragments: {label: string; code: string}[]}[];
 }
 
+let cachedRecipes: Promise<Part[]> | null = null;
+
 async function recipeParts(): Promise<Part[]> {
     if (!isTauri) return [];
-    const recipes = await invoke<Recipe[]>('genre_recipe', {genre: null});
-    return recipes.flatMap((r) => {
-        const fragments = r.sections.flatMap((s) => s.fragments);
-        // A recipe with one fragment is the generated skeleton. A detailed
-        // recipe's skeleton only repeats its named fragments.
-        const generated = fragments.length === 1;
-        return fragments
-            .filter((f) => generated || !f.label.startsWith('Full skeleton'))
-            .flatMap((f) => partsFrom({
-                id: `recipe:${r.genre}:${f.label}`,
-                name: f.label,
-                text: f.code,
-                source: 'recipe',
-                genre: r.genre,
-                bpm: r.bpm ? Math.round((r.bpm[0] + r.bpm[1]) / 2) : null,
-                generated,
-            }));
-    });
+    if (!cachedRecipes) {
+        cachedRecipes = invoke<Recipe[]>('genre_recipe', {genre: null}).then((recipes) =>
+            recipes.flatMap((r) => {
+                const fragments = r.sections.flatMap((s) => s.fragments);
+                // A recipe with one fragment is the generated skeleton. A detailed
+                // recipe's skeleton only repeats its named fragments.
+                const generated = fragments.length === 1;
+                return fragments
+                    .filter((f) => generated || !f.label.startsWith('Full skeleton'))
+                    .flatMap((f) => partsFrom({
+                        id: `recipe:${r.genre}:${f.label}`,
+                        name: f.label,
+                        text: f.code,
+                        source: 'recipe',
+                        genre: r.genre,
+                        bpm: r.bpm ? Math.round((r.bpm[0] + r.bpm[1]) / 2) : null,
+                        generated,
+                    }));
+            }),
+        ).catch((err) => {
+            cachedRecipes = null;
+            throw err;
+        });
+    }
+    return cachedRecipes;
 }
 
-interface SavedPart {
+export interface SavedPartRecord {
     path: string;
     name: string;
     role: string;
@@ -156,22 +169,38 @@ interface SavedPart {
 }
 
 /** Header tags that only repeat the role and collection. */
-function ownTags(p: SavedPart): string[] {
+function ownTags(p: SavedPartRecord): string[] {
     return p.tags.filter((t) => t !== 'part' && t !== p.role && t !== p.collection);
 }
 
-async function savedParts(): Promise<Part[]> {
-    if (!isTauri) return [];
-    const saved = await invoke<SavedPart[]>('list_saved_parts');
-    return saved.flatMap((p) => partsFrom({
-        id: `mine:${p.path}`,
-        name: p.name,
-        text: p.code,
-        source: 'mine',
-        bpm: p.bpm,
-        role: ROLES.includes(p.role as Role) ? (p.role as Role) : 'other',
-    }).map((part) => ({
-        ...part,
+const FAST_PART_START = /^(?:note|n|s|sound|stack|cat|seq|chord|freq)\s*\(/;
+const FAST_PART_DISQUALIFY = /\/\/|\/\*|\$:|\b(?:set(?:bpm|cpm)|const|let|var|function|class|import|export|if|for|while|return)\b|\.(?:pick|inhabit)\w*\s*\(|\barrange\s*\(|;/;
+
+/**
+ * Fast path for clean single-expression saved parts: skips the JS parser when
+ * the body has no comments, directives, tracks, or multi-statement syntax.
+ */
+export function fastSavedCode(text: string): string | null {
+    const trimmed = text.trim();
+    if (!trimmed || !FAST_PART_START.test(trimmed) || !trimmed.endsWith(')')) return null;
+    if (FAST_PART_DISQUALIFY.test(trimmed)) return null;
+    if (trimmed.includes('\n')) {
+        const lines = trimmed.split('\n');
+        // Reject multiple top-level statements; continuation lines indent or close the call.
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+            if (line && !/^[\s.)\]}]/.test(line)) return null;
+        }
+    } else if (/^stack\s*\(/.test(trimmed) || /\)\s+[A-Za-z_$]/.test(trimmed)) {
+        return null;
+    }
+    return tidy(trimmed);
+}
+
+/** Convert one backend saved-part record into shelf Part(s). */
+export function savedRecordToParts(p: SavedPartRecord): Part[] {
+    const role: Role = ROLES.includes(p.role as Role) ? (p.role as Role) : 'other';
+    const meta = {
         collection: p.collection,
         key: p.key,
         bars: p.bars,
@@ -180,7 +209,38 @@ async function savedParts(): Promise<Part[]> {
         rating: p.rating,
         tags: ownTags(p),
         kit: p.kit,
-    })));
+    };
+    const fast = fastSavedCode(p.code);
+    if (fast !== null) {
+        return [{
+            id: `mine:${p.path}#0`,
+            title: p.name,
+            role,
+            genre: null,
+            bpm: p.bpm,
+            code: fast,
+            source: 'mine',
+            ...meta,
+        }];
+    }
+    return partsFrom({
+        id: `mine:${p.path}`,
+        name: p.name,
+        text: p.code,
+        source: 'mine',
+        bpm: p.bpm,
+        role,
+    }).map((part) => ({...part, ...meta}));
+}
+
+async function savedParts(): Promise<Part[]> {
+    if (!isTauri) return [];
+    const saved = await invoke<SavedPartRecord[]>('list_saved_parts');
+    const out: Part[] = [];
+    for (const record of saved) {
+        for (const part of savedRecordToParts(record)) out.push(part);
+    }
+    return out;
 }
 
 /**

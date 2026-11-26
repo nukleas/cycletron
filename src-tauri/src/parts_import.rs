@@ -5,8 +5,11 @@
 //! checked before it goes anywhere else.
 
 use cycletron_midi::parts::{ExtractedPart, PartOptions, Role, extract_parts};
-use std::collections::HashSet;
+use parking_lot::Mutex;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+use std::time::SystemTime;
 
 use crate::library_index::PARTS_DIR;
 use cycletron_core::text::{frontmatter, slug::slugify as slug};
@@ -246,7 +249,7 @@ fn write_part(
 }
 
 /// A part saved in the library, with the header it was written with.
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SavedPart {
     pub path: String,
     pub name: String,
@@ -269,12 +272,39 @@ pub struct SavedPart {
     pub code: String,
 }
 
-/// Every part under `<root>/Parts/<role>/`, bounded and deterministically sorted.
+const MAX_PART_BYTES: u64 = 256 * 1024;
+/// Minimum uncached files before fanning reads across worker threads.
+const PARALLEL_THRESHOLD: usize = 32;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileStamp {
+    len: u64,
+    modified: Option<SystemTime>,
+}
+
+struct CachedPart {
+    stamp: FileStamp,
+    role: String,
+    part: SavedPart,
+}
+
+struct DiscoveredFile {
+    role: String,
+    path: PathBuf,
+    stamp: FileStamp,
+}
+
+static SAVED_CACHE: LazyLock<Mutex<HashMap<PathBuf, CachedPart>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Every part under `<root>/Parts/<role>/`, bounded, cached by file stamp, and deterministically sorted.
 pub fn list_saved(root: &Path) -> Vec<SavedPart> {
-    const MAX_PART_BYTES: u64 = 256 * 1024;
-    let mut out = Vec::new();
-    let Ok(roles) = std::fs::read_dir(root.join(PARTS_DIR)) else {
-        return out;
+    let parts_dir = root.join(PARTS_DIR);
+    let Ok(roles) = std::fs::read_dir(&parts_dir) else {
+        SAVED_CACHE
+            .lock()
+            .retain(|path, _| !path.starts_with(&parts_dir));
+        return Vec::new();
     };
     let mut role_dirs: Vec<(String, PathBuf)> = roles
         .flatten()
@@ -292,49 +322,135 @@ pub fn list_saved(root: &Path) -> Vec<SavedPart> {
         .collect();
     role_dirs.sort_by(|a, b| a.0.cmp(&b.0));
 
+    let mut discovered = Vec::new();
     for (role, role_path) in role_dirs {
-        let mut files = Vec::new();
-        collect_strudel(&role_path, 0, &mut files);
-        files.sort();
-        for path in files {
-            let Ok(meta) = std::fs::metadata(&path) else {
-                continue;
-            };
-            if meta.len() > MAX_PART_BYTES {
-                continue;
+        let start = discovered.len();
+        collect_strudel(&role_path, &role, 0, &mut discovered);
+        discovered[start..].sort_by(|a, b| a.path.cmp(&b.path));
+    }
+
+    let present: HashSet<PathBuf> = discovered.iter().map(|f| f.path.clone()).collect();
+    let mut slots: Vec<Option<SavedPart>> = vec![None; discovered.len()];
+    let mut misses: Vec<(usize, DiscoveredFile)> = Vec::new();
+
+    {
+        let cache = SAVED_CACHE.lock();
+        for (idx, file) in discovered.into_iter().enumerate() {
+            if let Some(cached) = cache.get(&file.path)
+                && cached.stamp == file.stamp
+                && cached.role == file.role
+            {
+                slots[idx] = Some(cached.part.clone());
+            } else {
+                misses.push((idx, file));
             }
-            let Ok(raw) = std::fs::read_to_string(&path) else {
-                continue;
-            };
-            let (yaml, code) = frontmatter::split(&raw);
-            let fm = yaml.map(frontmatter::parse).unwrap_or_default();
-            out.push(SavedPart {
-                name: fm.scalar("name").unwrap_or_else(|| {
-                    path.file_stem()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .into_owned()
-                }),
-                role: role.clone(),
-                bpm: fm.scalar("bpm").and_then(|v| v.parse().ok()),
-                bars: fm.scalar("bars").and_then(|v| v.parse().ok()),
-                key: fm.scalar("key"),
-                collection: fm.scalar("collection"),
-                license: fm.scalar("license"),
-                song: fm.scalar("song"),
-                source: fm.scalar("source"),
-                kit: fm.scalar("kit"),
-                rating: fm.scalar("rating").and_then(|v| v.parse().ok()),
-                tags: fm.array("tags").unwrap_or_default(),
-                code: code.to_string(),
-                path: path.to_string_lossy().into_owned(),
-            });
         }
     }
-    out
+
+    let parsed = parse_misses(misses);
+
+    {
+        let mut cache = SAVED_CACHE.lock();
+        cache.retain(|path, _| !path.starts_with(&parts_dir) || present.contains(path));
+        for (idx, file, part) in parsed {
+            cache.insert(
+                file.path,
+                CachedPart {
+                    stamp: file.stamp,
+                    role: file.role,
+                    part: part.clone(),
+                },
+            );
+            slots[idx] = Some(part);
+        }
+    }
+
+    slots.into_iter().flatten().collect()
 }
 
-fn collect_strudel(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
+fn parse_misses(misses: Vec<(usize, DiscoveredFile)>) -> Vec<(usize, DiscoveredFile, SavedPart)> {
+    if misses.is_empty() {
+        return Vec::new();
+    }
+    if misses.len() < PARALLEL_THRESHOLD {
+        return misses
+            .into_iter()
+            .filter_map(|(idx, file)| {
+                let part = parse_saved_part(&file.path, &file.role)?;
+                Some((idx, file, part))
+            })
+            .collect();
+    }
+
+    let workers = std::thread::available_parallelism()
+        .map(std::num::NonZero::get)
+        .unwrap_or(4)
+        .clamp(1, 8)
+        .min(misses.len());
+    let chunk_size = misses.len().div_ceil(workers);
+    let mut iter = misses.into_iter();
+    let mut buckets: Vec<Vec<(usize, DiscoveredFile)>> = Vec::with_capacity(workers);
+    loop {
+        let chunk: Vec<_> = iter.by_ref().take(chunk_size).collect();
+        if chunk.is_empty() {
+            break;
+        }
+        buckets.push(chunk);
+    }
+
+    std::thread::scope(|s| {
+        let handles: Vec<_> = buckets
+            .into_iter()
+            .map(|chunk| {
+                s.spawn(move || {
+                    chunk
+                        .into_iter()
+                        .filter_map(|(idx, file)| {
+                            let part = parse_saved_part(&file.path, &file.role)?;
+                            Some((idx, file, part))
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        let mut out = Vec::new();
+        for handle in handles {
+            if let Ok(mut items) = handle.join() {
+                out.append(&mut items);
+            }
+        }
+        out
+    })
+}
+
+fn parse_saved_part(path: &Path, role: &str) -> Option<SavedPart> {
+    let raw = std::fs::read_to_string(path).ok()?;
+    let (yaml, code) = frontmatter::split(&raw);
+    let fm = yaml.map(frontmatter::parse).unwrap_or_default();
+    Some(SavedPart {
+        name: fm.scalar("name").unwrap_or_else(|| {
+            path.file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned()
+        }),
+        role: role.to_string(),
+        bpm: fm.scalar("bpm").and_then(|v| v.parse().ok()),
+        bars: fm.scalar("bars").and_then(|v| v.parse().ok()),
+        key: fm.scalar("key"),
+        collection: fm.scalar("collection"),
+        license: fm.scalar("license"),
+        song: fm.scalar("song"),
+        source: fm.scalar("source"),
+        kit: fm.scalar("kit"),
+        rating: fm.scalar("rating").and_then(|v| v.parse().ok()),
+        tags: fm.array("tags").unwrap_or_default(),
+        code: code.to_string(),
+        path: path.to_string_lossy().into_owned(),
+    })
+}
+
+fn collect_strudel(dir: &Path, role: &str, depth: usize, out: &mut Vec<DiscoveredFile>) {
     const MAX_DEPTH: usize = 16;
     if depth > MAX_DEPTH {
         return;
@@ -349,9 +465,22 @@ fn collect_strudel(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
         }
         let path = entry.path();
         if ft.is_dir() {
-            collect_strudel(&path, depth + 1, out);
+            collect_strudel(&path, role, depth + 1, out);
         } else if ft.is_file() && path.extension().is_some_and(|e| e == "strudel") {
-            out.push(path);
+            let Ok(meta) = entry.metadata() else {
+                continue;
+            };
+            if meta.len() > MAX_PART_BYTES {
+                continue;
+            }
+            out.push(DiscoveredFile {
+                role: role.to_string(),
+                path,
+                stamp: FileStamp {
+                    len: meta.len(),
+                    modified: meta.modified().ok(),
+                },
+            });
         }
     }
 }
@@ -529,5 +658,53 @@ mod tests {
         assert_eq!(funk.collection.as_deref(), Some("groove-midi"));
         assert_eq!(funk.license.as_deref(), Some("CC-BY-4.0"));
         assert_eq!(funk.code, "s(\"bd sd\")\n");
+    }
+
+    #[test]
+    fn list_saved_caches_invalidates_and_sorts_parallel_batches() {
+        let tmp = tempfile::tempdir().unwrap();
+        let drums = tmp.path().join("Parts/drums/pack");
+        std::fs::create_dir_all(&drums).unwrap();
+        // Exceed PARALLEL_THRESHOLD so the multi-threaded reader path is exercised.
+        for i in 0..40 {
+            let file = drums.join(format!("beat-{i:02}.strudel"));
+            std::fs::write(
+                &file,
+                format!(
+                    "---\nname: \"Beat {i:02}\"\n---\ns(\"bd*{}\")\n",
+                    (i % 4) + 1
+                ),
+            )
+            .unwrap();
+        }
+
+        let first = list_saved(tmp.path());
+        assert_eq!(first.len(), 40);
+        assert_eq!(first[0].name, "Beat 00");
+        assert_eq!(first[39].name, "Beat 39");
+
+        // Second call serves from cache with identical ordering and content.
+        let second = list_saved(tmp.path());
+        assert_eq!(second.len(), 40);
+        assert_eq!(second[0].code, first[0].code);
+
+        // Updating a file invalidates its cache entry.
+        let target = drums.join("beat-00.strudel");
+        std::fs::write(
+            &target,
+            "---\nname: \"Beat 00 Updated\"\n---\ns(\"bd sd hh cp\")\n",
+        )
+        .unwrap();
+        let updated = list_saved(tmp.path());
+        assert_eq!(updated.len(), 40);
+        assert_eq!(updated[0].name, "Beat 00 Updated");
+        assert_eq!(updated[0].code, "s(\"bd sd hh cp\")\n");
+
+        // Deleting a file removes it from results and evicts it from cache.
+        std::fs::remove_file(&target).unwrap();
+        let after_delete = list_saved(tmp.path());
+        assert_eq!(after_delete.len(), 39);
+        assert_eq!(after_delete[0].name, "Beat 01");
+        assert!(!SAVED_CACHE.lock().contains_key(&target));
     }
 }

@@ -110,7 +110,7 @@ function commentAbove(code: string, pos: number): string | null {
 }
 
 /** Trim, drop a trailing `;`, and pull continuation lines back to one indent step. */
-function tidy(text: string): string {
+export function tidy(text: string): string {
     const lines = text.trim().replace(/;$/, '').split('\n');
     const rest = lines.slice(1).filter((l) => l.trim());
     const indent = Math.min(...rest.map((l) => l.match(/^\s*/)![0].length));

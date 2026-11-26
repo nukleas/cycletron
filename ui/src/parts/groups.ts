@@ -123,9 +123,17 @@ function kitRows(all: Part[], open: ReadonlySet<string>, rows: Row[]): void {
     for (const part of all) {
         if (!part.kit) continue;
         const style = part.collection ?? MINE;
-        const kits = styles.get(style) ?? new Map<string, Part[]>();
-        kits.set(part.kit, [...(kits.get(part.kit) ?? []), part]);
-        styles.set(style, kits);
+        let kits = styles.get(style);
+        if (!kits) {
+            kits = new Map<string, Part[]>();
+            styles.set(style, kits);
+        }
+        let list = kits.get(part.kit);
+        if (!list) {
+            list = [];
+            kits.set(part.kit, list);
+        }
+        list.push(part);
     }
     if (!styles.size) return;
 
@@ -169,9 +177,18 @@ export function shelfRows(all: Part[], open: ReadonlySet<string>): Row[] {
     };
 
     kitRows(all, open, rows);
+    const byRole = new Map<Role, Part[]>();
+    for (const part of all) {
+        let bucket = byRole.get(part.role);
+        if (!bucket) {
+            bucket = [];
+            byRole.set(part.role, bucket);
+        }
+        bucket.push(part);
+    }
     for (const role of ROLES) {
-        const parts = all.filter((p) => p.role === role);
-        if (parts.length) walk(parts, role, ROLE_LABELS[role], 0, 0);
+        const parts = byRole.get(role);
+        if (parts?.length) walk(parts, role, ROLE_LABELS[role], 0, 0);
     }
     return rows;
 }

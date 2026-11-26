@@ -25,6 +25,8 @@ const TAB_KEY = 'files-panel-tab';
 const DRAG_SLOP = 5;
 /** Rating from which a part gets a star. */
 const GOOD = 4;
+/** Debounce delay in ms while typing in the parts filter input. */
+const FILTER_DEBOUNCE_MS = 60;
 
 interface Drag {
     part: Part;
@@ -41,6 +43,8 @@ class PartsPanel {
     private list: VirtualList<Row> | null = null;
 
     private parts: Part[] = [];
+    /** Precomputed lowercased search strings aligned by index with `parts`. */
+    private haystacks: string[] = [];
     private rows: Row[] = [];
     /** Ids of the open groups, e.g. `drums/groove-midi`. */
     private open = new Set<string>();
@@ -49,6 +53,11 @@ class PartsPanel {
     private downGroupId: string | null = null;
     private activeIdx = -1;
     private emptyEl: HTMLElement | null = null;
+    private visible = false;
+    private loaded = false;
+    private dirty = false;
+    private loading: Promise<void> | null = null;
+    private filterTimer: ReturnType<typeof setTimeout> | null = null;
 
     async init(): Promise<void> {
         this.panel = document.getElementById('filesPanel');
@@ -70,7 +79,18 @@ class PartsPanel {
         filter?.addEventListener('input', () => {
             this.query = filter.value;
             this.activeIdx = -1;
-            this.rebuild();
+            if (this.filterTimer !== null) {
+                clearTimeout(this.filterTimer);
+                this.filterTimer = null;
+            }
+            if (!this.query.trim()) {
+                this.rebuild();
+            } else {
+                this.filterTimer = setTimeout(() => {
+                    this.filterTimer = null;
+                    this.rebuild();
+                }, FILTER_DEBOUNCE_MS);
+            }
         });
         filter?.addEventListener('keydown', (e) => this.onKeyDown(e, true));
         this.listEl.addEventListener('keydown', (e) => this.onKeyDown(e, false));
@@ -88,17 +108,18 @@ class PartsPanel {
             renderRow: (row, i) => this.renderRow(row, i),
         });
 
-        if (localStorage.getItem(TAB_KEY) === 'parts') this.show(true);
         if (isTauri) {
-            void listen('library-changed', () => void this.refresh());
+            void listen('library-changed', () => this.onLibraryChanged());
             mixer.onSave = (track) => void saveTrackAsPart(track);
         }
-        await this.refresh();
+        // Defer loading until the Parts tab is actually shown so startup pays zero cost.
+        if (localStorage.getItem(TAB_KEY) === 'parts') this.show(true);
     }
 
     /** Switch the left panel to Parts (or back to Files). */
     show(parts: boolean): void {
         if (!this.panel || !this.pane) return;
+        this.visible = parts;
         this.panel.classList.toggle('show-parts', parts);
         if (parts) this.panel.classList.remove('collapsed');
         this.pane.hidden = !parts;
@@ -108,25 +129,66 @@ class PartsPanel {
             tab?.setAttribute('aria-selected', String(on));
         }
         localStorage.setItem(TAB_KEY, parts ? 'parts' : 'files');
+        if (!parts) return;
+
+        if (!this.loaded || this.dirty) {
+            if (!this.loaded && this.emptyEl && this.listEl) {
+                this.emptyEl.textContent = 'Loading parts…';
+                this.emptyEl.hidden = false;
+                this.listEl.hidden = true;
+            }
+            void this.refresh();
+            return;
+        }
         // The list measured itself while hidden.
-        if (parts) this.list?.setItems(this.rows);
+        this.list?.setItems(this.rows);
+    }
+
+    private onLibraryChanged(): void {
+        if (!this.visible) {
+            this.dirty = true;
+            return;
+        }
+        if (this.loading) {
+            this.dirty = true;
+            return;
+        }
+        void this.refresh();
     }
 
     async refresh(): Promise<void> {
-        this.parts = await loadParts();
-        this.rebuild();
+        if (this.loading) {
+            this.dirty = true;
+            return this.loading;
+        }
+        const task = (async () => {
+            try {
+                do {
+                    this.dirty = false;
+                    const parts = await loadParts();
+                    this.parts = parts;
+                    this.haystacks = parts.map(searchHaystack);
+                    this.loaded = true;
+                    this.rebuild();
+                } while (this.dirty && this.visible);
+            } finally {
+                this.loading = null;
+            }
+        })();
+        this.loading = task;
+        return task;
     }
 
     private rebuild(): void {
+        if (!this.loaded) return;
         const q = this.query.trim().toLowerCase();
         let rows: Row[] = [];
 
         if (q) {
             const words = q.split(/\s+/);
-            for (const part of this.parts) {
-                const hay = `${part.title} ${part.role} ${part.genre ?? ''} ${part.collection ?? ''} ${part.key ?? ''} ${(part.tags ?? []).join(' ')} ${part.song ?? ''} ${part.kit ?? ''} ${part.code}`
-                    .toLowerCase();
-                if (words.every((w) => hay.includes(w))) rows.push({t: 'part', part, depth: 0});
+            for (let i = 0; i < this.parts.length; i++) {
+                const hay = this.haystacks[i];
+                if (words.every((w) => hay.includes(w))) rows.push({t: 'part', part: this.parts[i], depth: 0});
             }
         } else {
             rows = shelfRows(this.parts, this.open);
@@ -332,6 +394,12 @@ class PartsPanel {
         document.body.classList.remove('is-dragging-part');
         window.strudelApp?.editor?.setDropLine(null);
     }
+}
+
+/** Lowercased search haystack for a part, precomputed once per catalog load. */
+function searchHaystack(part: Part): string {
+    return `${part.title} ${part.role} ${part.genre ?? ''} ${part.collection ?? ''} ${part.key ?? ''} ${(part.tags ?? []).join(' ')} ${part.song ?? ''} ${part.kit ?? ''} ${part.code}`
+        .toLowerCase();
 }
 
 /** The part moved into the song's key. */

@@ -19,7 +19,7 @@ globalThis.window = {};
 after(() => { delete globalThis.window; });
 const {splitLanes, classify} = await server.ssrLoadModule('/src/parts/split.ts');
 const {planInsert} = await server.ssrLoadModule('/src/parts/insert.ts');
-const {partsFrom} = await server.ssrLoadModule('/src/parts/catalog.ts');
+const {partsFrom, fastSavedCode, savedRecordToParts} = await server.ssrLoadModule('/src/parts/catalog.ts');
 const {shelfRows, kitCore, SPLIT_OVER} = await server.ssrLoadModule('/src/parts/groups.ts');
 const {keyOf, parseKey, shiftBetween, transposed, fitted} = await server.ssrLoadModule('/src/parts/key.ts');
 
@@ -288,4 +288,71 @@ test('kits list above the roles, by style, main parts before alternates', () => 
     assert.deepEqual(rows.slice(3, 8).map((r) => r.part.title), ['beat', 'fill', 'bass', 'busier', 'hook']);
     assert.deepEqual(rows[2].kit.map((p) => p.title), ['beat', 'bass', 'hook']);
     assert.deepEqual(kitCore(kit).map((p) => p.title), ['beat', 'bass', 'hook']);
+});
+
+test('saved part fast path matches full parser output and falls back on complex bodies', () => {
+    const record = (code, over = {}) => ({
+        path: '/lib/Parts/bass/test.strudel',
+        name: 'Test',
+        role: 'bass',
+        bpm: 120,
+        bars: 2,
+        key: 'A:minor',
+        collection: 'pack',
+        license: 'MIT',
+        song: null,
+        source: 'folder/file.mid',
+        rating: 4,
+        tags: ['part', 'bass', 'pack', 'groove'],
+        kit: null,
+        code,
+        ...over,
+    });
+
+    // Clean single-line and multi-line expressions take the fast path.
+    assert.equal(fastSavedCode('note("a1 c2").s("saw")\n'), 'note("a1 c2").s("saw")');
+    assert.equal(
+        fastSavedCode('stack(\n  s("bd*4"),\n  s("~ sd ~ sd")\n)\n'),
+        'stack(\n  s("bd*4"),\n  s("~ sd ~ sd")\n)',
+    );
+
+    // Complex syntax falls back to the full Lezer parser.
+    assert.equal(fastSavedCode('// comment\nsetbpm(128);\n\nnote("c2")'), null);
+    assert.equal(fastSavedCode('$: s("bd*4")\n$: s("hh*8")'), null);
+    assert.equal(fastSavedCode('stack(s("bd"), s("hh"))'), null);
+    assert.equal(fastSavedCode('const a = s("bd");\nstack(a, s("hh"))'), null);
+    assert.equal(fastSavedCode('s("bd")\ns("sd")'), null);
+
+    // Parity check: savedRecordToParts produces the exact same code and metadata as partsFrom.
+    const samples = [
+        'note("a1 c2").s("saw")\n',
+        'stack(\n  s("bd*4"),\n  s("~ sd ~ sd")\n)\n',
+        '// mine\nsetbpm(128);\n\nnote("c2 e2").s("fm")\n',
+        '$: s("bd*4")\n$: s("hh*8")\n',
+        'stack(note("c3 e3"), note("g3 b3"))',
+        'const a = s("bd");\nstack(a, s("hh"))',
+    ];
+    for (const code of samples) {
+        const rec = record(code);
+        const actual = savedRecordToParts(rec);
+        const expected = partsFrom({
+            id: `mine:${rec.path}`,
+            name: rec.name,
+            text: rec.code,
+            source: 'mine',
+            bpm: rec.bpm,
+            role: rec.role,
+        }).map((part) => ({
+            ...part,
+            collection: rec.collection,
+            key: rec.key,
+            bars: rec.bars,
+            folder: 'folder',
+            song: rec.song,
+            rating: rec.rating,
+            tags: ['groove'],
+            kit: rec.kit,
+        }));
+        assert.deepEqual(actual, expected, `mismatch for ${JSON.stringify(code)}`);
+    }
 });
