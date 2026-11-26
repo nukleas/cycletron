@@ -4,6 +4,13 @@ Each release's notes, newest first. Add to `Unreleased` as changes land; `script
 
 ## Unreleased
 
+### Editor
+- **Parts shelf.** A new **Parts** tab in the left panel lists single voices (drums, bass, chords, leads) cut from the curated corpus and the genre recipes. Click one to add it as a new `$:` track, or drag it onto the editor to place it between tracks or inside one section's `stack(…)`. ▶ previews a part without adding it. **+** on a Mixer row, or **Save Track as Part…**, saves your own to `Parts/` in the library.
+- **Parts from MIDI.** `cycletron parts <file-or-folder> --license L` cuts MIDI into loop-sized parts, one per phrase a track repeats, and files them under `Parts/<role>/<collection>/` with the source and licence in each header.
+- **Kits.** Parts written to play together (same tempo, key and progression) list as kits at the top of the shelf. **+** adds a kit's drums, bass, chords and lead as tracks in one step; each kit also holds a variation of every part and a drum fill.
+- **Parts land in the song's key.** A pitched part is transposed to fit the notes already in the song when it's added or previewed, and its note names are rewritten. The first part into an empty song sets the key.
+- **Parts in a tree, with reviews.** The shelf groups parts by role, collection, then tempo or key, pack folder and length. `cycletron parts index` and `cycletron parts apply` take a library through a review: each part gets a descriptive name, tags and a rating from 1 to 5; good parts get a ★ and list first, and parts rated 1 leave the shelf.
+
 ## 0.1.0-alpha.30 (2026-11-14)
 
 ### Shows

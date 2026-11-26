@@ -248,9 +248,8 @@ async fn refresh_token(refresh: &str) -> Result<CodexTokens, String> {
 /// Run the full browser PKCE loop (binds `localhost:1455`, opens browser, waits).
 /// Blocks the async task until callback or timeout (~5 min).
 pub async fn login_with_browser() -> Result<CodexOAuthStatus, String> {
-    use std::io::{Read as _, Write as _};
-    use std::net::TcpListener;
-    use std::sync::mpsc;
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    use tokio::net::TcpListener;
 
     let verifier = random_urlsafe(64);
     let challenge = pkce_challenge_s256(&verifier);
@@ -265,98 +264,97 @@ pub async fn login_with_browser() -> Result<CodexOAuthStatus, String> {
         urlencoding_minimal(&state),
     );
 
-    let listener = TcpListener::bind("127.0.0.1:1455").map_err(|e| {
+    let listener = TcpListener::bind("127.0.0.1:1455").await.map_err(|e| {
         format!(
             "Could not bind localhost:1455 for Codex login ({e}). \
              Close any running `codex login` / another Cycletron sign-in, or run `codex login` and Import CLI session."
         )
     })?;
-    listener.set_nonblocking(true).map_err(|e| e.to_string())?;
 
-    // Open browser on the async runtime thread.
     if let Err(e) = open::that(&auth_url) {
         tracing::warn!(target: "cycletron::codex_oauth", "failed to open browser: {e}");
     }
 
-    let (tx, rx) = mpsc::channel::<Result<(String, String), String>>();
-    let expected_state = state.clone();
-    std::thread::spawn(move || {
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(300);
+    // Wait for `/auth/callback` up to 5 minutes, ignoring empty browser
+    // preconnects and unrelated requests like `/favicon.ico`. Dropping this
+    // future closes `listener` immediately and frees port 1455.
+    let code = tokio::time::timeout(std::time::Duration::from_secs(300), async {
         loop {
-            if std::time::Instant::now() > deadline {
-                let _ = tx.send(Err("Codex sign-in timed out (5 min). Try again.".into()));
-                return;
+            let (mut stream, _) = listener
+                .accept()
+                .await
+                .map_err(|e| format!("callback server error: {e}"))?;
+            let mut buf = [0u8; 4096];
+            let n = match tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                stream.read(&mut buf),
+            )
+            .await
+            {
+                Ok(Ok(n)) if n > 0 => n,
+                _ => continue,
+            };
+            let req = String::from_utf8_lossy(&buf[..n]);
+            let line = req.lines().next().unwrap_or("");
+            // GET /auth/callback?code=...&state=... HTTP/1.1
+            let path = line.split_whitespace().nth(1).unwrap_or("");
+            let (route, query) = path.split_once('?').unwrap_or((path, ""));
+            if route != "/auth/callback" {
+                let _ = stream
+                    .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                    .await;
+                continue;
             }
-            match listener.accept() {
-                Ok((mut stream, _)) => {
-                    let mut buf = [0u8; 4096];
-                    let n = stream.read(&mut buf).unwrap_or(0);
-                    let req = String::from_utf8_lossy(&buf[..n]);
-                    let line = req.lines().next().unwrap_or("");
-                    // GET /auth/callback?code=...&state=... HTTP/1.1
-                    let path = line.split_whitespace().nth(1).unwrap_or("");
-                    let query = path.split('?').nth(1).unwrap_or("");
-                    let mut code = None;
-                    let mut got_state = None;
-                    for pair in query.split('&') {
-                        let mut it = pair.splitn(2, '=');
-                        let k = it.next().unwrap_or("");
-                        let v = it.next().unwrap_or("");
-                        match k {
-                            "code" => code = Some(urlencoding_decode(v)),
-                            "state" => got_state = Some(urlencoding_decode(v)),
-                            _ => {}
-                        }
-                    }
-                    let html = b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n\
-                        <html><body style='font-family:system-ui;padding:2rem'>\
-                        <h2>Cycletron - signed in with ChatGPT</h2>\
-                        <p>You can close this tab and return to the app.</p>\
-                        </body></html>";
-                    let _ = stream.write_all(html);
-                    let _ = stream.flush();
+            let mut code = None;
+            let mut got_state = None;
+            for pair in query.split('&') {
+                let mut it = pair.splitn(2, '=');
+                let k = it.next().unwrap_or("");
+                let v = it.next().unwrap_or("");
+                match k {
+                    "code" => code = Some(urlencoding_decode(v)),
+                    "state" => got_state = Some(urlencoding_decode(v)),
+                    _ => {}
+                }
+            }
 
-                    if got_state.as_deref() != Some(expected_state.as_str()) {
-                        let _ = tx.send(Err("OAuth state mismatch (CSRF). Try again.".into()));
-                        return;
-                    }
-                    match code {
-                        Some(c) if !c.is_empty() => {
-                            let _ = tx.send(Ok((c, expected_state)));
-                        }
-                        _ => {
-                            let _ = tx.send(Err("Callback missing authorization code.".into()));
-                        }
-                    }
-                    return;
-                }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                }
-                Err(e) => {
-                    let _ = tx.send(Err(format!("callback server error: {e}")));
-                    return;
-                }
+            if got_state.as_deref() != Some(state.as_str()) {
+                let err_html = b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n\
+                    <html><body style='font-family:system-ui;padding:2rem'>\
+                    <h2>Cycletron - sign-in failed</h2>\
+                    <p>OAuth state mismatch. Please close this tab and try again.</p>\
+                    </body></html>";
+                let _ = stream.write_all(err_html).await;
+                let _ = stream.shutdown().await;
+                return Err("OAuth state mismatch (CSRF). Try again.".to_string());
             }
-        }
-    });
 
-    // Wait for the callback without blocking the runtime with a sync recv.
-    let code = loop {
-        match rx.try_recv() {
-            Ok(Ok((code, _))) => break code,
-            Ok(Err(e)) => return Err(e),
-            Err(mpsc::TryRecvError::Empty) => {
-                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            }
-            Err(mpsc::TryRecvError::Disconnected) => {
-                return Err("Codex login callback thread ended unexpectedly".into());
-            }
+            let Some(c) = code.filter(|c| !c.is_empty()) else {
+                let err_html = b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n\
+                    <html><body style='font-family:system-ui;padding:2rem'>\
+                    <h2>Cycletron - sign-in failed</h2>\
+                    <p>Callback was missing the authorization code. Please try again.</p>\
+                    </body></html>";
+                let _ = stream.write_all(err_html).await;
+                let _ = stream.shutdown().await;
+                return Err("Callback missing authorization code.".to_string());
+            };
+
+            let ok_html = b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n\
+                <html><body style='font-family:system-ui;padding:2rem'>\
+                <h2>Cycletron - signed in with ChatGPT</h2>\
+                <p>You can close this tab and return to the app.</p>\
+                </body></html>";
+            let _ = stream.write_all(ok_html).await;
+            let _ = stream.shutdown().await;
+            return Ok(c);
         }
-    };
+    })
+    .await
+    .map_err(|_| "Codex sign-in timed out (5 min). Try again.".to_string())??;
 
     // Exchange code for tokens.
-    let client = reqwest::Client::new();
+    let client = oauth_store::http_client()?;
     let resp = client
         .post(TOKEN_URL)
         .header("Accept", "application/json")
@@ -426,7 +424,8 @@ pub async fn login_with_browser() -> Result<CodexOAuthStatus, String> {
 fn account_id_from_jwt(jwt: &str) -> Option<String> {
     let v = oauth_store::jwt_payload(jwt)?;
     // Nested claim used by Codex / ChatGPT OAuth access tokens.
-    v.pointer("/https://api.openai.com/auth/chatgpt_account_id")
+    v.get("https://api.openai.com/auth")
+        .and_then(|o| o.get("chatgpt_account_id"))
         .and_then(|x| x.as_str())
         .map(str::to_string)
         .or_else(|| {
@@ -467,35 +466,15 @@ fn base64_url_encode(bytes: &[u8]) -> String {
 }
 
 fn random_urlsafe(n_bytes: usize) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    // Prefer OS randomness.
-    let mut buf = vec![0u8; n_bytes];
-    if getrandom_fill(&mut buf).is_err() {
-        let mut h = DefaultHasher::new();
-        oauth_store::now_unix().hash(&mut h);
-        std::process::id().hash(&mut h);
-        let seed = h.finish();
-        for (i, b) in buf.iter_mut().enumerate() {
-            *b = ((seed.wrapping_mul(i as u64 + 1)) % 256) as u8;
-        }
+    // Uuid::new_v4 draws from the OS CSPRNG (getrandom) on every platform,
+    // including Windows, Linux, and macOS.
+    let mut buf = Vec::with_capacity(n_bytes);
+    while buf.len() < n_bytes {
+        let bytes = uuid::Uuid::new_v4().into_bytes();
+        let take = (n_bytes - buf.len()).min(bytes.len());
+        buf.extend_from_slice(&bytes[..take]);
     }
     base64_url_encode(&buf)
-}
-
-fn getrandom_fill(buf: &mut [u8]) -> Result<(), ()> {
-    // Use /dev/urandom on unix without an extra crate.
-    #[cfg(unix)]
-    {
-        use std::io::Read;
-        let mut f = fs::File::open("/dev/urandom").map_err(|_| ())?;
-        f.read_exact(buf).map_err(|_| ())
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = buf;
-        Err(())
-    }
 }
 
 fn pkce_challenge_s256(verifier: &str) -> String {
@@ -518,18 +497,28 @@ fn urlencoding_minimal(s: &str) -> String {
     out
 }
 
+fn from_hex_digit(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
+
 fn urlencoding_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out = Vec::new();
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            let hex = &s[i + 1..i + 3];
-            if let Ok(v) = u8::from_str_radix(hex, 16) {
-                out.push(v);
-                i += 3;
-                continue;
-            }
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let (Some(hi), Some(lo)) =
+                (from_hex_digit(bytes[i + 1]), from_hex_digit(bytes[i + 2]))
+        {
+            out.push((hi << 4) | lo);
+            i += 3;
+            continue;
         }
         if bytes[i] == b'+' {
             out.push(b' ');
@@ -539,4 +528,48 @@ fn urlencoding_decode(s: &str) -> String {
         i += 1;
     }
     String::from_utf8_lossy(&out).into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_jwt(payload: &serde_json::Value) -> String {
+        let header = base64_url_encode(br#"{"alg":"none"}"#);
+        let body = base64_url_encode(&serde_json::to_vec(payload).unwrap());
+        format!("{header}.{body}.sig")
+    }
+
+    #[test]
+    fn account_id_extracts_nested_and_flat_claims() {
+        let nested = fake_jwt(&serde_json::json!({
+            "https://api.openai.com/auth": {
+                "chatgpt_account_id": "acct_nested_123"
+            }
+        }));
+        assert_eq!(
+            account_id_from_jwt(&nested).as_deref(),
+            Some("acct_nested_123")
+        );
+
+        let flat = fake_jwt(&serde_json::json!({
+            "chatgpt_account_id": "acct_flat_456"
+        }));
+        assert_eq!(account_id_from_jwt(&flat).as_deref(), Some("acct_flat_456"));
+    }
+
+    #[test]
+    fn urlencoding_decode_handles_multibyte_after_percent() {
+        assert_eq!(urlencoding_decode("hello+world%21"), "hello world!");
+        assert_eq!(urlencoding_decode("%é"), "%é");
+        assert_eq!(urlencoding_decode("a%2"), "a%2");
+    }
+
+    #[test]
+    fn random_urlsafe_produces_distinct_tokens() {
+        let a = random_urlsafe(24);
+        let b = random_urlsafe(24);
+        assert_ne!(a, b);
+        assert!(!a.is_empty());
+    }
 }

@@ -101,6 +101,7 @@ export class SoundBrowser {
         }
         this.root.hidden = false;
         this.cleanup = dismissibleModal(this.root, () => this.close());
+        this.unsubscribeAudition?.();
         this.unsubscribeAudition = onAuditionChange(() => this.list?.refresh());
         // The catalog only changes on sounds:changed, so a reopen with nothing
         // dirty just re-filters what is already in hand.

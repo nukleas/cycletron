@@ -95,38 +95,10 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
             }
             let group = &cd.events[i..j];
 
-            // Loudness estimate at this instant, three corrections over a raw
-            // gain-sum: (1) chord tones from ONE source (same sound + level,
-            // e.g. `note("[a3,c4,e4,g4]")`) are uncorrelated voices — they
-            // sum in power (~g·√n), not amplitude (g·n); (2) drum hits are
-            // millisecond transients, not sustained energy — weight them 0.5×
-            // so a kick+clap+hat backbeat doesn't read like three held saws;
-            // (3) the level is `EventDigest::effective_gain()`, not raw
-            // `gain` — it folds in `velocity` (a second multiplying stage,
-            // the usual stand-in for the engine's non-functional `duck`) and
-            // the distortion output trim. Without (3) any heavily driven mix
-            // reads several times hotter than it is, and hard/industrial
-            // styles legitimately run `gain` above 1 precisely because the
-            // shaper trims it back down.
-            let mut sources: std::collections::HashMap<(String, u64), usize> =
-                std::collections::HashMap::new();
-            for e in group {
-                let key = (
-                    e.sound.clone().unwrap_or_default(),
-                    e.effective_gain().to_bits(),
-                );
-                *sources.entry(key).or_insert(0) += 1;
-            }
-            let gsum: f64 = sources
-                .iter()
-                .map(|((sound, gbits), n)| {
-                    let weight = if is_percussive(sound) { 0.5 } else { 1.0 };
-                    f64::from_bits(*gbits) * (*n as f64).sqrt() * weight
-                })
-                .sum();
+            let (gsum, source_count) = instant_loudness(group);
             if gsum > peak_gain {
                 peak_gain = gsum;
-                peak_at = Some((cd.cycle, sources.len()));
+                peak_at = Some((cd.cycle, source_count));
             }
 
             // Semitone clashes (minor 2nd) between simultaneous pitches.
@@ -288,10 +260,60 @@ pub fn critique(ev: &crate::Evaluated) -> Critique {
     Critique { ok, findings }
 }
 
+/// Loudness estimate at one simultaneous onset instant, plus the number of
+/// distinct `(sound, effective_gain)` sources.
+///
+/// Three corrections over a raw gain-sum:
+/// 1. Chord tones from ONE source (same sound + level) are uncorrelated voices
+///    — they sum in power (`g·√n`), not amplitude (`g·n`).
+/// 2. Drum hits are millisecond transients, not sustained energy — weight `0.5×`.
+/// 3. Level uses `EventDigest::effective_gain()` (folding in `velocity` and
+///    distortion output trim), not raw `gain`.
+pub fn instant_loudness(group: &[crate::inspect::EventDigest]) -> (f64, usize) {
+    let mut sources: std::collections::HashMap<(String, u64), usize> =
+        std::collections::HashMap::new();
+    for e in group {
+        let key = (
+            e.sound.clone().unwrap_or_default(),
+            e.effective_gain().to_bits(),
+        );
+        *sources.entry(key).or_insert(0) += 1;
+    }
+    let gsum: f64 = sources
+        .iter()
+        .map(|((sound, gbits), n)| {
+            let weight = if is_percussive(sound) { 0.5 } else { 1.0 };
+            f64::from_bits(*gbits) * (*n as f64).sqrt() * weight
+        })
+        .sum();
+    (gsum, sources.len())
+}
+
+/// Peak simultaneous loudness across the first `cycles` cycles of `ev`, using
+/// the same model as [`critique`].
+pub fn peak_loudness(ev: &crate::evaluated::Evaluated, cycles: usize) -> f64 {
+    let d = ev.digest();
+    let span = d.cycles.len().min(cycles);
+    let mut peak = 0.0f64;
+    for cd in &d.cycles[..span] {
+        let mut i = 0;
+        while i < cd.events.len() {
+            let mut j = i + 1;
+            while j < cd.events.len() && (cd.events[j].begin - cd.events[i].begin).abs() < 1e-6 {
+                j += 1;
+            }
+            let (gsum, _) = instant_loudness(&cd.events[i..j]);
+            peak = peak.max(gsum);
+            i = j;
+        }
+    }
+    peak
+}
+
 /// Is this sound a drum/percussion voice (a short transient, not sustained
 /// energy)? Matches the default drum names and drum-machine voices like
 /// `RolandTR808_bd` (the voice is the suffix after the last `_`).
-fn is_percussive(sound: &str) -> bool {
+pub fn is_percussive(sound: &str) -> bool {
     const DRUMS: [&str; 12] = [
         "bd", "sd", "sn", "hh", "cp", "oh", "ht", "mt", "lt", "cr", "cb", "rs",
     ];

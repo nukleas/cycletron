@@ -17,6 +17,8 @@
  * `requireEl()` for the guards rather than optional-chaining into a no-op.
  */
 
+import {partsPanel} from './parts/panel.js';
+import {saveSelectionAsPart} from './parts/save.js';
 import {invoke, isTauri} from './tauri.js';
 import {escapeHtml} from './html.js';
 import {fileManager} from './file-manager.js';
@@ -50,7 +52,8 @@ interface Item {
     subtitle?: string;
     section: 'Commands' | 'Files' | 'Recent';
     hint?: string;
-    run: () => void | Promise<void>;
+    desktopOnly?: boolean;
+    run: () => void | Promise<unknown>;
 }
 
 interface DirEntry { name: string; path: string; is_dir: boolean }
@@ -204,46 +207,48 @@ class CommandPalette {
 // user-facing message via requireApp()/requireEl() instead of no-op'ing.
 const COMMANDS: Item[] = [
     {id: 'cmd.new',         title: 'New File',              section: 'Commands', hint: '⌘N',     run: () => fileManager.newFile()},
-    {id: 'cmd.open',        title: 'Open File…',            section: 'Commands', hint: '⌘O',     run: () => fileManager.openFile()},
-    {id: 'cmd.save',        title: 'Save',                  section: 'Commands', hint: '⌘S',     run: () => fileManager.saveCurrent()},
-    {id: 'cmd.save_as',     title: 'Save As…',              section: 'Commands', hint: '⌘⇧S',    run: () => fileManager.saveAs()},
+    {id: 'cmd.open',        title: 'Open File…',            section: 'Commands', hint: '⌘O',     desktopOnly: true, run: () => fileManager.openFile()},
+    {id: 'cmd.save',        title: 'Save',                  section: 'Commands', hint: '⌘S',     desktopOnly: true, run: () => fileManager.saveCurrent()},
+    {id: 'cmd.save_as',     title: 'Save As…',              section: 'Commands', hint: '⌘⇧S',    desktopOnly: true, run: () => fileManager.saveAs()},
     {id: 'cmd.play_pause',  title: 'Play / Pause',          section: 'Commands', hint: '⌘↩',     run: () => requireApp().togglePlayPause()},
     {id: 'cmd.stop',        title: 'Stop Playback',         section: 'Commands', hint: 'Esc',    run: () => requireApp().stop()},
-    {id: 'cmd.record',      title: 'Toggle Recording',      section: 'Commands',                 run: () => audioRecorder.toggle()},
+    {id: 'cmd.record',      title: 'Toggle Recording',      section: 'Commands',                 desktopOnly: true, run: () => audioRecorder.toggle()},
     {id: 'cmd.launch_quantum', title: 'Launch Quantization: Next Grid', section: 'Commands',       run: () => launchQuantum.cycleNext()},
-    {id: 'cmd.export_audio',title: 'Export Audio…',         section: 'Commands', hint: '⌘⇧E',    run: () => fileManager.exportAudio()},
-    {id: 'cmd.export_midi', title: 'Export MIDI…',          section: 'Commands',                 run: () => fileManager.exportMidi()},
-    {id: 'cmd.render_video', title: 'Render Video… (open show)', section: 'Commands',            run: () => videoRender.start()},
-    {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 run: () => midiLab.openEmpty()},
+    {id: 'cmd.export_audio',title: 'Export Audio…',         section: 'Commands', hint: '⌘⇧E',    desktopOnly: true, run: () => fileManager.exportAudio()},
+    {id: 'cmd.export_midi', title: 'Export MIDI…',          section: 'Commands',                 desktopOnly: true, run: () => fileManager.exportMidi()},
+    {id: 'cmd.render_video', title: 'Render Video… (open show)', section: 'Commands',            desktopOnly: true, run: () => videoRender.start()},
+    {id: 'cmd.midi',        title: 'Open MIDI Lab…',        section: 'Commands',                 desktopOnly: true, run: () => midiLab.openEmpty()},
     {id: 'cmd.sounds',      title: 'Browse Sounds…',        section: 'Commands', hint: '⌘⇧O',   run: () => soundBrowser.open()},
-    {id: 'cmd.samples',     title: 'Samples… (sets & packs)', section: 'Commands',               run: () => samplesModal.open()},
-    {id: 'cmd.import_folder', title: 'Import Sample Pack (Folder)…', section: 'Commands',        run: () => packImport.openFolderPicker()},
-    {id: 'cmd.import_zip',  title: 'Import Sample Pack (.zip)…', section: 'Commands',           run: () => packImport.openZipPicker()},
-    {id: 'cmd.preferences', title: 'Preferences…',          section: 'Commands', hint: '⌘,',     run: () => preferencesModal.open()},
+    {id: 'cmd.samples',     title: 'Samples… (sets & packs)', section: 'Commands',               desktopOnly: true, run: () => samplesModal.open()},
+    {id: 'cmd.import_folder', title: 'Import Sample Pack (Folder)…', section: 'Commands',        desktopOnly: true, run: () => packImport.openFolderPicker()},
+    {id: 'cmd.import_zip',  title: 'Import Sample Pack (.zip)…', section: 'Commands',           desktopOnly: true, run: () => packImport.openZipPicker()},
+    {id: 'cmd.preferences', title: 'Preferences…',          section: 'Commands', hint: '⌘,',     desktopOnly: true, run: () => preferencesModal.open()},
+    {id: 'cmd.parts',       title: 'Show Parts',            section: 'Commands',                 run: () => partsPanel.show(true)},
+    {id: 'cmd.save_part',   title: 'Save Track as Part…',   section: 'Commands',                 desktopOnly: true, run: () => saveSelectionAsPart()},
     {id: 'cmd.examples',    title: 'Browse Examples…',      section: 'Commands',                 run: () => requireEl('browseExamples', 'The examples browser').click()},
     {id: 'cmd.help_guide',  title: 'User Guide…',           section: 'Commands',                 run: () => helpModal.open('guide')},
     {id: 'cmd.help_keys',   title: 'Keyboard Shortcuts…',   section: 'Commands',                 run: () => helpModal.open('shortcuts')},
     {id: 'cmd.help_dialect',title: 'Cycletron Dialect…',    section: 'Commands',                 run: () => helpModal.open('dialect')},
     {id: 'cmd.help_shows',  title: 'Show Files Guide…',     section: 'Commands',                 run: () => helpModal.open('shows')},
     {id: 'cmd.whats_new',   title: "What's New…",           section: 'Commands',                 run: () => helpModal.open('changes')},
-    {id: 'cmd.about',       title: 'About Cycletron',       section: 'Commands',                 run: () => aboutModal.open()},
-    {id: 'cmd.updates',     title: 'Check for Updates',     section: 'Commands',                 run: () => checkForUpdates(true)},
-    {id: 'cmd.logs',        title: 'Show Logs…',            section: 'Commands',                 run: () => logsModal.open()},
+    {id: 'cmd.about',       title: 'About Cycletron',       section: 'Commands',                 desktopOnly: true, run: () => aboutModal.open()},
+    {id: 'cmd.updates',     title: 'Check for Updates',     section: 'Commands',                 desktopOnly: true, run: () => checkForUpdates(true)},
+    {id: 'cmd.logs',        title: 'Show Logs…',            section: 'Commands',                 desktopOnly: true, run: () => logsModal.open()},
     {id: 'cmd.stage',       title: 'Stage Mode',            section: 'Commands', hint: '⌘⇧F',   run: () => { void stage.toggle(); }},
     {id: 'cmd.stop_show',   title: 'Stop Show',             section: 'Commands',                 run: () => liveShow.stop()},
     {id: 'cmd.next_song',   title: 'Show: Next Song',       section: 'Commands',                 run: () => liveShow.skip(1)},
     {id: 'cmd.prev_song',   title: 'Show: Previous Song',   section: 'Commands',                 run: () => liveShow.skip(-1)},
     {id: 'cmd.stage_follow',title: 'Stage: Follow the Music', section: 'Commands', hint: 'cycle',  run: () => { stage.cycleFollow(); }},
-    {id: 'cmd.toggle_ai',   title: 'Toggle AI Panel',       section: 'Commands',                 run: () => { toggleAiPanel(); }},
+    {id: 'cmd.toggle_ai',   title: 'Toggle AI Panel',       section: 'Commands',                 desktopOnly: true, run: () => { toggleAiPanel(); }},
     {id: 'cmd.toggle_files',title: 'Toggle Files Panel',    section: 'Commands',                 run: () => { fileExplorer.toggleCollapsed(); }},
     {id: 'cmd.toggle_assist',title: 'Toggle Editor Autocomplete', section: 'Commands',            run: async () => { const e = requireApp().editor; if (!e) throw new Error('The editor is still loading — try again in a moment.'); const on = !e.isAssistEnabled(); e.setAssistEnabled(on); await persistEditorAssist(on); }},
     {id: 'cmd.tempo_up',    title: 'Tempo +1 BPM',          section: 'Commands',                 run: () => adjustBpm(1)},
     {id: 'cmd.tempo_down',  title: 'Tempo −1 BPM',          section: 'Commands',                 run: () => adjustBpm(-1)},
-    {id: 'cmd.clear_session', title: 'Clear AI Session',    section: 'Commands',                 run: () => clearSession()},
+    {id: 'cmd.clear_session', title: 'Clear AI Session',    section: 'Commands',                 desktopOnly: true, run: () => clearSession()},
 ];
 
 async function collectItems(): Promise<Item[]> {
-    const out: Item[] = [...COMMANDS];
+    const out: Item[] = COMMANDS.filter((c) => isTauri || !c.desktopOnly);
 
     if (!isTauri) return out;
 
@@ -353,7 +358,7 @@ function iconFor(section: Item['section']): string {
 // ------------------------------------------------------------------
 
 /** The live StrudelApp, or throw a user-facing error if it isn't up yet. */
-function requireApp(): any {
+function requireApp() {
     const app = window.strudelApp;
     if (!app) throw new Error('Cycletron is still starting up — try again in a moment.');
     return app;

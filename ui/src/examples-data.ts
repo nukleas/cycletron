@@ -30,6 +30,8 @@ export interface Example {
     /** Lesson order (1-based) when section === 'lessons' */
     lesson?: number;
     blurb?: string;
+    /** Written by the genre generator, not by hand. */
+    generated?: boolean;
 }
 
 /** Full catalog: progressive teaching set + every bundled song/technique/genre. */

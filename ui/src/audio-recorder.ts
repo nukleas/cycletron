@@ -15,13 +15,16 @@
  * since the target is computed from the BPM at the moment you start.
  */
 
-import {isTauri} from './tauri.js';
+import {invoke, isTauri} from './tauri.js';
 import {notify} from './notifications.js';
 import {addTask, removeTask} from './dock-badge.js';
-import {warnDialog, saveFileDialog} from './dialog.js';
-import {basename} from './paths.js';
+import {confirmDialog, warnDialog, saveFileDialog} from './dialog.js';
+import {basename, dirname} from './paths.js';
 import {currentBpm} from './bpm.js';
 import {wavCapture, type CaptureResult} from './wav-capture.js';
+import type {RecordingOrphan} from './types/tauri-commands.js';
+
+const LAST_RECORDING_DIR_KEY = 'cycletron-last-recording-dir';
 
 type RecorderState = 'idle' | 'recording' | 'finalizing';
 
@@ -77,6 +80,57 @@ class AudioRecorder {
         }
     }
 
+    /**
+     * Check the last recording directory and library root for partial `.part`
+     * takes left behind by an interrupted session and offer to recover or
+     * discard each one.
+     */
+    async checkOrphans(): Promise<void> {
+        if (!isTauri) return;
+        const dirs = new Set<string>();
+        try {
+            const last = localStorage.getItem(LAST_RECORDING_DIR_KEY);
+            if (last) dirs.add(last);
+        } catch { /* storage unavailable */ }
+        try {
+            const root = await invoke<string>('get_library_root');
+            if (root) dirs.add(root);
+        } catch { /* ignore */ }
+
+        for (const dir of dirs) {
+            let orphans: RecordingOrphan[];
+            try {
+                orphans = await invoke<RecordingOrphan[]>('recording_orphans', {dir});
+            } catch (e) {
+                console.warn('[recorder] recording_orphans failed:', e);
+                continue;
+            }
+            for (const orphan of orphans) {
+                const mb = (orphan.bytes / (1024 * 1024)).toFixed(1);
+                const keep = await confirmDialog(
+                    `An interrupted recording was found:\n\n${basename(orphan.final_path)} (${mb} MB)\n\nRecover it to a playable WAV file, or discard the partial take?`,
+                    {
+                        title: 'Recover Interrupted Recording',
+                        kind: 'warning',
+                        okLabel: 'Recover',
+                        cancelLabel: 'Discard',
+                    },
+                );
+                try {
+                    const recovered = await invoke<string | null>('recording_recover', {
+                        partPath: orphan.part_path,
+                        keep,
+                    });
+                    if (recovered) {
+                        void notify('Recording recovered', basename(recovered));
+                    }
+                } catch (e) {
+                    await warnDialog(`Could not ${keep ? 'recover' : 'discard'} ${basename(orphan.part_path)}:\n${e}`);
+                }
+            }
+        }
+    }
+
     private async start(): Promise<void> {
         const manager = window.strudelApp?.audioManager;
         const ctx = manager?.getAudioContext?.();
@@ -95,6 +149,11 @@ class AudioRecorder {
             filters: [{name: 'WAV Audio', extensions: ['wav']}],
         });
         if (!path) return;
+
+        const parentDir = dirname(path);
+        if (parentDir) {
+            try { localStorage.setItem(LAST_RECORDING_DIR_KEY, parentDir); } catch { /* ignore */ }
+        }
 
         this.stopAfterSeconds = this.barLimitSeconds();
         wavCapture.onFailure = (reason) => { void this.endEarly(reason); };

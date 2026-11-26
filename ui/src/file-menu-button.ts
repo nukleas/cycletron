@@ -10,6 +10,7 @@
 import {fileManager} from './file-manager.js';
 import {midiLab} from './midi-lab.js';
 import {videoRender} from './show/render-video.js';
+import {invoke, isTauri} from './tauri.js';
 import {diag} from './diagnostics.js';
 import {basename} from './paths.js';
 
@@ -27,6 +28,7 @@ class FileMenuButton {
     private popover: HTMLElement | null = null;
     private subPopover: HTMLElement | null = null;
     private openCleanup: (() => void) | null = null;
+    private submenuGen = 0;
 
     init(): void {
         this.btn = document.getElementById('fileMenuBtn') as HTMLButtonElement | null;
@@ -86,6 +88,7 @@ class FileMenuButton {
     }
 
     private closeSubmenu(): void {
+        this.submenuGen++;
         if (this.subPopover && this.subPopover.parentNode) {
             this.subPopover.parentNode.removeChild(this.subPopover);
         }
@@ -148,7 +151,9 @@ class FileMenuButton {
     private async openSubmenu(item: MenuItem, anchor: HTMLElement): Promise<void> {
         if (!item.submenu || !this.popover) return;
         this.closeSubmenu();
+        const gen = this.submenuGen;
         const items = await item.submenu();
+        if (gen !== this.submenuGen || !this.isOpen()) return;
         const sub = document.createElement('div');
         sub.className = 'file-menu-popover file-menu-popover--sub';
         sub.appendChild(this.renderList(items, 'sub'));
@@ -199,8 +204,9 @@ class FileMenuButton {
         items.push({
             label: 'Clear Recent Files',
             run: async () => {
+                if (!isTauri) return;
                 try {
-                    await window.__TAURI__?.core?.invoke('clear_recents');
+                    await invoke('clear_recents');
                 } catch (e) {
                     void diag('warn', 'file-menu', `clear_recents failed: ${e}`);
                 }

@@ -85,6 +85,12 @@ pub fn list(app_data_dir: &Path, file_path: &Path) -> Vec<Snapshot> {
 }
 
 pub fn read(app_data_dir: &Path, file_path: &Path, id: &str) -> std::io::Result<String> {
+    if id.parse::<i64>().is_err() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("invalid snapshot id: {id:?}"),
+        ));
+    }
     let dir = dir_for(app_data_dir, file_path);
     let target = dir.join(format!("{id}.strudel"));
     fs::read_to_string(target)
@@ -154,5 +160,17 @@ mod tests {
         // Newest 50 (ids 5..=54) survived.
         assert_eq!(remaining[0].id, "54");
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn read_rejects_traversal_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = PathBuf::from("/virtual/song.strudel");
+        let secret = dir.path().join("secret.strudel");
+        fs::write(&secret, "secret").unwrap();
+        let err = read(dir.path(), &file, "../../secret").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        let err2 = read(dir.path(), &file, "../secret").unwrap_err();
+        assert_eq!(err2.kind(), std::io::ErrorKind::InvalidInput);
     }
 }

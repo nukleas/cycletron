@@ -493,7 +493,7 @@ pub fn get_active_sample_set_manifests(
 
 /// Delete a downloaded set's cache (definition stays; it can be re-downloaded).
 #[tauri::command]
-pub fn remove_sample_set(set_id: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+pub async fn remove_sample_set(set_id: String, app_handle: tauri::AppHandle) -> Result<(), String> {
     if set_id == BUNDLED_SET_ID {
         return Err("the bundled set cannot be removed".into());
     }
@@ -514,19 +514,27 @@ pub fn remove_sample_set(set_id: String, app_handle: tauri::AppHandle) -> Result
         .find(|d| d.id == set_id)
         .ok_or_else(|| format!("unknown sample set '{set_id}'"))?;
     let root = sets_root(&app_handle)?;
-    for url in &def.sources {
-        let shared = defs
-            .iter()
-            .any(|other| other.id != set_id && other.sources.iter().any(|u| u == url));
-        if shared {
-            continue;
+    let dirs_to_remove: Vec<PathBuf> = def
+        .sources
+        .iter()
+        .filter(|url| {
+            !defs
+                .iter()
+                .any(|other| other.id != set_id && other.sources.iter().any(|u| u == *url))
+        })
+        .map(|url| source_dir(&root, url))
+        .collect();
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        for dir in dirs_to_remove {
+            if dir.exists() {
+                std::fs::remove_dir_all(&dir)
+                    .map_err(|e| format!("could not remove sample set: {e}"))?;
+            }
         }
-        let dir = source_dir(&root, url);
-        if dir.exists() {
-            std::fs::remove_dir_all(&dir)
-                .map_err(|e| format!("could not remove sample set: {e}"))?;
-        }
-    }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     refresh_bank_names(&app_handle);
     Ok(())
 }
@@ -545,9 +553,15 @@ pub async fn download_sample_set(
     if DOWNLOAD_RUNNING.swap(true, Ordering::SeqCst) {
         return Err("a sample-set download is already running".into());
     }
-    let result = download_all(&app_handle, &set_id).await;
-    DOWNLOAD_RUNNING.store(false, Ordering::SeqCst);
-    result?;
+    struct DownloadGuard;
+    impl Drop for DownloadGuard {
+        fn drop(&mut self) {
+            DOWNLOAD_RUNNING.store(false, Ordering::SeqCst);
+        }
+    }
+    let _guard = DownloadGuard;
+    download_all(&app_handle, &set_id).await?;
+    drop(_guard);
     refresh_bank_names(&app_handle);
     list_sample_sets(app_handle)
 }
@@ -757,7 +771,10 @@ async fn download_source(
     // URL's directory (same derivation the engine's loader uses).
     let base = match obj.remove("_base").as_ref().and_then(|b| b.as_str()) {
         Some(b) => resolve_source_url(b),
-        None => manifest_url[..=manifest_url.rfind('/').unwrap_or(0)].to_string(),
+        None => match manifest_url.rfind('/') {
+            Some(i) => manifest_url[..=i].to_string(),
+            None => String::new(),
+        },
     };
     let base = base.trim_end_matches('/').to_string();
 
@@ -977,7 +994,13 @@ fn push_rel(out: &mut Vec<String>, path: &str) {
     if path.starts_with("http://") || path.starts_with("https://") {
         return;
     }
-    if path.split('/').any(|seg| seg == "..") || path.starts_with('/') {
+    let unsafe_path = path.is_empty()
+        || path.starts_with('/')
+        || path.contains('\\')
+        || !Path::new(path)
+            .components()
+            .all(|c| matches!(c, std::path::Component::Normal(_)));
+    if unsafe_path {
         tracing::warn!(target: "cycletron::sample_sets", path, "skipping unsafe manifest path");
         return;
     }
@@ -1091,22 +1114,31 @@ async fn try_fetch_file(
 }
 
 fn dir_stats(dir: &Path) -> (u64, u64) {
-    fn walk(dir: &Path, files: &mut u64, bytes: &mut u64) {
+    const MAX_DEPTH: usize = 32;
+    fn walk(dir: &Path, depth: usize, files: &mut u64, bytes: &mut u64) {
+        if depth > MAX_DEPTH {
+            return;
+        }
         let Ok(entries) = std::fs::read_dir(dir) else {
             return;
         };
         for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                walk(&path, files, bytes);
-            } else if let Ok(meta) = entry.metadata() {
+            let Ok(ft) = entry.file_type() else { continue };
+            if ft.is_symlink() {
+                continue;
+            }
+            if ft.is_dir() {
+                walk(&entry.path(), depth + 1, files, bytes);
+            } else if ft.is_file()
+                && let Ok(meta) = entry.metadata()
+            {
                 *files += 1;
                 *bytes += meta.len();
             }
         }
     }
     let (mut files, mut bytes) = (0, 0);
-    walk(dir, &mut files, &mut bytes);
+    walk(dir, 0, &mut files, &mut bytes);
     (files, bytes)
 }
 

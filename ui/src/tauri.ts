@@ -54,6 +54,13 @@ export async function listen<T = unknown>(
     return api.listen<T>(event, handler);
 }
 
+/** Emit a Tauri event when running in the desktop shell. No-op in a browser. */
+export async function emit(event: string, payload?: unknown): Promise<void> {
+    const api = window.__TAURI__?.event;
+    if (!api?.emit) return;
+    await api.emit(event, payload);
+}
+
 /** True when running inside the Tauri desktop shell (vs. a plain browser). */
 export const isTauri = !!window.__TAURI__;
 

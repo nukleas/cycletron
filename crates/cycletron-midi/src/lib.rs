@@ -9,6 +9,7 @@
 //! clamp) so imports are smoother without mutating the source file on disk.
 
 pub mod index;
+pub mod parts;
 
 use midi_to_strudel::{
     InstrumentMode, MidiData, OutputFormatter, SectionNamingStrategy, TrackBuilder,
@@ -452,7 +453,7 @@ fn midi_to_label(midi: u8) -> String {
 }
 
 /// Parse Western pitch labels produced by midi-to-strudel (`C4`, `Db3`, `F#5`).
-fn parse_note_name(s: &str) -> Option<u8> {
+pub(crate) fn parse_note_name(s: &str) -> Option<u8> {
     let bytes = s.as_bytes();
     if bytes.is_empty() {
         return None;

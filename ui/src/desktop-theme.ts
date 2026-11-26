@@ -52,6 +52,7 @@ function restore(): void {
     const root = document.documentElement;
     for (const token of OVERRIDDEN) root.style.removeProperty(token);
     OVERRIDDEN.length = 0;
+    root.removeAttribute('data-theme-mode');
 }
 
 function apply(theme: DesktopTheme | null): void {
@@ -132,13 +133,24 @@ function apply(theme: DesktopTheme | null): void {
     // The neon layer: glows and hairlines derived from the two colours the
     // theme considers loudest, so the CRT look survives a palette it has
     // never seen.
+    const isLight = theme.mode.toLowerCase() === 'light';
+    document.documentElement.dataset.themeMode = isLight ? 'light' : 'dark';
     const secondary = pick('magenta', 'bright_magenta', 'red', 'color5', 'color1') ?? accent;
+    const blue = pick('blue', 'cyan', 'color4', 'color6') ?? accent;
+    const warm = pick('yellow', 'orange', 'bright_yellow', 'color3') ?? secondary;
+    set('--blue', blue);
     set('--neon', accent);
-    set('--neon-bright', mix(accent, '#ffffff', 0.55));
+    set('--neon-bright', mix(accent, isLight ? '#000000' : '#ffffff', isLight ? 0.35 : 0.55));
     set('--neon-subtle', alpha(accent, 0.2));
     set('--neon-glow', alpha(accent, 0.34));
     set('--neon-secondary', secondary);
     set('--neon-secondary-glow', alpha(secondary, 0.32));
+    set('--viz-active', accent);
+    set('--viz-hot', warm);
+    set('--text-glitch', isLight ? 'none' : `-1px 0 ${alpha(secondary, 0.45)}, 1px 0 ${alpha(accent, 0.45)}`);
+    set('--edge-3d', `inset 0 1px 0 ${alpha(accent, 0.14)}, inset 0 -1px 0 ${alpha(secondary, 0.12)}`);
+    set('--edge-3d-strong', `inset 0 1px 0 ${alpha(accent, 0.26)}, inset 0 -1px 0 ${alpha(secondary, 0.22)}`);
+    set('--edge-3d-panel', `inset 0 1px 0 ${alpha(accent, 0.10)}, inset 0 -1px 0 ${alpha(secondary, 0.10)}`);
     set('--pixel-grid', alpha(accent, 0.055));
     set('--panel-shadow', `inset 0 0 0 1px ${alpha(accent, 0.04)}, 0 0 24px ${alpha(accent, 0.07)}`);
     set('--sb-thumb', pick('selection', 'muted'));
@@ -153,13 +165,13 @@ function apply(theme: DesktopTheme | null): void {
 }
 
 /** `#rrggbb` → `rgba(r, g, b, a)`. Returns null on anything unparseable. */
-function alpha(hex: string, a: number): string | null {
+export function alpha(hex: string, a: number): string | null {
     const rgb = toRgb(hex);
     return rgb ? `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})` : null;
 }
 
 /** Blend `hex` toward `towards` by `amount` (0 = unchanged, 1 = fully). */
-function mix(hex: string, towards: string, amount: number): string | null {
+export function mix(hex: string, towards: string, amount: number): string | null {
     const from = toRgb(hex);
     const to = toRgb(towards);
     if (!from || !to) return null;
@@ -168,7 +180,7 @@ function mix(hex: string, towards: string, amount: number): string | null {
     return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
 }
 
-function toRgb(hex: string): [number, number, number] | null {
+export function toRgb(hex: string): [number, number, number] | null {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
     if (!m) return null;
     const n = parseInt(m[1], 16);

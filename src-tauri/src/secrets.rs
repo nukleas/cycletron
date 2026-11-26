@@ -117,29 +117,8 @@ fn file_set(provider_id: &str, key: &str) -> Result<(), String> {
         map.insert(provider_id.to_string(), key.to_string());
     }
     let raw = serde_json::to_string_pretty(&map).map_err(|e| e.to_string())?;
-    write_private(&path, raw.as_bytes())?;
+    crate::oauth_store::write_private(&path, raw.as_bytes())?;
     Ok(())
-}
-
-#[cfg(unix)]
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    let mut f = fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path)
-        .map_err(|e| e.to_string())?;
-    f.write_all(bytes).map_err(|e| e.to_string())?;
-    f.sync_all().map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    fs::write(path, bytes).map_err(|e| e.to_string())
 }
 
 // ── Release keychain ──────────────────────────────────────────────────────

@@ -13,20 +13,16 @@
 
 # Tauri generated
 src-tauri/gen/
-src-tauri/target/
 src-tauri/icons/*.png
 src-tauri/icons/*.icns
 src-tauri/icons/*.ico
 src-tauri/icons/android/
 src-tauri/icons/ios/
-src-tauri/icons/*.png
 
 # Logo / design exploration (temporary)
 tinker/
 
 # Build tools output
-tools/*/node_modules/
-tools/*/dist/
 tools/parity/reports/
 
 # Environment & secrets
@@ -70,11 +66,12 @@ corpus/test_ingest*/
 # Agent / tooling dev state (local-only)
 .grok/
 .playwright-mcp/
+.delta/
 
 # Local Supabase corpus cache (derived data)
 .corpus-cache/
 
-# Rendered audio (regenerate with strudio render — see exports/agency/README)
+# Rendered audio (regenerate with `cycletron export` — see ui/songs/agency/README.md)
 /exports/
 /Demos/
 
@@ -88,7 +85,5 @@ corpus/test_ingest*/
 # fine to track. The corpus loaders/gate skip these dirs at runtime too.
 _*/
 
-# Ingestion outputs + fetched bakery cache — regenerate with
-# tools/corpus-fetch/fetch-corpus.sh + hap-ingest/midi-ingest.
+# Ingestion outputs — regenerate with tools/corpus-fetch/fetch-corpus.sh + hap-ingest/midi-ingest.
 /corpus/ingested/
-/.corpus-cache/

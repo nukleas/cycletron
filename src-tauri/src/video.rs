@@ -8,10 +8,10 @@
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 
+use parking_lot::Mutex;
 use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter, Manager as _, State};
 
@@ -36,7 +36,7 @@ impl VideoState {
 
     /// Stop the running render, if any. The ending event follows when it exits.
     pub fn cancel(&self) {
-        let running = self.running.lock().unwrap();
+        let running = self.running.lock();
         let Some(r) = running.as_ref() else { return };
         r.cancelled.store(true, Ordering::SeqCst);
         terminate(r.pid, &r.out);
@@ -76,7 +76,7 @@ pub fn render_video(
     size: Option<String>,
     state: State<'_, VideoState>,
 ) -> Result<(), String> {
-    let mut running = state.running.lock().unwrap();
+    let mut running = state.running.lock();
     if running.is_some() {
         return Err("a video is already rendering".into());
     }
@@ -138,7 +138,7 @@ pub fn render_video(
             }
         }
         // Cleared before the child is reaped, so Cancel never signals a reused pid.
-        app.state::<VideoState>().running.lock().unwrap().take();
+        app.state::<VideoState>().running.lock().take();
         let status = child.wait();
         let stderr = tail_rx.recv().unwrap_or_default();
         let ending = if cancelled.load(Ordering::SeqCst) {

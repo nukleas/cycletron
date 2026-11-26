@@ -151,24 +151,80 @@ pub fn rename_path(from: &Path, to: &Path) -> std::io::Result<()> {
     fs::rename(from, to)
 }
 
+/// Resolve `path` to a canonicalized form for containment checks:
+/// walk upward to the deepest existing prefix (via `symlink_metadata`, so a
+/// broken symlink stops here rather than falling through to its parent),
+/// canonicalize that prefix, and fold the remaining non-existent components
+/// lexically without ever stepping above `floor` (when provided).
+fn resolve_for_containment(path: &Path, floor: Option<&Path>) -> Option<PathBuf> {
+    use std::path::Component;
+
+    let comps: Vec<Component<'_>> = path.components().collect();
+    if comps.is_empty() {
+        return None;
+    }
+
+    for len in (1..=comps.len()).rev() {
+        let prefix: PathBuf = comps[..len].iter().collect();
+        if fs::symlink_metadata(&prefix).is_ok() {
+            // If `prefix` exists as a dangling symlink or is unreadable, fail closed.
+            let mut resolved = prefix.canonicalize().ok()?;
+            for comp in &comps[len..] {
+                match comp {
+                    Component::Normal(seg) => resolved.push(seg),
+                    Component::CurDir => {}
+                    Component::ParentDir => {
+                        if !resolved.pop() {
+                            return None;
+                        }
+                        if let Some(root) = floor
+                            && !resolved.starts_with(root)
+                        {
+                            return None;
+                        }
+                    }
+                    Component::RootDir | Component::Prefix(_) => return None,
+                }
+            }
+            return Some(resolved);
+        }
+    }
+
+    // No existing ancestor (e.g. virtual path): only allow absolute paths,
+    // folding `..` lexically.
+    if !path.is_absolute() {
+        return None;
+    }
+    let mut resolved = PathBuf::new();
+    for comp in comps {
+        match comp {
+            Component::Prefix(p) => resolved.push(p.as_os_str()),
+            Component::RootDir => resolved.push(comp.as_os_str()),
+            Component::Normal(seg) => resolved.push(seg),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !resolved.pop() {
+                    return None;
+                }
+                if let Some(root) = floor
+                    && !resolved.starts_with(root)
+                {
+                    return None;
+                }
+            }
+        }
+    }
+    Some(resolved)
+}
+
 /// True iff `candidate` (after canonicalisation, when possible) lies under
 /// `root`. Used as a path-traversal guard for frontend-supplied paths.
 pub fn within(root: &Path, candidate: &Path) -> bool {
-    let root_canon = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    // For not-yet-existing paths, fall back to lexical containment using
-    // the canonicalised parent if available.
-    let candidate_canon = if candidate.exists() {
-        candidate
-            .canonicalize()
-            .unwrap_or_else(|_| candidate.to_path_buf())
-    } else {
-        match candidate.parent() {
-            Some(p) if p.exists() => p
-                .canonicalize()
-                .map(|cp| cp.join(candidate.file_name().unwrap_or_default()))
-                .unwrap_or_else(|_| candidate.to_path_buf()),
-            _ => candidate.to_path_buf(),
-        }
+    let Some(root_canon) = resolve_for_containment(root, None) else {
+        return false;
+    };
+    let Some(candidate_canon) = resolve_for_containment(candidate, Some(&root_canon)) else {
+        return false;
     };
     candidate_canon.starts_with(&root_canon)
 }
@@ -216,12 +272,31 @@ mod tests {
 
     #[test]
     fn within_blocks_traversal() {
-        let tmp = std::env::temp_dir().join("cycletron_lib_test_root");
-        let _ = fs::create_dir_all(&tmp);
-        assert!(within(&tmp, &tmp.join("foo.strudel")));
-        assert!(within(&tmp, &tmp.join("sub").join("bar.strudel")));
-        assert!(!within(&tmp, &PathBuf::from("/etc/passwd")));
-        let _ = fs::remove_dir_all(&tmp);
+        let dir = tempfile::tempdir().unwrap();
+        let tmp = dir.path();
+        assert!(within(tmp, &tmp.join("foo.strudel")));
+        assert!(within(tmp, &tmp.join("sub").join("bar.strudel")));
+        assert!(!within(tmp, &PathBuf::from("/etc/passwd")));
+        assert!(!within(tmp, &tmp.join("..").join("escape.strudel")));
+        assert!(!within(
+            tmp,
+            &tmp.join("nonexistent")
+                .join("..")
+                .join("..")
+                .join("escape.strudel")
+        ));
+        assert!(!within(tmp, &PathBuf::from("relative/escape.strudel")));
+        #[cfg(unix)]
+        {
+            let outside = tempfile::tempdir().unwrap();
+            let dangling = tmp.join("dangling.strudel");
+            std::os::unix::fs::symlink(outside.path().join("nope.strudel"), &dangling).unwrap();
+            assert!(!within(tmp, &dangling));
+
+            let escape_dir = tmp.join("escape_dir");
+            std::os::unix::fs::symlink(outside.path(), &escape_dir).unwrap();
+            assert!(!within(tmp, &escape_dir.join("child.strudel")));
+        }
     }
 
     #[test]

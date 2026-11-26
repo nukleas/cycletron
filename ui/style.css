@@ -2958,7 +2958,8 @@ body.is-drop-target::after {
     justify-content: center;
     padding: 0;
 }
-.files-panel.collapsed .files-panel-title { display: none; }
+.files-panel.collapsed .files-panel-tabs,
+.files-panel.collapsed .parts-pane { display: none; }
 .files-panel.collapsed .files-panel-actions { gap: 0; }
 .files-panel.collapsed .files-toggle { transform: rotate(180deg); }
 
@@ -3006,6 +3007,70 @@ body.is-drop-target::after {
     transition: all 0.2s;
 }
 .files-toggle:hover { color: var(--neon); border-color: var(--neon-subtle); }
+
+/* Files | Parts tabs */
+.files-panel-tabs { display: flex; align-items: stretch; height: 100%; gap: 10px; }
+.files-tab {
+    padding: 0;
+    background: none;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    color: var(--text-muted);
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+}
+.files-tab:hover { color: var(--neon-bright); }
+.files-tab.active { color: var(--neon); border-bottom-color: var(--neon); text-shadow: var(--text-glitch); }
+.files-panel-header { text-shadow: none; }
+
+.files-panel.show-parts .file-tree,
+.files-panel.show-parts .files-panel-footer,
+.files-panel.show-parts .files-panel-actions > :not(.files-toggle) { display: none; }
+
+.parts-pane {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--sp-3) var(--sp-3) 0;
+    position: relative;
+    z-index: 2;
+}
+.parts-pane[hidden] { display: none; }
+.parts-list { flex: 1; min-height: 0; overflow-y: auto; position: relative; }
+.parts-hint {
+    padding: var(--sp-3) 0;
+    color: var(--text-dim);
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-code);
+}
+.parts-list .snd-row { touch-action: none; user-select: none; }
+.parts-list .snd-row.is-active { background: var(--surface-hover, rgba(255, 255, 255, 0.06)); }
+.parts-list .snd-row-meta { white-space: nowrap; }
+.parts-empty {
+    padding: var(--sp-5) var(--sp-4);
+    color: var(--text-dim);
+    font-size: var(--fs-small);
+    text-align: center;
+}
+
+/* A part being dragged to the editor. */
+.part-ghost {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    padding: 2px 8px;
+    background: var(--bg);
+    border: 1px solid var(--neon);
+    color: var(--neon-bright);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    box-shadow: var(--glow-1);
+    white-space: nowrap;
+}
+body.is-dragging-part { cursor: copy; user-select: none; }
 
 /* Tree */
 .file-tree {
@@ -4540,7 +4605,7 @@ body.is-drop-target::after {
 }
 .prefs-path {
     flex: 1;
-    background: rgba(5, 6, 10, 0.6);
+    background: var(--surface-inset);
     border: 1px solid var(--border);
     padding: 4px 8px;
     color: var(--neon);
@@ -4552,7 +4617,7 @@ body.is-drop-target::after {
     text-align: left;
 }
 .prefs-inline-btn {
-    background: rgba(5, 6, 10, 0.6);
+    background: var(--surface-inset);
     color: var(--neon);
     border: 1px solid var(--neon-subtle);
     padding: 4px 10px;
@@ -4582,9 +4647,6 @@ body.is-drop-target::after {
     flex-wrap: wrap;
     gap: 6px;
     align-items: center;
-}
-.prefs-field-hint.is-ok {
-    color: var(--neon);
 }
 .prefs-hint {
     font-size: 9px;
@@ -6023,6 +6085,7 @@ body.stage-active #fullscreenVizHUD { display: none; }
 
 /* A machine is the unit you actually pick: RolandTR909, not RolandTR909_bd. */
 .snd-row--machine > .snd-row-name {
+    flex: 0 0 auto;
     color: var(--neon-bright);
     font-weight: var(--fw-bold);
 }
@@ -6036,7 +6099,6 @@ body.stage-active #fullscreenVizHUD { display: none; }
     color: var(--text-dim);
     letter-spacing: var(--ls-wide);
 }
-.snd-row--machine > .snd-row-name { flex: 0 0 auto; }
 /* Under a machine, the kind and origin columns just repeat the parent row. */
 .snd-row--voice .snd-row-kind,
 .snd-row--voice .snd-row-origin { display: none; }

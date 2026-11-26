@@ -20,6 +20,8 @@ mod oauth_store;
 mod osc;
 mod pack_import;
 mod packs;
+mod parts_import;
+mod parts_review;
 mod persistence;
 mod playback;
 mod recording;
@@ -330,6 +332,8 @@ pub fn run() {
             commands::critique_pattern,
             commands::critique_form,
             commands::genre_recipe,
+            commands::render_part_preview,
+            commands::list_saved_parts,
             commands::reload_corpus,
             commands::get_pattern_history,
             commands::get_config,
@@ -444,37 +448,78 @@ pub fn run() {
 
 #[cfg(test)]
 mod command_permission_tests {
-    /// The webview origin is remote, so a handler missing from `build.rs`
-    /// COMMANDS or the default capability fails at runtime with "not allowed".
-    #[test]
-    fn every_invoke_handler_is_registered_and_granted() {
-        let lib = include_str!("lib.rs");
-        let start = lib.find("generate_handler![").unwrap();
-        let block = &lib[start..start + lib[start..].find("])").unwrap()];
-        let handlers: Vec<&str> = block
+    use std::collections::BTreeSet;
+
+    fn parse_generate_handler(src: &str) -> BTreeSet<String> {
+        let start = src.find("generate_handler![").unwrap();
+        let block = &src[start..start + src[start..].find("])").unwrap()];
+        block
             .lines()
             .skip(1)
             .filter_map(|l| l.trim().strip_suffix(','))
             .filter_map(|l| l.rsplit("::").next())
-            .collect();
+            .map(str::to_string)
+            .collect()
+    }
+
+    fn parse_build_commands(src: &str) -> BTreeSet<String> {
+        let start = src.find("const COMMANDS: &[&str] = &[").unwrap();
+        let block = &src[start..start + src[start..].find("];").unwrap()];
+        block
+            .lines()
+            .skip(1)
+            .filter_map(|l| l.trim().strip_prefix('"')?.strip_suffix("\","))
+            .map(str::to_string)
+            .collect()
+    }
+
+    fn parse_allow_grants(cap_json: &str) -> BTreeSet<String> {
+        let v: serde_json::Value = serde_json::from_str(cap_json).unwrap();
+        v["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|p| p.as_str()?.strip_prefix("allow-"))
+            .map(|s| s.replace('-', "_"))
+            .collect()
+    }
+
+    /// Bidirectional parity check: every invoke handler in `lib.rs` (main
+    /// window) and `render.rs` (render windows) must appear in `build.rs`
+    /// COMMANDS and its capability file, and no stale/phantom entries may
+    /// linger in `build.rs` or capabilities.
+    #[test]
+    fn invoke_handlers_build_and_capabilities_stay_in_sync() {
+        let main_handlers = parse_generate_handler(include_str!("lib.rs"));
+        let render_handlers = parse_generate_handler(include_str!("render.rs"));
         assert!(
-            handlers.len() > 50,
-            "parsed only {} handlers",
-            handlers.len()
+            main_handlers.len() > 50,
+            "parsed only {} main handlers",
+            main_handlers.len()
+        );
+        assert!(
+            !render_handlers.is_empty(),
+            "parsed 0 render handlers from render.rs"
         );
 
-        let build = include_str!("../build.rs");
-        let capability = include_str!("../capabilities/default.json");
-        for h in handlers {
-            assert!(
-                build.contains(&format!("\"{h}\",")),
-                "{h} is missing from build.rs COMMANDS"
-            );
-            let grant = format!("\"allow-{}\"", h.replace('_', "-"));
-            assert!(
-                capability.contains(&grant),
-                "{h} is missing from capabilities/default.json"
-            );
-        }
+        let build_cmds = parse_build_commands(include_str!("../build.rs"));
+        let default_grants = parse_allow_grants(include_str!("../capabilities/default.json"));
+        let render_grants = parse_allow_grants(include_str!("../capabilities/render.json"));
+
+        assert_eq!(
+            main_handlers, default_grants,
+            "lib.rs generate_handler! and capabilities/default.json differ"
+        );
+        assert_eq!(
+            render_handlers, render_grants,
+            "render.rs generate_handler! and capabilities/render.json differ"
+        );
+
+        let all_handlers: BTreeSet<String> =
+            main_handlers.union(&render_handlers).cloned().collect();
+        assert_eq!(
+            all_handlers, build_cmds,
+            "combined invoke handlers and build.rs COMMANDS differ"
+        );
     }
 }

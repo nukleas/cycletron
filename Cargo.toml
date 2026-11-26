@@ -88,3 +88,5 @@ rustc-hash = "2"
 rustfft = "6"
 criterion = { version = "0.8.2", features = ["html_reports"] }
 proptest = "1.12"
+walkdir = "2"
+async-trait = "0.1"

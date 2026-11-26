@@ -402,10 +402,20 @@ fn is_folder_shaped(root: &Path) -> bool {
 
 /// Stage a source and propose a bank mapping. Copies nothing into the library.
 #[tauri::command]
-pub fn preview_pack_import(
+pub async fn preview_pack_import(
     source: String,
     id: Option<String>,
     app_handle: AppHandle,
+) -> Result<PackImportPreview, String> {
+    tauri::async_runtime::spawn_blocking(move || preview_pack_import_sync(source, id, &app_handle))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn preview_pack_import_sync(
+    source: String,
+    id: Option<String>,
+    app_handle: &AppHandle,
 ) -> Result<PackImportPreview, String> {
     let src = PathBuf::from(&source);
     let is_zip = src
@@ -415,7 +425,7 @@ pub fn preview_pack_import(
 
     let (token, root, staged, mut warnings, mut file_count, mut bytes) = if is_zip {
         let token = new_token();
-        let dir = stage_dir(&app_handle, &token)?;
+        let dir = stage_dir(app_handle, &token)?;
         let (files, size, warns) = stage_zip(&src, &dir)?;
         (token, unwrap_single_root(&dir), true, warns, files, size)
     } else {
@@ -431,7 +441,7 @@ pub fn preview_pack_import(
             Ok(m) => m,
             Err(e) => {
                 if staged {
-                    let _ = fs::remove_dir_all(stage_dir(&app_handle, &token)?);
+                    let _ = fs::remove_dir_all(stage_dir(app_handle, &token)?);
                 }
                 return Err(e);
             }
@@ -441,7 +451,7 @@ pub fn preview_pack_import(
         // rather than show a dialog for a pack that cannot go in.
         if let Some(v) = viz.iter().find(|v| !v.built) {
             if staged {
-                let _ = fs::remove_dir_all(stage_dir(&app_handle, &token)?);
+                let _ = fs::remove_dir_all(stage_dir(app_handle, &token)?);
             }
             return Err(format!(
                 "visualizer pack {} is not built (no dist/index.js)",
@@ -494,7 +504,7 @@ pub fn preview_pack_import(
     let (strategy, scanned) = sounds::scan_folder_banks_detailed(&root)?;
     if scanned.is_empty() {
         if staged {
-            let _ = fs::remove_dir_all(stage_dir(&app_handle, &token)?);
+            let _ = fs::remove_dir_all(stage_dir(app_handle, &token)?);
         }
         return Err("no audio files found in that folder".into());
     }
@@ -637,8 +647,11 @@ pub fn commit_pack_import(
     // Validate the whole request before writing anything.
     let mut plan: Vec<(String, Vec<PathBuf>)> = Vec::with_capacity(banks.len());
     for bank in &banks {
+        if !packs::is_valid_bank_name(&bank.name) {
+            return Err(format!("bank name {:?} is not usable", bank.name));
+        }
         let (final_name, rename) = packs::bank_name_for_pack(&bank.name, &id, &core, &mut used);
-        if final_name.is_empty() {
+        if !packs::is_valid_bank_name(&final_name) {
             return Err(format!("bank name {:?} is not usable", bank.name));
         }
         if let Some(r) = rename {
@@ -702,7 +715,11 @@ pub fn commit_pack_import(
                     })
                     .collect();
                 let rel = format!("banks/{bank_name}/{dest_name}");
-                packs::copy_file(src_file, &dest.join(&rel))?;
+                let dest_file = dest.join(&rel);
+                if !library::within(&dest, &dest_file) {
+                    return Err(format!("target file escapes pack directory: {rel}"));
+                }
+                packs::copy_file(src_file, &dest_file)?;
                 rel_files.push(rel);
             }
             bank_names.push(bank_name.clone());
@@ -780,17 +797,27 @@ pub fn commit_pack_import(
     })
 }
 
-/// Sizes of the files under `root`, for the preview.
+/// Sizes of the files under `root`, for the preview. Skips symlinks and caps depth.
 fn walkdir_count(root: &Path) -> Vec<u64> {
+    const MAX_DEPTH: usize = 32;
     let mut out = Vec::new();
-    let mut stack = vec![root.to_path_buf()];
-    while let Some(dir) = stack.pop() {
+    let mut stack = vec![(root.to_path_buf(), 0usize)];
+    while let Some((dir, depth)) = stack.pop() {
+        if depth > MAX_DEPTH {
+            continue;
+        }
         let Ok(rd) = fs::read_dir(&dir) else { continue };
         for entry in rd.flatten() {
+            let Ok(ft) = entry.file_type() else { continue };
+            if ft.is_symlink() {
+                continue;
+            }
             let p = entry.path();
-            if p.is_dir() {
-                stack.push(p);
-            } else if let Ok(md) = p.metadata() {
+            if ft.is_dir() {
+                stack.push((p, depth + 1));
+            } else if ft.is_file()
+                && let Ok(md) = entry.metadata()
+            {
                 out.push(md.len());
             }
         }

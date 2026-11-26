@@ -35,10 +35,16 @@ impl CodexClient {
     ) -> Self {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        if let Ok(v) = HeaderValue::from_str(&format!("Bearer {access_token}")) {
+        let token = access_token.trim();
+        if !token.is_empty()
+            && let Ok(v) = HeaderValue::from_str(&format!("Bearer {token}"))
+        {
             headers.insert(AUTHORIZATION, v);
         }
-        if let Ok(v) = HeaderValue::from_str(account_id) {
+        let acct = account_id.trim();
+        if !acct.is_empty()
+            && let Ok(v) = HeaderValue::from_str(acct)
+        {
             headers.insert("ChatGPT-Account-Id", v);
         }
         // Identity headers the Codex backend expects from CLI-class clients.

@@ -2,6 +2,7 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "ignorePatterns": [
     "dist/**",
+    "dist-web/**",
     "pkg/**",
     "public/**",
     "node_modules/**"

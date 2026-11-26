@@ -70,6 +70,14 @@ note("0 2 4").add("<0 12>")
 s("bd sd").every("<2 3>", x => x.fast(2))
 ```
 
+### `swingBy` swings twice as hard (engine)
+
+`swingBy(x, n)` delays the second half of each `n`th by `x` of that slice. Upstream delays
+it by `x / 2`. So triplet swing is `swingBy(1/6, n)` here, and `swing(n)` lands later than a
+triplet. For an MPC swing percentage on 16ths: `swingBy((pct - 50) / 100, 8)`.
+
+The next strudel-rs matches upstream. Double every `swingBy` amount when the pin moves.
+
 ### `vowel` takes numbers (engine)
 
 `0`=a `1`=e `2`=i `3`=o `4`=u. Upstream letters (`vowel("a e")`) are dropped silently.

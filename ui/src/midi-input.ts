@@ -13,6 +13,7 @@
  */
 
 import type {MidiInputSettings, MidiDeviceInfo} from './types/tauri-commands.js';
+import {invoke, isTauri, listen} from './tauri.js';
 import {midiMonitor} from './midi-monitor.js';
 import {midiCapture} from './midi-capture.js';
 import {midiPads} from './midi-pads.js';
@@ -27,9 +28,6 @@ export interface NativeMidiEvent {
     timestamp: number;
 }
 
-type TauriCore = {invoke: <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>};
-type TauriEvent = {listen: (event: string, cb: (e: {payload: unknown}) => void) => Promise<() => void>};
-
 class MidiInput {
     private deviceId: string | null = null;
     private ccGain = 7;
@@ -40,20 +38,11 @@ class MidiInput {
     /** Signature of the device set we last connected to, for hot-plug detection. */
     private lastDeviceSig = '';
 
-    private get core(): TauriCore | null {
-        return window.__TAURI__?.core ?? null;
-    }
-    private get events(): TauriEvent | null {
-        return window.__TAURI__?.event ?? null;
-    }
-
     /** Subscribe to the backend event stream (once). */
     async init(): Promise<void> {
-        if (this.subscribed) return;
-        const events = this.events;
-        if (!events) return; // not running under Tauri
+        if (this.subscribed || !isTauri) return;
         this.subscribed = true;
-        await events.listen('midi-input', (e) => this.handleEvent(e.payload as NativeMidiEvent));
+        await listen<NativeMidiEvent>('midi-input', (e) => this.handleEvent(e.payload));
         // Hot-plug: midir has no device-change callback, so re-scan whenever the
         // window regains focus. If the device set changed (e.g. a keyboard was
         // just plugged in), reconnect so it starts flowing without a restart.
@@ -62,7 +51,7 @@ class MidiInput {
 
     /** Re-list devices and restart listening only if the device set changed. */
     private async rescanIfChanged(): Promise<void> {
-        if (!this.core) return;
+        if (!isTauri) return;
         const devices = await this.listDevices();
         const sig = devices.map((d) => d.id).sort().join('|');
         if (sig !== this.lastDeviceSig) {
@@ -77,8 +66,9 @@ class MidiInput {
 
     /** List available input devices (for the Preferences picker). */
     async listDevices(): Promise<MidiDeviceInfo[]> {
+        if (!isTauri) return [];
         try {
-            return (await this.core?.invoke<MidiDeviceInfo[]>('list_midi_input_devices')) ?? [];
+            return await invoke<MidiDeviceInfo[]>('list_midi_input_devices');
         } catch (e) {
             console.info('[midi-input] list devices failed:', e);
             return [];
@@ -91,21 +81,21 @@ class MidiInput {
         this.ccBpm = settings.cc_bpm ?? 74;
         midiMonitor.applyFromSettings({
             enabled: settings.monitor_enabled ?? false,
-            instrument: settings.monitor_instrument ?? 'gm_piano',
+            instrument: settings.monitor_instrument ?? 'sawtooth',
             gain: settings.monitor_gain ?? 0.8,
         });
         midiPads.applyFromSettings({
             pad_assignments: settings.pad_assignments ?? [],
-            monitor_instrument: settings.monitor_instrument ?? 'gm_piano',
+            monitor_instrument: settings.monitor_instrument ?? 'sawtooth',
         });
         // (Re)start listening on the selected device.
         void this.startListening();
     }
 
     async startListening(): Promise<void> {
-        if (!this.core) return;
+        if (!isTauri) return;
         try {
-            await this.core.invoke('start_midi_input_listening', {deviceId: this.deviceId});
+            await invoke('start_midi_input_listening', {deviceId: this.deviceId});
             this.listening = true;
         } catch (e) {
             // Common, benign case: no MIDI devices plugged in.
@@ -120,9 +110,9 @@ class MidiInput {
     }
 
     async stopListening(): Promise<void> {
-        if (!this.core) return;
+        if (!isTauri) return;
         try {
-            await this.core.invoke('stop_midi_input_listening');
+            await invoke('stop_midi_input_listening');
         } catch { /* ignore */ }
         this.listening = false;
     }

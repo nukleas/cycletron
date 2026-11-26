@@ -133,12 +133,14 @@ function basename(p: string): string {
     return i >= 0 ? p.slice(i + 1) : p;
 }
 
-/** Bundled manifest paths are relative to the served root. */
+/** Bundled manifest paths are relative to the served base URL (`/` or `/play/`). */
 function bundledRef(rel: string): SampleRef {
     if (/^https?:\/\//i.test(rel)) {
         return {kind: 'url', url: rel, label: basename(rel), note: 'streams from upstream'};
     }
-    return {kind: 'url', url: rel.startsWith('/') ? rel : `/${rel}`, label: basename(rel)};
+    const base = import.meta.env.BASE_URL ?? '/';
+    const clean = rel.replace(/^\/+/, '');
+    return {kind: 'url', url: `${base}${clean}`, label: basename(rel)};
 }
 
 function refsFor(value: ManifestValue, toRef: (rel: string) => SampleRef): SampleRef[] {

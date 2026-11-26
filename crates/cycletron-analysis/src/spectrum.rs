@@ -62,10 +62,17 @@ pub fn measure(mono: &[f32], sample_rate: u32) -> Measured {
         };
     }
 
-    let fft = FftPlanner::<f32>::new().plan_fft_forward(FRAME);
-    let window: Vec<f32> = (0..FRAME)
-        .map(|n| 0.5 * (1.0 - (2.0 * std::f32::consts::PI * n as f32 / (FRAME as f32 - 1.0)).cos()))
-        .collect();
+    static FFT_AND_WINDOW: std::sync::OnceLock<(std::sync::Arc<dyn rustfft::Fft<f32>>, Vec<f32>)> =
+        std::sync::OnceLock::new();
+    let (fft, window) = FFT_AND_WINDOW.get_or_init(|| {
+        let plan = FftPlanner::<f32>::new().plan_fft_forward(FRAME);
+        let hann = (0..FRAME)
+            .map(|n| {
+                0.5 * (1.0 - (2.0 * std::f32::consts::PI * n as f32 / (FRAME as f32 - 1.0)).cos())
+            })
+            .collect();
+        (plan, hann)
+    });
     let bin_hz = f64::from(sample_rate) / FRAME as f64;
 
     let mut bands = [0.0f64; NB];

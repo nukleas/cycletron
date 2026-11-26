@@ -315,7 +315,7 @@ export const DSL_SYMBOLS: DslSymbol[] = [
     {
         "label": "chord",
         "detail": "chord(pat)",
-        "info": "Expand chord symbols (e.g. \"Cm7\" → constituent notes).",
+        "info": "Tag chord symbols (e.g. \"Cm7\") — follow with .voicing() to expand into notes.",
         "kinds": [
             "function",
             "method"

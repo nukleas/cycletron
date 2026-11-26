@@ -136,7 +136,7 @@ pub fn seed_into_library(library_root: &Path) -> Result<SeedReport, String> {
 Cycletron demo library
 ======================
 
-Songs/       Full tracks and covers (plus the Agency OST album).
+Songs/       Full tracks (plus the Agency OST album).
 Shows/       Show files: songs played as music videos. agency-ost plays the
              album, feature-tour uses every setting, cycletron-trailer is
              the trailer.
@@ -170,18 +170,47 @@ pub struct SeedReport {
     pub skipped: usize,
 }
 
+/// Content fingerprint of all embedded corpus assets so any change to a
+/// recipe or curated pattern triggers re-export on upgrade even when
+/// `CARGO_PKG_VERSION` stays `0.1.0` across prereleases.
+fn corpus_assets_fingerprint() -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut paths: Vec<String> = CorpusAssets::iter()
+        .map(std::borrow::Cow::into_owned)
+        .collect();
+    paths.sort();
+    let mut hasher = Sha256::new();
+    hasher.update(env!("CARGO_PKG_VERSION").as_bytes());
+    for rel in paths {
+        let rel_unix = rel.replace('\\', "/");
+        if cycletron_corpus::layout::is_underscore_hidden(Path::new(&rel_unix)) {
+            continue;
+        }
+        if let Some(file) = CorpusAssets::get(&rel) {
+            hasher.update(rel_unix.as_bytes());
+            hasher.update(b"\0");
+            hasher.update(file.data.as_ref());
+            hasher.update(b"\0");
+        }
+    }
+    let digest = hasher.finalize();
+    let hex: String = digest.iter().take(8).map(|b| format!("{b:02x}")).collect();
+    format!("{}:{hex}", env!("CARGO_PKG_VERSION"))
+}
+
 /// Materialize the embedded corpus into `dest`, mirroring the repo's `corpus/`
 /// layout verbatim (category dirs, `genres/<slug>/…`, `lessons/`, …). The
 /// on-disk corpus loader can then read it in a packaged build, where the
 /// compile-time `corpus/` path isn't present on the user's machine.
 ///
-/// Idempotent per app version: a `.corpus-version` marker skips the copy when
-/// already current, and a version bump re-exports so the agent's knowledge
-/// tracks the shipped release.
+/// Idempotent per embedded corpus fingerprint: a `.corpus-version` marker skips
+/// the copy when already current, and any corpus/version change re-exports so
+/// the agent's knowledge tracks the shipped release.
 pub fn export_corpus_assets(dest: &Path) -> Result<(), String> {
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    let stamp = corpus_assets_fingerprint();
     let marker = dest.join(".corpus-version");
-    if fs::read_to_string(&marker).ok().as_deref() == Some(VERSION) {
+    if fs::read_to_string(&marker).ok().as_deref() == Some(stamp.as_str()) {
         return Ok(());
     }
     for path in CorpusAssets::iter() {
@@ -200,7 +229,7 @@ pub fn export_corpus_assets(dest: &Path) -> Result<(), String> {
         fs::write(&out, file.data.as_ref()).map_err(|e| format!("write {}: {e}", out.display()))?;
     }
     fs::create_dir_all(dest).map_err(|e| format!("mkdir {}: {e}", dest.display()))?;
-    fs::write(&marker, VERSION).map_err(|e| format!("write {}: {e}", marker.display()))
+    fs::write(&marker, stamp).map_err(|e| format!("write {}: {e}", marker.display()))
 }
 
 /// Writes each demo once. The library root's seed list records what was

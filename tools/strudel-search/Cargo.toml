@@ -16,4 +16,4 @@ path = "main.rs"
 cycletron-midi = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-walkdir = "2"
+walkdir = { workspace = true }

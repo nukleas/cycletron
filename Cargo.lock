@@ -1031,7 +1031,6 @@ dependencies = [
  "serde",
  "serde_json",
  "strudel-dsl",
- "strudel-mini",
  "walkdir",
 ]
 
@@ -1262,6 +1261,7 @@ dependencies = [
  "cycletron-gen",
  "cycletron-midi",
  "cycletron-render",
+ "dirs 6.0.0",
  "fs4",
  "hound",
  "http-body-util",
@@ -1307,6 +1307,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
  "webkit2gtk",
  "zip",
 ]
@@ -1664,7 +1665,6 @@ dependencies = [
  "serde_json",
  "strudel-core",
  "strudel-dsl",
- "strudel-mini",
 ]
 
 [[package]]

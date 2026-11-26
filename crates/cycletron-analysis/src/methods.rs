@@ -74,8 +74,7 @@ pub fn methods_listing(kind_filter: Option<&str>, category: Option<&str>) -> Str
     let mut out = String::new();
     out.push_str(
         "strudel-rs DSL surface (ground truth — every entry is accepted by the \
-         validator). Signatures show the arg shape; `x => …` arrow params take NO \
-         parentheses.\n",
+         validator). Signatures show the arg shape.\n",
     );
     let mut current = "";
     for s in &syms {

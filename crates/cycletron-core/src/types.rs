@@ -337,15 +337,6 @@ pub enum PlaybackState {
     Playing,
 }
 
-/// Transport state sent to the frontend.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TransportState {
-    pub playback: PlaybackState,
-    pub tempo: f64,
-    pub cycle: f64,
-    pub pattern_code: Option<String>,
-}
-
 #[cfg(test)]
 mod tool_outcome_tests {
     use super::*;

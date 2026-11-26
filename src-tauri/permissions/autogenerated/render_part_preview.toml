@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-render-part-preview"
+description = "Enables the render_part_preview command without any pre-configured scope."
+commands.allow = ["render_part_preview"]
+
+[[permission]]
+identifier = "deny-render-part-preview"
+description = "Denies the render_part_preview command without any pre-configured scope."
+commands.deny = ["render_part_preview"]

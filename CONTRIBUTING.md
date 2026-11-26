@@ -18,12 +18,13 @@ nightly toolchain or sibling checkout is needed.
 
 ## Before you open a PR
 
-- `cargo check --workspace` must pass, and the library crates must test clean —
-  this is exactly what CI runs (the Tauri crate's tests need a desktop toolchain):
+- Run the same Rust and UI checks CI runs:
 
   ```bash
-  cargo test -p cycletron-core -p cycletron-agent -p cycletron-corpus \
-             -p cycletron-analysis -p cycletron-gen
+  cargo fmt --all --check
+  cargo clippy --workspace --all-targets --locked -- -D warnings
+  cargo test --workspace --locked
+  cd ui && npm run typecheck && npm run lint && npm test
   ```
 
 - If you touch anything under `corpus/` (or `ui/songs/`), run the corpus gate:

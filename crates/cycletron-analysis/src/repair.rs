@@ -59,8 +59,8 @@ pub fn sanitize_source_with_catalog(input: &str, known: &crate::sounds::SoundSet
     s
 }
 
-/// Repair the mechanical mistakes with a single correct rewrite (fences, arrow
-/// params, negative pan). Context-free — no sound catalog needed. For the
+/// Repair the mechanical mistakes with a single correct rewrite (fences,
+/// negative pan). Context-free — no sound catalog needed. For the
 /// catalog-backed sound remapping too, use [`sanitize_source_with_catalog`].
 pub fn sanitize_source(input: &str) -> Sanitized {
     let mut code = input.to_string();
@@ -72,17 +72,7 @@ pub fn sanitize_source(input: &str) -> Sanitized {
         notes.push("Stripped markdown code fences from the pattern.".to_string());
     }
 
-    // 2. Parenthesised arrow params are a parse error in strudel-rs:
-    //    `.every(2, (x) => x.fast(2))` must be `.every(2, x => x.fast(2))`.
-    let (c, n) = strip_arrow_parens(&code);
-    if n > 0 {
-        code = c;
-        notes.push(format!(
-            "Removed parentheses around {n} arrow-function parameter(s) (`(x) =>` → `x =>`)."
-        ));
-    }
-
-    // 3. Negative literal pan is sqrt(-x) = NaN in the panner → the event is
+    // 2. Negative literal pan is sqrt(-x) = NaN in the panner → the event is
     //    completely silent. Pan is 0..1 in strudel-rs; clamp a bare negative
     //    literal to 0 (hard left, but audible).
     let (c, n) = clamp_negative_pan(&code);
@@ -108,36 +98,6 @@ fn strip_fences(code: &str) -> Option<String> {
             .collect::<Vec<_>>()
             .join("\n"),
     )
-}
-
-/// Rewrite `( ident ) =>` to `ident =>`. Only touches a *single* bare
-/// identifier inside the parens — multi-arg `(a, b) =>` or destructuring is
-/// left alone (strudel-rs callbacks are single-arg, and touching those would be
-/// a guess). Returns the new code and how many params were unwrapped.
-fn strip_arrow_parens(code: &str) -> (String, usize) {
-    let bytes = code.as_bytes();
-    // (start, end) byte span of the `(...)` to replace, plus its inner ident.
-    let mut edits: Vec<(usize, usize, String)> = Vec::new();
-    let mut i = 0;
-    while let Some(rel) = code[i..].find("=>") {
-        let arrow = i + rel;
-        // Walk left over whitespace to the char before `=>`.
-        let mut j = arrow;
-        while j > 0 && bytes[j - 1].is_ascii_whitespace() {
-            j -= 1;
-        }
-        if j > 0 && bytes[j - 1] == b')' {
-            let close = j - 1;
-            if let Some(open) = matching_open_paren(bytes, close) {
-                let inner = code[open + 1..close].trim();
-                if is_single_identifier(inner) {
-                    edits.push((open, close + 1, inner.to_string()));
-                }
-            }
-        }
-        i = arrow + 2;
-    }
-    apply_edits(code, edits)
 }
 
 /// Replace a bare negative numeric argument to `.pan(` with `0`. A non-literal
@@ -296,40 +256,6 @@ fn apply_edits(code: &str, mut edits: Vec<(usize, usize, String)>) -> (String, u
     (out, count)
 }
 
-/// Find the `(` matching the `)` at `close` by scanning left with a depth count.
-fn matching_open_paren(bytes: &[u8], close: usize) -> Option<usize> {
-    let mut depth = 0i32;
-    let mut k = close;
-    loop {
-        match bytes[k] {
-            b')' => depth += 1,
-            b'(' => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(k);
-                }
-            }
-            _ => {}
-        }
-        if k == 0 {
-            return None;
-        }
-        k -= 1;
-    }
-}
-
-/// True for a single JS-style identifier (`x`, `_p`, `$foo`) — rejects commas,
-/// dots, whitespace, and anything multibyte.
-fn is_single_identifier(s: &str) -> bool {
-    let mut chars = s.chars();
-    match chars.next() {
-        Some(c) if c.is_ascii_alphabetic() || c == '_' || c == '$' => {}
-        _ => return false,
-    }
-    s.chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -343,10 +269,12 @@ mod tests {
     }
 
     #[test]
-    fn strips_arrow_parens() {
-        let out = sanitize_source("x.every(2, (x) => x.fast(2))");
-        assert_eq!(out.code, "x.every(2, x => x.fast(2))");
-        assert_eq!(out.notes.len(), 1);
+    fn leaves_parenthesised_arrow_untouched() {
+        // strudel-rs =0.2.0 accepts `(x) => ...` (see engine_contract.rs).
+        let code = "x.every(2, (x) => x.fast(2))";
+        let out = sanitize_source(code);
+        assert_eq!(out.code, code);
+        assert!(out.notes.is_empty());
     }
 
     #[test]
@@ -378,8 +306,8 @@ mod tests {
     #[test]
     fn repairs_compose() {
         let out = sanitize_source("```\ns(\"bd\").every(2, (x) => x.fast(2)).pan(-0.5)\n```");
-        assert_eq!(out.code, "s(\"bd\").every(2, x => x.fast(2)).pan(0)");
-        assert_eq!(out.notes.len(), 3);
+        assert_eq!(out.code, "s(\"bd\").every(2, (x) => x.fast(2)).pan(0)");
+        assert_eq!(out.notes.len(), 2);
     }
 
     fn builtin() -> crate::sounds::SoundSet {

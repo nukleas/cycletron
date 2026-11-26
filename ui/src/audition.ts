@@ -82,6 +82,18 @@ async function fetchBytes(ref: SampleRef): Promise<ArrayBuffer> {
     return invoke<ArrayBuffer>('read_audio_file', {path: ref.path});
 }
 
+let currentRequest = 0;
+
+function cachePut(key: string, buf: AudioBuffer): void {
+    cache.delete(key);
+    cache.set(key, buf);
+    while (cache.size > CACHE_LIMIT) {
+        const oldest = cache.keys().next().value;
+        if (oldest === undefined) break;
+        cache.delete(oldest);
+    }
+}
+
 async function decode(ctx: AudioContext, ref: SampleRef): Promise<AudioBuffer> {
     const key = refKey(ref);
     const hit = cache.get(key);
@@ -99,12 +111,7 @@ async function decode(ctx: AudioContext, ref: SampleRef): Promise<AudioBuffer> {
         // decodeAudioData detaches its input, so decode from a copy — the same
         // bytes may be re-decoded after a context swap.
         const buf = await ctx.decodeAudioData(bytes.slice(0));
-        cache.set(key, buf);
-        while (cache.size > CACHE_LIMIT) {
-            const oldest = cache.keys().next().value;
-            if (oldest === undefined) break;
-            cache.delete(oldest);
-        }
+        cachePut(key, buf);
         return buf;
     })().finally(() => inflight.delete(key));
 
@@ -114,6 +121,7 @@ async function decode(ctx: AudioContext, ref: SampleRef): Promise<AudioBuffer> {
 
 /** Stop whatever is sounding. Safe to call when nothing is. */
 export function stopAudition(): void {
+    currentRequest++;
     if (!current) return;
     const {source, gain} = current;
     current = null;
@@ -136,18 +144,73 @@ export function stopAudition(): void {
  * 300-row list cannot stack 300 voices.
  */
 export async function auditionSample(ref: SampleRef): Promise<void> {
+    const req = ++currentRequest;
     const ctx = audioContext();
     if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
 
-    const key = refKey(ref);
     let buffer: AudioBuffer;
     try {
         buffer = await decode(ctx, ref);
     } catch (e) {
-        stopAudition();
+        if (req === currentRequest) stopAudition();
         throw e;
     }
+    if (req !== currentRequest) return;
+    play(ctx, refKey(ref), buffer);
+}
 
+/**
+ * Play the first bars of a pattern, rendered offline by the backend. `key`
+ * names the preview for {@link playingKey}; the same key again stops it.
+ */
+export async function auditionPart(key: string, code: string, bpm: number): Promise<void> {
+    if (currentKey === key) {
+        stopAudition();
+        return;
+    }
+    const req = ++currentRequest;
+    const ctx = audioContext();
+    if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
+
+    // Include `code` so transposing the same part to a new song key doesn't
+    // replay a cached render in the old key.
+    const cacheKey = `part:${key}@${bpm}:${code}`;
+    let buffer = cache.get(cacheKey);
+    if (buffer) {
+        cachePut(cacheKey, buffer);
+    } else {
+        let pending = inflight.get(cacheKey);
+        if (!pending) {
+            pending = (async () => {
+                const bytes = await invoke<ArrayBuffer>('render_part_preview', {code, bpm});
+                if (bytes.byteLength < 8 || (bytes.byteLength - 4) % 8 !== 0) {
+                    throw new Error('Preview render returned an empty or malformed audio buffer');
+                }
+                const sampleRate = new DataView(bytes).getUint32(0, true);
+                const frames = new Float32Array(bytes, 4);
+                const frameCount = frames.length / 2;
+                if (sampleRate === 0 || frameCount === 0) {
+                    throw new Error('Preview render produced silence');
+                }
+                const decoded = ctx.createBuffer(2, frameCount, sampleRate);
+                const left = decoded.getChannelData(0);
+                const right = decoded.getChannelData(1);
+                for (let i = 0; i < left.length; i++) {
+                    left[i] = frames[i * 2];
+                    right[i] = frames[i * 2 + 1];
+                }
+                cachePut(cacheKey, decoded);
+                return decoded;
+            })().finally(() => inflight.delete(cacheKey));
+            inflight.set(cacheKey, pending);
+        }
+        buffer = await pending;
+    }
+    if (req !== currentRequest) return;
+    play(ctx, key, buffer);
+}
+
+function play(ctx: AudioContext, key: string, buffer: AudioBuffer): void {
     stopAudition();
 
     const source = ctx.createBufferSource();

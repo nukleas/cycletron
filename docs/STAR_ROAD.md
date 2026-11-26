@@ -50,7 +50,7 @@ Sparks, flames, speed lines, coin spin and sign blinks are functions of time
 and `hash32`. Bursts and the kart's state come from onsets. `npm run test:render`
 matches across chunk seams.
 
-The schedule comes from `viz/hap-field.ts`, shared with TANK FIELD: two bars
+The schedule comes from `ui/packages/viz-sdk/src/hap-field.ts`, shared with TANK FIELD: two bars
 of haps keyed by absolute onset, with held notes extended across bar lines
 instead of firing again.
 
